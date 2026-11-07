@@ -4555,6 +4555,15 @@ class $CustomersTable extends Customers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _ifuMeta = const VerificationMeta('ifu');
+  @override
+  late final GeneratedColumn<String> ifu = GeneratedColumn<String>(
+    'ifu',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _creditLimitMeta = const VerificationMeta(
     'creditLimit',
   );
@@ -4599,6 +4608,7 @@ class $CustomersTable extends Customers
     phone,
     city,
     email,
+    ifu,
     creditLimit,
     isActive,
     syncStatus,
@@ -4646,6 +4656,12 @@ class $CustomersTable extends Customers
         email.isAcceptableOrUnknown(data['email']!, _emailMeta),
       );
     }
+    if (data.containsKey('ifu')) {
+      context.handle(
+        _ifuMeta,
+        ifu.isAcceptableOrUnknown(data['ifu']!, _ifuMeta),
+      );
+    }
     if (data.containsKey('credit_limit')) {
       context.handle(
         _creditLimitMeta,
@@ -4690,6 +4706,10 @@ class $CustomersTable extends Customers
         DriftSqlType.string,
         data['${effectivePrefix}email'],
       ),
+      ifu: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ifu'],
+      ),
       creditLimit: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}credit_limit'],
@@ -4725,6 +4745,10 @@ class Customer extends DataClass implements Insertable<Customer> {
   /// Adresse e-mail (ticket F0.72) : le tirage la sert désormais, le formulaire la saisit.
   final String? email;
 
+  /// MECEF-3 (schéma v85) — IFU du client, 13 chiffres, FACULTATIF (un client particulier n'en a pas) : saisi à la fiche du client
+  /// (web ET poste), envoyé avec elle, il préremplit la fenêtre « Facture normalisée » de la caisse.
+  final String? ifu;
+
   /// Plafond de crédit accordé, en FCFA. ⚠️ Jamais saisi ni envoyé par le poste.
   final double creditLimit;
   final bool isActive;
@@ -4740,6 +4764,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     this.phone,
     this.city,
     this.email,
+    this.ifu,
     required this.creditLimit,
     required this.isActive,
     required this.syncStatus,
@@ -4757,6 +4782,9 @@ class Customer extends DataClass implements Insertable<Customer> {
     }
     if (!nullToAbsent || email != null) {
       map['email'] = Variable<String>(email);
+    }
+    if (!nullToAbsent || ifu != null) {
+      map['ifu'] = Variable<String>(ifu);
     }
     map['credit_limit'] = Variable<double>(creditLimit);
     map['is_active'] = Variable<bool>(isActive);
@@ -4779,6 +4807,7 @@ class Customer extends DataClass implements Insertable<Customer> {
       email: email == null && nullToAbsent
           ? const Value.absent()
           : Value(email),
+      ifu: ifu == null && nullToAbsent ? const Value.absent() : Value(ifu),
       creditLimit: Value(creditLimit),
       isActive: Value(isActive),
       syncStatus: Value(syncStatus),
@@ -4796,6 +4825,7 @@ class Customer extends DataClass implements Insertable<Customer> {
       phone: serializer.fromJson<String?>(json['phone']),
       city: serializer.fromJson<String?>(json['city']),
       email: serializer.fromJson<String?>(json['email']),
+      ifu: serializer.fromJson<String?>(json['ifu']),
       creditLimit: serializer.fromJson<double>(json['creditLimit']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       syncStatus: $CustomersTable.$convertersyncStatus.fromJson(
@@ -4812,6 +4842,7 @@ class Customer extends DataClass implements Insertable<Customer> {
       'phone': serializer.toJson<String?>(phone),
       'city': serializer.toJson<String?>(city),
       'email': serializer.toJson<String?>(email),
+      'ifu': serializer.toJson<String?>(ifu),
       'creditLimit': serializer.toJson<double>(creditLimit),
       'isActive': serializer.toJson<bool>(isActive),
       'syncStatus': serializer.toJson<String>(
@@ -4826,6 +4857,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     Value<String?> phone = const Value.absent(),
     Value<String?> city = const Value.absent(),
     Value<String?> email = const Value.absent(),
+    Value<String?> ifu = const Value.absent(),
     double? creditLimit,
     bool? isActive,
     SyncStatus? syncStatus,
@@ -4835,6 +4867,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     phone: phone.present ? phone.value : this.phone,
     city: city.present ? city.value : this.city,
     email: email.present ? email.value : this.email,
+    ifu: ifu.present ? ifu.value : this.ifu,
     creditLimit: creditLimit ?? this.creditLimit,
     isActive: isActive ?? this.isActive,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -4846,6 +4879,7 @@ class Customer extends DataClass implements Insertable<Customer> {
       phone: data.phone.present ? data.phone.value : this.phone,
       city: data.city.present ? data.city.value : this.city,
       email: data.email.present ? data.email.value : this.email,
+      ifu: data.ifu.present ? data.ifu.value : this.ifu,
       creditLimit: data.creditLimit.present
           ? data.creditLimit.value
           : this.creditLimit,
@@ -4864,6 +4898,7 @@ class Customer extends DataClass implements Insertable<Customer> {
           ..write('phone: $phone, ')
           ..write('city: $city, ')
           ..write('email: $email, ')
+          ..write('ifu: $ifu, ')
           ..write('creditLimit: $creditLimit, ')
           ..write('isActive: $isActive, ')
           ..write('syncStatus: $syncStatus')
@@ -4878,6 +4913,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     phone,
     city,
     email,
+    ifu,
     creditLimit,
     isActive,
     syncStatus,
@@ -4891,6 +4927,7 @@ class Customer extends DataClass implements Insertable<Customer> {
           other.phone == this.phone &&
           other.city == this.city &&
           other.email == this.email &&
+          other.ifu == this.ifu &&
           other.creditLimit == this.creditLimit &&
           other.isActive == this.isActive &&
           other.syncStatus == this.syncStatus);
@@ -4902,6 +4939,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String?> phone;
   final Value<String?> city;
   final Value<String?> email;
+  final Value<String?> ifu;
   final Value<double> creditLimit;
   final Value<bool> isActive;
   final Value<SyncStatus> syncStatus;
@@ -4912,6 +4950,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.phone = const Value.absent(),
     this.city = const Value.absent(),
     this.email = const Value.absent(),
+    this.ifu = const Value.absent(),
     this.creditLimit = const Value.absent(),
     this.isActive = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -4923,6 +4962,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.phone = const Value.absent(),
     this.city = const Value.absent(),
     this.email = const Value.absent(),
+    this.ifu = const Value.absent(),
     this.creditLimit = const Value.absent(),
     this.isActive = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -4935,6 +4975,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? phone,
     Expression<String>? city,
     Expression<String>? email,
+    Expression<String>? ifu,
     Expression<double>? creditLimit,
     Expression<bool>? isActive,
     Expression<String>? syncStatus,
@@ -4946,6 +4987,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       if (phone != null) 'phone': phone,
       if (city != null) 'city': city,
       if (email != null) 'email': email,
+      if (ifu != null) 'ifu': ifu,
       if (creditLimit != null) 'credit_limit': creditLimit,
       if (isActive != null) 'is_active': isActive,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -4959,6 +5001,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String?>? phone,
     Value<String?>? city,
     Value<String?>? email,
+    Value<String?>? ifu,
     Value<double>? creditLimit,
     Value<bool>? isActive,
     Value<SyncStatus>? syncStatus,
@@ -4970,6 +5013,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       phone: phone ?? this.phone,
       city: city ?? this.city,
       email: email ?? this.email,
+      ifu: ifu ?? this.ifu,
       creditLimit: creditLimit ?? this.creditLimit,
       isActive: isActive ?? this.isActive,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -4994,6 +5038,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     }
     if (email.present) {
       map['email'] = Variable<String>(email.value);
+    }
+    if (ifu.present) {
+      map['ifu'] = Variable<String>(ifu.value);
     }
     if (creditLimit.present) {
       map['credit_limit'] = Variable<double>(creditLimit.value);
@@ -5020,6 +5067,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
           ..write('phone: $phone, ')
           ..write('city: $city, ')
           ..write('email: $email, ')
+          ..write('ifu: $ifu, ')
           ..write('creditLimit: $creditLimit, ')
           ..write('isActive: $isActive, ')
           ..write('syncStatus: $syncStatus, ')
@@ -40817,6 +40865,88 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _factureTypeMeta = const VerificationMeta(
+    'factureType',
+  );
+  @override
+  late final GeneratedColumn<String> factureType = GeneratedColumn<String>(
+    'facture_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clientIfuMeta = const VerificationMeta(
+    'clientIfu',
+  );
+  @override
+  late final GeneratedColumn<String> clientIfu = GeneratedColumn<String>(
+    'client_ifu',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clientNomFactureMeta = const VerificationMeta(
+    'clientNomFacture',
+  );
+  @override
+  late final GeneratedColumn<String> clientNomFacture = GeneratedColumn<String>(
+    'client_nom_facture',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _aibTauxMeta = const VerificationMeta(
+    'aibTaux',
+  );
+  @override
+  late final GeneratedColumn<String> aibTaux = GeneratedColumn<String>(
+    'aib_taux',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefAibMontantMeta = const VerificationMeta(
+    'mecefAibMontant',
+  );
+  @override
+  late final GeneratedColumn<double> mecefAibMontant = GeneratedColumn<double>(
+    'mecef_aib_montant',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deliveryFeeMeta = const VerificationMeta(
+    'deliveryFee',
+  );
+  @override
+  late final GeneratedColumn<double> deliveryFee = GeneratedColumn<double>(
+    'delivery_fee',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _deliveryInTotalMeta = const VerificationMeta(
+    'deliveryInTotal',
+  );
+  @override
+  late final GeneratedColumn<bool> deliveryInTotal = GeneratedColumn<bool>(
+    'delivery_in_total',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("delivery_in_total" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -40840,6 +40970,13 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
     mecefCompteurs,
     mecefNormaliseLe,
     mecefMessage,
+    factureType,
+    clientIfu,
+    clientNomFacture,
+    aibTaux,
+    mecefAibMontant,
+    deliveryFee,
+    deliveryInTotal,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -41006,6 +41143,63 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
         ),
       );
     }
+    if (data.containsKey('facture_type')) {
+      context.handle(
+        _factureTypeMeta,
+        factureType.isAcceptableOrUnknown(
+          data['facture_type']!,
+          _factureTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('client_ifu')) {
+      context.handle(
+        _clientIfuMeta,
+        clientIfu.isAcceptableOrUnknown(data['client_ifu']!, _clientIfuMeta),
+      );
+    }
+    if (data.containsKey('client_nom_facture')) {
+      context.handle(
+        _clientNomFactureMeta,
+        clientNomFacture.isAcceptableOrUnknown(
+          data['client_nom_facture']!,
+          _clientNomFactureMeta,
+        ),
+      );
+    }
+    if (data.containsKey('aib_taux')) {
+      context.handle(
+        _aibTauxMeta,
+        aibTaux.isAcceptableOrUnknown(data['aib_taux']!, _aibTauxMeta),
+      );
+    }
+    if (data.containsKey('mecef_aib_montant')) {
+      context.handle(
+        _mecefAibMontantMeta,
+        mecefAibMontant.isAcceptableOrUnknown(
+          data['mecef_aib_montant']!,
+          _mecefAibMontantMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_fee')) {
+      context.handle(
+        _deliveryFeeMeta,
+        deliveryFee.isAcceptableOrUnknown(
+          data['delivery_fee']!,
+          _deliveryFeeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_in_total')) {
+      context.handle(
+        _deliveryInTotalMeta,
+        deliveryInTotal.isAcceptableOrUnknown(
+          data['delivery_in_total']!,
+          _deliveryInTotalMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -41101,6 +41295,34 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
         DriftSqlType.string,
         data['${effectivePrefix}mecef_message'],
       ),
+      factureType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}facture_type'],
+      ),
+      clientIfu: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_ifu'],
+      ),
+      clientNomFacture: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_nom_facture'],
+      ),
+      aibTaux: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}aib_taux'],
+      ),
+      mecefAibMontant: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}mecef_aib_montant'],
+      ),
+      deliveryFee: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}delivery_fee'],
+      )!,
+      deliveryInTotal: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}delivery_in_total'],
+      )!,
     );
   }
 
@@ -41154,6 +41376,23 @@ class Sale extends DataClass implements Insertable<Sale> {
   final String? mecefCompteurs;
   final DateTime? mecefNormaliseLe;
   final String? mecefMessage;
+
+  /// MECEF-3 (schéma v85) — LE CHOIX FAIT À LA VENTE : `simple` (défaut : jamais transmise à la DGI, pas de QR) ou `normalisee`.
+  /// Le poste l'ÉCRIT à la saisie et l'envoie avec la vente ; le serveur le revalide. `client_ifu` (13 chiffres, vide = client sans
+  /// IFU), `client_nom_facture` (obligatoire si normalisée) et `aib_taux` (`5%`, `1%`, `N/A`) en sont l'identité fiscale de
+  /// l'ACHETEUR. NUL = vente d'avant ce choix : facture simple.
+  final String? factureType;
+  final String? clientIfu;
+  final String? clientNomFacture;
+  final String? aibTaux;
+
+  /// Montant d'AIB CALCULÉ PAR LA DGI, tiré du serveur et JAMAIS écrit par le poste (comme les `mecef_*`).
+  final double? mecefAibMontant;
+
+  /// Frais de livraison INCLUS dans la vente (web seulement : la caisse du poste ne saisit pas la livraison) — tirés pour que la
+  /// facture du poste montre sa ligne « Frais de livraison ». `delivery_in_total` faux = ventes d'avant, frais hors total.
+  final double deliveryFee;
+  final bool deliveryInTotal;
   const Sale({
     required this.id,
     required this.deviceId,
@@ -41176,6 +41415,13 @@ class Sale extends DataClass implements Insertable<Sale> {
     this.mecefCompteurs,
     this.mecefNormaliseLe,
     this.mecefMessage,
+    this.factureType,
+    this.clientIfu,
+    this.clientNomFacture,
+    this.aibTaux,
+    this.mecefAibMontant,
+    required this.deliveryFee,
+    required this.deliveryInTotal,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -41227,6 +41473,23 @@ class Sale extends DataClass implements Insertable<Sale> {
     if (!nullToAbsent || mecefMessage != null) {
       map['mecef_message'] = Variable<String>(mecefMessage);
     }
+    if (!nullToAbsent || factureType != null) {
+      map['facture_type'] = Variable<String>(factureType);
+    }
+    if (!nullToAbsent || clientIfu != null) {
+      map['client_ifu'] = Variable<String>(clientIfu);
+    }
+    if (!nullToAbsent || clientNomFacture != null) {
+      map['client_nom_facture'] = Variable<String>(clientNomFacture);
+    }
+    if (!nullToAbsent || aibTaux != null) {
+      map['aib_taux'] = Variable<String>(aibTaux);
+    }
+    if (!nullToAbsent || mecefAibMontant != null) {
+      map['mecef_aib_montant'] = Variable<double>(mecefAibMontant);
+    }
+    map['delivery_fee'] = Variable<double>(deliveryFee);
+    map['delivery_in_total'] = Variable<bool>(deliveryInTotal);
     return map;
   }
 
@@ -41275,6 +41538,23 @@ class Sale extends DataClass implements Insertable<Sale> {
       mecefMessage: mecefMessage == null && nullToAbsent
           ? const Value.absent()
           : Value(mecefMessage),
+      factureType: factureType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(factureType),
+      clientIfu: clientIfu == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientIfu),
+      clientNomFacture: clientNomFacture == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientNomFacture),
+      aibTaux: aibTaux == null && nullToAbsent
+          ? const Value.absent()
+          : Value(aibTaux),
+      mecefAibMontant: mecefAibMontant == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefAibMontant),
+      deliveryFee: Value(deliveryFee),
+      deliveryInTotal: Value(deliveryInTotal),
     );
   }
 
@@ -41309,6 +41589,13 @@ class Sale extends DataClass implements Insertable<Sale> {
         json['mecefNormaliseLe'],
       ),
       mecefMessage: serializer.fromJson<String?>(json['mecefMessage']),
+      factureType: serializer.fromJson<String?>(json['factureType']),
+      clientIfu: serializer.fromJson<String?>(json['clientIfu']),
+      clientNomFacture: serializer.fromJson<String?>(json['clientNomFacture']),
+      aibTaux: serializer.fromJson<String?>(json['aibTaux']),
+      mecefAibMontant: serializer.fromJson<double?>(json['mecefAibMontant']),
+      deliveryFee: serializer.fromJson<double>(json['deliveryFee']),
+      deliveryInTotal: serializer.fromJson<bool>(json['deliveryInTotal']),
     );
   }
   @override
@@ -41338,6 +41625,13 @@ class Sale extends DataClass implements Insertable<Sale> {
       'mecefCompteurs': serializer.toJson<String?>(mecefCompteurs),
       'mecefNormaliseLe': serializer.toJson<DateTime?>(mecefNormaliseLe),
       'mecefMessage': serializer.toJson<String?>(mecefMessage),
+      'factureType': serializer.toJson<String?>(factureType),
+      'clientIfu': serializer.toJson<String?>(clientIfu),
+      'clientNomFacture': serializer.toJson<String?>(clientNomFacture),
+      'aibTaux': serializer.toJson<String?>(aibTaux),
+      'mecefAibMontant': serializer.toJson<double?>(mecefAibMontant),
+      'deliveryFee': serializer.toJson<double>(deliveryFee),
+      'deliveryInTotal': serializer.toJson<bool>(deliveryInTotal),
     };
   }
 
@@ -41363,6 +41657,13 @@ class Sale extends DataClass implements Insertable<Sale> {
     Value<String?> mecefCompteurs = const Value.absent(),
     Value<DateTime?> mecefNormaliseLe = const Value.absent(),
     Value<String?> mecefMessage = const Value.absent(),
+    Value<String?> factureType = const Value.absent(),
+    Value<String?> clientIfu = const Value.absent(),
+    Value<String?> clientNomFacture = const Value.absent(),
+    Value<String?> aibTaux = const Value.absent(),
+    Value<double?> mecefAibMontant = const Value.absent(),
+    double? deliveryFee,
+    bool? deliveryInTotal,
   }) => Sale(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -41389,6 +41690,17 @@ class Sale extends DataClass implements Insertable<Sale> {
         ? mecefNormaliseLe.value
         : this.mecefNormaliseLe,
     mecefMessage: mecefMessage.present ? mecefMessage.value : this.mecefMessage,
+    factureType: factureType.present ? factureType.value : this.factureType,
+    clientIfu: clientIfu.present ? clientIfu.value : this.clientIfu,
+    clientNomFacture: clientNomFacture.present
+        ? clientNomFacture.value
+        : this.clientNomFacture,
+    aibTaux: aibTaux.present ? aibTaux.value : this.aibTaux,
+    mecefAibMontant: mecefAibMontant.present
+        ? mecefAibMontant.value
+        : this.mecefAibMontant,
+    deliveryFee: deliveryFee ?? this.deliveryFee,
+    deliveryInTotal: deliveryInTotal ?? this.deliveryInTotal,
   );
   Sale copyWithCompanion(SalesCompanion data) {
     return Sale(
@@ -41433,6 +41745,23 @@ class Sale extends DataClass implements Insertable<Sale> {
       mecefMessage: data.mecefMessage.present
           ? data.mecefMessage.value
           : this.mecefMessage,
+      factureType: data.factureType.present
+          ? data.factureType.value
+          : this.factureType,
+      clientIfu: data.clientIfu.present ? data.clientIfu.value : this.clientIfu,
+      clientNomFacture: data.clientNomFacture.present
+          ? data.clientNomFacture.value
+          : this.clientNomFacture,
+      aibTaux: data.aibTaux.present ? data.aibTaux.value : this.aibTaux,
+      mecefAibMontant: data.mecefAibMontant.present
+          ? data.mecefAibMontant.value
+          : this.mecefAibMontant,
+      deliveryFee: data.deliveryFee.present
+          ? data.deliveryFee.value
+          : this.deliveryFee,
+      deliveryInTotal: data.deliveryInTotal.present
+          ? data.deliveryInTotal.value
+          : this.deliveryInTotal,
     );
   }
 
@@ -41459,7 +41788,14 @@ class Sale extends DataClass implements Insertable<Sale> {
           ..write('mecefNim: $mecefNim, ')
           ..write('mecefCompteurs: $mecefCompteurs, ')
           ..write('mecefNormaliseLe: $mecefNormaliseLe, ')
-          ..write('mecefMessage: $mecefMessage')
+          ..write('mecefMessage: $mecefMessage, ')
+          ..write('factureType: $factureType, ')
+          ..write('clientIfu: $clientIfu, ')
+          ..write('clientNomFacture: $clientNomFacture, ')
+          ..write('aibTaux: $aibTaux, ')
+          ..write('mecefAibMontant: $mecefAibMontant, ')
+          ..write('deliveryFee: $deliveryFee, ')
+          ..write('deliveryInTotal: $deliveryInTotal')
           ..write(')'))
         .toString();
   }
@@ -41487,6 +41823,13 @@ class Sale extends DataClass implements Insertable<Sale> {
     mecefCompteurs,
     mecefNormaliseLe,
     mecefMessage,
+    factureType,
+    clientIfu,
+    clientNomFacture,
+    aibTaux,
+    mecefAibMontant,
+    deliveryFee,
+    deliveryInTotal,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -41512,7 +41855,14 @@ class Sale extends DataClass implements Insertable<Sale> {
           other.mecefNim == this.mecefNim &&
           other.mecefCompteurs == this.mecefCompteurs &&
           other.mecefNormaliseLe == this.mecefNormaliseLe &&
-          other.mecefMessage == this.mecefMessage);
+          other.mecefMessage == this.mecefMessage &&
+          other.factureType == this.factureType &&
+          other.clientIfu == this.clientIfu &&
+          other.clientNomFacture == this.clientNomFacture &&
+          other.aibTaux == this.aibTaux &&
+          other.mecefAibMontant == this.mecefAibMontant &&
+          other.deliveryFee == this.deliveryFee &&
+          other.deliveryInTotal == this.deliveryInTotal);
 }
 
 class SalesCompanion extends UpdateCompanion<Sale> {
@@ -41537,6 +41887,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
   final Value<String?> mecefCompteurs;
   final Value<DateTime?> mecefNormaliseLe;
   final Value<String?> mecefMessage;
+  final Value<String?> factureType;
+  final Value<String?> clientIfu;
+  final Value<String?> clientNomFacture;
+  final Value<String?> aibTaux;
+  final Value<double?> mecefAibMontant;
+  final Value<double> deliveryFee;
+  final Value<bool> deliveryInTotal;
   final Value<int> rowid;
   const SalesCompanion({
     this.id = const Value.absent(),
@@ -41560,6 +41917,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     this.mecefCompteurs = const Value.absent(),
     this.mecefNormaliseLe = const Value.absent(),
     this.mecefMessage = const Value.absent(),
+    this.factureType = const Value.absent(),
+    this.clientIfu = const Value.absent(),
+    this.clientNomFacture = const Value.absent(),
+    this.aibTaux = const Value.absent(),
+    this.mecefAibMontant = const Value.absent(),
+    this.deliveryFee = const Value.absent(),
+    this.deliveryInTotal = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -41584,6 +41948,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     this.mecefCompteurs = const Value.absent(),
     this.mecefNormaliseLe = const Value.absent(),
     this.mecefMessage = const Value.absent(),
+    this.factureType = const Value.absent(),
+    this.clientIfu = const Value.absent(),
+    this.clientNomFacture = const Value.absent(),
+    this.aibTaux = const Value.absent(),
+    this.mecefAibMontant = const Value.absent(),
+    this.deliveryFee = const Value.absent(),
+    this.deliveryInTotal = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -41613,6 +41984,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     Expression<String>? mecefCompteurs,
     Expression<DateTime>? mecefNormaliseLe,
     Expression<String>? mecefMessage,
+    Expression<String>? factureType,
+    Expression<String>? clientIfu,
+    Expression<String>? clientNomFacture,
+    Expression<String>? aibTaux,
+    Expression<double>? mecefAibMontant,
+    Expression<double>? deliveryFee,
+    Expression<bool>? deliveryInTotal,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -41637,6 +42015,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       if (mecefCompteurs != null) 'mecef_compteurs': mecefCompteurs,
       if (mecefNormaliseLe != null) 'mecef_normalise_le': mecefNormaliseLe,
       if (mecefMessage != null) 'mecef_message': mecefMessage,
+      if (factureType != null) 'facture_type': factureType,
+      if (clientIfu != null) 'client_ifu': clientIfu,
+      if (clientNomFacture != null) 'client_nom_facture': clientNomFacture,
+      if (aibTaux != null) 'aib_taux': aibTaux,
+      if (mecefAibMontant != null) 'mecef_aib_montant': mecefAibMontant,
+      if (deliveryFee != null) 'delivery_fee': deliveryFee,
+      if (deliveryInTotal != null) 'delivery_in_total': deliveryInTotal,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -41663,6 +42048,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     Value<String?>? mecefCompteurs,
     Value<DateTime?>? mecefNormaliseLe,
     Value<String?>? mecefMessage,
+    Value<String?>? factureType,
+    Value<String?>? clientIfu,
+    Value<String?>? clientNomFacture,
+    Value<String?>? aibTaux,
+    Value<double?>? mecefAibMontant,
+    Value<double>? deliveryFee,
+    Value<bool>? deliveryInTotal,
     Value<int>? rowid,
   }) {
     return SalesCompanion(
@@ -41687,6 +42079,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       mecefCompteurs: mecefCompteurs ?? this.mecefCompteurs,
       mecefNormaliseLe: mecefNormaliseLe ?? this.mecefNormaliseLe,
       mecefMessage: mecefMessage ?? this.mecefMessage,
+      factureType: factureType ?? this.factureType,
+      clientIfu: clientIfu ?? this.clientIfu,
+      clientNomFacture: clientNomFacture ?? this.clientNomFacture,
+      aibTaux: aibTaux ?? this.aibTaux,
+      mecefAibMontant: mecefAibMontant ?? this.mecefAibMontant,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      deliveryInTotal: deliveryInTotal ?? this.deliveryInTotal,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -41759,6 +42158,27 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     if (mecefMessage.present) {
       map['mecef_message'] = Variable<String>(mecefMessage.value);
     }
+    if (factureType.present) {
+      map['facture_type'] = Variable<String>(factureType.value);
+    }
+    if (clientIfu.present) {
+      map['client_ifu'] = Variable<String>(clientIfu.value);
+    }
+    if (clientNomFacture.present) {
+      map['client_nom_facture'] = Variable<String>(clientNomFacture.value);
+    }
+    if (aibTaux.present) {
+      map['aib_taux'] = Variable<String>(aibTaux.value);
+    }
+    if (mecefAibMontant.present) {
+      map['mecef_aib_montant'] = Variable<double>(mecefAibMontant.value);
+    }
+    if (deliveryFee.present) {
+      map['delivery_fee'] = Variable<double>(deliveryFee.value);
+    }
+    if (deliveryInTotal.present) {
+      map['delivery_in_total'] = Variable<bool>(deliveryInTotal.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -41789,6 +42209,13 @@ class SalesCompanion extends UpdateCompanion<Sale> {
           ..write('mecefCompteurs: $mecefCompteurs, ')
           ..write('mecefNormaliseLe: $mecefNormaliseLe, ')
           ..write('mecefMessage: $mecefMessage, ')
+          ..write('factureType: $factureType, ')
+          ..write('clientIfu: $clientIfu, ')
+          ..write('clientNomFacture: $clientNomFacture, ')
+          ..write('aibTaux: $aibTaux, ')
+          ..write('mecefAibMontant: $mecefAibMontant, ')
+          ..write('deliveryFee: $deliveryFee, ')
+          ..write('deliveryInTotal: $deliveryInTotal, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -54112,6 +54539,7 @@ typedef $$CustomersTableCreateCompanionBuilder =
       Value<String?> phone,
       Value<String?> city,
       Value<String?> email,
+      Value<String?> ifu,
       Value<double> creditLimit,
       Value<bool> isActive,
       Value<SyncStatus> syncStatus,
@@ -54124,6 +54552,7 @@ typedef $$CustomersTableUpdateCompanionBuilder =
       Value<String?> phone,
       Value<String?> city,
       Value<String?> email,
+      Value<String?> ifu,
       Value<double> creditLimit,
       Value<bool> isActive,
       Value<SyncStatus> syncStatus,
@@ -54161,6 +54590,11 @@ class $$CustomersTableFilterComposer
 
   ColumnFilters<String> get email => $composableBuilder(
     column: $table.email,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ifu => $composableBuilder(
+    column: $table.ifu,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -54215,6 +54649,11 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ifu => $composableBuilder(
+    column: $table.ifu,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get creditLimit => $composableBuilder(
     column: $table.creditLimit,
     builder: (column) => ColumnOrderings(column),
@@ -54254,6 +54693,9 @@ class $$CustomersTableAnnotationComposer
 
   GeneratedColumn<String> get email =>
       $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get ifu =>
+      $composableBuilder(column: $table.ifu, builder: (column) => column);
 
   GeneratedColumn<double> get creditLimit => $composableBuilder(
     column: $table.creditLimit,
@@ -54303,6 +54745,7 @@ class $$CustomersTableTableManager
                 Value<String?> phone = const Value.absent(),
                 Value<String?> city = const Value.absent(),
                 Value<String?> email = const Value.absent(),
+                Value<String?> ifu = const Value.absent(),
                 Value<double> creditLimit = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<SyncStatus> syncStatus = const Value.absent(),
@@ -54313,6 +54756,7 @@ class $$CustomersTableTableManager
                 phone: phone,
                 city: city,
                 email: email,
+                ifu: ifu,
                 creditLimit: creditLimit,
                 isActive: isActive,
                 syncStatus: syncStatus,
@@ -54325,6 +54769,7 @@ class $$CustomersTableTableManager
                 Value<String?> phone = const Value.absent(),
                 Value<String?> city = const Value.absent(),
                 Value<String?> email = const Value.absent(),
+                Value<String?> ifu = const Value.absent(),
                 Value<double> creditLimit = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<SyncStatus> syncStatus = const Value.absent(),
@@ -54335,6 +54780,7 @@ class $$CustomersTableTableManager
                 phone: phone,
                 city: city,
                 email: email,
+                ifu: ifu,
                 creditLimit: creditLimit,
                 isActive: isActive,
                 syncStatus: syncStatus,
@@ -71695,6 +72141,13 @@ typedef $$SalesTableCreateCompanionBuilder =
       Value<String?> mecefCompteurs,
       Value<DateTime?> mecefNormaliseLe,
       Value<String?> mecefMessage,
+      Value<String?> factureType,
+      Value<String?> clientIfu,
+      Value<String?> clientNomFacture,
+      Value<String?> aibTaux,
+      Value<double?> mecefAibMontant,
+      Value<double> deliveryFee,
+      Value<bool> deliveryInTotal,
       Value<int> rowid,
     });
 typedef $$SalesTableUpdateCompanionBuilder =
@@ -71720,6 +72173,13 @@ typedef $$SalesTableUpdateCompanionBuilder =
       Value<String?> mecefCompteurs,
       Value<DateTime?> mecefNormaliseLe,
       Value<String?> mecefMessage,
+      Value<String?> factureType,
+      Value<String?> clientIfu,
+      Value<String?> clientNomFacture,
+      Value<String?> aibTaux,
+      Value<double?> mecefAibMontant,
+      Value<double> deliveryFee,
+      Value<bool> deliveryInTotal,
       Value<int> rowid,
     });
 
@@ -71834,6 +72294,41 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<String> get mecefMessage => $composableBuilder(
     column: $table.mecefMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get factureType => $composableBuilder(
+    column: $table.factureType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientIfu => $composableBuilder(
+    column: $table.clientIfu,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientNomFacture => $composableBuilder(
+    column: $table.clientNomFacture,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get aibTaux => $composableBuilder(
+    column: $table.aibTaux,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get mecefAibMontant => $composableBuilder(
+    column: $table.mecefAibMontant,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get deliveryFee => $composableBuilder(
+    column: $table.deliveryFee,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get deliveryInTotal => $composableBuilder(
+    column: $table.deliveryInTotal,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -71951,6 +72446,41 @@ class $$SalesTableOrderingComposer
     column: $table.mecefMessage,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get factureType => $composableBuilder(
+    column: $table.factureType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientIfu => $composableBuilder(
+    column: $table.clientIfu,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientNomFacture => $composableBuilder(
+    column: $table.clientNomFacture,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get aibTaux => $composableBuilder(
+    column: $table.aibTaux,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get mecefAibMontant => $composableBuilder(
+    column: $table.mecefAibMontant,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get deliveryFee => $composableBuilder(
+    column: $table.deliveryFee,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get deliveryInTotal => $composableBuilder(
+    column: $table.deliveryInTotal,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SalesTableAnnotationComposer
@@ -72045,6 +72575,37 @@ class $$SalesTableAnnotationComposer
     column: $table.mecefMessage,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get factureType => $composableBuilder(
+    column: $table.factureType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get clientIfu =>
+      $composableBuilder(column: $table.clientIfu, builder: (column) => column);
+
+  GeneratedColumn<String> get clientNomFacture => $composableBuilder(
+    column: $table.clientNomFacture,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get aibTaux =>
+      $composableBuilder(column: $table.aibTaux, builder: (column) => column);
+
+  GeneratedColumn<double> get mecefAibMontant => $composableBuilder(
+    column: $table.mecefAibMontant,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get deliveryFee => $composableBuilder(
+    column: $table.deliveryFee,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get deliveryInTotal => $composableBuilder(
+    column: $table.deliveryInTotal,
+    builder: (column) => column,
+  );
 }
 
 class $$SalesTableTableManager
@@ -72096,6 +72657,13 @@ class $$SalesTableTableManager
                 Value<String?> mecefCompteurs = const Value.absent(),
                 Value<DateTime?> mecefNormaliseLe = const Value.absent(),
                 Value<String?> mecefMessage = const Value.absent(),
+                Value<String?> factureType = const Value.absent(),
+                Value<String?> clientIfu = const Value.absent(),
+                Value<String?> clientNomFacture = const Value.absent(),
+                Value<String?> aibTaux = const Value.absent(),
+                Value<double?> mecefAibMontant = const Value.absent(),
+                Value<double> deliveryFee = const Value.absent(),
+                Value<bool> deliveryInTotal = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion(
                 id: id,
@@ -72119,6 +72687,13 @@ class $$SalesTableTableManager
                 mecefCompteurs: mecefCompteurs,
                 mecefNormaliseLe: mecefNormaliseLe,
                 mecefMessage: mecefMessage,
+                factureType: factureType,
+                clientIfu: clientIfu,
+                clientNomFacture: clientNomFacture,
+                aibTaux: aibTaux,
+                mecefAibMontant: mecefAibMontant,
+                deliveryFee: deliveryFee,
+                deliveryInTotal: deliveryInTotal,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -72144,6 +72719,13 @@ class $$SalesTableTableManager
                 Value<String?> mecefCompteurs = const Value.absent(),
                 Value<DateTime?> mecefNormaliseLe = const Value.absent(),
                 Value<String?> mecefMessage = const Value.absent(),
+                Value<String?> factureType = const Value.absent(),
+                Value<String?> clientIfu = const Value.absent(),
+                Value<String?> clientNomFacture = const Value.absent(),
+                Value<String?> aibTaux = const Value.absent(),
+                Value<double?> mecefAibMontant = const Value.absent(),
+                Value<double> deliveryFee = const Value.absent(),
+                Value<bool> deliveryInTotal = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion.insert(
                 id: id,
@@ -72167,6 +72749,13 @@ class $$SalesTableTableManager
                 mecefCompteurs: mecefCompteurs,
                 mecefNormaliseLe: mecefNormaliseLe,
                 mecefMessage: mecefMessage,
+                factureType: factureType,
+                clientIfu: clientIfu,
+                clientNomFacture: clientNomFacture,
+                aibTaux: aibTaux,
+                mecefAibMontant: mecefAibMontant,
+                deliveryFee: deliveryFee,
+                deliveryInTotal: deliveryInTotal,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

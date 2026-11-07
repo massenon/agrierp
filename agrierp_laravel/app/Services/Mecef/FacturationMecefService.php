@@ -34,13 +34,19 @@ use Throwable;
 class FacturationMecefService
 {
     /**
-     * @return array{transmise: bool, deja: bool, message: string, inactif?: bool}
+     * @return array{transmise: bool, deja: bool, message: string, inactif?: bool, simple?: bool}
      */
     public function facturer(Sale|string $vente): array
     {
         // Ticket VC-5 : module désactivé — rien n'est transmis, la vente reste « en attente », aucun appelant ne lève d'alerte.
         if (! app(MecefReglage::class)->actif()) {
             return ['transmise' => false, 'deja' => false, 'inactif' => true, 'message' => 'module MeCeF désactivé'];
+        }
+
+        // Une FACTURE SIMPLE n'est JAMAIS transmise (même module actif) : décision du client, une correction passe par un avoir.
+        $enregistree = $vente instanceof Sale ? $vente : Sale::query()->find($vente);
+        if ($enregistree !== null && ! $enregistree->estADeclarer()) {
+            return ['transmise' => false, 'deja' => false, 'simple' => true, 'message' => 'Facture simple : aucune transmission à la DGI.'];
         }
 
         return $this->transmettre(
@@ -139,6 +145,11 @@ class FacturationMecefService
                         'mecef_compteurs' => $details['compteurs'] ?? null,
                         'mecef_normalise_le' => $this->horodatage($details['date'] ?? null),
                     ];
+
+                    // Le montant d'AIB que la DGI a calculé (une vente seulement : l'avoir n'a pas cette colonne).
+                    if ($estVente && isset($details['aib'])) {
+                        $colonnes['mecef_aib_montant'] = $details['aib'];
+                    }
                 }
 
                 $objet->update($colonnes);

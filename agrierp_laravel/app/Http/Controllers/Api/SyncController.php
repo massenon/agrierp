@@ -847,7 +847,7 @@ class SyncController extends Controller
             'customers' => fn () => Customer::query()
                 ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                 ->orderBy('name')
-                ->get(['id', 'name', 'phone', 'email', 'city', 'credit_limit', 'is_active']),
+                ->get(['id', 'name', 'phone', 'email', 'city', 'ifu', 'credit_limit', 'is_active']),
 
             // ⚠️ SANS FILTRE `since` POUR CE QUI RESTE DU. Une facture echue il y a
             // trois mois n'a plus bouge depuis : un tirage incremental la
@@ -1798,6 +1798,14 @@ class SyncController extends Controller
                     'mecef_compteurs' => $vente->mecef_compteurs,
                     'mecef_normalise_le' => $vente->mecef_normalise_le?->toIso8601String(),
                     'mecef_message' => $vente->mecef_message,
+                    // Choix de la vente (écrits par le poste à la saisie) et ce que la DGI a calculé (AIB) ; frais de livraison inclus.
+                    'facture_type' => $vente->typeFacture(),
+                    'client_ifu' => $vente->client_ifu,
+                    'client_nom_facture' => $vente->client_nom_facture,
+                    'aib_taux' => $vente->aib_taux,
+                    'mecef_aib_montant' => $vente->mecef_aib_montant,
+                    'delivery_fee' => $vente->delivery_fee,
+                    'delivery_in_total' => (bool) $vente->delivery_in_total,
                     'sold_at' => $vente->date_effective?->toIso8601String(),
                 ],
                 'lignes' => [
@@ -2176,7 +2184,7 @@ class SyncController extends Controller
             // 🔴→✅ Ticket U14 — l'échec de la facture d'une vente reçue redevient une ligne du journal d'audit, comme
             // avant S-T13 (qui avait sorti l'appel de la transaction et perdu cette trace) : la vente est gardée, en
             // « Erreur MeCeF », et le journal dit qu'elle vient d'un poste. Libellé dans `AuditLog::ACTION_LABELS`.
-            if (! $facture['transmise'] && ! $facture['deja'] && ! ($facture['inactif'] ?? false)) {
+            if (! $facture['transmise'] && ! $facture['deja'] && ! ($facture['inactif'] ?? false) && ! ($facture['simple'] ?? false)) {
                 AuditLog::record('sale.mecef_failed_on_sync', 'facturation');
             }
         }
@@ -6608,6 +6616,11 @@ class SyncController extends Controller
 
                 $this->verifierCoherenceDuTotal($saleData);
 
+                // Choix « Facture simple » / « Facture normalisée » : le poste l'a écrit à la saisie et l'envoie avec la vente ; le
+                // serveur le REVALIDE (IFU de 13 chiffres s'il est présent, nom obligatoire pour une normalisée, AIB dans la
+                // liste) par le point de passage du web. Absent (poste ancien) = facture simple, jamais transmise. Refus motivé.
+                $choix = app(\App\Services\Mecef\ChoixFactureService::class)->valider($saleData);
+
                 // 🔴→✅ TICKET 15.30 — UNE VENTE DATÉE EST JUGÉE SUR SA DATE, AVANT TOUT EFFET.
                 // Futur, mois clôturé (verrou du Journal), exercice absent ou clos : refus MOTIVÉ,
                 // pour cette vente seule. Placé APRÈS la validation (`unique:sales,id`) : une vente
@@ -6618,7 +6631,7 @@ class SyncController extends Controller
                     app(VerifySaleDateAction::class)->execute($validated['sold_at']);
                 }
 
-                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler) {
+                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler, $choix) {
                     // ⚠️ Même contrainte que LivestockDailyEntry ci-dessus :
                     // 'id' n'est pas fillable sur Sale — assignation
                     // explicite pour préserver réellement l'UUID généré
@@ -6633,7 +6646,7 @@ class SyncController extends Controller
                         Arr::only($saleData, self::VENTE_CHAMPS_DU_POSTE),
                         fn ($valeur, $champ) => $champ !== 'status' || $valeur !== null,
                         ARRAY_FILTER_USE_BOTH,
-                    ));
+                    ) + $choix);
                     $sale->save();
 
                     foreach ($saleData['lines'] as $line) {

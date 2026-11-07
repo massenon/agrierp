@@ -9,7 +9,7 @@ class Customer extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['name', 'phone', 'email', 'city', 'credit_limit', 'is_active'];
+    protected $fillable = ['name', 'phone', 'email', 'city', 'ifu', 'credit_limit', 'is_active'];
 
     protected function casts(): array
     {

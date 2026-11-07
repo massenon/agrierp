@@ -10,6 +10,7 @@ import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/temps/heure_benin.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
+import 'choix_facture.dart';
 import 'facturation_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -55,6 +56,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
   /// Filtres du web (`facturation.blade.php`, MECEF-1 : les libellés de `MecefEtat`), dans son ordre.
   static const filtres = <String>[
     'Tous les statuts',
+    'Facture simple',
     'Normalisée',
     'En attente',
     'Refusée',
@@ -115,7 +117,8 @@ class _FacturationScreenState extends State<FacturationScreen> {
     return [
       for (final f in d.factures)
         if ((etat == null || etat.contient(f.vente.soldAt)) &&
-            (_filtre == filtres.first || f.statut.libelle == _filtre))
+            // MECEF-3 — « Facture simple » : les ventes jamais transmises ; les statuts MeCeF ne portent que sur les normalisées.
+            (_filtre == filtres.first || (_filtre == 'Facture simple' ? f.simple : f.declaree && f.statut.libelle == _filtre)))
           f,
     ];
   }
@@ -506,7 +509,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
   /// MECEF-1 — la pastille, et sous elle le MOTIF (français, venu de la DGI ou de la passerelle) d'une facture en attente,
   /// refusée ou expirée : comme `facturation.blade.php`.
   Widget _statutAvecMotif(LigneFacture f) {
-    final motif = f.statut == StatutMecef.transmise ? null : f.vente.mecefMessage;
+    final motif = f.simple || f.statut == StatutMecef.transmise ? null : f.vente.mecefMessage;
     if (motif == null || motif.isEmpty) return _pastilleStatut(f);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,16 +529,19 @@ class _FacturationScreenState extends State<FacturationScreen> {
   }
 
   Widget _pastilleStatut(LigneFacture f) {
-    final (couleur, libelle) = switch (f.statut) {
-      StatutMecef.transmise => (AgriColors.brandEmerald, f.statut.libelle),
-      StatutMecef.enAttente => (AgriColors.accentYellow, f.statut.libelle),
-      StatutMecef.erreur => (AgriColors.errorRed, f.statut.libelle),
-      StatutMecef.expiree => (AgriColors.errorRed, f.statut.libelle),
-      StatutMecef.jamais => (
-        AgriColors.outline,
-        f.envoyee ? f.statut.libelle : 'Vente pas encore envoyée',
-      ),
-    };
+    // MECEF-3 — une facture SIMPLE n'a pas de statut MeCeF : la pastille le dit. Une normalisée demandée que le serveur n'a pas
+    // encore tirée affiche « Facture normalisée demandée — en attente » jusqu'au tirage.
+    final (couleur, libelle) = f.simple
+        ? (AgriColors.outline, 'Facture simple')
+        : f.statut == StatutMecef.jamais
+        ? (f.envoyee ? (AgriColors.outline, f.statut.libelle) : (AgriColors.accentYellow, ChoixFacture.mentionEnAttente))
+        : switch (f.statut) {
+            StatutMecef.transmise => (AgriColors.brandEmerald, f.statut.libelle),
+            StatutMecef.enAttente => (AgriColors.accentYellow, f.statut.libelle),
+            StatutMecef.erreur => (AgriColors.errorRed, f.statut.libelle),
+            StatutMecef.expiree => (AgriColors.errorRed, f.statut.libelle),
+            StatutMecef.jamais => (AgriColors.outline, f.statut.libelle),
+          };
 
     return Align(
       alignment: Alignment.centerLeft,

@@ -73,6 +73,8 @@ class EmecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
 
         try {
             $uid = $uidConnu;
+            // Montant d'AIB CALCULÉ PAR LA DGI (champ `aib` de sa réponse de création ou de consultation) : jamais calculé ici.
+            $aib = null;
 
             if ($uid === null || $uid === '') {
                 $charge = $construire($emetteur);
@@ -83,6 +85,7 @@ class EmecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
                 }
 
                 $uid = (string) ($reponse->json('uid') ?? '');
+                $aib = $reponse->json('aib');
 
                 if ($uid === '') {
                     return $this->echec(MecefEtat::EN_ATTENTE, 'Réponse e-MECeF sans identifiant de facture : la facture reste en attente.');
@@ -98,6 +101,8 @@ class EmecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
                 if ($etat->failed()) {
                     return $this->echecHttp($etat, 'Synchronisation impossible', ['uid' => $uid]);
                 }
+
+                $aib = $etat->json('aib');
             }
 
             $confirmation = $this->requete($emetteur)->put('/invoice/'.rawurlencode($uid).'/confirm');
@@ -130,6 +135,7 @@ class EmecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
                     'nim' => $confirmation->json('nim'),
                     'compteurs' => $confirmation->json('counters'),
                     'date' => $confirmation->json('dateTime'),
+                    'aib' => is_numeric($aib) ? (float) $aib : null,
                 ],
             ];
         } catch (MecefFactureInvalideException $e) {

@@ -197,7 +197,11 @@ class CaisseWebInterblocageTest extends TestCase
             ->set('weightLotId', $this->bande->id)
             ->call('confirmWeightAdd')
             ->set('paymentMode', 'especes')
-            ->set('cashReceived', 7_000);
+            ->set('cashReceived', 7_000)
+            // Ces essais portent sur la FACTURE NORMALISÉE (la facture simple n'est jamais transmise).
+            ->set('factureType', 'normalisee')
+            ->set('clientNomFacture', 'Client Essai')
+            ->set('aibTaux', 'N/A');
     }
 
     /** Un toast de ce type contenant cet extrait, parmi TOUS ceux du dernier appel (`assertDispatched` ne lit que le premier). */
@@ -398,6 +402,7 @@ class CaisseWebInterblocageTest extends TestCase
         $this->actingAs(User::where('username', 'caisse')->sole(), 'sanctum')->postJson('/api/sync/push', ['sales' => array_map(fn ($id) => [
             'id' => $id, 'payment_mode' => 'especes', 'status' => 'validee',
             'subtotal' => 3_500, 'discount' => 0, 'total' => 3_500, 'sold_at' => self::JOUR.' 10:00:00',
+            'facture_type' => 'normalisee', 'client_nom_facture' => 'Client Essai', 'aib_taux' => 'N/A',
             'lines' => [['product_id' => $this->poulet->id, 'lot_id' => $this->bande->id, 'qty' => 1, 'unit_price' => 3_500, 'manual_total_amount' => 3_500]],
         ], $ids)])->assertOk()->assertJsonPath('sales.accepted', $ids);
 

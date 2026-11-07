@@ -123,6 +123,8 @@ class ConvertirDevisEnFactureAction
                 'status' => 'validee',
                 'sold_at' => $instant,
                 'delivery_fee' => 0,
+                // Une facture issue d'un devis est une facture SIMPLE (aucun choix à l'encaissement, aucune ligne à normaliser).
+                'facture_type' => \App\Support\FactureType::SIMPLE,
             ]);
 
             $devis->update(['status' => 'facture', 'converted_sale_id' => $vente->id]);

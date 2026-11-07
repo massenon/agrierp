@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../ventes/choix_facture.dart' show ChoixFacture;
 import '../../core/config/envoi_email_test.dart' show EchecEnvoiEmail;
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
@@ -45,12 +46,16 @@ class FormulaireClient {
     this.telephone = '',
     this.ville = '',
     this.email = '',
+    this.ifu = '',
   });
 
   final String nom;
   final String telephone;
   final String ville;
   final String email;
+
+  /// MECEF-3 — IFU du client (13 chiffres), FACULTATIF : un client particulier n'en a pas. Préremplit la facture normalisée.
+  final String ifu;
 }
 
 /// Une ligne de « Suivi des Dettes Clients ».
@@ -258,6 +263,9 @@ class ClientsCreancesRepository {
         e['email'] = "Adresse e-mail invalide.";
       }
     }
+    // MECEF-3 — même règle et même motif que `CustomerCatalogService` (`ifu`, regex 13 chiffres) : vide = client sans IFU.
+    final ifu = f.ifu.trim();
+    if (ifu.isNotEmpty && !RegExp(r'^\d{13}$').hasMatch(ifu)) e['ifu'] = ChoixFacture.motifIfu;
 
     return e;
   }
@@ -277,6 +285,7 @@ class ClientsCreancesRepository {
             phone: Value(_ouNul(f.telephone)),
             city: Value(_ouNul(f.ville)),
             email: Value(_ouNul(f.email)),
+            ifu: Value(_ouNul(f.ifu)),
             syncStatus: const Value(SyncStatus.pending),
           ),
         );
@@ -294,6 +303,7 @@ class ClientsCreancesRepository {
         phone: Value(_ouNul(f.telephone)),
         city: Value(_ouNul(f.ville)),
         email: Value(_ouNul(f.email)),
+        ifu: Value(_ouNul(f.ifu)),
         syncStatus: const Value(SyncStatus.pending),
       ),
     );

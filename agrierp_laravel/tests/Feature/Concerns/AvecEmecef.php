@@ -67,14 +67,14 @@ trait AvecEmecef
     }
 
     /** @param array<int, array{0: Product, 1: float, 2: int}> $lignes produit, quantité, montant de la ligne */
-    protected function venteAFacturer(array $lignes = [], int $remise = 0, string $mode = 'especes'): Sale
+    protected function venteAFacturer(array $lignes = [], int $remise = 0, string $mode = 'especes', array $choix = ['facture_type' => 'normalisee', 'client_nom_facture' => 'AMOUSSOU Régis', 'aib_taux' => 'N/A']): Sale
     {
         $lignes = $lignes ?: [[$this->taxable, 2, 11800]];
         $client = Customer::firstOrCreate(['name' => 'AMOUSSOU Régis'], ['is_active' => true]);
         $sousTotal = array_sum(array_column($lignes, 2));
 
         $vente = Sale::create(['customer_id' => $client->id, 'payment_mode' => $mode, 'subtotal' => $sousTotal, 'discount' => $remise,
-            'total' => $sousTotal - $remise, 'delivery_fee' => 0, 'status' => 'validee']);
+            'total' => $sousTotal - $remise, 'delivery_fee' => 0, 'status' => 'validee'] + $choix);
 
         foreach ($lignes as [$produit, $qte, $montant]) {
             SaleLine::create(['sale_id' => $vente->id, 'product_id' => $produit->id, 'qty' => $qte,

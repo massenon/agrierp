@@ -71,6 +71,9 @@ class _ModaleFicheClientState extends State<_ModaleFicheClient> {
   late final TextEditingController _email = TextEditingController(
     text: widget.existant?.email ?? '',
   );
+  late final TextEditingController _ifu = TextEditingController(
+    text: widget.existant?.ifu ?? '',
+  );
   Map<String, String> _erreurs = const {};
 
   bool get _creation => widget.existant == null;
@@ -81,6 +84,7 @@ class _ModaleFicheClientState extends State<_ModaleFicheClient> {
     _telephone.dispose();
     _ville.dispose();
     _email.dispose();
+    _ifu.dispose();
     super.dispose();
   }
 
@@ -90,6 +94,7 @@ class _ModaleFicheClientState extends State<_ModaleFicheClient> {
       telephone: _telephone.text,
       ville: _ville.text,
       email: _email.text,
+      ifu: _ifu.text,
     );
 
     final erreurs = ClientsCreancesRepository.validerFiche(saisie);
@@ -164,6 +169,14 @@ class _ModaleFicheClientState extends State<_ModaleFicheClient> {
             'email',
             _email,
             clavier: TextInputType.emailAddress,
+          ),
+          // MECEF-3 — IFU facultatif (13 chiffres) : préremplit la facture normalisée de ce client.
+          _champ(
+            'IFU',
+            'ifu',
+            _ifu,
+            indice: '13 chiffres (facultatif)',
+            clavier: TextInputType.number,
           ),
         ],
       ),

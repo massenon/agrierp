@@ -172,7 +172,10 @@ return [
     | Messages propres à un champ et à une règle (« champ.règle »). Vide : chaque écran passe ses
     | messages particuliers à `validate()`, au plus près de la règle.
     */
-    'custom' => [],
+    'custom' => [
+        // Fiche client : l'IFU, facultatif, compte 13 chiffres (client des factures normalisées).
+        'ifu' => ['regex' => "L'IFU du client doit comporter 13 chiffres (laissez-le vide pour un client sans IFU)."],
+    ],
 
     /*
     | Libellés français des champs validés par les écrans du web (propriétés des composants

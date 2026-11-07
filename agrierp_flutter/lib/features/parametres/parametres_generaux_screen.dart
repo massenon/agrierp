@@ -112,18 +112,21 @@ class ParametresGenerauxScreen extends StatefulWidget {
   /// Onglet ouvert à l'arrivée (« Appairage » depuis l'entrée « Paramètres du poste ») ; le premier sinon.
   final String? ongletInitial;
 
+  /// MECEF-3 — l'onglet de la facturation normalisée (mode, IFU, adresse de l'API, opérateur), à la place de celui du web.
+  static const ongletFacturationEmecef = 'Facturation normalisée (e-MECeF)';
   static const ongletEmailSmtp = 'Email (SMTP)';
   static const ongletAppairage = 'Appairage';
   static const ongletCorbeille = 'Corbeille';
   static const ongletReinitialisation = 'Réinitialisation';
   static const ongletSauvegardes = 'Sauvegardes';
 
-  /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
+  /// Les dix onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
   /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web, et
   /// « Réinitialisation » (R-1) après « Audit Logs », avec l'icône du web (`restart_alt`).
   static const onglets = <(String, IconData)>[
     ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
     ("Données de l'Entreprise", SymbolesAgri.domain),
+    (ongletFacturationEmecef, SymbolesAgri.receipt_long),
     (ongletEmailSmtp, SymbolesAgri.mail),
     ('Modules Actifs', SymbolesAgri.tune),
     ('Gestion Utilisateurs', SymbolesAgri.manage_accounts),
@@ -250,6 +253,8 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                           d,
                           large,
                         ),
+                        ParametresGenerauxScreen.ongletFacturationEmecef =>
+                          _ongletFacturationEmecef(),
                         ParametresGenerauxScreen.ongletEmailSmtp =>
                           _ongletEmailSmtp(),
                         'Modules Actifs' => _ongletModules(d, large),
@@ -637,6 +642,20 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       ],
     ),
   );
+
+  // ── Facturation normalisée (e-MECeF) — MECEF-3 ───────────────────────────
+
+  Widget _ongletFacturationEmecef() {
+    final reglages = widget.reglages;
+    if (reglages == null) {
+      return _mentionPoste(
+        'Facturation normalisée indisponible dans cette vue : elle se règle depuis le poste connecté.',
+        cle: 'facturation-emecef-indisponible',
+      );
+    }
+
+    return PageFacturationEmecef(depot: reglages, estAdmin: widget.estAdmin);
+  }
 
   // ── Onglet 3 : Email (SMTP) — ticket CFG-2 ───────────────────────────────
 

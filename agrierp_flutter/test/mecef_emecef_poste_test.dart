@@ -6,6 +6,7 @@ import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/parametres/reglages_ferme_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
+import 'package:agrierp/features/ventes/choix_facture.dart';
 import 'package:agrierp/features/ventes/facturation_repository.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -208,10 +209,11 @@ void main() {
   group('la facture PDF', () {
     Future<Sale> lire() => (db.select(db.sales)..where((s) => s.id.equals(vente))).getSingle();
 
-    Future<void> poser({String? statut, String? qr, String? code}) => db.into(db.sales).insert(
+    Future<void> poser({String? statut, String? qr, String? code, String? type}) => db.into(db.sales).insert(
       SalesCompanion.insert(
         id: vente, deviceId: 'serveur', syncStatus: const Value(SyncStatus.synced), updatedAt: DateTime(2026, 11, 7),
         paymentMode: 'especes', total: 11800, soldAt: DateTime(2026, 11, 7, 9),
+        factureType: Value(type),
         mecefStatus: Value(statut), mecefQrRef: Value(qr), mecefCode: Value(code),
         mecefNim: Value(code == null ? null : 'ED01000001'), mecefCompteurs: Value(code == null ? null : '12/34 FV'),
         mecefNormaliseLe: Value(code == null ? null : DateTime(2026, 11, 7, 10, 15, 0)),
@@ -232,12 +234,21 @@ void main() {
       expect(doc.codeQr, 'F;ED01000001;TEST-AAAA;3202601234567;20261107101500');
     });
 
-    test('⚠️ sans normalisation (en attente, refusée, jamais transmise) : aucune mention, aucun QR inventé', () async {
+    test('⚠️ sans normalisation (en attente, refusée, jamais transmise) : aucune mention DGI, aucun QR inventé', () async {
       for (final statut in ['en_attente', 'erreur', 'expiree', null]) {
+        // Facture normalisée DEMANDÉE mais pas certifiée : « demandée — en attente », rien d'inventé.
+        await db.delete(db.sales).go();
+        await poser(statut: statut, qr: statut == null ? null : 'REF-NON-CERTIFIEE', type: 'normalisee');
+        var doc = DocumentsFacturation.facture(LigneFacture(vente: await lire(), envoyee: true), const []);
+        expect(doc.noteDePied, ChoixFacture.mentionEnAttente, reason: '$statut');
+        expect(doc.mentions, isEmpty, reason: '$statut');
+        expect(doc.codeQr, isNull, reason: '$statut');
+
+        // Facture SIMPLE (le défaut, y compris une vente d'avant le choix) : sa mention, jamais de QR.
         await db.delete(db.sales).go();
         await poser(statut: statut, qr: statut == null ? null : 'REF-NON-CERTIFIEE');
-        final doc = DocumentsFacturation.facture(LigneFacture(vente: await lire(), envoyee: true), const []);
-        expect(doc.noteDePied, 'Facture émise sans certification MeCeF.', reason: '$statut');
+        doc = DocumentsFacturation.facture(LigneFacture(vente: await lire(), envoyee: true), const []);
+        expect(doc.noteDePied, ChoixFacture.mentionSimple, reason: '$statut');
         expect(doc.mentions, isEmpty, reason: '$statut');
         expect(doc.codeQr, isNull, reason: '$statut');
       }
@@ -299,7 +310,8 @@ void main() {
       expect(await db.select(db.settingsRequests).get(), isEmpty, reason: 'un refus n\'écrit rien');
 
       // Les mêmes phrases sont celles du serveur (lues dans le code PHP).
-      final php = File('$dossierLaravel/app/Services/EntrepriseService.php');
+      // MECEF-3 : ces règles vivent dans `MecefReglageService` (partagé avec l'onglet web) et `EntrepriseService` (demande du poste).
+      final php = File('$dossierLaravel/app/Services/Mecef/MecefReglageService.php');
       if (php.existsSync()) {
         final source = php.readAsStringSync();
         expect(source, contains("L'IFU doit comporter 13 chiffres pour la facturation e-MECeF."));
@@ -318,7 +330,13 @@ void main() {
       for (final libelle in ReglagesFermeRepository.libellesModesMecef.values) {
         expect(source, contains("'$libelle'"));
       }
-      expect(source, contains("URL_PAR_DEFAUT = '${ReglagesFermeRepository.urlEmecefParDefaut}'"));
+      expect(source, contains("URL_ESSAI = '${ReglagesFermeRepository.urlEmecefEssai}'"));
+      expect(source, contains("URL_PRODUCTION = '${ReglagesFermeRepository.urlEmecefProduction}'"));
+      expect(source, contains('URL_PAR_DEFAUT = self::URL_ESSAI'));
+      expect(ReglagesFermeRepository.urlEmecefParDefaut, ReglagesFermeRepository.urlEmecefEssai);
+      for (final e in ReglagesFermeRepository.prereglagesUrlMecef.values) {
+        expect(source, contains(e.$1));
+      }
     });
   });
 }

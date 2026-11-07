@@ -71,7 +71,7 @@ class AvoirMecefTest extends TestCase
             return $q->method() === 'POST' && str_ends_with($q->url(), '/invoice')
                 && $q['type'] === 'FA' && $q['reference'] === 'uid-origine'
                 && $q['items'][0]['quantity'] == 1 && $q['items'][0]['price'] == 5900.0
-                && $q['payment'] === [['name' => 'ESPECES', 'amount' => 5900.0]];
+                && $q['payment'] === [['name' => 'ESPECES', 'amount' => 5900]];
         });
 
         // La vente d'origine, elle, n'a pas bougé : toujours normalisée, intacte.

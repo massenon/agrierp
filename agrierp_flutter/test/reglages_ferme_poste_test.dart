@@ -328,7 +328,7 @@ void main() {
       expect(find.byKey(const Key('reglage-message')), findsOneWidget);
     });
 
-    // MECEF-1 — « Facturation normalisée (MeCeF) » : mêmes libellés que le web ; le jeton ne se saisit PAS au poste.
+    // MECEF-1 / MECEF-3 — « Facturation normalisée (e-MECeF) » : son ONGLET, comme au web ; le jeton ne se saisit PAS au poste.
     testWidgets('⚠️ le mode MeCeF se règle au poste (demande), le jeton jamais : un témoin « configuré / non configuré » seulement', (tester) async {
       tester.view.physicalSize = const Size(1700, 2600);
       tester.view.devicePixelRatio = 1;
@@ -336,13 +336,12 @@ void main() {
       await entrepriseVerrouillee();
       await db.into(db.appSettings).insertOnConflictUpdate(AppSettingsCompanion.insert(key: 'mecef.jeton_configure', value: '1'));
       await tester.pumpWidget(MaterialApp(home: ParametresGenerauxScreen(
-        depot: ParametresGenerauxRepository(database: db), reglages: depot, estAdmin: true, ongletInitial: "Données de l'Entreprise",
+        depot: ParametresGenerauxRepository(database: db), reglages: depot, estAdmin: true, ongletInitial: ParametresGenerauxScreen.ongletFacturationEmecef,
       )));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('entreprise-modifier')));
-      await tester.pumpAndSettle();
-      expect(find.text('Facturation normalisée (MeCeF)'), findsOneWidget);
+      expect(find.text('Facturation normalisée (e-MECeF)'), findsWidgets);
+      expect(find.byKey(const Key('entreprise-mecef-aide')), findsOneWidget, reason: 'où trouver le jeton');
       expect(find.byKey(const Key('entreprise-mecefApiUrl')), findsNothing, reason: 'désactivé : aucun champ e-MECeF');
 
       await tester.tap(find.byKey(const Key('entreprise-mecefMode')));
@@ -351,19 +350,50 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('entreprise-mecefApiUrl')), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-url-production')), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-url-essai')), findsOneWidget);
       expect(find.byKey(const Key('entreprise-jeton-etat')), findsOneWidget);
       expect(find.text('••••••••••••'), findsOneWidget, reason: 'jeton configuré au serveur : masqué');
       expect(find.byType(TextField).evaluate().where((e) => (e.widget as TextField).obscureText), isEmpty, reason: 'aucune saisie de secret au poste');
 
+      await tester.tap(find.byKey(const Key('entreprise-url-production')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('entreprise-mecefApiUrl'))).controller!.text, ReglagesFermeRepository.urlEmecefProduction);
+
       await tester.enterText(find.byKey(const Key('entreprise-ifu')), '3201700000000');
       await tester.enterText(find.byKey(const Key('entreprise-mecefOperateurNom')), 'Awa');
-      await tester.tap(find.byKey(const Key('entreprise-enregistrer')));
+      await tester.tap(find.byKey(const Key('entreprise-mecef-enregistrer')));
       await tester.pumpAndSettle();
 
       final p = jsonDecode((await demandes()).single.payload) as Map<String, dynamic>;
       expect(p['mecefMode'], 'emecef');
       expect(p['mecefOperateurNom'], 'Awa');
+      expect(p['mecefApiUrl'], ReglagesFermeRepository.urlEmecefProduction);
+      expect(p['ifu'], '3201700000000');
       expect(p.keys.where((k) => k.toLowerCase().contains('jeton')), isEmpty);
+      expect(find.byKey(const Key('reglage-message')), findsOneWidget);
+    });
+
+    testWidgets('« Données de l\'Entreprise » ne porte plus le réglage MeCeF : un renvoi vers son onglet, aucune clé mecef dans la demande', (tester) async {
+      tester.view.physicalSize = const Size(1700, 2600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await entrepriseVerrouillee();
+      await tester.pumpWidget(MaterialApp(home: ParametresGenerauxScreen(
+        depot: ParametresGenerauxRepository(database: db), reglages: depot, estAdmin: true, ongletInitial: "Données de l'Entreprise",
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('entreprise-modifier')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('entreprise-renvoi-mecef')), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-mecefMode')), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('entreprise-ifu')), '3201700000000');
+      await tester.tap(find.byKey(const Key('entreprise-enregistrer')));
+      await tester.pumpAndSettle();
+      final p = jsonDecode((await demandes()).single.payload) as Map<String, dynamic>;
+      expect(p.keys.where((k) => k.startsWith('mecef')), isEmpty);
     });
   });
 }

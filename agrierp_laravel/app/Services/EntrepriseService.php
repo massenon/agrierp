@@ -102,10 +102,8 @@ class EntrepriseService
     {
         $settings = CompanySetting::current();
 
-        // MECEF-1 — e-MECeF exige l'IFU à 13 chiffres : refusé AVANT d'écrire quoi que ce soit.
-        if (($v['mecefMode'] ?? null) === MecefMode::EMECEF && ! preg_match('/^\d{13}$/', (string) $v['ifu'])) {
-            throw ValidationException::withMessages(['ifu' => "L'IFU doit comporter 13 chiffres pour la facturation e-MECeF."]);
-        }
+        // MECEF-1 — e-MECeF exige l'IFU à 13 chiffres : refusé AVANT d'écrire quoi que ce soit (règle de `MecefReglageService`).
+        app(\App\Services\Mecef\MecefReglageService::class)->verifierIfu($v['mecefMode'] ?? null, (string) $v['ifu']);
 
         $tauxModifies = $settings->payrollSettingsLocked() && (
             (float) $settings->vps_rate !== (float) $v['vpsRate']
@@ -154,26 +152,12 @@ class EntrepriseService
     /** @return array<string, mixed> les seules colonnes MeCeF présentes dans la demande (absentes : réglage conservé) */
     private function colonnesMecef(array $v): array
     {
-        $colonnes = [];
-
-        foreach (['mecefMode' => 'mecef_mode', 'mecefApiUrl' => 'mecef_api_url', 'mecefOperateurId' => 'mecef_operateur_id', 'mecefOperateurNom' => 'mecef_operateur_nom'] as $cle => $colonne) {
-            if (array_key_exists($cle, $v)) {
-                $colonnes[$colonne] = ($v[$cle] ?? null) === '' ? null : ($v[$cle] ?? null);
-            }
-        }
-
-        if (is_string($v['mecefJeton'] ?? null) && trim($v['mecefJeton']) !== '') {
-            $colonnes['mecef_jeton_encrypted'] = trim($v['mecefJeton']);
-        }
-
-        return $colonnes;
+        return app(\App\Services\Mecef\MecefReglageService::class)->colonnes($v);
     }
 
     /** @param array<string, mixed> $avant `mecef_mode` et `mecef_api_url` d'avant l'écriture */
     private function mecefAChange(array $avant, CompanySetting $apres, array $v): bool
     {
-        return trim((string) ($v['mecefJeton'] ?? '')) !== ''
-            || $apres->mecef_mode !== $avant['mecef_mode']
-            || $apres->mecef_api_url !== $avant['mecef_api_url'];
+        return app(\App\Services\Mecef\MecefReglageService::class)->aChange($avant, $apres, $v);
     }
 }

@@ -3,6 +3,7 @@
         :tabs="[
             ['key' => 'roles', 'label' => 'Rôles & Permissions', 'icon' => 'admin_panel_settings'],
             ['key' => 'entreprise', 'label' => 'Données de l\'Entreprise', 'icon' => 'business'],
+            ['key' => 'facturation', 'label' => 'Facturation normalisée (e-MECeF)', 'icon' => 'receipt_long'],
             ['key' => 'email', 'label' => 'Email (SMTP)', 'icon' => 'mail'],
             ['key' => 'modules', 'label' => 'Modules Actifs', 'icon' => 'apps'],
             ['key' => 'utilisateurs', 'label' => 'Gestion Utilisateurs', 'icon' => 'group'],
@@ -21,6 +22,10 @@
 
         @if($tab === 'entreprise')
             <livewire:parametres.donnees-entreprise />
+        @endif
+
+        @if($tab === 'facturation')
+            <livewire:parametres.facturation-emecef />
         @endif
 
         @if($tab === 'email')

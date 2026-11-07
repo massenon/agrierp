@@ -93,6 +93,7 @@ class EchecMecefEnvoiAuditTest extends TestCase
                 'id' => '22222222-2222-4222-8222-222222222222',
                 'payment_mode' => 'especes', 'subtotal' => 1_000, 'discount' => 0, 'total' => 1_000,
                 'status' => 'validee',
+                'facture_type' => 'normalisee', 'client_nom_facture' => 'Client Essai', 'aib_taux' => 'N/A',
                 'lines' => [['product_id' => $this->produit->id, 'qty' => 2, 'unit_price' => 500, 'manual_total_amount' => 1_000]],
             ]],
         ])->assertOk()->assertJsonPath('sales.accepted.0', '22222222-2222-4222-8222-222222222222');

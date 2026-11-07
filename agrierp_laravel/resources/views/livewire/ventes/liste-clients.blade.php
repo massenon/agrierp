@@ -128,6 +128,12 @@
                 <input wire:model="email" type="email" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('email') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('email') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">IFU</label>
+                <input wire:model="ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres (facultatif)" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('ifu') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('ifu') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                <p class="text-[10px] text-outline mt-xs">Préremplit la facture normalisée de ce client. Laissez vide pour un client particulier.</p>
+            </div>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-client' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
                 <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>

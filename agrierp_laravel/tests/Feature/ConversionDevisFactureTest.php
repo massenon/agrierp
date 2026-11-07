@@ -403,9 +403,10 @@ class ConversionDevisFactureTest extends TestCase
 
         // Comme toute vente reçue du poste : `FacturationMecefService::facturer`, après la transaction (aucun code DGI
         // nouveau, D-MECEF-1 laissé de côté). Le dispositif du projet est la passerelle factice.
+        // Facture issue d'un devis = facture SIMPLE (aucun choix à la conversion) : `facturer` ne la transmet JAMAIS.
         $vente = Sale::firstOrFail();
-        $this->assertContains($vente->mecef_status, ['transmise', 'erreur', 'en_attente']);
-        $this->assertSame('transmise', $vente->mecef_status);
+        $this->assertSame('simple', $vente->typeFacture());
+        $this->assertSame('en_attente', $vente->mecef_status);
     }
 
     public function test_le_renvoi_de_la_demande_est_acquitte_sans_seconde_facture(): void

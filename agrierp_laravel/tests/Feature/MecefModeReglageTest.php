@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Parametres\DonneesEntreprise;
+use App\Livewire\Parametres\FacturationEmecef;
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Models\Permission;
@@ -38,7 +38,7 @@ class MecefModeReglageTest extends TestCase
 
     private function ecran()
     {
-        return Livewire::actingAs($this->admin)->test(DonneesEntreprise::class);
+        return Livewire::actingAs($this->admin)->test(FacturationEmecef::class);
     }
 
     public function test_sans_reglage_le_commutateur_general_decide_et_actif_est_derive_du_mode(): void

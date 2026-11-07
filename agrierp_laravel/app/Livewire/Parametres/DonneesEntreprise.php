@@ -61,20 +61,6 @@ class DonneesEntreprise extends Component
 
     public $cnssEmployerRiskRate = 2;
 
-    // --- Facturation normalisée MeCeF (MECEF-1) -------------------------
-    public string $mecefMode = 'desactive';
-
-    public string $mecefApiUrl = '';
-
-    public string $mecefOperateurId = '';
-
-    public string $mecefOperateurNom = '';
-
-    /** Saisie d'un NOUVEAU jeton JWT seulement : la valeur enregistrée n'est jamais relue ni envoyée au navigateur. */
-    public string $mecefJeton = '';
-
-    public bool $remplacerJeton = false;
-
     public $logoFile = null;
 
     public $faviconFile = null;
@@ -98,19 +84,6 @@ class DonneesEntreprise extends Component
         $this->cnssEmployerPensionRate = (float) ($settings->cnss_employer_pension_rate ?? 6.4);
         $this->cnssEmployerFamilyRate = (float) ($settings->cnss_employer_family_rate ?? 9);
         $this->cnssEmployerRiskRate = (float) ($settings->cnss_employer_risk_rate ?? 2);
-
-        // MECEF-1 — le mode effectif (`simule` des environnements de développement s'affiche « Désactivé »).
-        $reglage = app(\App\Services\Mecef\MecefReglage::class);
-        $this->mecefMode = in_array($reglage->mode(), \App\Support\MecefMode::REGLABLES, true) ? $reglage->mode() : \App\Support\MecefMode::DESACTIVE;
-        $this->mecefApiUrl = (string) ($settings->mecef_api_url ?: \App\Support\MecefMode::URL_PAR_DEFAUT);
-        $this->mecefOperateurId = (string) $settings->mecef_operateur_id;
-        $this->mecefOperateurNom = (string) $settings->mecef_operateur_nom;
-    }
-
-    /** MECEF-1 — un jeton est-il enregistré ? (le seul fait que l'écran connaît du secret) */
-    public function getJetonConfigureProperty(): bool
-    {
-        return app(\App\Services\Mecef\MecefReglage::class)->jetonConfigure();
     }
 
     public function getSettingsProperty(): CompanySetting
@@ -124,7 +97,8 @@ class DonneesEntreprise extends Component
 
         $service = app(\App\Services\EntrepriseService::class);
 
-        $this->validate($service->regles() + [
+        // Les règles `mecef*` ne s'appliquent qu'à la demande du poste et à l'onglet « Facturation normalisée (e-MECeF) » : pas ici.
+        $this->validate(array_filter($service->regles(), fn ($cle) => ! str_starts_with($cle, 'mecef'), ARRAY_FILTER_USE_KEY) + [
             'logoFile' => ['nullable', 'image', 'max:2048'],
             'faviconFile' => ['nullable', 'image', 'max:500'],
         ], \App\Services\EntrepriseService::MESSAGES);
@@ -146,9 +120,7 @@ class DonneesEntreprise extends Component
                 'tvaEnabled' => $this->tvaEnabled, 'vpsRate' => $this->vpsRate, 'cnssEmployeeRate' => $this->cnssEmployeeRate,
                 'cnssEmployerPensionRate' => $this->cnssEmployerPensionRate, 'cnssEmployerFamilyRate' => $this->cnssEmployerFamilyRate,
                 'cnssEmployerRiskRate' => $this->cnssEmployerRiskRate,
-                'mecefMode' => $this->mecefMode, 'mecefApiUrl' => $this->mecefApiUrl,
-                'mecefOperateurId' => $this->mecefOperateurId, 'mecefOperateurNom' => $this->mecefOperateurNom,
-                'mecefJeton' => $this->mecefJeton,
+                // Le réglage MeCeF a son onglet (`FacturationEmecef`) : aucune clé `mecef*` ici, il reste tel quel.
             ], auth()->user(), $fichiers);
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Le refus porte sur UN champ : l'IFU (e-MECeF) ou les taux de paie arrêtés.
@@ -159,7 +131,7 @@ class DonneesEntreprise extends Component
             return;
         }
 
-        $this->reset(['logoFile', 'faviconFile', 'mecefJeton', 'remplacerJeton']);
+        $this->reset(['logoFile', 'faviconFile']);
         $this->dispatch('toast', message: 'Modifications enregistrées avec succès.', type: 'success');
     }
 

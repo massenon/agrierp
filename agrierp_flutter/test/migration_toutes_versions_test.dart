@@ -390,6 +390,18 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
     (d.creditNotes, d.creditNotes.mecefNormaliseLe),
     (d.creditNotes, d.creditNotes.mecefMessage),
   ],
+  // MECEF-3 : IFU du client, choix « facture simple / normalisée » de la vente (identité fiscale de l'acheteur, AIB), montant d'AIB
+  // calculé par la DGI, frais de livraison inclus dans la vente.
+  85: [
+    (d.customers, d.customers.ifu),
+    (d.sales, d.sales.factureType),
+    (d.sales, d.sales.clientIfu),
+    (d.sales, d.sales.clientNomFacture),
+    (d.sales, d.sales.aibTaux),
+    (d.sales, d.sales.mecefAibMontant),
+    (d.sales, d.sales.deliveryFee),
+    (d.sales, d.sales.deliveryInTotal),
+  ],
   // VOL-2 : quatrième emplacement (Poussin ponte), passages supplémentaires et transferts du quatrième emplacement des
   // fiches de volailles pondeuses.
   83: [
@@ -525,7 +537,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 84, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1, 82 = VOL-1, 83 = VOL-2, 84 = MECEF-1');
+    expect(d.schemaVersion, 85, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1, 82 = VOL-1, 83 = VOL-2, 84 = MECEF-1, 85 = MECEF-3 (IFU du client, choix de facture, AIB, livraison incluse)');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

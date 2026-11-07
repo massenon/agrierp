@@ -36,6 +36,10 @@ class Sale extends Model
         'sold_at',
         // MECEF-1 — ce que la DGI renvoie de la facture normalisée (écrits par `FacturationMecefService`, jamais par un poste).
         'mecef_uid', 'mecef_code', 'mecef_nim', 'mecef_compteurs', 'mecef_normalise_le', 'mecef_message',
+        // Choix « Facture simple » / « Facture normalisée » (validé par `ChoixFactureService`) ; `mecef_aib_montant` = ce que la DGI a calculé.
+        'facture_type', 'client_ifu', 'client_nom_facture', 'aib_taux', 'mecef_aib_montant',
+        // Frais de livraison : `true` = ils sont DANS `total` (nouvelles ventes) ; `false` = hors total (ventes d'avant, inchangées).
+        'delivery_in_total',
     ];
 
     /**
@@ -69,9 +73,29 @@ class Sale extends Model
         return $this->mecef_status === \App\Support\MecefEtat::NORMALISEE;
     }
 
+    /**
+     * Le type de la facture : `simple` (défaut, y compris une vente sans choix enregistré) ou `normalisee`. UNE SEULE lecture :
+     * une facture simple n'est JAMAIS transmise à la DGI (`FacturationMecefService`).
+     */
+    public function typeFacture(): string
+    {
+        // Une vente déjà normalisée l'est forcément, quel que soit le choix enregistré (donnée d'avant le choix).
+        return $this->facture_type === \App\Support\FactureType::NORMALISEE || $this->estNormalisee()
+            ? \App\Support\FactureType::NORMALISEE
+            : \App\Support\FactureType::SIMPLE;
+    }
+
+    /** La vente a-t-elle été choisie en facture normalisée (à transmettre, ou déjà transmise) ? */
+    public function estADeclarer(): bool
+    {
+        return $this->typeFacture() === \App\Support\FactureType::NORMALISEE;
+    }
+
     protected function casts(): array
     {
         return [
+            'delivery_in_total' => 'boolean',
+            'mecef_aib_montant' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'discount' => 'decimal:2',
             'total' => 'decimal:2',

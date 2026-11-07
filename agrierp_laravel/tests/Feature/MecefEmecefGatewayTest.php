@@ -289,7 +289,7 @@ class MecefEmecefGatewayTest extends TestCase
         $totalLignes = 5310 * 2 + 180 * 10;
         $this->assertSame(12420, $totalLignes);
         $this->assertSame(12420, (int) $vente->total);
-        $this->assertSame([['name' => 'MOBILEMONEY', 'amount' => 12420.0]], $charge['payment']);
+        $this->assertSame([['name' => 'MOBILEMONEY', 'amount' => 12420]], $charge['payment']);
     }
 
     public function test_un_taux_de_tva_inconnu_est_refuse_avec_son_motif_sans_appel(): void
@@ -312,7 +312,7 @@ class MecefEmecefGatewayTest extends TestCase
         $html = fn () => view('exports.facture-vente', ['sale' => $vente->fresh()->load(['customer', 'lines.product'])])->render();
 
         // En attente : aucune mention inventée.
-        $this->assertStringContainsString('Facture émise sans certification MeCeF.', $html());
+        $this->assertStringContainsString(\App\Support\FactureType::MENTION_EN_ATTENTE, $html());
         $this->assertStringNotContainsString('Code MeCeF/DGI', $html());
         $this->assertStringNotContainsString('data:image/svg+xml', $html());
 

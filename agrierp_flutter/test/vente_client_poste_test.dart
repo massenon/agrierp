@@ -26,6 +26,10 @@ class _Casse extends CaisseRepository {
     double remise = 0,
     double? especesRecues,
     DateTime? dateVente,
+    String factureType = 'simple',
+    String? clientIfu,
+    String? clientNomFacture,
+    String? aibTaux,
   }) async => throw StateError('Le disque du poste est plein : écriture impossible.');
 }
 

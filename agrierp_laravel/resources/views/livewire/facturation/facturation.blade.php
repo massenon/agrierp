@@ -38,6 +38,7 @@
             @if($this->mecefActif)
             <select wire:model.live="statusFilter" class="border border-outline-variant rounded-lg text-xs px-sm py-2 bg-white w-full md:w-auto">
                 <option value="">Tous les statuts</option>
+                <option value="{{ \App\Support\FactureType::LIBELLES[\App\Support\FactureType::SIMPLE] }}">{{ \App\Support\FactureType::LIBELLES[\App\Support\FactureType::SIMPLE] }}</option>
                 @foreach(\App\Support\MecefEtat::LIBELLES as $libelleEtat)
                     <option value="{{ $libelleEtat }}">{{ $libelleEtat }}</option>
                 @endforeach
@@ -65,7 +66,9 @@
                             <td data-label="Montant TTC" class="px-md py-sm text-xs">{{ number_format($sale->total, 0, ',', ' ') }}</td>
                             @if($this->mecefActif)
                             <td data-label="Statut MeCeF" class="px-md py-sm">
-                                @if($sale->mecef_status === 'transmise')
+                                @if(! $sale->estADeclarer())
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">Facture simple</span>
+                                @elseif($sale->mecef_status === 'transmise')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Normalisée</span>
                                 @elseif($sale->mecef_status === 'erreur')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">Refusée</span>
@@ -74,7 +77,7 @@
                                 @else
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">En attente</span>
                                 @endif
-                                @if($sale->mecef_status !== 'transmise' && $sale->mecef_message)
+                                @if($sale->estADeclarer() && $sale->mecef_status !== 'transmise' && $sale->mecef_message)
                                     <p class="text-[10px] text-outline mt-xs max-w-xs">{{ $sale->mecef_message }}</p>
                                 @endif
                             </td>
@@ -84,7 +87,7 @@
                                 @if($this->mecefActif && $sale->mecef_status === 'transmise' && $sale->mecef_qr_ref)
                                     <button type="button" wire:click="showMecef('{{ $sale->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Facture normalisée MeCeF"><span class="material-symbols-outlined text-[18px]">qr_code_2</span></button>
                                 @endif
-                                @if($this->mecefActif && $sale->mecef_status !== 'transmise')
+                                @if($this->mecefActif && $sale->estADeclarer() && $sale->mecef_status !== 'transmise')
                                     <button type="button" wire:click="retryMecef('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retransmettre au MeCeF"><span class="material-symbols-outlined text-[18px]">refresh</span></button>
                                 @endif
                             </td>

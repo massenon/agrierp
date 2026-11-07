@@ -109,6 +109,12 @@
                     <input wire:model.live="discount" type="number" min="0" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-right text-xs">
                 </div>
             </div>
+            @if($this->livraisonRetenue > 0)
+                <div class="flex items-center justify-between text-xs" dusk="ligne-livraison">
+                    <span class="text-outline">Frais de livraison</span>
+                    <span class="font-bold">{{ number_format($this->livraisonRetenue, 0, ',', ' ') }} FCFA</span>
+                </div>
+            @endif
             <div class="grid grid-cols-2 gap-md items-end border-t border-outline-variant pt-sm">
                 <div class="min-w-0">
                     <span class="block font-bold text-brand-forest mb-xs">Total à Payer</span>
@@ -125,6 +131,24 @@
                     </select>
                 </div>
             </div>
+            {{-- Choix du type de facture : seulement quand le module MeCeF est actif. « Facture normalisée » ouvre la fenêtre (événement open-modal). --}}
+            @if($this->facturationNormaliseeDisponible)
+                <div class="grid grid-cols-2 gap-sm items-end" dusk="choix-facture">
+                    <div class="min-w-0">
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Type de Facture</label>
+                        <select wire:model.live="factureType" dusk="facture-type" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                            @foreach(\App\Support\FactureType::LIBELLES as $valeurType => $libelleType)
+                                <option value="{{ $valeurType }}">{{ $libelleType }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="min-w-0">
+                        @if($factureType === 'normalisee')
+                            <button type="button" wire:click="ouvrirFactureNormalisee" dusk="facture-infos" class="w-full h-10 px-sm rounded-lg border border-brand-emerald text-brand-emerald text-[11px] font-bold hover:bg-brand-emerald/5 truncate">Modifier les informations de facturation</button>
+                        @endif
+                    </div>
+                </div>
+            @endif
             @if($paymentMode === 'especes')
                 <div class="grid grid-cols-2 gap-xs">
                     <div><label class="block text-[9px] text-outline font-bold uppercase mb-xs">Montant Reçu</label><input wire:model.live="cashReceived" type="number" min="0" placeholder="0" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs"></div>
@@ -197,6 +221,41 @@
         </form>
     </x-modal>
 
+    {{-- Fenêtre « Facture normalisée » : ouverte par l'événement open-modal (jamais par @if). Mêmes libellés et même ordre que le poste. --}}
+    <x-modal name="modal-facture-normalisee" max-width="sm">
+        <div class="flex items-center justify-between mb-md">
+            <h3 class="font-bold text-lg text-brand-forest">Facture Normalisée</h3>
+            <button type="button" wire:click="annulerFactureNormalisee" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="space-y-md">
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">IFU du client</label>
+                <input wire:model="clientIfu" dusk="client-ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('clientIfu') ? 'is-invalid' : 'border-outline-variant' }}">
+                <p class="text-[10px] text-outline mt-xs">Laissez vide pour un client sans IFU (client particulier).</p>
+                @error('clientIfu') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Nom et prénom du client *</label>
+                <input wire:model="clientNomFacture" dusk="client-nom-facture" type="text" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('clientNomFacture') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('clientNomFacture') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taux AIB</label>
+                <select wire:model="aibTaux" dusk="aib-taux" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('aibTaux') ? 'is-invalid' : 'border-outline-variant' }}">
+                    @foreach(\App\Support\AibTaux::LIBELLES as $valeurAib => $libelleAib)
+                        <option value="{{ $valeurAib }}">{{ $libelleAib }}</option>
+                    @endforeach
+                </select>
+                <p class="text-[10px] text-outline mt-xs">Le montant de l'AIB est calculé par la DGI.</p>
+                @error('aibTaux') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+        </div>
+        <div class="flex justify-end gap-sm pt-md mt-md border-t border-outline-variant">
+            <button type="button" wire:click="annulerFactureNormalisee" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+            <button type="button" wire:click="validerFactureNormalisee" dusk="facture-valider" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Valider</button>
+        </div>
+    </x-modal>
+
     <x-modal name="modal-livraison" max-width="sm">
         <div class="flex items-center justify-between mb-md">
             <h3 class="font-bold text-lg text-brand-forest">Livraison</h3>
@@ -213,10 +272,10 @@
                         <option value="gratuite">Livraison gratuite (offerte)</option>
                         <option value="client">Livraison assurée par le client</option>
                         <option value="incluse">Prix de livraison inclus dans le montant</option>
-                        <option value="facturee">Livraison facturée séparément</option>
+                        <option value="facturee">Livraison facturée (ajoutée au total de la vente)</option>
                     </select>
                     @if($deliveryMode === 'facturee')
-                        <input wire:model="deliveryFrais" type="number" placeholder="Frais de livraison (FCFA) si facturée séparément" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">
+                        <input wire:model="deliveryFrais" type="number" placeholder="Frais de livraison (FCFA), inclus dans le total" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">
                     @endif
                     <input wire:model="deliveryAdresse" type="text" placeholder="Adresse de livraison" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">
                     <input wire:model="deliveryContact" type="text" placeholder="Contact du transporteur" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">

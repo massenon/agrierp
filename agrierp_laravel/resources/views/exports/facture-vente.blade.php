@@ -1,9 +1,22 @@
 {{-- Facture d'une vente (Facturation) — avec ou sans certification MeCeF. --}}
+@php $normalisee = $sale->estADeclarer(); @endphp
 <p style="font-size:12px;">
     Facture <strong>{{ $sale->numero_facture }}</strong> du <strong>{{ $sale->date_effective->format('d/m/Y') }}</strong><br>
-    Client : <strong>{{ $sale->customer?->name ?? 'Client Anonyme' }}</strong>
-    @if($sale->customer?->phone) — {{ $sale->customer->phone }} @endif
-    <br>Mode de règlement : {{ $sale->payment_mode ?? '—' }}
+    @if($normalisee)
+        {{-- Facture normalisée : l'identité fiscale de l'ACHETEUR saisie à la vente (nom, IFU facultatif, AIB). --}}
+        Client : <strong>{{ $sale->client_nom_facture ?: ($sale->customer?->name ?? 'Client Anonyme') }}</strong><br>
+        @if($sale->client_ifu) IFU du client : <strong>{{ $sale->client_ifu }}</strong><br> @endif
+        @if($sale->aib_taux)
+            AIB : <strong>{{ \App\Support\AibTaux::LIBELLES[$sale->aib_taux] ?? $sale->aib_taux }}</strong>
+            @if($sale->mecef_aib_montant !== null && (float) $sale->mecef_aib_montant > 0) — montant calculé par la DGI : {{ number_format((float) $sale->mecef_aib_montant, 0, ',', ' ') }} FCFA @endif
+            <br>
+        @endif
+    @else
+        Client : <strong>{{ $sale->customer?->name ?? 'Client Anonyme' }}</strong>
+        @if($sale->customer?->phone) — {{ $sale->customer->phone }} @endif
+        <br>
+    @endif
+    Mode de règlement : {{ $sale->payment_mode ?? '—' }}
 </p>
 
 <table class="data-table">
@@ -27,12 +40,21 @@
         @empty
             <tr><td colspan="4" style="text-align:center;">Aucune ligne.</td></tr>
         @endforelse
+        {{-- Frais de livraison INCLUS dans la vente (nouvelles ventes) : une ligne, comprise dans le total. --}}
+        @if($sale->delivery_in_total && (float) $sale->delivery_fee > 0)
+            <tr>
+                <td>Frais de livraison</td>
+                <td style="text-align:right;">1</td>
+                <td style="text-align:right;">{{ number_format($sale->delivery_fee, 0, ',', ' ') }}</td>
+                <td style="text-align:right;">{{ number_format($sale->delivery_fee, 0, ',', ' ') }}</td>
+            </tr>
+        @endif
     </tbody>
 </table>
 
 <p style="text-align:right;font-size:12px;margin-top:10px;">
     @if($sale->discount > 0) Remise : {{ number_format($sale->discount, 0, ',', ' ') }} FCFA<br> @endif
-    @if($sale->delivery_fee > 0) Frais de livraison : {{ number_format($sale->delivery_fee, 0, ',', ' ') }} FCFA<br> @endif
+    @if($sale->delivery_fee > 0 && ! $sale->delivery_in_total) Frais de livraison : {{ number_format($sale->delivery_fee, 0, ',', ' ') }} FCFA<br> @endif
     <strong>Total TTC : {{ number_format($sale->total, 0, ',', ' ') }} FCFA</strong>
 </p>
 
@@ -55,6 +77,9 @@
             </td>
         </tr>
     </table>
+@elseif($normalisee)
+    {{-- Facture normalisée demandée, pas encore certifiée : aucun QR ni code inventé. --}}
+    <p style="font-size:11px;margin-top:14px;" id="mention-en-attente">{{ \App\Support\FactureType::MENTION_EN_ATTENTE }}</p>
 @else
-    <p style="font-size:11px;margin-top:14px;">Facture émise sans certification MeCeF.</p>
+    <p style="font-size:11px;margin-top:14px;" id="mention-simple">{{ \App\Support\FactureType::MENTION_SIMPLE }}</p>
 @endif

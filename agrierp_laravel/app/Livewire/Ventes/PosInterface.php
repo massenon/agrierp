@@ -19,7 +19,13 @@ use App\Models\Receivable;
 use App\Models\Sale;
 use App\Models\SaleLine;
 use App\Models\VeterinaryWithdrawalPeriod;
+use App\Services\Mecef\ChoixFactureService;
 use App\Services\Mecef\FacturationMecefService;
+use App\Services\Mecef\MecefFactureBuilder;
+use App\Services\Mecef\MecefReglage;
+use App\Support\AibTaux;
+use App\Support\FactureType;
+use Illuminate\Validation\ValidationException;
 use App\Services\TransactionRejouable;
 use App\Support\OrdreDesVerrous;
 use Livewire\Component;
@@ -152,6 +158,24 @@ class PosInterface extends Component
      */
     public string $dateVente = '';
 
+    /**
+     * CHOIX « Facture simple » / « Facture normalisée » (demande du client, 07/11/2026). Proposé SEULEMENT quand le module
+     * MeCeF est actif ; défaut = facture simple (AUCUNE transmission, pas de QR). « Facture normalisée » ouvre la fenêtre
+     * `modal-facture-normalisee` (événement `open-modal`) : IFU du client (13 chiffres, vide = client sans IFU), nom et prénom
+     * (obligatoire), taux d'AIB (5 % par défaut). Validé par `ChoixFactureService`, le point de passage du poste aussi.
+     * Propriétés publiques, donc modifiables par le client : le serveur re-juge tout dans `validateSale`.
+     */
+    public string $factureType = FactureType::SIMPLE;
+
+    public string $clientIfu = '';
+
+    public string $clientNomFacture = '';
+
+    public string $aibTaux = AibTaux::DEFAUT;
+
+    /** Le client dont la fenêtre a été préremplie (ne pas écraser une saisie quand le client n'a pas changé). */
+    public string $clientPrerempli = '';
+
     public function mount(): void
     {
         $this->dateVente = now()->format('Y-m-d');
@@ -267,9 +291,103 @@ class PosInterface extends Component
         return collect($this->cart)->sum('montant');
     }
 
+    /**
+     * Frais de livraison INCLUS dans la vente (décision du client, 07/11/2026) : une livraison « facturée » entre dans le total
+     * (en FCFA ENTIERS, jamais négatif). Les autres modes (gratuite, client, incluse) n'ajoutent rien.
+     */
+    public function getLivraisonRetenueProperty(): int
+    {
+        return $this->deliveryConcerned && $this->deliveryMode === 'facturee'
+            ? max(0, MecefFactureBuilder::arrondi($this->deliveryFrais))
+            : 0;
+    }
+
     public function getTotalProperty(): float
     {
-        return max(0, $this->subtotal - $this->discount);
+        return max(0, $this->subtotal - $this->discount) + $this->livraisonRetenue;
+    }
+
+    /** Le module MeCeF est-il actif ? Alors la vente propose le choix du type de facture. */
+    public function getFacturationNormaliseeDisponibleProperty(): bool
+    {
+        return app(MecefReglage::class)->actif();
+    }
+
+    /** Choix « Facture normalisée » : la fenêtre s'ouvre, préremplie d'après le client de la vente. */
+    public function updatedFactureType(): void
+    {
+        if ($this->factureType === FactureType::NORMALISEE && $this->facturationNormaliseeDisponible) {
+            $this->ouvrirFactureNormalisee();
+        }
+    }
+
+    public function ouvrirFactureNormalisee(): void
+    {
+        $client = $this->customerId !== '' ? Customer::query()->find($this->customerId) : null;
+
+        // Le client a changé (ou rien n'a été saisi) : nom et IFU sont repris de sa fiche ; sinon la saisie est gardée.
+        if ($this->clientPrerempli !== $this->customerId || ($this->clientNomFacture === '' && $this->clientIfu === '')) {
+            $this->clientNomFacture = (string) ($client?->name ?? '');
+            $this->clientIfu = (string) ($client?->ifu ?? '');
+            $this->clientPrerempli = $this->customerId;
+        }
+
+        $this->resetErrorBag(['clientIfu', 'clientNomFacture', 'aibTaux']);
+        $this->dispatch('open-modal', name: 'modal-facture-normalisee');
+    }
+
+    /** « Valider » de la fenêtre : mêmes règles que l'enregistrement de la vente (`ChoixFactureService`). */
+    public function validerFactureNormalisee(): void
+    {
+        if ($this->choixDeFacture() === null) {
+            return;
+        }
+
+        $this->dispatch('close-modal', name: 'modal-facture-normalisee');
+    }
+
+    /** « Annuler » de la fenêtre : on revient à la facture simple (le choix par défaut). */
+    public function annulerFactureNormalisee(): void
+    {
+        $this->factureType = FactureType::SIMPLE;
+        $this->resetErrorBag(['clientIfu', 'clientNomFacture', 'aibTaux']);
+        $this->dispatch('close-modal', name: 'modal-facture-normalisee');
+    }
+
+    /**
+     * Le choix de facture VALIDÉ (colonnes de `sales`), ou null avec les refus posés sous les champs de la fenêtre. Module
+     * inactif : toujours facture simple (le choix n'est pas proposé).
+     *
+     * @return array{facture_type: string, client_ifu: ?string, client_nom_facture: ?string, aib_taux: ?string}|null
+     */
+    private function choixDeFacture(): ?array
+    {
+        $type = $this->facturationNormaliseeDisponible ? $this->factureType : FactureType::SIMPLE;
+
+        try {
+            $choix = app(ChoixFactureService::class)->valider([
+                'facture_type' => $type,
+                'client_ifu' => $this->clientIfu,
+                'client_nom_facture' => $this->clientNomFacture,
+                'aib_taux' => $this->aibTaux,
+            ]);
+            $this->resetErrorBag(['clientIfu', 'clientNomFacture', 'aibTaux']);
+
+            return $choix;
+        } catch (ValidationException $e) {
+            $this->resetErrorBag(['clientIfu', 'clientNomFacture', 'aibTaux']);
+
+            foreach (['client_ifu' => 'clientIfu', 'client_nom_facture' => 'clientNomFacture', 'aib_taux' => 'aibTaux'] as $champ => $propriete) {
+                if (isset($e->errors()[$champ])) {
+                    $this->addError($propriete, $e->errors()[$champ][0]);
+                }
+            }
+
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+            $this->dispatch('open-modal', name: 'modal-facture-normalisee');
+
+            return null;
+        }
     }
 
     public function getChangeDueProperty(): float
@@ -471,6 +589,14 @@ class PosInterface extends Component
 
         $this->resetErrorBag('customerId');
 
+        // CHOIX DE LA FACTURE : validé AVANT tout effet (nom obligatoire, IFU de 13 chiffres, AIB dans la liste) ; un refus rouvre
+        // la fenêtre « Facture normalisée » avec son motif, le panier est gardé.
+        $choixFacture = $this->choixDeFacture();
+
+        if ($choixFacture === null) {
+            return;
+        }
+
         // 🔴→✅ TICKET 15.30 — UNE DATE PASSÉE EST JUGÉE AVANT TOUT EFFET (futur, mois clôturé,
         // exercice absent ou clos) par le MÊME point de passage que la synchronisation.
         [$soldAt, $refus] = $this->evaluerDateVente();
@@ -546,7 +672,7 @@ class PosInterface extends Component
         // validation de la transaction, ci-dessous.
         try {
             [$sale, $ecriture, $bandesSignalees] = app(TransactionRejouable::class)->executer(
-                fn () => $this->enregistrerVente($soldAt),
+                fn () => $this->enregistrerVente($soldAt, $choixFacture),
                 'vente de la caisse web',
             );
         } catch (TransactionInterbloqueeException $e) {
@@ -580,7 +706,7 @@ class PosInterface extends Component
             $this->dispatch('toast', message: 'Vente enregistree avec succes - total '.number_format($this->total, 0, ',', ' ').' FCFA.', type: 'success');
         }
 
-        if (! $facture['transmise'] && ! ($facture['inactif'] ?? false)) {
+        if (! $facture['transmise'] && ! ($facture['inactif'] ?? false) && ! ($facture['simple'] ?? false)) {
             $this->dispatch('toast', message: 'Vente enregistrée — ATTENTION : facture normalisée MeCeF non transmise ('.$facture['message'].'). La vente reste à facturer : retransmettez-la depuis Facturation & MeCeF.', type: 'warning');
         }
 
@@ -598,6 +724,12 @@ class PosInterface extends Component
         $this->deliveryFrais = null;
         $this->deliveryAdresse = '';
         $this->deliveryContact = '';
+        // Prochaine vente : facture simple, fenêtre vide (le choix ne se reporte jamais d'une vente à l'autre).
+        $this->factureType = FactureType::SIMPLE;
+        $this->clientIfu = '';
+        $this->clientNomFacture = '';
+        $this->aibTaux = AibTaux::DEFAUT;
+        $this->clientPrerempli = '';
 
         // 🔴→✅ TICKET 14.2 — MÊME DÉFAUT QUE `ClotureExercice`, trouvé par
         // recherche systématique du motif et non par hasard : `subtotal`,
@@ -607,7 +739,7 @@ class PosInterface extends Component
         // juste au-dessus, le rendu qui suit réaffichait le total de la
         // vente DÉJÀ ENCAISSÉE au-dessus d'un panier vide — la caissière
         // voyait un montant ne correspondant plus à rien.
-        unset($this->subtotal, $this->total, $this->changeDue);
+        unset($this->subtotal, $this->total, $this->changeDue, $this->livraisonRetenue);
     }
 
     /**
@@ -615,9 +747,10 @@ class PosInterface extends Component
      * écritures en base, qui s'annulent avec lui. Rend la vente, son écriture (nulle si non générée) et les bandes
      * signalées sous délai d'attente.
      *
+     * @param  array{facture_type: string, client_ifu: ?string, client_nom_facture: ?string, aib_taux: ?string}  $choixFacture  déjà validé
      * @return array{0: Sale, 1: ?\App\Models\AccountingEntry, 2: array<int, string>}
      */
-    private function enregistrerVente(?\Carbon\Carbon $soldAt): array
+    private function enregistrerVente(?\Carbon\Carbon $soldAt, array $choixFacture): array
     {
         // 🔴→✅ Ticket U14 — ORDRE DES VERROUS (`OrdreDesVerrous`) : le stock du panier, par identifiant croissant, AVANT la
         // fiche du jour — le même ordre que l'envoi des postes et que les fiches. Le tri évite aussi l'interblocage entre
@@ -655,10 +788,13 @@ class PosInterface extends Component
             // inexécutable avant le ticket 14.1.
             // 0 plutôt que `null` : c'est la valeur que le schéma prévoit
             // pour « aucun frais de livraison ».
-            'delivery_fee' => $this->deliveryConcerned && $this->deliveryMode === 'facturee' ? ($this->deliveryFrais ?? 0) : 0,
+            // Frais de livraison INCLUS (07/11/2026) : entiers, dans `total` ; le drapeau est posé pour les NOUVELLES ventes seules
+            // (celles d'avant gardent leurs frais hors total, voir la migration `delivery_in_total`).
+            'delivery_fee' => $this->livraisonRetenue,
+            'delivery_in_total' => $this->livraisonRetenue > 0,
             'delivery_address' => $this->deliveryConcerned ? ($this->deliveryAdresse ?: null) : null,
             'delivery_contact' => $this->deliveryConcerned ? ($this->deliveryContact ?: null) : null,
-        ]);
+        ] + $choixFacture);
 
         foreach ($this->cart as $item) {
             SaleLine::create([

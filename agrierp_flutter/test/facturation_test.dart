@@ -50,6 +50,7 @@ void main() {
     String? compteursMecef,
     String? messageMecef,
     DateTime? normaliseLe,
+    String type = 'normalisee',
   }) => db
       .into(db.sales)
       .insert(
@@ -61,6 +62,8 @@ void main() {
           customerName: Value(client),
           paymentMode: 'especes',
           total: total,
+          // MECEF-3 — ces essais portent sur le statut des factures NORMALISÉES (une facture simple n'a pas de statut MeCeF).
+          factureType: Value(type),
           mecefStatus: Value(statutMecef),
           mecefQrRef: Value(refMecef),
           mecefCode: Value(codeMecef),
@@ -198,7 +201,8 @@ void main() {
 
       await afficher(tester);
 
-      expect(find.text('Vente pas encore envoyée'), findsOneWidget);
+      // MECEF-3 — une facture normalisée demandée, pas encore envoyée : « demandée — en attente » jusqu'au tirage.
+      expect(find.text('Facture normalisée demandée — en attente'), findsOneWidget);
       expect(
         find.textContaining('1 facture(s) pas encore envoyée(s)'),
         findsOneWidget,
@@ -405,12 +409,12 @@ void main() {
     });
 
     test('la facture porte lignes, total et la mention du web, avec ou sans référence MeCeF', () async {
-      await facture('abcdef12', total: 8000, client: 'GBAGUIDI Solange');
+      await facture('abcdef12', total: 8000, client: 'GBAGUIDI Solange', type: 'simple');
       await db.into(db.products).insert(ProductsCompanion.insert(id: uuid('prod'), sku: 'OEUF', name: 'Oeufs de table', unit: 'plateau', pricingMode: 'fixe'));
       await db.into(db.saleLines).insert(SaleLinesCompanion.insert(id: uuid('ligne'), saleId: uuid('abcdef12'), productId: uuid('prod'), qty: 4, unitPrice: 2000, manualTotalAmount: 8000));
 
       final doc = (await depot.documentFacture(uuid('abcdef12')))!;
-      expect(doc.noteDePied, 'Facture émise sans certification MeCeF.');
+      expect(doc.noteDePied, 'Facture simple — non normalisée DGI', reason: 'sans choix enregistré : une facture simple');
       final textes = [for (final l in doc.lignes) if (l is DonneesDocument) l.cellules.join('|') else if (l is TotalDocument) l.cellules.join('|')];
       expect(textes, ['Oeufs de table|4|2 000|8 000', 'Total TTC|||8 000']);
 

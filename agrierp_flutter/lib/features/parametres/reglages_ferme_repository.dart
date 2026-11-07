@@ -173,8 +173,18 @@ class ReglagesFermeRepository {
     'boitier': 'Boîtier MeCeF (à venir)',
   };
 
-  /// Adresse de l'API e-MECeF proposée par défaut (`MecefMode::URL_PAR_DEFAUT`).
-  static const urlEmecefParDefaut = 'https://developper.impots.bj/sygmef-emcf/api';
+  /// Environnement d'ESSAI de la DGI (`MecefMode::URL_ESSAI`) : l'adresse proposée tant que rien n'est réglé (`URL_PAR_DEFAUT`) — un
+  /// premier essai ne part jamais en production par défaut. Production : `MecefMode::URL_PRODUCTION`. Les deux sont relevées dans
+  /// le paquet de référence non officiel, NON confirmées par la documentation de la DGI.
+  static const urlEmecefEssai = 'https://developper.impots.bj/sygmef-emcf/api';
+  static const urlEmecefProduction = 'https://api.impots.bj/sygmef-emcf/api';
+  static const urlEmecefParDefaut = urlEmecefEssai;
+
+  /// Les deux préréglages de l'adresse (`MecefMode::PREREGLAGES_URL`) : clé → (libellé, adresse), dans l'ordre du web.
+  static const prereglagesUrlMecef = <String, (String, String)>{
+    'production': ('Production (DGI)', urlEmecefProduction),
+    'essai': ("Environnement d'essai (DGI)", urlEmecefEssai),
+  };
 
   /// MECEF-1 — le réglage servi par le tirage (`app_settings`) : mode, adresse, opérateur et UN BOOLÉEN « jeton configuré ».
   /// ⚠️ Le jeton lui-même n'existe PAS au poste (secret du serveur) : il se saisit sur le web.
@@ -189,6 +199,31 @@ class ReglagesFermeRepository {
       operateurId: lignes['mecef.operateur_id'] ?? '',
       operateurNom: lignes['mecef.operateur_nom'] ?? '',
       jetonConfigure: lignes['mecef.jeton_configure'] == '1',
+    );
+  }
+
+  /// Paramètres > « Facturation normalisée (e-MECeF) » : le mode, l'IFU, l'adresse et l'opérateur, écrits comme une DEMANDE `entreprise`
+  /// (mêmes règles, mêmes refus que « Données de l'Entreprise » : c'est le même service au serveur). Les autres données de
+  /// l'entreprise sont reprises telles quelles de la fiche tirée ; jamais un jeton.
+  Future<void> enregistrerMecef({
+    required String mode,
+    required String ifu,
+    required String apiUrl,
+    required String operateurId,
+    required String operateurNom,
+    required bool estAdmin,
+  }) async {
+    final e = await entreprise();
+    if (e == null) {
+      throw const ReglageRefuse({'ifu': "Identité de la ferme non synchronisée : lancez une synchronisation avant de régler la facturation normalisée."});
+    }
+    String taux(double? v, double defaut) => _s(v ?? defaut);
+    await enregistrerEntreprise(
+      raisonSociale: e.companyName ?? '', promoteur: e.promoterName ?? '', adresse: e.address ?? '', telephone: e.phone ?? '', email: e.email ?? '',
+      ifu: ifu, rccm: e.rccm ?? '', tva: e.tvaEnabled,
+      vps: taux(e.vpsRate, 4), cnssSalarie: taux(e.cnssEmployeeRate, 3.6), cnssPension: taux(e.cnssEmployerPensionRate, 6.4),
+      cnssFamille: taux(e.cnssEmployerFamilyRate, 9), cnssRisque: taux(e.cnssEmployerRiskRate, 2), estAdmin: estAdmin,
+      mecefMode: mode, mecefApiUrl: apiUrl, mecefOperateurId: operateurId, mecefOperateurNom: operateurNom,
     );
   }
 

@@ -8,7 +8,8 @@ import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
 import '../clients/clients_creances_repository.dart';
 import '../elevage/fiche_journaliere_repository.dart';
-import 'facturation_repository.dart' show FactureNormaliseeRefusee, StatutMecef;
+import 'choix_facture.dart';
+import 'facturation_repository.dart' show FacturationRepository, FactureNormaliseeRefusee, StatutMecef;
 
 /// Ligne du panier de caisse.
 class LignePanier {
@@ -166,6 +167,10 @@ class CaisseRepository {
     return client;
   }
 
+  /// MECEF-3 — le choix « Facture simple / normalisée » n'est proposé que si le module MeCeF est actif (mode e-MECeF, boîtier ou
+  /// simulé : `company_settings.mecef_actif`, servi par le tirage). Sinon toute vente est une facture simple.
+  Future<bool> mecefActif() => FacturationRepository(database: _db, mecefParDefaut: false).mecefActif();
+
   Future<List<Product>> catalogue() {
     return (_db.select(_db.products)
           ..where((t) => t.isActive.equals(true))
@@ -226,6 +231,10 @@ class CaisseRepository {
     double remise = 0,
     double? especesRecues,
     DateTime? dateVente,
+    String factureType = ChoixFacture.simple,
+    String? clientIfu,
+    String? clientNomFacture,
+    String? aibTaux,
   }) async {
     if (panier.isEmpty) {
       throw const VenteRefusee('Le panier est vide.');
@@ -241,6 +250,15 @@ class CaisseRepository {
     if (modePaiement == 'credit') {
       if (clientId == null || clientId.isEmpty) throw const VenteRefusee(motifCreditSansClient);
       if (client == null) throw const VenteRefusee(motifCreditClientIntrouvable);
+    }
+
+    // MECEF-3 — le choix de facture est jugé AVANT tout effet, par les règles du serveur (mêmes motifs, mêmes mots) : nom
+    // obligatoire, IFU de 13 chiffres s'il est saisi, taux d'AIB dans la liste. Une facture simple n'emporte aucune identité fiscale.
+    final ChoixValide choix;
+    try {
+      choix = ChoixFacture.valider(type: factureType, ifu: clientIfu, nom: clientNomFacture, aib: aibTaux);
+    } on ChoixFactureRefuse catch (e) {
+      throw VenteRefusee(e.message);
     }
 
     final saisie = maintenant();
@@ -331,6 +349,11 @@ class CaisseRepository {
                 especesRecues == null ? null : especesRecues - total,
               ),
               soldAt: soldAt,
+              // MECEF-3 — le choix de facture, ÉCRIT à la saisie et envoyé avec la vente (le serveur le revalide).
+              factureType: Value(choix.type),
+              clientIfu: Value(choix.ifu),
+              clientNomFacture: Value(choix.nom),
+              aibTaux: Value(choix.aib),
             ),
           );
 

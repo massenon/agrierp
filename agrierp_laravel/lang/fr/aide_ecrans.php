@@ -545,7 +545,7 @@ return [
         '/parametres-hub' => [
             'titre' => 'Paramètres',
             'puces' => [
-                "Onze onglets : rôles et permissions, données de l'entreprise, e-mail (SMTP), modules actifs, utilisateurs, postes et appairage, modes de paiement, audit, corbeille, réinitialisation et sauvegardes.",
+                "Douze onglets : rôles et permissions, données de l'entreprise, facturation normalisée (e-MECeF), e-mail (SMTP), modules actifs, utilisateurs, postes et appairage, modes de paiement, audit, corbeille, réinitialisation et sauvegardes.",
                 "« Modules Actifs » allume ou éteint les espèces d'élevage et l'assistant de démarrage.",
                 "« Gestion Utilisateurs » crée les comptes et attribue un rôle à chacun.",
                 "« Corbeille » restaure ce qui a été archivé ; « Audit Logs » garde la trace des actions.",

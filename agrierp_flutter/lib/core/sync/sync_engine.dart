@@ -2278,6 +2278,8 @@ class SyncEngine {
                 phone: Value(l['phone'] as String?),
                 email: Value(l['email'] as String?),
                 city: Value(l['city'] as String?),
+                // MECEF-3 — IFU du client (13 chiffres, facultatif) : préremplit la facture normalisée.
+                ifu: Value(l['ifu'] as String?),
                 creditLimit: Value(_reel(l['credit_limit']) ?? 0),
                 isActive: Value(_bool(l['is_active'])),
               ),
@@ -4045,6 +4047,15 @@ class SyncEngine {
         mecefCompteurs: Value(l['mecef_compteurs'] as String?),
         mecefNormaliseLe: Value(_date(l['mecef_normalise_le'])),
         mecefMessage: Value(l['mecef_message'] as String?),
+        // MECEF-3 — le choix de la vente (facture simple / normalisée, identité fiscale de l'acheteur, AIB), l'AIB calculé par la
+        // DGI et les frais de livraison inclus. Absents (serveur antérieur) : facture simple, livraison hors total.
+        factureType: Value(l['facture_type'] as String?),
+        clientIfu: Value(l['client_ifu'] as String?),
+        clientNomFacture: Value(l['client_nom_facture'] as String?),
+        aibTaux: Value(l['aib_taux'] as String?),
+        mecefAibMontant: Value(_reel(l['mecef_aib_montant'])),
+        deliveryFee: Value(_reel(l['delivery_fee']) ?? 0),
+        deliveryInTotal: Value(_bool(l['delivery_in_total'])),
         soldAt: vendueLe,
       );
 
@@ -7730,6 +7741,7 @@ class SyncEngine {
     'phone': c.phone,
     'email': c.email,
     'city': c.city,
+    'ifu': c.ifu,
     'is_active': c.isActive,
   };
 
@@ -8381,6 +8393,13 @@ class SyncEngine {
     // basculer de jour toute vente d'avant 01h00 — le defaut que ce
     // ticket corrige, reintroduit par l'autre bout.
     'sold_at': _instant(v.soldAt),
+    // MECEF-3 — le choix fait à la saisie et l'identité fiscale de l'acheteur : le poste les ÉCRIT, le serveur les REVALIDE
+    // (IFU de 13 chiffres s'il est présent, nom obligatoire si normalisée, AIB dans la liste). Jamais l'AIB calculé ni ce que
+    // renvoie la DGI : cela vient d'elle. Facture simple : aucune identité fiscale, jamais transmise.
+    'facture_type': v.factureType ?? 'simple',
+    'client_ifu': v.clientIfu,
+    'client_nom_facture': v.clientNomFacture,
+    'aib_taux': v.aibTaux,
     'device_id': v.deviceId,
     'updated_at': v.updatedAt.toUtc().toIso8601String(),
     'lines': lignes

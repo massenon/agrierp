@@ -478,6 +478,10 @@ class Customers extends Table {
   /// Adresse e-mail (ticket F0.72) : le tirage la sert désormais, le formulaire la saisit.
   TextColumn get email => text().nullable()();
 
+  /// MECEF-3 (schéma v85) — IFU du client, 13 chiffres, FACULTATIF (un client particulier n'en a pas) : saisi à la fiche du client
+  /// (web ET poste), envoyé avec elle, il préremplit la fenêtre « Facture normalisée » de la caisse.
+  TextColumn get ifu => text().nullable()();
+
   /// Plafond de crédit accordé, en FCFA. ⚠️ Jamais saisi ni envoyé par le poste.
   RealColumn get creditLimit => real().withDefault(const Constant(0))();
 
@@ -1667,6 +1671,23 @@ class Sales extends Table with SyncColumns {
   TextColumn get mecefCompteurs => text().nullable()();
   DateTimeColumn get mecefNormaliseLe => dateTime().nullable()();
   TextColumn get mecefMessage => text().nullable()();
+
+  /// MECEF-3 (schéma v85) — LE CHOIX FAIT À LA VENTE : `simple` (défaut : jamais transmise à la DGI, pas de QR) ou `normalisee`.
+  /// Le poste l'ÉCRIT à la saisie et l'envoie avec la vente ; le serveur le revalide. `client_ifu` (13 chiffres, vide = client sans
+  /// IFU), `client_nom_facture` (obligatoire si normalisée) et `aib_taux` (`5%`, `1%`, `N/A`) en sont l'identité fiscale de
+  /// l'ACHETEUR. NUL = vente d'avant ce choix : facture simple.
+  TextColumn get factureType => text().nullable()();
+  TextColumn get clientIfu => text().nullable()();
+  TextColumn get clientNomFacture => text().nullable()();
+  TextColumn get aibTaux => text().nullable()();
+
+  /// Montant d'AIB CALCULÉ PAR LA DGI, tiré du serveur et JAMAIS écrit par le poste (comme les `mecef_*`).
+  RealColumn get mecefAibMontant => real().nullable()();
+
+  /// Frais de livraison INCLUS dans la vente (web seulement : la caisse du poste ne saisit pas la livraison) — tirés pour que la
+  /// facture du poste montre sa ligne « Frais de livraison ». `delivery_in_total` faux = ventes d'avant, frais hors total.
+  RealColumn get deliveryFee => real().withDefault(const Constant(0))();
+  BoolColumn get deliveryInTotal => boolean().withDefault(const Constant(false))();
 }
 
 /// Achat saisi au poste, ou reçu du serveur.
@@ -2419,7 +2440,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 84;
+  int get schemaVersion => 85;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3100,6 +3121,21 @@ class AppDatabase extends _$AppDatabase {
       if (from < 75) {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v85 — ticket MECEF-3 : IFU du client, choix « facture simple / normalisée » de la vente, AIB, frais de livraison inclus.
+      if (from < 85) {
+        await _ajouterColonneSiAbsente(m, customers, customers.ifu);
+        for (final colonne in <GeneratedColumn>[
+          sales.factureType,
+          sales.clientIfu,
+          sales.clientNomFacture,
+          sales.aibTaux,
+          sales.mecefAibMontant,
+          sales.deliveryFee,
+          sales.deliveryInTotal,
+        ]) {
+          await _ajouterColonneSiAbsente(m, sales, colonne);
+        }
       }
       // v84 — ticket MECEF-1 : ce que la DGI renvoie d'une facture normalisée (vente `FV`, avoir `FA`), tiré du serveur.
       if (from < 84) {

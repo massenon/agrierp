@@ -63,7 +63,7 @@ class ModuleMecefDesactiveTest extends TestCase
 
         $html = view('exports.facture-vente', ['sale' => $vente->load(['customer', 'lines.product'])])->render();
         $this->assertStringContainsString($vente->numero_facture, $html);
-        $this->assertStringContainsString('Facture émise sans certification MeCeF.', $html);
+        $this->assertStringContainsString(\App\Support\FactureType::MENTION_SIMPLE, $html);
 
         $vente->update(['mecef_status' => 'transmise', 'mecef_qr_ref' => 'REF-123']);
         $html = view('exports.facture-vente', ['sale' => $vente->fresh()->load(['customer', 'lines.product'])])->render();

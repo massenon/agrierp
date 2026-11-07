@@ -10,7 +10,7 @@ use App\Models\Customer;
  *
  * Extrait de `Livewire\Ventes\ListeClients` (ticket 4.6) pour que la page web ET
  * `/sync/push` (le poste Flutter) appliquent les MÊMES règles — nom obligatoire,
- * téléphone / e-mail / ville facultatifs —, la même trace d'audit et le même archivage.
+ * téléphone / e-mail / ville / IFU (13 chiffres) facultatifs —, la même trace d'audit et le même archivage.
  *
  * ⚠️ ARCHIVER N'EFFACE RIEN : `is_active = false`, jamais un DELETE. Les ventes, les
  * créances et les avances du client restent lisibles.
@@ -28,6 +28,8 @@ class CustomerCatalogService
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:150'],
             'city' => ['nullable', 'string', 'max:100'],
+            // IFU du client (facultatif : un client particulier n'en a pas) : 13 chiffres. Il préremplit la facture normalisée.
+            'ifu' => ['nullable', 'string', 'regex:/^\d{13}$/'],
             'is_active' => ['nullable', 'boolean'],
         ];
     }
@@ -38,12 +40,19 @@ class CustomerCatalogService
      */
     public function payload(array $v): array
     {
-        return [
+        $charge = [
             'name' => $v['name'],
             'phone' => ($v['phone'] ?? null) ?: null,
             'email' => ($v['email'] ?? null) ?: null,
             'city' => ($v['city'] ?? null) ?: null,
         ];
+
+        // `ifu` ABSENT (poste ancien) = conservé ; présent mais vide = effacé. Les factures déjà normalisées gardent leur propre IFU.
+        if (array_key_exists('ifu', $v)) {
+            $charge['ifu'] = ($v['ifu'] ?? null) ?: null;
+        }
+
+        return $charge;
     }
 
     /**
