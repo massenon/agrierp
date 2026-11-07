@@ -7,5 +7,5 @@
         'text-white/90 hover:bg-white/10' => ! $isActive,
     ]) }}>
     <span class="material-symbols-outlined text-[20px]">{{ $icon }}</span>
-    <span class="text-[13px]">{{ $label }}</span>
+    <span class="text-[14px]">{{ $label }}</span>
 </a>

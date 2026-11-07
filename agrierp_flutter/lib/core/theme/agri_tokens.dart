@@ -147,9 +147,9 @@ class AgriTypography {
   /// comme `text-[10px]`, qui ne fixe aucun interligne.
   static const double interligneCorps = 1.5;
 
-  /// Libellé d'un lien de la barre latérale : `text-[13px]` EXPLICITE de `components/sidebar-link.blade.php`
-  /// (ticket H1). Ce n'est pas un `text-xs` mal mesuré : le web l'écrit en pixels.
-  static const double lienBarreLaterale = 13;
+  /// Libellé d'un lien de la barre latérale : `text-[14px]` EXPLICITE de `components/sidebar-link.blade.php`
+  /// (ticket H1, puis demande du client du 07/11/2026 : 13 → 14 px, web ET poste). Ce n'est pas un `text-sm` : le web l'écrit en pixels.
+  static const double lienBarreLaterale = 14;
   static const double base = 16;
   static const double lg = 18;
   static const double xl = 20;
