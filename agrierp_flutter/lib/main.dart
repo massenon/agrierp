@@ -1677,7 +1677,6 @@ class _BarreLaterale extends StatelessWidget {
       [
         (SymbolesAgri.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
         (SymbolesAgri.category, 'Catalogue Produits', EcranPoste.catalogueProduits),
-        (SymbolesAgri.upload_file, 'Importation en masse', EcranPoste.importationMasse),
       ],
     ),
     (
@@ -1696,6 +1695,8 @@ class _BarreLaterale extends StatelessWidget {
           'Administration & Document',
           EcranPoste.administrationEtDocument,
         ),
+        // Ticket IMPORT-1 : même groupe, même ordre, même libellé et même icône que le menu web.
+        (SymbolesAgri.upload_file, 'Importation en masse', EcranPoste.importationMasse),
       ],
     ),
     (

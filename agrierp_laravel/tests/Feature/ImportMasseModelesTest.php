@@ -295,4 +295,25 @@ class ImportMasseModelesTest extends ImportMasseBase
         $this->assertStringContainsString('CustomerCatalogService::class)->creer(', file_get_contents(app_path('Services/Import/ImportClientsService.php')));
         $this->assertStringContainsString('SupplierCatalogService::class)->creer(', file_get_contents(app_path('Services/Import/ImportFournisseursService.php')));
     }
+
+    public function test_le_lien_du_menu_est_dans_le_groupe_administration_pour_qui_peut_importer(): void
+    {
+        $this->withoutVite();
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $lien = fn ($role) => (function () use ($role) {
+            $user = \App\Models\User::create(['name' => 'U '.$role, 'username' => $role.uniqid(), 'email' => $role.uniqid().'@x.test', 'password' => bcrypt('x'), 'is_active' => true]);
+            $user->assignRole($role);
+
+            return $this->actingAs($user)->get('/dashboard')->getContent();
+        })();
+
+        foreach (['admin', 'caissier'] as $role) {
+            $html = $lien($role);
+            $this->assertMatchesRegularExpression('#ADMINISTRATION</p>\s*<div[^>]*>.*?href="/importation-masse".*?Importation en masse#s', $html, $role);
+        }
+        $this->assertStringContainsString('Administration &amp; Document', $lien('admin'));
+        $this->assertStringNotContainsString('href="/importation-masse"', $lien('animalier'));
+        $this->assertStringNotContainsString('href="/importation-masse"', $lien('comptable'));
+    }
 }

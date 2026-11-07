@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
@@ -252,7 +251,7 @@ void main() {
       await t.pumpAndSettle();
 
       expect(find.text("6 · RAPPORT D'IMPORTATION"), findsOneWidget);
-      expect(find.text('Créées'), findsOneWidget);
+      expect(find.text('CRÉÉES'), findsOneWidget);
       expect(find.text('Corriger le fichier puis ré-importer'), findsOneWidget);
       expect((await db.select(db.products).get()).single.name, 'Poulet fermier');
 

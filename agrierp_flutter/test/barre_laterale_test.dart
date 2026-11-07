@@ -44,8 +44,6 @@ void main() {
     'STOCKS & PRODUITS': [
       ('Gestion Stocks', EcranPoste.gestionStocks),
       ('Catalogue Produits', EcranPoste.catalogueProduits),
-      // Ticket IMPORT-1 : entrée du menu web (« Importation en masse »), hors maquette.
-      ('Importation en masse', EcranPoste.importationMasse),
     ],
     'FACTURATION': [('Facturation & MeCeF', EcranPoste.facturation)],
     'RESSOURCES HUMAINES': [
@@ -53,6 +51,8 @@ void main() {
     ],
     'ADMINISTRATION': [
       ('Administration & Document', EcranPoste.administrationEtDocument),
+      // Ticket IMPORT-1 : entrée du menu web (groupe ADMINISTRATION), hors maquette.
+      ('Importation en masse', EcranPoste.importationMasse),
     ],
     'COMPTABILITÉ & ADMIN': [
       ('Comptabilité', EcranPoste.comptabilite),

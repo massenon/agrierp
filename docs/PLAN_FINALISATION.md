@@ -981,3 +981,16 @@ Demande du client du 07/11/2026. (Le ticket « MECEF-2 » reste le mode boîtier
 | PWA-4 | Consultation hors ligne élargie (stock, créances, historique des ventes) | Tables lues en lecture seule, chiffrées |
 | PWA-5 | Comptabilité / paie hors ligne | Probablement jamais : reste au poste Windows (règle « la vue Blade est le maître », deux clients à tenir en parité) |
 | PWA-6 | Essai multipostes avec un navigateur participant (`SyncEssaiMultipostesTest`), essai iOS/Safari documenté (A12 de la spécification) | Appareils du client |
+
+## IMPORT-1 ✅ (08/11/2026) Importation en masse par tableur xlsx — Stocks, Clients, Fournisseurs (web d'abord, puis poste, aucun palier Drift)
+Décision du client : « ON DÉMARRE LA CONSTRUCTION », « très important », écran dédié au poste et au web. Conception : guide logialvia bloc 21 / fichier 28. Détail : sections IMPORT-1 de `agrierp_laravel/CLAUDE.md` et `agrierp_flutter/CLAUDE.md`.
+- **Fait** : `App\Services\Import\*` (orchestrateur + un service par module, lecture et validation ligne par ligne, aperçu, confirmation, rapport xlsx, journal `import_batches`), modèles xlsx versionnés à télécharger, écran Livewire `/importation-masse` (six étapes, groupe ADMINISTRATION du menu), écran du poste fidèle, parité exécutée contre le vrai PHP, tests et contrôle par mutation.
+- **Décisions** : création SEULE (jamais d'écrasement) ; idempotence par clé naturelle (`FusionReferentielsService`) + UUID v5 déterministe ; produit déjà au catalogue IGNORÉ sans stock ajouté ; stock initial par `AdjustStockAction` (web) / règle existante du poste (serveur écrit le mouvement) ; ligne par ligne, pas de « tout ou rien » ; fournisseurs sans e-mail ; modèle du poste généré hors ligne sans listes déroulantes natives.
+- **Reste à décider avec le client** (questions Q-IMP du guide) : taille maximale (5 Mo / 5 000 lignes retenus provisoirement), option « tout ou rien », conservation du rapport (aujourd'hui au journal serveur), date d'ouverture du stock initial (aujourd'hui : jour de l'import), intrants distincts des produits vendables (AgriERP n'a qu'une table `products`).
+### Phases suivantes (non construites, registre `ImportMasseService::REGISTRE` prêt)
+| Phase | Module | Point de passage |
+|---|---|---|
+| IMPORT-2 | Employés (clé : nom + prénom + date d'embauche ; dates AAAA-MM-JJ) | `SaisieEmployeAction`, droit `manage-rh` |
+| IMPORT-3 | Plan comptable (comptes complémentaires, code unique) | `PlanComptableService`, `manage-comptabilite` |
+| IMPORT-4 | Barème de rationnement (filière + libellé EXACT du barème) | écran Paramètres Élevage, `manage-elevage` |
+| IMPORT-5 | Journal d'import au poste, glisser-déposer, mise à jour en masse, CSV de repli | à décider |
