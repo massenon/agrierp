@@ -77,7 +77,7 @@
 | NFR-SEC-01 | Accès par rôle | 0 accès non autorisé par URL directe, au web ET dans les écrans du poste | test par (rôle, route) | NFRS-SEC-01 ; `agrierp_laravel/CLAUDE.md` | C |
 | NFR-SEC-02 | Injection SQL | 0 requête construite par concaténation ; API typée (Eloquent/Drift) ; `grep customSelect\|customStatement` justifié | grep avant livraison | NFRS-SEC-02 ; I3 §1 | C |
 | NFR-SEC-03 | Secrets | 0 secret en dur ni versionné ; `.env` non versionné | recherche statique + `git ls-files` | NFRS-SEC-03 ; `CLAUDE.md` racine | C |
-| NFR-SEC-04 | Mots de passe | hachés au serveur (`Hash::make`) ; longueur minimale 8 (existant logialvia) ; politique complète À DÉFINIR (Q-ADM-1) ; jamais journalisés ; jamais SHA-256+sel après la bascule | test de garde sur les colonnes du poste | guide D-SRV-5 ; F8 | C/D |
+| NFR-SEC-04 | Mots de passe | hachés au serveur (`Hash::make`) ; politique indiquée au champ de Mon Profil de logialvia : « Min. 8 caractères, 1 majuscule, 1 chiffre » (à confirmer, Q-ADM-1) ; jamais journalisés ; jamais SHA-256+sel après la bascule | test de garde sur les colonnes du poste | guide D-SRV-5 ; F8 ; `logialvia/docs/manuel/libelles/31-mon-profil.json` | C/D |
 | NFR-SEC-05 | PIN local du poste | PBKDF2-HMAC-SHA256 ≥ 100 000 itérations, sel 16 octets | test unitaire | guide D-SRV-5 | P |
 | NFR-SEC-06 | Verrou de connexion | 5 échecs → 15 min, persisté côté serveur | test | F1 ; I3 §6 | C |
 | NFR-SEC-07 | HTTPS obligatoire en production (jeton et mot de passe circulent) | 100 % des requêtes `/api` | test d'environnement | guide D-SRV-7 | P |
