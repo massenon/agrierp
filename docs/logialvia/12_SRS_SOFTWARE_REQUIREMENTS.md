@@ -3,7 +3,7 @@
 ## USAGE
 
 - **Quand l'utiliser** : après le PRD ; avant de créer la première migration. Il fige le comportement du SYSTÈME (architecture, interfaces, données, sécurité, hors ligne) ; le FRS (`13_`) fige les fonctions testables par module.
-- **Ordre** : `10_BRS` → `11_PRD` → **`12_SRS`** → `13_FRS` → `14_NFRS` → `15_REGLES_METIER` ; s'appuie sur `02_ARCHITECTURE_WEB_ET_STACK.md` (stack), `30_DATABASE.md` (schéma), `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` (appairage, synchro), `41_MECEF_EMECEF.md`, `40_PWA_HORS_LIGNE.md`.
+- **Ordre** : `10_BRS` → `11_PRD` → **`12_SRS`** → `13_FRS` → `14_NFRS` → `15_REGLES_METIER` ; s'appuie sur `02_ARCHITECTURE_WEB_ET_STACK.md` (stack), `30_DATABASE_ENGINEERING.md` (schéma), `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` (appairage, synchro), `41_MECEF_EMECEF.md`, `40_PWA_HORS_LIGNE.md`.
 - **Entrées** : `logialvia/docs/B3_SRS_Software_Requirements.md`, `C1_Architecture_Clean_DDD_Flutter.md`, `D1_Modele_Donnees_ERD_Dictionnaire.md`, `I1`, `I3_Security_Strict.md`, `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (§14 à §21), `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md`, `agrierp_laravel/CLAUDE.md`, `agrierp_flutter/CLAUDE.md`.
 - **Sorties** : ce fichier à jour (exigences `SR-nnn`), la liste des interfaces externes, la matrice « table → nature → règle de conflit » (section 5) complétée pour CHAQUE table de logialvia.
 - **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` (lecture seule) ; `logialvia_app/…` idem ; sans préfixe = monorepo `/home/user/agrierp`.
@@ -97,7 +97,7 @@ Matrice de classement des **37 tables Drift** de logialvia (relevées par `grep 
 | `AuditLogs`, `SecurityLogs`, `Corbeille`, `MessagesEditeur` | serveur seule (copie en lecture selon droit) | serveur |
 | `PreferencesPoste` | locale, non synchronisée | — |
 
-Absences à noter : il n'existe PAS de table « sujets » dans logialvia (seule `Bandes`) ; les sujets nominatifs (registre des reproducteurs) sont une fonction d'AgriERP (BS3) à décider (Q-ELV-8). Liste complète et dictionnaire : `30_DATABASE.md` et `logialvia/docs/D1_Modele_Donnees_ERD_Dictionnaire.md`.
+Absences à noter : il n'existe PAS de table « sujets » dans logialvia (seule `Bandes`) ; les sujets nominatifs (registre des reproducteurs) sont une fonction d'AgriERP (BS3) à décider (Q-ELV-8). Liste complète et dictionnaire : `30_DATABASE_ENGINEERING.md` et `logialvia/docs/D1_Modele_Donnees_ERD_Dictionnaire.md`.
 
 ## 6. Exigences de sécurité, hors ligne, PWA, import
 

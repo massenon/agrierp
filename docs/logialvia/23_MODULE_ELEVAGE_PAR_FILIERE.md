@@ -1,0 +1,144 @@
+# 23 — MODULE ÉLEVAGE PAR FILIÈRE (fiches journalières, bandes, couvoir, soins, rationnement, paramètres)
+
+## USAGE
+
+- **Quand l'utiliser** : pour construire/auditer tout ce qui touche à l'élevage (le module le plus complexe, « cœur du métier », B2 §7), au jalon W6d (après stocks et ventes, car la vente alimente la fiche et la provende lit le stock). Il se construit en cascade : **bandes → fiche générique → rationnement → soins/prophylaxie → couvoir → rappels**, puis filière par filière.
+- **Ordre** : `20_MODULES_INDEX` → `25_` → `24_` → **`23_`** → `22_` (tableaux de bord) ; règles : `15_REGLES_METIER.md` §1 à §3 et §7 (particularités filières).
+- **Entrées** : `logialvia/docs/F3_Module_Production_Elevage.md`, `H2_Onglets_Fiche_Poulets_Pondeuses.md`, `05_LOGIQUE_CALCUL_FORMULAIRES.md`, `B6_Regles_Metier.md`, `E4_DataTables_Complet.md`, `E6_Formulaires.md`, `I2_Gestion_Modules_Actifs.md`, `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` blocs 1, 5, 6, 12 ; code `logialvia_app/lib/elevage/` (`domain/entities/configuration_espece.dart`, `domain/services/{calcul_fiche_journaliere,suivi_incubation,statistiques_mirages,prophylaxie_de_la_bande,rappels_prophylaxie,agregation_hebdomadaire}.dart`, `domain/usecases/{enregistrer_journee_usecase,reporter_deces_infirmerie_usecase}.dart`, `data/seed/parametres_elevage_seeder.dart`, `presentation/screens/fiche_espece_screen.dart`) ; AgriERP : `agrierp_laravel/app/Services/EffectifParCategorieService.php`, `agrierp_laravel/app/Actions/SaisieBandeAction.php`, `agrierp_laravel/app/Actions/TransferBetweenLotsAction.php`, `agrierp_laravel/app/Actions/RecordSaleOnFicheElevageAction.php`, `agrierp_laravel/app/Services/ProtocoleDuJourService.php`, `agrierp_laravel/app/Livewire/Elevage/` ; libellés `logialvia/docs/manuel/libelles/{05…11d,m01…m04}*.json`.
+- **Sorties** : migrations, modèles, Actions/Services, composants Livewire `Elevage\…`, vues, tables Drift/dépôts/écrans, tests (cas de `15_`).
+- **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` ; sans préfixe = `/home/user/agrierp`.
+
+---
+
+## 1. Objectif
+
+Remplacer les fiches papier : l'animalier saisit des FAITS (achats, nés, morts, dons ; les ventes viennent de la caisse) et lit des effectifs CALCULÉS par catégorie, la provende du jour, les alertes et les rappels ; un seul écran générique, configuré par filière (`ConfigurationEspece`), jamais cinq implémentations (A2 §5, §15 ; NFRS-SCAL-02).
+
+## 2. Écrans du module
+
+| Route | Écran | Rôles | Droit web | Module actif | Surface |
+|---|---|---|---|---|---|
+| `/elevage/goliaths` | Fiche Goliaths | A N | view/manage-elevage | toujours actif | W+P |
+| `/elevage/pintades` | Fiche Pintades | A N | idem | toujours actif | W+P |
+| `/elevage/lapins` | Fiche Lapins | A N | idem | `cuniculture` | W+P |
+| `/elevage/poissons-chats` | Fiche Poissons-Chats | A N | idem | `pisciculture` | W+P |
+| `/elevage/poulets-pondeuses` | Fiche Poulets / Pondeuses (onglets « Poulets », « Pondeuses ») | A N | idem | `aviculture_classique` | W+P |
+| `/elevage/couveuse` | Cycle Couveuse | A N | idem | — | W+P |
+| `/elevage/mirages` | Statistiques des Mirages | A N | view-elevage | — | W+P |
+| `/elevage/soins` | Soins & Calendrier (3 onglets) | A N | idem | — | W+P |
+| `/parametres/elevage` | Paramètres Élevage (4 onglets) | A N (limité) | idem | — | W+P |
+| `/elevage/dashboard` | Dashboard Élevage | A N | view-elevage | — | `22_` |
+
+Un module désactivé : entrée de menu retirée ET route inaccessible par URL directe (redirection `/elevage/dashboard`) ; données conservées (BR-ADM-002) ; réactivation = reprise de la cascade où elle s'était arrêtée.
+
+## 3. Patron commun d'une fiche (les 5 écrans de fiche)
+
+Ordre : (1) en-tête : nom de la filière, sélecteur mois/année ; (2) 4 KPI ; (3) bandeau « Rappel du Cycle » (pastilles des étapes) ; (4) bandeau « Bande en cours » (code, mise en place, **jour de cycle du jour affiché**, « Déclarer une Mise en Bande » / « Clôturer la Bande ») ; (5) formulaire de saisie journalière ; (6) « Historique du Mois — <Mois Année> » avec pilule **Grille Quotidienne / Vue Hebdomadaire** ; (7) calendrier mobile (vue étroite).
+
+**KPI (4 cartes)** : EFFECTIF VIVANT (effectif du dernier jour saisi) ; Mortalité du mois (Σ morts toutes catégories) ; Taux de mortalité (mortalité du mois ÷ effectif début de mois × 100) ; Ventes du mois (Σ `vente`). Pondeuses : Effectif Pondeuses, Stock d'œufs actuel, Taux de ponte, Alerte autonomie alimentaire (H2 : badge rouge sous 7 jours — Q-ALR-1).
+
+**Formulaire** (hauteur de champ 44 px ; un seul composant `ChampSaisieNombre`) :
+
+| Champ (libellé exact) | Nature | Règle |
+|---|---|---|
+| Date (jour actif) | sélecteur | changer de date recharge le formulaire (jour vide si non saisi) ; un jour dans un exercice clos est refusé à l'enregistrement (bandeau de l'exercice de LA DATE) |
+| ACHATS (« Achats / Entrées » pour Pondeuses) | entier ≥ 0 | alimente la catégorie la plus jeune (RM-ELV-01) ; empoissonnement = Achats |
+| NÉS (libellé par filière : « Nés (Couveuse) », « Nés (Mise bas) », « Nés », « Nés / Transferts ») | entier ≥ 0 | alimente la catégorie la plus jeune |
+| VENTES (POS) | LECTURE SEULE | somme des ventes historiques et des ventes réelles de la caisse pour l'espèce et la date (BR-ELV-010) ; jamais saisi |
+| MORTS PAR CATÉGORIE | compteurs `−` / `+` (3 ou 4) | jamais négatif ni non numérique |
+| DONS PAR CATÉGORIE | compteurs `−` / `+` | idem |
+| EFFECTIF FINAL DU JOUR (CALCULÉ) | LECTURE SEULE (texte, pas champ désactivé) | « = Effectif (J-1) + Achats/Nés − (Morts + Ventes + Dons) » ; détail par catégorie |
+| TAUX DE MORTALITÉ DU JOUR | calculé | « = (Morts du Jour ÷ Effectif J-1) × 100 » |
+| TAUX DE MORTALITÉ (CUMUL) | calculé | RM-ELV-08 |
+| PESÉE TOTALE DU LOT (G) | entier facultatif | stocké `poidsGeneralG` ; sert au futur GMQ (Q-PIL-2) |
+| OBSERVATION DE TRAITEMENT + case « Traitement validé » | texte + booléen | `traitementObs`, `traitementValide` |
+| Section « Traitements & Prophylaxie » | liste | échéances du jour de cycle (RM-PRO-01) avec produit et délai d'attente ; « rien n'est projeté sans bande » |
+| Bouton **Enregistrer** | primaire | valide → calcule (RM-ELV-01) → persiste → cascade (RM-ELV-02) ; toast après écriture seulement |
+
+**Tableau « Historique du Mois »** (clic sur une ligne = charge ce jour dans le formulaire, ne navigue pas) : Date · Achat · Né · Vente · Morts (total) · Dons (total) · Effectif. Pondeuses : + SRH · TS · Sorties · Stock Final. **Vue hebdomadaire** (RM-ELV-11) : Semaine · Cumul Achats · Cumul Nés (libellé de la filière) · Cumul Morts · Cumul Ventes · Effectif Fin de Semaine · Taux Mortalité Semaine · Traitements & Prophylaxie (observations réellement saisies, pas une projection) ; semaine sans saisie = « — ».
+**Rationnement** (table intégrée) : une ligne par catégorie : Effectif (calculé) · Ration normative (g/tête) · Provende servie (g) ; **ligne de total = somme de TOUTES les catégories** (RM-ELV-09) ; note sous le tableau quand le barème n'est pas confirmé (Goliaths : « Barème générique réutilisé de la référence Aviculture — aucun barème Goliath spécifique confirmé à ce jour, à valider avec la Gérante. » ; Poissons-Chats : « Seuils non confirmés pour cette filière — barème à valider avant usage réel »).
+**États vides/erreurs** : jour non saisi = formulaire vide ; fiche sans bande : « Rien n'est projeté sans bande » + proposition d'en déclarer une ; départ manquant (si Q-ELV-5 = oui) : demande du départ à la place de l'effectif, enregistrement refusé sans lui, messages exacts de `15_` RM-ELV-03 ; catégorie inconnue : « — ».
+**Poste hors ligne** : intégral ; la fiche est écrite localement puis envoyée (« Pas encore envoyé » tant que `pending`) ; le compteur de ventes du jour se met à jour à la synchronisation d'une vente faite sur un autre poste.
+
+## 4. Les filières, une par une
+
+Pour chacune : catégories, libellés, rôles, spécificités. Les formules sont dans `15_REGLES_METIER.md` (§1 à §3) ; ce qui n'est pas défini y est marqué À DÉFINIR et n'est pas répété ici.
+
+### 4.1 Lapins (`/elevage/lapins`, module `cuniculture`)
+Catégories logialvia **LAPEREAU** (reçoit achats/nés) · **CHAIR** (commercialisée) · **REPRODUCTEUR** ; libellés « ACHATS », « NÉS (MISE BAS) » ; colonnes d'éligibilité à l'écran : « CHAIR (IMMATURES) », « REPRODUCTEUR (ÉLIGIBLES VENTE) » ; bouton « Déclarer une Mise en Bande ». Barème semé : Sevré / Lapereaux 30 · Chair / Jeune 60 · Reproducteur 120, **confirmé** (« Référence Cuniculture »), alors que le code porte 110 pour Reproducteur (C-5, Q-ELV-2). Prophylaxie semée : J1 Déparasitage (Levalap, rémanence 7), J9 Hépato-protection (Hépaturyl). Mécanisme : famille « neutre » (RM-ELV-01) ; les lapins d'AgriERP (3 catégories avec « inconnu » = `null`, passage Sous-mères → Jeune, glossaire Reproducteur/Sous-mères/Jeune) sont une PROPOSITION (Q-ELV-1) ; ne pas renommer sans accord. **Reproduction** : dans logialvia, seule la colonne « Nés (Mise bas) » existe ; le « Suivi Reproduction » d'AgriERP (saillie, palpation, échecs de reproduction, jour de référence de la prophylaxie = dernière saillie) n'existe PAS dans logialvia → **À DÉFINIR (Q-REP-1)** : ALLMANY veut-elle suivre saillies et mises bas ? Si oui, spécifier d'abord au web.
+
+### 4.2 Volailles : Poulets et Pondeuses (`/elevage/poulets-pondeuses`, module `aviculture_classique`, 2 onglets, chacun son ViewModel/composant et son historique)
+- **Onglet « Poulets »** : POUSSIN (jeune) · POULETTE (commercialisée) · ADULTE ; « NÉS / TRANSFERTS » ; patron standard sans écart (H2) ; Q-ELV-3 : catégories et rations à confirmer (AgriERP : Reproducteur/Jeune/Poussin).
+- **Onglet « Pondeuses »** : 4 catégories **Poussin Ponte** (reçoit achats/nés) · **Poussin Croissance** · **Poulette** · **Pondeuse** (commercialisée) ; « ACHATS / ENTRÉES », « NÉS / TRANSFERTS » ; rations 30/60/80/110 ; **section « SUIVI DU STOCK D'ŒUFS »** (STOCK HIER (SRH), ŒUFS PONDUS, ŒUFS CASSÉS, TOTAL STOCK (TS), SORTIES (PLATEAUX), STOCK FINAL ; SRH/TS/Stock final rendus par des textes) ; RM-ELV-07 ; colonnes SRH, TS, Sorties, Stock Final au tableau mensuel. 3 saisies par jour : œufs pondus (≥ 0), cassés (0 ≤ cassés ≤ pondus), sorties (≥ 0, × 30).
+- Reproducteurs de volaille (VOL-1 d'AgriERP : stades Reproducteur/Jeune/Poussin, vente d'un produit « abattage » = transformation) : **PROPOSITION** ; non défini dans logialvia (Q-ELV-3/4).
+
+### 4.3 Goliaths (`/elevage/goliaths`, toujours actif)
+Catégories **POUSSINS · GOLIATHAU (IMMATURES) · MATURE (ÉLIGIBLES VENTE)** ; **vente déduite de GOLIATHAU** (piège F3, test dédié) ; libellés « ACHATS », « NÉS (COUVEUSE) » ; bouton « Clôturer la Bande » ; bandeau de cycle : « Naissance (Couveuse) », « Goliathau (0 → 4 mois) », « Mature (≥ 4 mois, ≥ 2,8 kg) — Éligible à la Vente » ; constantes de maturité 2 800 g / 120 j (données seulement, aucune alerte codée) ; ration 30/60/110 générique ; couvoir 21 jours. Effectif de référence 31 matures. À définir : Q-GOL-1 à Q-GOL-3 (`15_` §7.3).
+
+### 4.4 Pintades (`/elevage/pintades`, toujours actif)
+Catégories **POUSSINS · PINTADAU (IMMATURES) · MATURE (ÉLIGIBLES VENTE)** ; vente déduite de PINTADAU ; « ACHATS », « NÉS (COUVEUSE) » ; couvoir **28 jours** ; ration 30/60/110 générique ; prophylaxie J1, J5, J6 (calcium), J12 (Gumboro). Effectif de référence 28 matures. **Aucune règle propre au-delà** : stades, durées, rations, reproducteurs → Q-PIN-1 à Q-PIN-4 (`15_` §7.2). Vérifier le libellé « Alevins » du barème semé (C-4).
+
+### 4.5 Pisciculture — Poissons-Chats (`/elevage/poissons-chats`, module `pisciculture`, désactivé par défaut)
+Catégories **ALEVIN · JUVÉNILE (IMMATURES) · MATURE (ÉLIGIBLES VENTE)** ; vente déduite de JUVÉNILE ; « ACHATS » (empoissonnement) et « NÉS » ; bouton « Déclarer une Mise en Bande » ; identifiant de bassin préfixé `B` (Bassin) ; produit catalogue **« Poisson-chat vif (kg) »** (vendu AU KILO alors que l'effectif se tient en sujets : la conversion kg ↔ sujets déduits de la fiche n'est définie nulle part — **Q-PIS-6**, à ajouter à la liste de `15_` §7.1) ; ration code 30/60/110 contre barème semé 8/25/45 (C-3) ; prophylaxie J1 antifongique du bassin (3 j), J14 contrôle oxygénation/ammoniac. **Tout le reste est À DÉFINIR** (stades, mortalité, biomasse, cycle bassin/étang, aliment, vente) : `15_REGLES_METIER.md` §7.1 (Q-PIS-1 à Q-PIS-9). Tant que non tranché : la filière fonctionne en famille « neutre » (RM-ELV-01), AUCUNE formule de biomasse, de GMQ ou de conversion n'est codée.
+
+## 5. Bandes, sujets, transferts (web d'abord ; pas d'écran « Gestion des Bandes » dans logialvia aujourd'hui — E6 du guide)
+
+**Existant logialvia** : entité `Bande` + dépôt minimal (charger, couvrant, créer, clôturer) ; `BANDES.dateMiseEnBande`, `effectifInitial` (documentaire, n'alimente aucun calcul). **À construire** (guide bloc 12, PROPOSÉ ; messages exacts de `15_` RM-ELV-06) : écran de gestion (liste filtrable : filière, statut, code ; modales **Nouvelle bande** : filière*, code (préfixe de numérotation, unique parmi les bandes en cours), date de mise en bande*, effectif initial*, stade, observations ; **Modifier** : stade, statut, effectif SEULEMENT si la bande n'a pas de fiches ; **Archiver** / **Restaurer** ; **Transférer** : bande source, bande cible, catégorie (si chaîne), quantité, date ; **Constitution** ; **Transformation** (bon d'abattage : bande, sujets, produit, quantité produite, jour ; sortie de la bande, entrée du produit fini au stock ; refus : effectif insuffisant, produit inconnu, exercice clos) ; **Dons** ventilés par catégorie sur la fiche). Droit `manage-elevage` ; archivage `archive-elevage`. Hors ligne : fait daté, jamais supprimé ni annulé ; envoyé par UUID ; refus du serveur → `conflict` avec motif.
+
+## 6. Cycle Couveuse (`/elevage/couveuse`) et Statistiques des Mirages (`/elevage/mirages`)
+
+**KPI (cartes)** : CYCLES EN COURS ; ŒUFS EN INCUBATION (œufs RETENUS après mirages) ; POUSSINS ATTENDUS ; TAUX BRUT MOYEN ; TAUX D'ÉCLOSION RÉEL (TER). **Situation au JJ/MM/AAAA** (date de référence injectée, jamais `now()`).
+**Parc d'incubateurs** : une carte par machine (code, libellé, occupation en œufs retenus, taux de remplissage si capacité renseignée, nombre de lots en cours) ; bouton « Ajouter un Incubateur » (modale : CODE *, LIBELLÉ *, CAPACITÉ (ŒUFS) facultative ; la capacité signale une surcharge, ne bloque jamais).
+**Tableau des lots** : Code Cycle · Espèce · Œufs Chargés · Date Chargement · Éclosion Prévue (fenêtre ± 2 j) · Taux Éclosion · Statut (En Incubation / Éclos / Remplacé) · Mirages (2 boutons : vert = fait avec « N retirés », rouge « À saisir » = échu non saisi, gris = prévu) · Actions (Modifier le lot, Supprimer le lot, Historique des remplacements, Éclosion — bouton rouge plein). Filtres : statut (Tous les statuts / En cours / Éclos), espèce (Toutes espèces / Goliath / Pintade), incubateur. Un cycle éclos ne se modifie plus (infobulle : « Un cycle éclos ne se modifie plus : ses poussins sont entrés dans les effectifs et son taux d'éclosion dans les statistiques. »).
+**Modales** : « Déclarer un Nouveau Cycle » (ESPÈCE*, DATE DE CHARGEMENT*, NOMBRE D'ŒUFS CHARGÉS*, INCUBATEUR (« Non précisé » possible) ; bloc **CALENDRIER PRÉVISIONNEL (CALCULÉ)** : mirage 1 et 2 en dates exactes, éclosion en fenêtre ; bouton « Créer le Cycle ») ; « Enregistrer l'Éclosion » (poussins éclos, œufs non éclos/cassés ; invariant éclos + perdus ≤ chargés ; taux calculés en direct ; case « Recharger la machine immédiatement ») ; saisie des mirages depuis la ligne (œufs clairs J+7, gâtés J+14) ; « Historique des remplacements » (chaîne des `lotParentId` avec les mirages de chaque occupation et le TER de la lignée).
+**Alertes** : bandeau AVANT le tableau : mirages échus non saisis, retards les plus anciens d'abord (RM-COU-05) ; « Prochaines échéances (3 jours) » séparées des alertes. Éclosion imminente < 3 jours → tableau de bord.
+**Statistiques des Mirages** : ŒUFS CHARGÉS · CLAIRS (J+7) · GÂTÉS (J+14) · ŒUFS RETENUS · TAUX D'ÉCLOSION RÉEL (TER) · PERTE TOTALE ; filtres « Tous incubateurs », « Toutes filières » ; infertilité, mortalité embryonnaire, TER, perte totale avec chacun son dénominateur (RM-COU-03) ; bandeau des lots dont un mirage manque (« tant qu'il manque, tous les taux de l'écran sont faux »).
+**Sync** : `cycle_couveuse` : fait de saisie (création, mirages, éclosion) par UUID, éclosion idempotente ; `machines_incubateur` : référentiel créé au web ou au poste (fusion par code). Sous-lot créé dans la même transaction que l'éclosion. Contrat JSON local `SuiviIncubation.versJson()` à reprendre comme contrat d'API.
+
+## 7. Soins & Calendrier (`/elevage/soins`)
+
+**KPI** : DOSES ADMINISTRÉES (MOIS) · PLANIFIÉES À VENIR · EN QUARANTAINE / TRAITEMENT · COÛT VÉTÉRINAIRE (MOIS). **3 onglets** : « Registre des Soins » (Date · Lot/Espèce · Type d'action · Produit · Dose · Statut · Actions ; filtres catégorie et espèce « Toutes espèces ») ; « Calendrier des Doses » (grille Lot/Bande × jours du mois, colonne gauche figée, jour courant surligné ; statuts Effectué vert / Planifié or / En retard rouge / En cours bleu) ; « Suivi Infirmerie » (Date d'Entrée · Lot/Sujet · Motif · Niveau d'Isolement · Statut · Actions ; filtres statut En cours / Réintégré / Décédé et niveau).
+**Modale « Nouveau Soin »** (9 champs) : LOT / BANDE *, DATE DU SOIN *, TYPE D'ACTION * (liste fermée : Vaccination, Traitement curatif, Vermifuge, Vitamines), PRODUIT UTILISÉ, DOSE, DÉLAI D'ATTENTE / RÉMANENCE (JOURS), VÉTÉRINAIRE / ANIMALIER, SYMPTÔMES OBSERVÉS, COÛT (FCFA). **Modale « Planifier une Intervention »** : INTERVENTION *, LOT / BANDE *, DATE PRÉVUE * (le type d'action est demandé : le calendrier de prophylaxie ne le porte pas ; idempotent par `(bande, échéance)`). **Infirmerie** : « Nouvelle Entrée » (sujet, motif, niveau : Simple surveillance / Infirmerie / Quarantaine stricte, filière concernée facultative) ; « Réintégrer » ; « Décès » (RM-PRO-03 : catégorie obligatoire ou « Déjà saisie sur la fiche — ne rien ajouter » ; bouton « Confirmer le Décès » inactif sans réponse ; « Mortalité portée sur la fiche » / « Mortalité non reportée » dans le tableau). Bannière des délais d'attente en cours avec date de fin (RM-PRO-04). Hors ligne : fait daté ; décès = écriture de fiche (cascade).
+
+## 8. Paramètres Élevage (`/parametres/elevage`, 4 onglets)
+
+1. **Rationnement** : colonnes ESPÈCE · STADE PHYSIOLOGIQUE · RATION (G/TÊTE/J) · CONFIRMÉ ? · ACTIONS ; 12 barèmes semés (badge « Confirmé » pour les 3 lapins, « Générique (Aviculture, à confirmer) » pour les 9 autres) ; recherche « Rechercher un stade physiologique… », filtre « Toutes espèces » ; « Ajouter » ; icône d'information sur un stade libre : « Ce stade ne correspond à aucune catégorie de la fiche X : il est documentaire et ne pilote aucun calcul de provende. » Modifier une ration change immédiatement la provende de la fiche ; supprimer retombe sur la ration de référence (jamais 0) ; suppression = archivage (corbeille).
+2. **Calendriers Prophylaxie** : pastilles d'espèce (Goliaths, Pintades, Lapins, Poissons-Chats) ; colonnes JOUR DU CYCLE · TRAITEMENT · PRODUIT · RÉMANENCE · ACTIONS ; 11 échéances semées ; « Ajouter une Échéance » ; CRUD complet ; **le calendrier s'injecte dans la fiche** par jour de cycle depuis la date de mise en bande.
+3. **Intrants de Provende** (lecture seule) : CODE · INTRANT · STOCK ACTUEL · SEUIL D'ALERTE · PRIX INDICATIF (FCFA/KG) = PMP réel du module Achats ; « le stock se gère exclusivement depuis Gestion Stocks / Fabrication de Provende ».
+4. **Numérotation Bandes & Sujets** : PRÉFIXE ENCLOS · CAGE · BANDE · BASSIN (groupés AVICULTURE (GOLIATHS & PINTADES) · CUNICULTURE (LAPINS) · PISCICULTURE (POISSONS-CHATS)) ; aperçu en direct ; bouton « Enregistrer Tous les Formats de Numérotation » ; **préfixe vide refusé**.
+Droits : `animalier` modifie rations et prophylaxie ; l'activation/désactivation d'une filière reste `admin` (I1 §3). Édition au poste : les référentiels sont « serveur gagne » ; une modification faite au poste part comme DEMANDE rejouée par le serveur (modèle `SyncController::pushSettingsRequests`, PROPOSÉ).
+
+## 9. Synchronisation (tables du module)
+
+| Table | Nature | Règle de conflit |
+|---|---|---|
+| `fiche_journee` (UUID, `bande_id`, `(bande, date)` unique) | fait de saisie | dernier écrivain par UUID ; `vente` JAMAIS prise du poste (le serveur l'incrémente) ; fiche déjà connue pour le même `(bande, jour)` sous un autre UUID : fusionnée |
+| `fiche_ventes_jour` | dérivée | recalculée par le serveur à la réception des ventes |
+| `bandes`, transferts, sujets | fait | refus motivé du serveur → `conflict` |
+| `cycle_couveuse`, `machines_incubateur`, `soins_calendrier`, `infirmerie` | fait | par UUID ; éclosion idempotente |
+| `baremes_ration`, `calendrier_prophylaxie` | référentiel | serveur gagne ; édition au poste = demande |
+| `modules_actifs` | référentiel | serveur gagne |
+Ordre de verrous : stock avant fiche (UUID croissants) ; deux écrivains (caisse et fiche) sur le même `(bande, jour)` : un seul écrivain, transaction unique.
+
+## 10. Notifications du module
+
+Soins à venir/en retard (06:05), prophylaxie du jour (06:00), mirage échu non saisi, éclosion imminente (< 3 jours), autonomie de provende (à l'enregistrement), mortalité anormale (seuil À DÉFINIR, Q-ALR-2), vente sous délai d'attente (signalée).
+
+## 11. Critères d'acceptation
+
+- [ ] Chaque cas de `15_REGLES_METIER.md` RM-ELV-01 à RM-ELV-11, RM-COU-01 à 05, RM-PRO-01 à 04 donne exactement le résultat calculé à la main (Feature + Dart).
+- [ ] Vente de 3 Goliathau : seule Goliathau baisse ; fiche du jour +3 en « Ventes (POS) ».
+- [ ] Effectif jamais saisissable ; SRH(J+1) = Stock final(J) (pas TS).
+- [ ] Total de provende = somme de TOUTES les catégories (Pondeuses : 32 050 g pour (77, 79, 43, 196)).
+- [ ] Désactiver `pisciculture` : menu retiré, URL directe refusée, données intactes ; Goliaths/Pintades non désactivables.
+- [ ] Aucun libellé de colonne ne mélange les vocabulaires (« couveuse » seulement chez Goliaths et Pintades).
+- [ ] Pisciculture et Pintades : AUCUNE formule hors famille « neutre » ; chaque point À DÉFINIR est visible dans l'écran de paramétrage (« non confirmé »).
+- [ ] Hors ligne : une fiche saisie sans réseau part à la synchronisation et donne les mêmes effectifs au web.
+
+## 12. Tests
+
+Modèles AgriERP à lire : `agrierp_laravel/tests/Feature/{EffectifParCategorieServicePurTest,VolaillesEffectifParCategorieTest,PondeusesEffectifParStadeTest,RationVolailleTest,RappelsDuJourTest}.php`, `agrierp_flutter/test/{effectif_par_categorie_test,cascade_categories_test,fiche_pondeuses_stades_test,ration_volaille_test}.dart`. Poste logialvia existants à étendre : `logialvia_app/test/elevage/{calcul_fiche_journaliere_test,enregistrer_journee_usecase_test,glossaire_filieres_test,stock_oeufs_cascade_test,prophylaxie_du_jour_test,rappels_prophylaxie_test,bande_prophylaxie_test,soins_test,parametres_elevage_test}.dart`. À écrire : jeu de cas ci-dessus en `effectif_par_categorie_test.dart` ; propriété « somme des catégories = total sur 500 jours aléatoires » ; test de mutation (retirer le plancher ou le refus de passage doit faire rougir ≥ 1 test) ; parité PHP↔Dart dès que le web existe.
+
+## 13. PROMPT de construction du module
+
+> Construis le module **Élevage** d'après ce fichier, filière par filière, APRÈS Stocks (`25_`) et Ventes (`24_`). Lis `20_` §7, `F3`, `H2`, `05`, `B6`, `15_REGLES_METIER.md` §1–§3 et §7, guide blocs 1, 5, 6, 12. **Ordre** : **(1) migration** `bands` (UUID, `species`, `code` unique parmi les bandes en cours, `stage`, `placed_on`, `initial_count`, `current_count`, `is_active`), `livestock_daily_entries` (UUID, `band_id`, `date`, `achat`, `ne`, `vente`, `mort_cat_1..4`, `don_cat_1..4`, `eff_cat_1..4`, `poids_general_g`, `traitement_obs`, `traitement_valide`, œufs : `oeufs_pondus`, `oeufs_casses`, `sorties_plateaux`, `srh`, `ts`, `stock_final_oeufs` ; unique `(band_id, date)` ; si Q-ELV-5 = oui : `cat_depart_1..4`, `vente_cat_1..4`, passages), transferts, `incubation_cycles`, `incubator_machines`, `veterinary_cares`, `infirmary_entries`, `feed_ration_standards`, `prophylaxis_calendar`, `modules_actifs` ; **(2) modèles** ; **(3) Services/Actions** : `EffectifParCategorieService` (fonctions PURES : un jeu de cas à la main par famille AVANT tout branchement), `EnregistrerFicheAction` (SEUL écrivain d'une fiche : saisie, vente de caisse, transfert, décès d'infirmerie, import), `SaisieBandeAction`, `TransfertEntreBandesAction`, `SuiviIncubationService`, `StatistiquesMiragesService`, `ProtocoleDuJourService`, `RappelsDuJourService`, `AlerteAutonomieFicheService` ; **(4) composants Livewire** UN `Elevage\FicheEspece` paramétré par configuration (+ `Elevage\CycleCouveuse`, `StatistiquesMirages`, `SoinsCalendrier`, `ParametresElevage`) ; **(5) vues Blade** fidèles aux sections ci-dessus, libellés mot pour mot ; **(6) portage poste** : étendre `ConfigurationEspece` (`emplacement`, `famille`), migration Drift `from < 27` avec `_ajouterColonneSiAbsente`, `EnregistrerJourneeUseCase` reste le seul écrivain, aucun calcul dans le ViewModel/le widget ; **(7) tests** du §12. **Pisciculture et pintades : famille « neutre » uniquement, formules À DÉFINIR non codées.** **Interdits** : répartition en pourcentage fixe, effectif saisissable, vente déduite de « Mature », mise à jour directe de `mort_cat_N` hors de la fonction d'écriture, cinq écrans de fiche dupliqués, calcul dans un widget, libellé avicole sur une filière non avicole, alerte qui bloque la saisie.

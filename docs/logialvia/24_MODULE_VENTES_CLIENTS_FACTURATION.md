@@ -1,0 +1,80 @@
+# 24 — MODULE VENTES, CLIENTS ET FACTURATION (caisse, devis, historique, avoirs, créances, relances, facture simple / normalisée MeCeF)
+
+## USAGE
+
+- **Quand l'utiliser** : pour construire/auditer la caisse et tout ce qui en découle ; au jalon W6c (après Stocks `25_` : la vente décrémente le stock) ; la partie MeCeF au jalon W7b. La caisse est le « point le plus surveillé de tout le projet » (F4 : atomicité).
+- **Ordre** : `25_` (produits, stock) → **`24_`** (clients, caisse) → `23_` (la vente alimente la fiche) → `26_` (écritures) → `28_` (rapports).
+- **Entrées** : `logialvia/docs/F4_Module_Ventes_Clients.md`, `H1_Onglets_Ventes.md`, `E9_Impression_PDF.md`, `B4_FRS_Functional_Requirements.md` (FRS-VTE-01…07), `B6_Regles_Metier.md` (BR-VTE-001…006), `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` blocs 14, 16, 19 ; code `logialvia_app/lib/commercial/` (`domain/entities/{vente,client,produit_vendable,facture_mecef,livraison}.dart`, `domain/services/transmission_mecef.dart`, `data/tables/{ventes,lignes_vente,clients,devis,produits_vendables,facturation_mecef_tables}*.dart`, `presentation/screens/widgets/onglet_pos.dart`) ; AgriERP : `agrierp_laravel/app/Services/AvoirClientService.php`, `agrierp_laravel/app/Services/Mecef/MecefFactureBuilder.php`, `agrierp_laravel/app/Services/Mecef/EmecefGateway.php`, `agrierp_laravel/app/Services/RelanceClientService.php`, `agrierp_laravel/app/Services/CustomerSettlementService.php`, `docs/prd/devis-poste.md`, `docs/prd/avoirs-historique-poste.md`, `docs/prd/panier-vente-deux-rangees.md` ; libellés `logialvia/docs/manuel/libelles/{12*,13,14b,m08,m10}*.json`. Voisins : `41_MECEF_EMECEF.md`, `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
+- **Sorties** : migrations, `SaisieVenteAction`, `AnnulerVenteAction`, `AvoirClientService`, `FacturationMecefService`, composants Livewire, vues, dépôts Drift, tests.
+- **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` ; sans préfixe = `/home/user/agrierp`.
+
+---
+
+## 1. Objectif
+
+Encaisser en moins de 60 secondes (BR-003) avec un stock exact en temps réel (BR-002), suivre les créances sans jamais accuser un retard qui n'existe pas (BR-026), produire une facture imprimable et, si le client le décide, une facture normalisée DGI (BR-015). Aucune vente ne s'écrit à moitié (BR-VTE-002).
+
+## 2. Écrans
+
+| Route | Écran | Rôles | Droit web | Module actif | Surface |
+|---|---|---|---|---|---|
+| `/ventes` | Ventes (4 onglets) | A C | view/manage/export-ventes | — | W+P (hors ligne au poste) |
+| `/clients` | Clients et Créances | A C | idem | — | W+P |
+| `/factures-mecef` | Facturation MeCeF | A C | view/manage-facturation | `mecef` | W+P (transmission au serveur) |
+| (modales) | Livraison, Annulation, Enregistrer un Paiement, Ajouter un Client, Émettre une Facture | — | — | — | — |
+
+## 3. Écran Ventes — KPI persistants (au-dessus des onglets) et 4 onglets
+
+**KPI** : CA DU JOUR (Σ `total` des ventes non annulées du jour) ; PANIER MOYEN (CA du jour ÷ nombre de ventes du jour ; « — » si aucune vente) ; VENTES EN ATTENTE (AVANCE) (nombre de ventes `status = 'Avance'`). Texte vide : « Aucune vente aujourd'hui ».
+
+### Onglet 1 — « Enregistrer Vente » (POS ; 2 colonnes : grille 2/3, panier 1/3 ; panier en deux rangées, `docs/prd/panier-vente-deux-rangees.md`)
+**Grille produits** : recherche « Rechercher un produit… » (filtrage en direct) ; filtre catégorie « Toutes catégories » (Avicole / Commerce Annexe / Cuniculture / Pisciculture) ; cartes : désignation, catégorie · unité (ex. « Avicole · sujet(s) », « Pisciculture · kg », « Commerce Annexe · paire(s) »), badge de stock (rouge si `stock ≤ seuil`), prix ou fourchette (« 1 500 – 3 500 F ») ; carte grisée non cliquable si `stock = 0`. Produits semés de référence : Goliath mature, Pintade mature, Poulet de chair (sujet), Poussin d'un jour, Œufs de table (plateau), Œufs fertiles goliath/pintade (u), Lapin vif (sujet), Poisson-chat vif (kg), fournitures scolaires, textile.
+**Panier** : lignes (désignation, prix × unité, `−`/valeur/`+` borné par le stock, retirer ×) ; texte vide « Panier vide. Cliquez sur un produit pour l'ajouter. » ; champ **Client** (« Client Comptant » par défaut, sinon client enregistré) ; **Mode de règlement** (Espèces · Mobile Money · Avance (Solde Restant Dû)) ; **Condition de paiement** (Comptant / Avance : « Avance » est une condition, pas un canal, F8) ; **Montant reçu** (si Avance : > 0, requis) ; « Payable le » (visible en Avance seulement, RM-VTE-04) ; bouton **Livraison concernée** ; TOTAL en grands caractères (`successDeep`) ; **Encaisser la Vente** (primaire, pleine largeur).
+**Modale Livraison** (`#modal-livraison`) : 4 options : « Livraison gratuite (offerte) », « Livraison assurée par le client », « Prix de livraison inclus dans le montant », « Livraison facturée séparément » (frais > 0 : « Une livraison facturée séparément exige un montant de frais. » ; frais négatifs : « Les frais de livraison ne peuvent pas être négatifs. ») + adresse + contact ; persistée sur la vente ; seuls les frais « facturée » entrent dans le total (AgriERP : drapeau `sales.delivery_in_total` pour les NOUVELLES ventes, frais au taux de la ligne de plus grand montant : RM-TVA-01).
+**Validations** : quantité ≤ stock : « Stock insuffisant (X disponible). » ; panier non vide ; montant reçu > 0 en Avance. **Encaisser** (RM-VTE-01/02/03) : UNE transaction : vente + lignes + décrément du stock de chaque ligne + incrément du compteur de la fiche d'élevage (si animal vivant, via la catégorie d'effectif du produit : RM-ELV-05, Q-ELV-7) ; ordre de verrous : produits (UUID croissants) AVANT toute fiche ; toast avec la référence APRÈS écriture. Écriture comptable générée (RM-CPT-01). Au poste : vente = fait indépendant, jamais fusionné ; le serveur accepte et signale un stock négatif.
+
+### Onglet 2 — « Devis Prestations »
+Formulaire : Client *, Objet / Prestation *, Montant Estimé (FCFA) * (> 0), Validité (jours) (entier ≥ 1, défaut 15) ; bouton « Générer le Devis » ; tableau Référence · Client · Objet · Montant. Web/poste : « Devis & Proforma » AgriERP (`docs/prd/devis-poste.md`) : cycle brouillon → envoyé → accepté/refusé, archivage, numéro `DEV-AAAA-NNN` attribué par le SERVEUR, devis daté dans un exercice clos = lecture seule, une facture issue d'un devis est simple : **PROPOSÉ** (aujourd'hui logialvia n'a qu'une liste, table `Devis`).
+
+### Onglet 3 — « Historique des Ventes »
+Recherche « Référence ou client… » ; filtre statut « Tous statuts » (Payée / Avance / Annulée) ; mode ; client ; tableau Référence · Date · Client · Montant · Statut (badge) · Actions ; pied : pagination ; clic sur une ligne = panneau latéral (détail + « Imprimer la Facture ») ; bouton « Exporter l'Historique » ; action **Annuler** visible seulement si statut ≠ Annulée. **Modale d'annulation** : motif OBLIGATOIRE parmi Erreur de saisie / Client non honoré / Produit indisponible / Autre ; confirme → stock restitué, compteur de fiche défait (RM-VTE-03). Une facture normalisée n'est plus annulable : « Facture normalisée : corrigez-la par un avoir. »
+
+### Onglet 4 — « Retours et Avoirs »
+Aujourd'hui (logialvia) : tableau LECTURE SEULE des ventes `Annulée` (Référence, Date, Client, Montant, Motif d'Annulation), aucune saisie. **Avec le web (PROPOSÉ, `AvoirClientService`)** : bouton « Nouveau Retour » (vente, produit, quantité, montant, motif, décision réintégré / réformé) avec les 3 refus de RM-VTE-07 et l'avoir `AV-AAAA-NNN` (numéro serveur) ; écriture inverse datée du jour du retour. Le poste envoie une DEMANDE (`credit_notes`) rejouée par le service unique. Q-VTE-2.
+
+## 4. Écran Clients et Créances
+
+**KPI** : CLIENTS ENREGISTRÉS ; SOLDE TOTAL RESTANT DÛ ; SOLDES ANCIENS (>10J) ; ÉVÉNEMENTS CRM (7J). **3 tableaux** : « Clients » (Nom · Téléphone · Date de Naissance · Total Achats · Solde Actuel) ; « Créances Ouvertes » (Client · Référence Vente · Montant Total · Déjà Réglé · Solde Restant Dû · Ancienneté (« 10 j », « 16 j »…) · Action) ; « Événements CRM à Venir » (Client · Type d'Événement · Date · Jours Restants · Dernier Contact · Action) ; texte vide : « Aucun événement dans les 7 prochains jours. Les anniversaires sont déduits de la date de naissance des clients — renseignez-la pour les voir apparaître. »
+**Modale « Ajouter un Client »** : NOM COMPLET * ; TÉLÉPHONE ; DATE DE NAISSANCE (« Non renseignée »). **Modale « Enregistrer un Paiement »** (sur une créance) : Montant Reçu (> 0), Date → `paye += montant` ; si `paye = total` : « Payée » (RM-VTE-02). **Action « Marquer contacté »** (ex-« Relancer ») : horodate « Dernier Contact » ; ne prétend PAS envoyer de message (aucune passerelle SMS : AgriERP les a supprimés, AUT-3 ; canal de relance : appel). **Lettre de relance PDF** (depuis Rapports/Créances) : « Rappel de Solde » sans échéance. Bouton « Exporter PDF ».
+**Règles** : solde client recalculé à chaque lecture depuis les ventes `Avance` non annulées, jamais stocké ; annuler une vente à crédit fait tomber total d'achats et solde sans écriture de correction ; ancienneté = jours depuis la date de la vente ; retard seulement avec échéance (RM-VTE-04) ; Q-VTE-1 délai par défaut.
+**Sync** : `clients` référentiel mixte (création au poste fusionnée par clé naturelle nom + téléphone — PROPOSÉ, modèle `FusionReferentielsService`) ; `dernier_contact` et paiements = faits.
+
+## 5. Écran Facturation MeCeF (`/factures-mecef`, module `mecef`)
+
+Module invisible tant que MeCeF n'est pas actif ; activable seulement si IFU et RCCM renseignés (BR-ADM-004). **KPI** : NORMALISÉES, À TRANSMETTRE, REJETÉES, FACTURÉ NET (factures de vente moins avoirs). Filtres : « Toutes », « À transmettre », « Normalisée », « Rejetée » ; recherche « Rechercher une référence ou un client… ». Tableau : RÉFÉRENCE (`FV-AAAA-NNN` / `FA-AAAA-NNN`) · DATE · CLIENT · TOTAL TTC · STATUT · ACTIONS (« Saisir le code de normalisation », « Transmettre à e-MECeF », « Émettre un avoir »).
+**Modale « Émettre une Facture »** : « Vente à facturer * » (liste des ventes), IFU du client (« Facultatif — un particulier n'en a pas » : vide ou 13 chiffres), nom du client (obligatoire pour la normalisée), « Adresse du client », taux AIB (5 % défaut, 1 %, N/A), type : **simple** (jamais transmise ; mention « Facture émise sans certification MeCeF. ») ou **normalisée**. « Code MeCeF reçu de la DGI » : saisie manuelle du code de normalisation tant que la transmission n'est pas configurée. Texte d'état : « Transmission e-MECeF non configurée. Les factures sont émises et imprimables, mais restent « À transmettre » : elles ne valent pas facture normalisée. Renseignez l'URL du service et le jeton dans Paramètres Général, ou reportez le code de normalisation à la main une fois la facture transmise. »
+**Règles (RM-MEC-01)** : statuts `a_transmettre` → `normalisee` | `rejetee` ; une facture n'est « Normalisée » que si les champs rendus par la DGI (code, NIM, compteur, lien de vérification) sont présents ; montants entiers, groupes de taxe A/B (grille modifiable `GroupesTaxe`, jamais codée en dur), remise répartie, une normalisée est verrouillée et se corrige par un **avoir** `FA` qui la désigne (`origineRef`), obligatoire sur un avoir, nul sur une facture de vente ; QR de la DGI + code + NIM + compteurs sur le PDF. **Avec le web (D-SRV-6)** : la transmission passe CÔTÉ SERVEUR (`MecefGatewayFactory` : modes `desactive` / `emecef` / `boitier`), le jeton JWT est un secret serveur chiffré, masqué à l'écran, jamais servi au poste ; le poste n'écrit pas les champs `mecef_*` (il les tire) ; hors ligne la facture reste « À transmettre » puis part à la synchronisation. **Ce contrat n'a jamais été éprouvé contre la vraie DGI** (ni logialvia ni AgriERP) : ne pas promettre. Boîtier : À VENIR, non construit. Voir `41_MECEF_EMECEF.md`. Q-MEC-1, Q-TVA-1.
+**Notifications** : facture « En attente » > N jours (À DÉFINIR) ; transmission refusée avec motif.
+
+## 6. Droits et hors ligne
+
+Caissier : ventes, clients, historique, annulation, facturation MeCeF, avoirs (arbitrage de la Gérante : l'erreur de facturation est commise au comptoir). Animalier : aucun accès. Au poste : tout le périmètre (hors transmission DGI) fonctionne hors ligne ; les références `V-AAAA-NNN` : le numéro n'est jamais inventé au poste quand il y a un serveur — numéro provisoire local remplacé par le numéro serveur à la synchronisation (Q-SYN-2).
+
+## 7. Critères d'acceptation
+
+- [ ] Vente à stock 2, 3e unité refusée : « Stock insuffisant (2 disponible). »
+- [ ] Vente atomique : une ligne vers un produit inexistant → rien n'est écrit, stock du produit valide inchangé (vérifié sur la base).
+- [ ] Remise 500 sur 8 500 : total persisté 8 000 ; solde client Avance 3 000 reçu → 5 000 ; paiement 5 000 → « Payée ».
+- [ ] Annulation : stock rétabli, compteur de fiche défait, vente visible dans « Retours et Avoirs ».
+- [ ] Sans délai paramétré : créance « Sans échéance », jamais « En retard », PDF « Rappel de Solde ».
+- [ ] Facture normalisée : plus modifiable ni annulable ; avoir lié ; TTC 11 800 à 18 % : HT 10 000, TVA 1 800.
+- [ ] Le jeton e-MECeF n'apparaît dans aucune réponse `/api` ni dans aucun journal.
+- [ ] Aucun toast « Message/Relance envoyé » sans envoi réel.
+
+## 8. Tests
+
+Modèles AgriERP : `agrierp_laravel/tests/Feature/{EncaissementVenteTest,MecefEntiersTest,MecefChoixFactureTest,MecefLivraisonTest,MecefTestConfigurationTest,MecefModeReglageTest}.php`, `agrierp_laravel/tests/Feature/{AvoirMecefTest,AvoirsClientsSyncTest,CycleAvoirComptableTest,DevisPosteTest,DevisSaisieWebTest,SyncEncaissementCreanceTest}.php`, `agrierp_flutter/test/{avoirs_poste_test,avoirs_parite_php_test,avoirs_sync_poste_test,devis_poste_test,historique_ventes_poste_test}.dart`. Poste logialvia : étendre `logialvia_app/test/commercial/` (flux POS → créance : 12 tests existants ; réécrire tout test qui verrouillait « l'échéance vaut la date de vente »). À écrire : cas RM-VTE-01 à 07 ; test d'atomicité sur la base ; test de parité du choix facture simple/normalisée (22 cas chez AgriERP : `ChoixFacture`) ; garde « aucun `round(` de montant hors de la fonction d'arrondi unique ».
+
+## 9. PROMPT de construction du module
+
+> Construis le module **Ventes, Clients, Facturation** d'après ce fichier, APRÈS Stocks. Lis `20_` §7, `F4`, `H1`, `E9`, `15_REGLES_METIER.md` §4–§5, guide blocs 14, 16, 19. **Ordre** : **(1) migration** `clients` (UUID, nom, téléphone, `date_naissance`, `dernier_contact`, `is_active`), `sales` (UUID, `reference` serveur, `client_id`, `total`, `paye`, `status` Payée/Avance/Annulée, `mode`, `condition_paiement`, `echeance`, livraison_*, `facture_type`, champs `mecef_*` écrits par le serveur seul, `cancel_reason`), `sale_lines` (`manual_total_amount` source du montant, `unit_price` dérivé), `quotes`, `credit_notes`, `invoices` + `invoice_lines` + `tax_groups` ; **(2) modèles** ; **(3) Actions/Services** : `SaisieVenteAction` (UN point de passage, appelé par la caisse web ET le push : verrous stock → vente → lignes → stock → fiche → écriture comptable, une transaction, refus AVANT écriture), `AnnulerVenteAction`, `AvoirClientService`, `RelanceClientService` (« Marquer contacté »), `ChoixFactureService`, `FacturationMecefService` (APRÈS la transaction, jamais bloquante pour la vente), `MecefFactureBuilder` (une fonction d'arrondi) ; **(4) composants Livewire** `Ventes\PointDeVente`, `Ventes\Devis`, `Ventes\HistoriqueVentes`, `Ventes\RetoursAvoirs`, `Ventes\Clients`, `Facturation\FacturesMecef` (hub `Ventes\Hub` imbriquant les onglets, jamais iframes) ; **(5) vues** fidèles (libellés mot pour mot) ; **(6) poste** : `ventes_repository_drift.dart` écrit via l'événement `VenteValideeEvent`, `RepercuterVenteUseCase` refuse avant écriture, UUID, `sync_status`, envoi par `POST /api/sync/push`, aucune transmission DGI au poste ; **(7) tests** du §8. **Interdits** : toast de succès sans écriture, décrément de stock hors `AdjustStockAction`, solde stocké, échéance inventée, vente fusionnée, jeton e-MECeF au poste, `@if` de modale, suppression d'une facture émise.

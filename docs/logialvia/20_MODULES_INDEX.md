@@ -3,7 +3,7 @@
 ## USAGE
 
 - **Quand l'utiliser** : en premier, avant tout fichier de module `21_` à `29_`. Il répond à : quel écran existe, sous quelle route, pour quel rôle, avec quels droits web `view-`/`manage-`, quels onglets, de quoi dépend-il, dans quel ordre le construire. Chaque ligne renvoie au fichier de module qui détaille composants, formulaires, calculs, hors ligne et synchronisation.
-- **Ordre** : `10`–`15` (spécification) → **`20_MODULES_INDEX`** → modules dans l'ordre de la section 6 ; pile : `02_ARCHITECTURE_WEB_ET_STACK.md` ; base : `30_DATABASE.md` ; tests : `31_TESTING_QA.md` ; skills : `32_SKILLS_LIBRARY.md`.
+- **Ordre** : `10`–`15` (spécification) → **`20_MODULES_INDEX`** → modules dans l'ordre de la section 6 ; pile : `02_ARCHITECTURE_WEB_ET_STACK.md` ; base : `30_DATABASE_ENGINEERING.md` ; tests : `31_TESTING_QA.md` ; skills : `32_CLAUDE_CODE_SKILLS_LIBRARY.md`.
 - **Entrées** : `logialvia/docs/03_INVENTAIRE_31_ECRANS.md`, `07_NAVIGATION_ROUTAGE.md`, `I1_Matrice_RBAC.md`, `I2_Gestion_Modules_Actifs.md`, `logialvia_app/lib/core/router/{app_router,permission_service,navigation_model}.dart` (CODE : fait foi sur les routes réelles), `logialvia/docs/manuel/libelles/*.json` (libellés exacts des écrans), `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` §1, `agrierp_laravel/database/seeders/RolesAndPermissionsSeeder.php`.
 - **Sorties** : ce fichier à jour ; toute route ajoutée y figure AVANT d'être codée (une route sans ligne ici ne se code pas).
 - **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` (lecture seule) ; sans préfixe = `/home/user/agrierp`.
@@ -104,7 +104,7 @@ Ordre issu du guide §1 (révisé le 07/11/2026) et du jalonnement W0–W9 (guid
 |---|---|---|---|
 | 0 | W0 | Décisions du client (ADR), classement des 37 tables | `12_SRS` §5, `10_BRS` §6 |
 | 1 | W1 | Squelette Laravel 12, rôles et droits semés, audit, fuseau, `php artisan test --testsuite=Feature` vert | `02_`, `03_`, `30_` |
-| 2 | W2 | Schéma UUID des référentiels (produits, clients, fournisseurs, paramètres) ; palier de migration UUID du poste | `30_DATABASE.md` |
+| 2 | W2 | Schéma UUID des référentiels (produits, clients, fournisseurs, paramètres) ; palier de migration UUID du poste | `30_DATABASE_ENGINEERING.md` |
 | 3 | W3 | Authentification : connexion, jeton nommé, compte désactivé, mot de passe temporaire | `21_` ; `43_` |
 | 4 | W4–W5 | Synchronisation minimale puis barre du haut (cloche, sélecteur d'exercice, modale de synchronisation) | `43_` ; `22_` |
 | 5 | W6a | Paramètres & administration (utilisateurs, modules actifs, entreprise) | `29_` |
