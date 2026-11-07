@@ -78,7 +78,7 @@
                 x-on:drop.prevent="survol = false; $refs.entree.files = $event.dataTransfer.files; $refs.entree.dispatchEvent(new Event('change', { bubbles: true }))"
                 class="relative">
                 <label for="fichier-import" :class="survol ? 'border-brand-emerald bg-brand-emerald/10' : 'border-outline-variant bg-white'" class="flex flex-col items-center justify-center gap-xs text-center border-2 border-dashed rounded-lg p-lg cursor-pointer hover:border-brand-emerald">
-                    <span class="material-symbols-outlined text-brand-emerald text-[36px]">cloud_upload</span>
+                    <span class="material-symbols-outlined text-brand-emerald text-[36px]">upload_file</span>
                     <span class="text-sm font-bold text-on-surface">Glissez votre fichier .xlsx ici, ou cliquez pour le choisir</span>
                     <span class="text-[11px] text-outline">Modèle « {{ $module->libelle() }} », version {{ $module->version() }} — {{ \App\Services\Import\LecteurXlsx::TAILLE_MAX_OCTETS / 1024 / 1024 }} Mo et {{ number_format(\App\Services\Import\LecteurXlsx::LIGNES_MAX, 0, ',', ' ') }} lignes au plus</span>
                     <span x-show="envoi" x-cloak class="text-xs text-brand-forest font-bold">Envoi en cours…</span>
