@@ -120,8 +120,7 @@ class AutorisationsEcrituresTest extends TestCase
 
         Livewire::actingAs($this->lecteur())
             ->test(\App\Livewire\Parametres\DonneesEntreprise::class)
-            ->call('save')
-            ->assertForbidden();
+            ->assertForbidden(); // CONF-1 : le refus tombe désormais dès l'ouverture de l'écran (avant tout geste).
     }
 
     /** ⚠️ Un stagiaire enregistré engage l'exploitation. */

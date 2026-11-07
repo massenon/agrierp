@@ -127,9 +127,8 @@ class ReinitialisationMotDePasseAdminTest extends TestCase
     {
         $this->caissier->givePermissionTo('view-ventes');
 
-        Livewire::actingAs($this->caissier)->test(GestionUtilisateurs::class)
-            ->call('resetPasswordUser', $this->admin->id)
-            ->assertForbidden();
+        // CONF-1 : l'écran lui-même refuse sans `manage-users`, dès l'ouverture (avant tout geste).
+        Livewire::actingAs($this->caissier)->test(GestionUtilisateurs::class)->assertForbidden();
 
         $this->assertFalse($this->admin->fresh()->must_change_password);
     }
