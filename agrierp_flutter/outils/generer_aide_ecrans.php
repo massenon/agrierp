@@ -38,6 +38,7 @@ const CHEMINS = [
     'fichePorcs' => '/fiche-porcs',
     'ficheEscargots' => '/fiche-escargots',
     'transfertsBandes' => '/transferts-bandes',
+    'importationMasse' => '/importation-masse',
     'gestionBandes' => '/gestion-bandes',
     'enregistrerSujets' => '/enregistrer-sujets',
     'ventesEtDevis' => '/ventes-devis',

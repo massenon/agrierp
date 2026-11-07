@@ -181,6 +181,7 @@ void main() {
     // CFG-2 : « Paramètres du poste » ouvre le hub Paramètres sur l'onglet Appairage.
     EcranPoste.parametres: 'parametres/parametres_generaux_screen.dart',
     EcranPoste.transfertsBandes: 'elevage/transferts_bandes_screen.dart',
+    EcranPoste.importationMasse: 'importation/importation_screen.dart',
     EcranPoste.gestionBandes: 'elevage/gestion_bandes_screen.dart',
     EcranPoste.enregistrerSujets: 'elevage/enregistrer_sujets_screen.dart',
     EcranPoste.registreReproducteurs: 'elevage/registre_reproducteurs_screen.dart',
@@ -200,6 +201,12 @@ void main() {
         'accounting_entries',
         'accounting_entry_lines',
       },
+    },
+    // Ticket IMPORT-1 — l'écran n'offre (et ne lit) que les modules du compte : le catalogue et les filières pour
+    // `manage-stocks`, les fournisseurs pour `manage-achats` (le caissier n'a que `manage-ventes` : clients).
+    EcranPoste.importationMasse: {
+      'manage-stocks': {'livestock_species'},
+      'manage-achats': {'suppliers', 'purchase_orders'},
     },
   };
 

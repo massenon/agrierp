@@ -52,7 +52,7 @@ export const MOTIFS = {
     remise: 'Le champ remise est inférieur au minimum autorisé (0).',
     remiseEntiere: 'La remise doit être un nombre entier de FCFA.',
     remiseTropGrande: 'La remise ne peut pas dépasser le sous-total de la vente.',
-    produitSansBande: 'Ce produit est un sujet vivant : sa vente exige la bande source et le contrôle vétérinaire du serveur. Vendez-le en ligne.',
+    produitSansBande: "Ce produit est rattaché à une espèce d'élevage : sa vente exige la bande source et le contrôle vétérinaire. Vendez-le en ligne.",
     produitSurDevis: 'Ce produit se chiffre sur devis : il ne se vend pas à la caisse.',
     produitInconnu: 'Produit inconnu de la copie locale : synchronisez d’abord.',
     especesInsuffisantes: 'Le montant reçu est inférieur au total à payer.',

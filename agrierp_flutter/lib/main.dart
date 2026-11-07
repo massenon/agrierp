@@ -100,6 +100,8 @@ import 'features/parametres/corbeille_repository.dart';
 import 'features/parametres/reinitialisation_poste.dart';
 import 'features/aide/aide_a_propos_screen.dart';
 import 'features/contact/contact_editeur_repository.dart';
+import 'features/importation/importation_repository.dart';
+import 'features/importation/importation_screen.dart';
 import 'features/stocks/produits_repository.dart';
 import 'features/contact/contact_editeur_screen.dart';
 import 'features/notifications/notifications_repository.dart';
@@ -1290,6 +1292,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.transfertsBandes => TransfertsBandesScreen(
           depot: widget.transferts,
         ),
+        // Ticket IMPORT-1 — « Importation en masse » : les lignes valides s'écrivent par les dépôts propriétaires (`pending`).
+        EcranPoste.importationMasse => ImportationScreen(
+          depot: ImportationRepository(database: widget.database),
+          role: _role,
+        ),
         // Ticket EL-1 — « Bon d'Abattage & Transformation » : l'opérateur est le compte connecté (`auth()->user()->name`).
         EcranPoste.transformation => TransformationScreen(
           depot: widget.transformation,
@@ -1670,6 +1677,7 @@ class _BarreLaterale extends StatelessWidget {
       [
         (SymbolesAgri.inventory_2, 'Gestion Stocks', EcranPoste.gestionStocks),
         (SymbolesAgri.category, 'Catalogue Produits', EcranPoste.catalogueProduits),
+        (SymbolesAgri.upload_file, 'Importation en masse', EcranPoste.importationMasse),
       ],
     ),
     (
@@ -1997,6 +2005,7 @@ class SocleAccueilTitres {
     EcranPoste.saisieDepenses: 'Achats > Saisie des Dépenses',
     EcranPoste.gestionStocks: 'Gestion des Stocks',
     EcranPoste.catalogueProduits: 'Stocks & Produits > Catalogue Produits',
+    EcranPoste.importationMasse: 'Stocks & Produits > Importation en masse',
     EcranPoste.facturation: 'Facturation & MeCeF',
     EcranPoste.personnelEtStages: 'Personnel & Stages',
     EcranPoste.administrationEtDocument: 'Administration & Documents',

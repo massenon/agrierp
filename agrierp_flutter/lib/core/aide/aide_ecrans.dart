@@ -39,6 +39,7 @@ class AideEcrans {
     EcranPoste.fichePorcs: '/fiche-porcs',
     EcranPoste.ficheEscargots: '/fiche-escargots',
     EcranPoste.transfertsBandes: '/transferts-bandes',
+    EcranPoste.importationMasse: '/importation-masse',
     EcranPoste.gestionBandes: '/gestion-bandes',
     EcranPoste.enregistrerSujets: '/enregistrer-sujets',
     EcranPoste.ventesEtDevis: '/ventes-devis',
@@ -141,6 +142,13 @@ class AideEcrans {
         'Le tableau garde la date, les deux bandes, le nombre de sujets, la catégorie, le type, le motif et le statut de chaque transfert.',
         'Les cartes du haut comptent les transferts du mois, les sujets transférés et les bandes à vérifier.',
         'Les bandes peut-être issues d\'une autre, sans origine renseignée, sont listées ; « Rattacher à sa bande d\'origine » les relie.',
+      ]),
+    EcranPoste.importationMasse: AideEcran(titre: 'Importation en masse', puces: [
+        'Six étapes : choisir le module (Stocks, Clients ou Fournisseurs), télécharger le modèle Excel, déposer le fichier, vérifier l\'aperçu, confirmer, lire le rapport.',
+        'Le modèle contient une feuille « Instructions », la feuille « Données » à remplir et des listes déroulantes. Ne renommez pas les en-têtes ; les montants sont des francs CFA entiers.',
+        'L\'aperçu valide chaque ligne sans rien écrire : valides, ignorées (déjà présentes) et refusées, avec le motif, la ligne et la colonne.',
+        'Une fiche déjà présente est ignorée, jamais modifiée : un produit déjà au catalogue ne reçoit pas de stock initial supplémentaire.',
+        'Le rapport se télécharge en Excel ; corrigez les lignes refusées puis ré-importez le fichier : seules elles entrent.',
       ]),
     EcranPoste.gestionBandes: AideEcran(titre: 'Bandes & Sujets', puces: [
         'Liste les bandes d\'élevage avec leur espèce, leur stade, leur effectif initial et actuel, leur mortalité et leur statut.',

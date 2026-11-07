@@ -90,12 +90,15 @@ export async function activer({ identifiant, motDePasse, pin, fetchFn = (...a) =
         }
         const utilisateur = { id: json.user?.id, name: json.user?.name, username: json.user?.username, role: json.user?.role };
         const persistant = await demanderPersistance();
+        // ⚠️ Tout ce qui est ASYNCHRONE hors IndexedDB (WebCrypto) se fait AVANT la transaction : une transaction IndexedDB se
+        // referme dès qu'elle n'a plus de requête en cours, et l'écriture suivante échouerait (ou serait perdue).
+        const jetonChiffre = await chiffrer(cle, json.token, cryptoApi);
         await base.transaction(['meta'], 'readwrite', async (tx) => {
             const p = (req) => new Promise((ok, ko) => { req.onsuccess = () => ok(); req.onerror = () => ko(req.error); });
             const m = tx.objectStore('meta');
             await p(m.put({ cle: 'appareil', valeur: { device_name: deviceName, utilisateur, active_le: new Date().toISOString(), persistant } }));
             await p(m.put({ cle: 'coffre', valeur: parametres }));
-            await p(m.put({ cle: 'jeton', valeur: await chiffrer(cle, json.token, cryptoApi) }));
+            await p(m.put({ cle: 'jeton', valeur: jetonChiffre }));
             await p(m.put({ cle: 'echecs_pin', valeur: 0 }));
             await p(m.delete('suspendu'));
         });

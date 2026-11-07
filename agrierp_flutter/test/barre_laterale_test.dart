@@ -44,6 +44,8 @@ void main() {
     'STOCKS & PRODUITS': [
       ('Gestion Stocks', EcranPoste.gestionStocks),
       ('Catalogue Produits', EcranPoste.catalogueProduits),
+      // Ticket IMPORT-1 : entrée du menu web (« Importation en masse »), hors maquette.
+      ('Importation en masse', EcranPoste.importationMasse),
     ],
     'FACTURATION': [('Facturation & MeCeF', EcranPoste.facturation)],
     'RESSOURCES HUMAINES': [
@@ -104,8 +106,8 @@ void main() {
 
     expect(
       entrees.length,
-      20,
-      reason: 'la barre de la maquette en porte dix-neuf entrées, plus « Transformation » du menu web (EL-1)',
+      21,
+      reason: 'la barre de la maquette en porte dix-neuf entrées, plus « Transformation » du menu web (EL-1) et « Importation en masse » (IMPORT-1)',
     );
 
     // Quelques repères que le client a nommés explicitement.

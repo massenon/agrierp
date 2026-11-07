@@ -273,8 +273,9 @@ class ClientsCreancesRepository {
   String? _ouNul(String v) => v.trim().isEmpty ? null : v.trim();
 
   /// Crée une fiche, EN ATTENTE d'envoi. Le serveur la valide à la synchronisation.
-  Future<Customer> creerClient(FormulaireClient f) async {
-    final id = _uuid.v4();
+  /// [id] : identifiant imposé — l'UUID déterministe de l'importation en masse (IMPORT-1) ; absent, un au hasard.
+  Future<Customer> creerClient(FormulaireClient f, {String? id}) async {
+    id ??= _uuid.v4();
 
     await database
         .into(database.customers)

@@ -152,8 +152,10 @@ class ProduitsRepository {
     return espece?.code == 'aviculture' ? f.categorieEffectif : null;
   }
 
-  Future<Product> creer(FormulaireProduit f) async {
-    final id = _uuid.v4();
+  /// [id] : identifiant imposé — l'UUID déterministe de l'importation en masse (IMPORT-1, voir `ImportationRepository`) ;
+  /// absent, le poste en tire un au hasard comme toujours.
+  Future<Product> creer(FormulaireProduit f, {String? id}) async {
+    id ??= _uuid.v4();
     final categorieEffectif = await _categorieEffectif(f);
 
     await database

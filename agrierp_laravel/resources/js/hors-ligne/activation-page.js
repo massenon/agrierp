@@ -4,7 +4,7 @@ import { pinValide, MOTIF_PIN } from './coffre.js';
 
 /**
  * PWA-1 — composant Alpine de la page « Mode hors ligne » (`livewire/profil/mode-hors-ligne.blade.php`). Enregistré à
- * `alpine:init` (Alpine est démarré par Livewire : jamais de `Alpine.start()` ici). Le mot de passe ne quitte pas ce
+ * `alpine:init` (Alpine est démarré par Livewire : jamais de second démarrage d'Alpine ici). Le mot de passe ne quitte pas ce
  * composant que pour UNE requête `POST /api/auth/login`, puis il est effacé de la mémoire de la page.
  */
 document.addEventListener('alpine:init', () => {

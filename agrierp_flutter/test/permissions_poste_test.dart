@@ -114,6 +114,8 @@ void main() {
         EcranPoste.aideEtAPropos, // idem (F0.60)
         EcranPoste.contactEditeur, // idem (F0.62)
         EcranPoste.synchronisation,
+        // Ticket IMPORT-1 — hors maquette : le caissier a `manage-ventes` (module Clients).
+        EcranPoste.importationMasse,
       ]);
 
       // `RBAC_PAGE_MAP` accorde a l'animalier les fiches d'espece — ici les

@@ -6,7 +6,7 @@
         <p class="text-xs text-outline mt-xs">Vendre à la caisse même quand la liaison de la ferme tombe : les ventes sont gardées sur cet appareil, puis envoyées toutes seules au retour du réseau.</p>
     </div>
 
-    {{-- Le formulaire est piloté par Alpine/JavaScript, jamais par Livewire : le mot de passe ne passe pas par `wire:model`. --}}
+    {{-- Le formulaire est piloté par Alpine/JavaScript, jamais par Livewire : le mot de passe ne passe jamais par Livewire. --}}
     <div wire:ignore
          x-data="modeHorsLigne({ identifiant: @js($identifiant), urlCaisse: '/caisse-hors-ligne.html' })"
          class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
@@ -73,7 +73,7 @@
             <p class="text-sm font-bold text-brand-forest uppercase pt-sm">Ce qu'il ne couvre pas</p>
             <ul class="list-disc pl-md space-y-xs">
                 <li>Comptabilité, élevage, achats, paie : ces écrans exigent le réseau.</li>
-                <li>Les sujets vivants (bande source, contrôle vétérinaire) se vendent en ligne.</li>
+                <li>Les produits rattachés à une espèce d'élevage (bande source, contrôle vétérinaire) se vendent en ligne.</li>
             </ul>
             <p class="text-sm font-bold text-brand-forest uppercase pt-sm">À savoir</p>
             <ul class="list-disc pl-md space-y-xs">

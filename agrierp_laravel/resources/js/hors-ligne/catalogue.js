@@ -17,7 +17,7 @@ export function filtrerProduits(produits, recherche = '', categorieId = '') {
 /** Ce que la tuile dit du produit, et si elle est cliquable. */
 export function etatTuile(p) {
     if (p.pricing_mode === 'quote') return { vendable: false, note: 'Sur devis technique' };
-    if (p.species_id) return { vendable: false, note: 'Sujet vivant — vente en ligne seulement' };
+    if (p.species_id) return { vendable: false, note: 'Rattaché à une espèce (bande source) — vente en ligne' };
     return { vendable: true, note: '' };
 }
 

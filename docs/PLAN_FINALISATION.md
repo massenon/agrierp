@@ -954,3 +954,30 @@ Demande du client du 07/11/2026. (Le ticket « MECEF-2 » reste le mode boîtier
 **Non vérifié** : AUCUN appel réel à la DGI ; `GET /info/status`, ses champs de réponse, le champ `aib` (A/B) et l'AIB hors du total envoyé viennent d'un paquet non officiel ; les deux adresses (essai / production) ne sont confirmées par aucune documentation DGI ; Dusk (modale de la caisse) et MariaDB réel non lancés.
 **Décision à prendre** : la Déclaration de TVA ne retient que les ventes normalisées (règle M14) : les factures simples n'y figurent pas — à confirmer avec le cabinet FAGUEZ.
 
+
+## PWA-1 ✅ (08/11/2026) — la caisse hors ligne du navigateur (PWA utilisable hors ligne, synchronisation à la reconnexion)
+
+**Décision du client (08/11/2026) : « ON DÉMARRE LA CONSTRUCTION ».** Elle LÈVE le refus d'origine de `agrierp_laravel/CLAUDE.md` (« cette PWA ne fait pas travailler AgriERP hors ligne ») pour un **périmètre minimal : la caisse**. Conception suivie : `docs/logialvia/40_PWA_HORS_LIGNE.md` (inchangé). Doctrine et pièces : `agrierp_laravel/CLAUDE.md`, sections « PWA » et « PWA-1 ».
+
+| Point | Livraison |
+|---|---|
+| Périmètre | Ventes de caisse (produits du catalogue, panier, quantité entière + montant global, remise, mode de règlement espèces / Mobile Money / virement / crédit, facture simple ou normalisée avec nom, IFU, AIB) ; consultation du catalogue et des clients copiés ; verrou/PIN ; indicateur « Hors ligne / En attente (N) / Synchronisé / Refus (N) / Reconnexion requise » |
+| Appairage | Page « Mode hors ligne » (menu de profil, `manage-ventes`) : `POST /api/auth/login` avec `device_name = pwa-<uuid>` APRÈS la connexion web ; jeton chiffré par le PIN (PBKDF2 600 000 + AES-GCM) ; révocable dans « Postes & Appairage » ; purge à la déconnexion |
+| Stockage | IndexedDB `agrierp_hors_ligne` v2 (migration testée v1 → v2), file `pending/synced/conflict`, journal des refus, quota géré (la vente n'est PAS enregistrée si le stockage refuse), nettoyage des `synced` de plus de 30 jours |
+| Service worker | `agrierp-v6` : enveloppe statique précachée, deux pages HTML statiques nommées, aucun POST, aucun HTML authentifié, purge par message `PURGER`, Background Sync = réveil d'un onglet seulement (repli : `online` + sondage `/up`, premier plan, 5 min, bouton) |
+| Synchronisation | Protocole du poste inchangé : pull paginé puis push par lots, `server_time`, idempotence par UUID, accusé avant `synced`, refus motivés, 401/403 = suspension, réessais 30 s à 1 h ; vente normalisée = « demandée — en attente », transmise par le serveur |
+| Preuves | 73 essais `node --test` (dont parité exécutée contre le PHP), `PwaHorsLigneTest` (13), `PwaEtPolicesLocalesTest` (20), essai Playwright de bout en bout (14 étapes), 3 mutations détectées |
+
+**Ce que le MVP ne couvre pas (dit au client)** : voir « Limites connues » de `CLAUDE.md` — purge possible d'IndexedDB par le navigateur (détectée, non récupérable), pas de Background Sync sur iOS/Safari ni Firefox (aucun essai iPhone), un seul onglet qui écrit, tant que l'appareil est verrouillé rien ne part, durée hors ligne bornée par le jeton (90 jours) et par la fraîcheur des prix (avertissement dès 3 jours), le catalogue incrémental ne retire pas un produit supprimé au bureau.
+
+**Décisions client en attente** : (1) seuil de péremption des prix au-delà duquel REFUSER la vente hors ligne (aujourd'hui : avertissement seul, 3 jours) ; (2) appareil personnel ou d'entreprise, PIN suffisant ? ; (3) reçu provisoire à imprimer (aujourd'hui : aucun, le numéro de facture est attribué par le serveur à la synchronisation) ; (4) essai sur les vrais appareils de la ferme (Android, iPhone).
+
+### Phases suivantes (non construites)
+
+| Phase | Contenu | Prérequis |
+|---|---|---|
+| PWA-2 | Caisse complète : livraison facturée, vente sur avance, client créé hors ligne (`customers` en écriture), produits rattachés à une espèce (bande source, rémanence tirée) | Décision client ; extension de `calculs-caisse.js` + parité |
+| PWA-3 | Fiches journalières d'élevage hors ligne (effectif calculé, mortalité, provende, production) | Tirage des bandes et barèmes ; jeu de calculs prouvé contre `EffectifParCategorieService` |
+| PWA-4 | Consultation hors ligne élargie (stock, créances, historique des ventes) | Tables lues en lecture seule, chiffrées |
+| PWA-5 | Comptabilité / paie hors ligne | Probablement jamais : reste au poste Windows (règle « la vue Blade est le maître », deux clients à tenir en parité) |
+| PWA-6 | Essai multipostes avec un navigateur participant (`SyncEssaiMultipostesTest`), essai iOS/Safari documenté (A12 de la spécification) | Appareils du client |

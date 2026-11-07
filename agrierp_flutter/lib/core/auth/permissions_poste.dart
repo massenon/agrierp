@@ -244,7 +244,13 @@ enum EcranPoste {
 
   /// ⚠️ Hors maquette (ticket 15.46, décision client du 17/10/2026) : écran dédié des transferts entre
   /// bandes, construit d'abord sur le web. Ouvert depuis « Gestion Élevage », comme les fiches.
-  transfertsBandes(null);
+  transfertsBandes(null),
+
+  /// ⚠️ Hors maquette (ticket IMPORT-1, décision du client du 08/11/2026) : « Importation en masse » par tableur xlsx,
+  /// construite d'abord sur le web (`/importation-masse`, Gate `importation-masse`). Ouverte à qui peut importer AU MOINS un
+  /// module : `manage-stocks`, `manage-ventes` ou `manage-achats` (admin et caissier d'après le seeder) ; l'écran n'offre que
+  /// les modules autorisés et le serveur re-juge chaque ligne à la synchronisation.
+  importationMasse(null);
 
   const EcranPoste(this.page);
 
@@ -371,6 +377,8 @@ class PermissionsPoste {
     EcranPoste.parametres => role == 'admin',
     // Ticket 15.46 — mêmes rôles que `manage-elevage` sur le web (seeder : admin et animalier).
     EcranPoste.transfertsBandes => role == 'admin' || role == 'animalier',
+    // Ticket IMPORT-1 — Gate `importation-masse` du web : un des trois droits d'écriture des modules importables.
+    EcranPoste.importationMasse => ['manage-stocks', 'manage-ventes', 'manage-achats'].any((d) => peut(role, d)),
     _ => true,
   };
 

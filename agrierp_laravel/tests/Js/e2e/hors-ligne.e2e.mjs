@@ -3,7 +3,8 @@
  *
  *   node tests/Js/e2e/hors-ligne.e2e.mjs            # depuis agrierp_laravel/
  *   E2E_CAPTURE=/chemin/caisse.png node …           # chemin de la capture d'écran (deviceScaleFactor 1)
- *   E2E_MUTATION=html|idempotence node …            # contrôle par MUTATION (voir la fin du fichier)
+ *   E2E_MUTATION=html node …                          # contrôle par MUTATION : sw.js « cache toutes les navigations » (doit ÉCHOUER)
+ *   (l'idempotence se mute côté serveur : retirer `unique:sales,id` de SyncController::pushSales, voir CLAUDE.md « PWA-1 »)
  *
  * SÛRETÉ : le serveur est `php -S` (le routeur de `php artisan serve`) sur un port libre, avec une base SQLITE TEMPORAIRE
  * dans le dossier temporaire du système. ⚠️ `php artisan serve` IGNORE les variables d'environnement exportées et relit
@@ -56,6 +57,18 @@ php(['artisan', 'tinker', '--execute', `
 `]);
 const produits = sql("select id||'|'||name||'|'||stock_qty from products where species_id is null and pricing_mode != 'quote' order by name limit 3").split('\n').map((l) => l.split('|'));
 assert.ok(produits.length >= 2, 'au moins deux produits vendables hors sujets vivants');
+
+// MUTATION « html » : sw.js met en cache TOUTES les navigations (HTML authentifié compris). Le fichier du dépôt est modifié
+// le temps du test (copie de sauvegarde, restauration garantie) ; le test DOIT alors échouer.
+const swChemin = path.join(racine, 'public/sw.js');
+const swOriginal = fs.readFileSync(swChemin, 'utf8');
+const restaurer = () => { if (fs.readFileSync(swChemin, 'utf8') !== swOriginal) fs.writeFileSync(swChemin, swOriginal); };
+if (mutation === 'html') {
+    const cible = "fetch(request).catch(() =>\n                caches.match('/offline.html')";
+    assert.ok(swOriginal.includes(cible), 'la mutation doit pouvoir s\'appliquer');
+    fs.writeFileSync(swChemin, swOriginal.replace(cible, "fetch(request).then((rep) => { const c = rep.clone(); caches.open(CACHE_STATIQUE).then((k) => k.put(request, c)); return rep; }).catch(() =>\n                caches.match('/offline.html')"));
+    for (const signal of ['exit', 'SIGINT', 'SIGTERM']) process.on(signal, () => { restaurer(); if (signal !== 'exit') process.exit(1); });
+}
 
 const serveur = spawn('php', ['-S', `127.0.0.1:${port}`, path.join(racine, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')], { cwd: path.join(racine, 'public'), env, stdio: 'ignore' });
 const arreter = () => { try { serveur.kill('SIGTERM'); } catch { /* déjà arrêté */ } };
@@ -183,7 +196,7 @@ try {
         db.close();
         return JSON.stringify(sortie);
     });
-    for (const secret of ['KPOGNON', 'Awa', produits[0][1], '11800', '1234567890123']) assert.ok(!brut.includes(secret), `« ${secret} » ne doit pas être lisible dans IndexedDB`);
+    for (const secret of ['KPOGNON', 'Awa KPOGNON', produits[0][1], '11800', '1234567890123']) assert.ok(!brut.includes(secret), `« ${secret} » ne doit pas être lisible dans IndexedDB`);
     ok('IndexedDB : aucun nom de produit, de client ni montant en clair');
 
     // --- 4. Retour du réseau : synchronisation AUTOMATIQUE ---
@@ -214,7 +227,7 @@ try {
     await page.unroute('**/api/sync/push');
     await page.click('#btn-synchroniser');
     await page.waitForFunction(() => /Synchronisé/.test(document.querySelector('#etat-synchro').textContent), null, { timeout: 30000 });
-    assert.equal(sql('select count(*) from sales'), '4', mutation === 'idempotence' ? 'MUTATION idempotence : doublon attendu' : 'toujours UNE vente par UUID');
+    assert.equal(sql('select count(*) from sales'), '4', 'toujours UNE vente par UUID');
     assert.equal(sql('select count(distinct id) from sales'), '4');
     ok('réponse perdue puis renvoi : UNE vente par UUID côté serveur, file « synced »');
 
@@ -238,11 +251,13 @@ try {
 
     // --- 7. Jeton révoqué (401) : suspension, ventes conservées ---
     sql("delete from personal_access_tokens where name like 'pwa-%'");   // l'administrateur révoque l'appareil (Postes & Appairage)
+    await page.selectOption('#mode', 'especes');
     await vendre(produits[0][0], 1, 3000);
     await page.click('#btn-valider');
     await page.waitForFunction(() => /Reconnexion requise/.test(document.querySelector('#etat-synchro').textContent), null, { timeout: 30000 });
     assert.match(await page.textContent('#avis'), /reconnectez-vous/);
-    assert.ok((await page.evaluate(() => [...document.querySelectorAll('#corps-ventes tr')].some((t) => t.dataset.statut === 'pending'))), 'la vente reste sur l\'appareil');
+    const st = await page.evaluate(() => [...document.querySelectorAll('#corps-ventes tr')].map((t) => t.dataset.statut));
+    assert.ok(st.includes('pending'), `la vente reste sur l'appareil (statuts : ${st})`);
     ok('jeton révoqué : 401, synchronisation suspendue, « Reconnexion requise », vente conservée');
 
     // --- 8. Aucun HTML authentifié ni jeton dans les caches et stockages ---
@@ -288,6 +303,7 @@ try {
 } finally {
     await navigateur?.close();
     arreter();
+    restaurer();
 }
 console.log(`\n${resultats.length} étape(s) réussie(s).`);
 if (echec) { console.error(`\nÉCHEC : ${echec.message}`); process.exitCode = 1; }
