@@ -29,12 +29,10 @@ abstract final class SymbolesAgri {
   static const IconData arrow_downward = IconData(0xe5db, fontFamily: famille);
   static const IconData arrow_forward = IconData(0xe5c8, fontFamily: famille);
   static const IconData arrow_upward = IconData(0xe5d8, fontFamily: famille);
-  static const IconData assessment = IconData(0xe24b, fontFamily: famille);
   static const IconData assignment = IconData(0xe85d, fontFamily: famille);
   static const IconData assignment_return = IconData(0xe860, fontFamily: famille);
   static const IconData assignment_turned_in = IconData(0xe862, fontFamily: famille);
   static const IconData attach_file = IconData(0xe226, fontFamily: famille);
-  static const IconData auto_stories = IconData(0xe666, fontFamily: famille);
   static const IconData backup = IconData(0xe864, fontFamily: famille);
   static const IconData badge = IconData(0xea67, fontFamily: famille);
   static const IconData balance = IconData(0xeaf6, fontFamily: famille);
@@ -101,8 +99,10 @@ abstract final class SymbolesAgri {
   static const IconData history = IconData(0xe28e, fontFamily: famille);
   static const IconData hourglass_empty = IconData(0xe88b, fontFamily: famille);
   static const IconData how_to_reg = IconData(0xe174, fontFamily: famille);
+  static const IconData import_contacts = IconData(0xe0e0, fontFamily: famille);
   static const IconData inbox = IconData(0xe156, fontFamily: famille);
   static const IconData info = IconData(0xe88e, fontFamily: famille);
+  static const IconData insights = IconData(0xf092, fontFamily: famille);
   static const IconData inventory = IconData(0xe179, fontFamily: famille);
   static const IconData inventory_2 = IconData(0xe1a1, fontFamily: famille);
   static const IconData layers = IconData(0xe53b, fontFamily: famille);
@@ -141,7 +141,6 @@ abstract final class SymbolesAgri {
   static const IconData person_outline = IconData(0xe7fd, fontFamily: famille);
   static const IconData pets = IconData(0xe91d, fontFamily: famille);
   static const IconData picture_as_pdf = IconData(0xe415, fontFamily: famille);
-  static const IconData pie_chart = IconData(0xe6c4, fontFamily: famille);
   static const IconData point_of_sale = IconData(0xf17e, fontFamily: famille);
   static const IconData post_add = IconData(0xea20, fontFamily: famille);
   static const IconData print = IconData(0xe555, fontFamily: famille);

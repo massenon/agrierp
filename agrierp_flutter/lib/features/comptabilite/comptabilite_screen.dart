@@ -105,24 +105,41 @@ class ComptabiliteScreen extends StatefulWidget {
   State<ComptabiliteScreen> createState() => _ComptabiliteScreenState();
 }
 
-/// Les neuf cartes du hub, dans l'ordre de la maquette.
+/// Les neuf cartes du hub, dans l'ordre de la cible du client (07/11/2026) : libellé, DESCRIPTION et icône sont ceux du
+/// web (`comptabilite-hub.blade.php`), gardés par `comptabilite_hub_cartes_test.dart`. `immobilisations` n'est pas dans
+/// la liste du client : page réelle sans autre accès, elle est posée dans la rangée « Autres états », après les neuf.
 enum PageComptable {
-  hub('Comptabilité', SymbolesAgri.account_balance),
-  planComptable('Plan Comptable', SymbolesAgri.list_alt),
-  journal('Journal Comptable', SymbolesAgri.menu_book),
-  grandLivre('Grand Livre', SymbolesAgri.auto_stories),
-  balance('Balance Générale', SymbolesAgri.balance),
-  etatsFinanciers('États Financiers', SymbolesAgri.assessment),
-  immobilisations('Immobilisations', SymbolesAgri.domain),
-  cloture('Clôture Périodique & Annuelle', SymbolesAgri.lock_clock),
-  analytique('Comptabilité Analytique', SymbolesAgri.pie_chart),
-  tva('Déclaration TVA', SymbolesAgri.receipt_long),
-  rapprochement('Rapprochement Bancaire', SymbolesAgri.account_balance_wallet);
+  hub('Comptabilité', '', SymbolesAgri.account_balance),
+  planComptable('Plan Comptable', 'Comptes SYSCOHADA (Classes 1 à 7)', SymbolesAgri.menu_book),
+  journal('Journal Comptable', 'Écritures Débit/Crédit, saisie manuelle', SymbolesAgri.account_balance),
+  grandLivre('Grand Livre', 'Écritures par compte, solde progressif', SymbolesAgri.import_contacts),
+  balance('Balance Générale', 'Soldes de tous les comptes utilisés', SymbolesAgri.balance),
+  etatsFinanciers('États Financiers', 'Bilan, Résultat, Flux de Trésorerie, Notes Annexes', SymbolesAgri.description),
+  cloture('Clôture Périodique & Annuelle', "Clôture mensuelle, bascule d'exercice, report à nouveau", SymbolesAgri.event_repeat),
+  analytique(
+    'Comptabilité Analytique',
+    'Marges réelles par filière (Cuniculture, Aviculture, Porciculture)',
+    SymbolesAgri.insights,
+  ),
+  tva('Déclaration TVA', 'TVA Collectée / Déductible, taux 18% ou exonéré', SymbolesAgri.receipt_long),
+  rapprochement(
+    'Rapprochement Bancaire',
+    'Pointage Grand Livre / Relevé Banque et Mobile Money',
+    SymbolesAgri.sync_alt,
+  ),
+  immobilisations('Immobilisations', 'Registre des biens, amortissement lineaire et dotation', SymbolesAgri.domain);
 
-  const PageComptable(this.libelle, this.icone);
+  const PageComptable(this.libelle, this.description, this.icone);
 
   final String libelle;
+  final String description;
   final IconData icone;
+
+  /// Les neuf cartes de la liste du client, dans l'ordre (le hub et la rangée « Autres états » en sont exclus).
+  static List<PageComptable> get cartesDuClient => [
+    for (final p in values)
+      if (p != hub && p != immobilisations) p,
+  ];
 }
 
 class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
@@ -364,23 +381,35 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.lg),
-      GridView.count(
-        crossAxisCount: large ? 3 : 1,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: AgriSpacing.md,
-        crossAxisSpacing: AgriSpacing.md,
-        childAspectRatio: large ? 3.2 : 4.5,
-        children: [
-          for (final page in PageComptable.values)
-            if (page != PageComptable.hub && (page != PageComptable.immobilisations || widget.depotImmobilisations != null)) _carteNavigation(page),
-        ],
-      ),
+      _grilleCartes([for (final page in PageComptable.cartesDuClient) _carteNavigation(page)], large),
+      // Pages réelles sans autre accès, absentes de la liste du client : conservées après les neuf (comme le web).
+      if (widget.depotImmobilisations != null) ...[
+        const SizedBox(height: AgriSpacing.lg),
+        const Text(
+          'AUTRES ÉTATS',
+          key: Key('hub-autres-etats'),
+          style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        _grilleCartes([_carteNavigation(PageComptable.immobilisations)], large),
+      ],
     ],
+  );
+
+  /// Deux colonnes (`sm:grid-cols-2` du web), une seule sur un écran étroit.
+  Widget _grilleCartes(List<Widget> cartes, bool large) => GridView.count(
+    crossAxisCount: large ? 2 : 1,
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    mainAxisSpacing: AgriSpacing.md,
+    crossAxisSpacing: AgriSpacing.md,
+    childAspectRatio: large ? 5.2 : 4.6,
+    children: cartes,
   );
 
   Widget _carteNavigation(PageComptable page) {
     final embarquee = !motifs.containsKey(page) || (page == PageComptable.cloture && widget.depotCloture != null);
+    final teinte = embarquee ? AgriColors.brandEmerald : AgriColors.outline;
 
     return InkWell(
       key: Key('carte-${page.name}'),
@@ -394,12 +423,17 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              page.icone,
-              size: 24,
-              color: embarquee ? AgriColors.brandEmerald : AgriColors.outline,
+            // Icône dans un carré teinté (`w-12 h-12 rounded-lg bg-brand-emerald/10`).
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: teinte.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
+              child: Icon(page.icone, size: 24, color: teinte),
             ),
-            const SizedBox(width: AgriSpacing.sm),
+            const SizedBox(width: AgriSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,14 +448,16 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                       color: AgriColors.brandForest,
                     ),
                   ),
-                  if (!embarquee)
-                    const Text(
-                      'Consultation sur la surface web',
-                      style: TextStyle(fontSize: 10, color: AgriColors.outline),
-                    ),
+                  Text(
+                    page.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: AgriColors.outline),
+                  ),
                 ],
               ),
             ),
+            const Icon(SymbolesAgri.chevron_right, size: 24, color: AgriColors.outline),
           ],
         ),
       ),

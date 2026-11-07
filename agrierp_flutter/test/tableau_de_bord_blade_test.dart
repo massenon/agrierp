@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/localisation/localisation_poste.dart';
 import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/features/pilotage/tableau_de_bord_repository.dart';
+import 'package:agrierp/features/rapports/rapports_exports_screen.dart' show PeriodeDemandee;
 import 'package:agrierp/features/pilotage/tableau_de_bord_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -401,12 +403,21 @@ void main() {
   // ── 1. Libellés et messages vides lus dans le Blade ────────────────────────────────────────────────────
 
   group('libellés lus dans le Blade', () {
-    Future<void> afficher(WidgetTester tester, {ValueChanged<EcranPoste>? onOuvrir}) async {
+    Future<void> afficher(
+      WidgetTester tester, {
+      ValueChanged<EcranPoste>? onOuvrir,
+      void Function(EcranPoste, PeriodeDemandee)? onOuvrirEtat,
+    }) async {
       tester.view.physicalSize = const Size(1600, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
-        MaterialApp(home: TableauDeBordScreen(depot: depot, onOuvrir: onOuvrir)),
+        MaterialApp(
+          locale: LocalisationPoste.locale,
+          supportedLocales: LocalisationPoste.locales,
+          localizationsDelegates: LocalisationPoste.delegues,
+          home: TableauDeBordScreen(depot: depot, onOuvrir: onOuvrir, onOuvrirEtat: onOuvrirEtat),
+        ),
       );
       await tester.pumpAndSettle();
     }
@@ -513,16 +524,67 @@ void main() {
       expect(tester.widget<ElevatedButton>(pdf).onPressed, isNull);
     }, skip: sautSansWeb != null);
 
-    testWidgets('la période est le mois courant, et ses deux champs sont désactivés comme au web', (tester) async {
-      expect(blade(), contains('disabled>'));
+    /// Calendrier : choisit le jour [jour] du mois affiché (octobre 2026) puis valide.
+    Future<void> choisirJour(WidgetTester tester, String champ, String jour) async {
+      await tester.tap(find.byKey(Key(champ)));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(find.descendant(of: find.byType(DatePickerDialog), matching: find.text(jour)));
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('la période est ÉDITABLE (mois courant par défaut) : plus de champ désactivé, comme au web', (tester) async {
+      // Le Blade : deux `<input type="date" x-model>` sans `disabled`, bornés par `min` / `max`.
+      final champs = RegExp(r'<input type="date"[^\n]*>').allMatches(blade()).map((m) => m.group(0)!).toList();
+      expect(champs, hasLength(2));
+      for (final c in champs) {
+        expect(c, isNot(contains(' disabled')));
+        expect(c, contains('min='));
+        expect(c, contains('max='));
+      }
       await afficher(tester);
       // Horloge figée au 19/10/2026 : du 1er octobre à ce jour.
       expect(find.text('01/10/2026'), findsOneWidget);
       expect(find.text('19/10/2026'), findsOneWidget);
       await tester.tap(find.byKey(const Key('date-du')));
       await tester.pumpAndSettle();
-      expect(find.byType(DatePickerDialog), findsNothing);
+      expect(find.byType(DatePickerDialog), findsOneWidget);
     }, skip: sautSansWeb != null);
+
+    testWidgets('⚠️⚠️ du > au désactive « PDF » ; l état choisi s ouvre avec la période choisie', (tester) async {
+      final ouverts = <(EcranPoste, PeriodeDemandee)>[];
+      await afficher(tester, onOuvrirEtat: (e, p) => ouverts.add((e, p)));
+      final pdf = find.byKey(const Key('export-pdf'));
+
+      await tester.tap(find.byKey(const Key('choix-etat')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('État de Trésorerie').last);
+      await tester.pumpAndSettle();
+      expect(tester.widget<ElevatedButton>(pdf).onPressed, isNotNull, reason: 'état choisi, période du mois valide');
+
+      // du (10) après au (5) : désactivé.
+      await choisirJour(tester, 'date-au', '5');
+      await choisirJour(tester, 'date-du', '10');
+      expect(tester.widget<ElevatedButton>(pdf).onPressed, isNull);
+
+      // du (3) avant au (5) : réactivé, et l'état s'ouvre sur CETTE période, avec son onglet.
+      await choisirJour(tester, 'date-du', '3');
+      expect(tester.widget<ElevatedButton>(pdf).onPressed, isNotNull);
+      await tester.tap(pdf);
+      await tester.pumpAndSettle();
+      expect(ouverts, hasLength(1));
+      expect(ouverts.single.$1, EcranPoste.rapportsEtExports);
+      expect(ouverts.single.$2.du, DateTime(2026, 10, 3));
+      expect(ouverts.single.$2.au, DateTime(2026, 10, 5));
+      expect(ouverts.single.$2.onglet, 'État de Trésorerie');
+    }, skip: sautSansWeb != null);
+
+    test('l adresse de chaque état du sélecteur désigne l onglet de Rapports & Exports que le poste ouvre', () {
+      expect(TableauDeBordScreen.ongletDuLien('/rapports-exports?tab=recettes-depenses'), 'Recettes et Dépenses');
+      expect(TableauDeBordScreen.ongletDuLien('/rapports-exports?tab=stocks-synth'), 'Rapport de Stocks');
+      expect(TableauDeBordScreen.ongletDuLien('/rapport-bilan'), isNull);
+    });
 
     test('les préfixes des alertes et des sous-textes sont ceux du web', () async {
       final prefixesAlertes = captures(composant(), r"""'label' => "([^{"]+)\{""");

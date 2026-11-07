@@ -592,18 +592,8 @@ void main() {
       tester,
     ) async {
       await afficher(tester);
-      // Sur le hub, seules ces pages disent « Consultation sur la surface web » (plus les États Financiers).
-      expect(
-        find.text('Consultation sur la surface web'),
-        findsNWidgets(_ComptabiliteMotifs.attendus.length),
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('carte-etatsFinanciers')),
-          matching: find.text('Consultation sur la surface web'),
-        ),
-        findsNothing,
-      );
+      // Sur le hub, la carte ne porte que titre + description (comme le web) : le motif se lit en ouvrant la page.
+      expect(find.text('Consultation sur la surface web'), findsNothing);
 
       for (final entree in _ComptabiliteMotifs.attendus.entries) {
         await ouvrir(tester, entree.key);

@@ -811,6 +811,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
     });
   }
 
+  /// Période (et onglet) demandés par le Tableau de bord à Rapports & Exports ; lue à l'ouverture de l'écran puis effacée.
+  PeriodeDemandee? _periodeDemandee;
+
   /// Brouillon de « Contactez l'Éditeur » : possédé par la coque (`_AgriErpAppState`) pour survivre aux
   /// changements d'écran ET au verrouillage (ticket VL-2).
   /// Sans brouillon fourni (tests du socle), le socle en possède un et le libère lui-même.
@@ -1236,6 +1239,14 @@ class _SocleAccueilState extends State<SocleAccueil> {
           onEnregistrerVente: () => setState(() => _ecran = EcranPoste.caisse),
           onElevage: () => setState(() => _ecran = EcranPoste.gestionElevage),
           onOuvrir: (e) => setState(() => _ecran = e),
+          // L'état choisi au Tableau de bord s'ouvre sur la période choisie (`?startDate=&endDate=` du web).
+          onOuvrirEtat: (e, periode) {
+            setState(() {
+              _periodeDemandee = periode;
+              _ecran = e;
+            });
+            WidgetsBinding.instance.addPostFrameCallback((_) => _periodeDemandee = null);
+          },
         ),
         EcranPoste.monProfil => MonProfilScreen(
           depot: MonProfilRepository(database: widget.database),
@@ -1434,6 +1445,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
           peutExporter: PermissionsPoste.peut(_role, 'export-rapports'),
           imprimer: EditeursRapports.imprimer,
           enregistrer: EditeursRapports.enregistrer,
+          // Période et onglet du Tableau de bord, lus une fois à l'ouverture puis oubliés (comme `_catalogueOnglet`) :
+          // une ouverture par le menu retrouve le mois en cours.
+          periodeDemandee: _periodeDemandee,
         ),
         EcranPoste.administrationEtDocument => AdministrationScreen(
           depot: widget.administration,

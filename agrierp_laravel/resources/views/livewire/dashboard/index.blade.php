@@ -18,14 +18,17 @@
             </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-sm bg-white border border-outline-variant rounded-lg p-sm">
+        {{-- Période ÉDITABLE (bornes de l'exercice affiché) : l'état choisi s'ouvre avec CETTE période. Le bouton reste
+             désactivé tant qu'aucun état n'est choisi ou que « du » dépasse « au » ; le serveur re-juge (ouvrirEtat). --}}
+        @php [$borneDebut, $borneFin] = \App\Support\ExerciceChoisi::bornes(); @endphp
+        <div x-data="{ report: '', du: '{{ $periodeDu }}', au: '{{ $periodeAu }}' }" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-sm bg-white border border-outline-variant rounded-lg p-sm">
             <div class="flex items-center gap-xs flex-1">
                 <span class="material-symbols-outlined text-outline text-[18px]">calendar_month</span>
-                <input type="date" value="{{ now()->startOfMonth()->format('Y-m-d') }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1" disabled>
+                <input type="date" id="date-du" x-model="du" min="{{ $borneDebut }}" max="{{ $borneFin }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1">
                 <span class="text-outline text-xs">au</span>
-                <input type="date" value="{{ now()->format('Y-m-d') }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1" disabled>
+                <input type="date" id="date-au" x-model="au" min="{{ $borneDebut }}" max="{{ $borneFin }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1">
             </div>
-            <div class="flex items-center gap-xs" x-data="{ report: '' }">
+            <div class="flex items-center gap-xs">
                 <select x-model="report" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white flex-1 sm:w-56">
                     <option value="">-- Choisir un état / rapport --</option>
                     <option value="/rapports-exports?tab=recettes-depenses">État des Recettes</option>
@@ -37,7 +40,7 @@
                     <option value="/rapports-exports?tab=elevage-synth">Rapport Élevage</option>
                     <option value="/rapports-exports?tab=stocks-synth">Rapport de Stocks</option>
                 </select>
-                <button type="button" x-on:click="if (report) window.location.href = report" :disabled="!report" class="flex items-center gap-1 text-xs font-bold px-md py-2 rounded-lg bg-brand-emerald text-white hover:bg-brand-forest disabled:bg-surface-zebra disabled:text-outline disabled:cursor-not-allowed"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF</button>
+                <button type="button" id="export-pdf" x-on:click="$wire.ouvrirEtat(report, du, au)" :disabled="!report || !du || !au || du > au" class="flex items-center gap-1 text-xs font-bold px-md py-2 rounded-lg bg-brand-emerald text-white hover:bg-brand-forest disabled:bg-surface-zebra disabled:text-outline disabled:cursor-not-allowed" disabled><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF</button>
             </div>
         </div>
     </div>

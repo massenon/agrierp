@@ -1140,7 +1140,7 @@ void main() {
       enregistres = [];
     });
 
-    Future<void> afficher(WidgetTester tester, {bool peutExporter = true}) async {
+    Future<void> afficher(WidgetTester tester, {bool peutExporter = true, PeriodeDemandee? periode}) async {
       addTearDown(ToastAgri.toutRetirer);
       tester.view.physicalSize = const Size(1900, 2400);
       tester.view.devicePixelRatio = 1;
@@ -1155,6 +1155,7 @@ void main() {
             depot: depot,
             peutExporter: peutExporter,
             maintenant: () => maintenant,
+            periodeDemandee: periode,
             imprimer: (doc, _) async {
               imprimes.add(doc);
               return null;
@@ -1249,6 +1250,30 @@ void main() {
 
     /// ⚠️⚠️ **CHAQUE ONGLET ÉDITE SON PROPRE DOCUMENT.** Un titre générique
     /// ferait six documents indiscernables dans un classeur de ferme.
+    /// Demande du client (07/11/2026) — l'état choisi au Tableau de bord s'ouvre sur la période choisie (`?tab=…&startDate=
+    /// …&endDate=…` du web) : l'onglet, les deux champs, les données chargées ET le PDF portent CETTE période, pas le mois.
+    testWidgets('⚠️⚠️ une période demandée par le Tableau de bord ouvre l onglet dessus et le PDF la porte', (tester) async {
+      await afficher(
+        tester,
+        periode: PeriodeDemandee(du: DateTime(2026, 8, 3), au: DateTime(2026, 8, 12), onglet: 'Créances Clients'),
+      );
+
+      expect(find.descendant(of: find.byKey(const Key('hub-filter-du')), matching: find.text('03/08/2026')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('hub-filter-au')), matching: find.text('12/08/2026')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('hub-export-pdf')));
+      await tester.pumpAndSettle();
+      expect(imprimes.single.titre, 'État des Créances Clients');
+      expect(imprimes.single.sousTitre, '03/08/2026 au 12/08/2026');
+    });
+
+    testWidgets('sans période demandée, l écran garde le mois en cours (menu)', (tester) async {
+      await afficher(tester);
+
+      expect(find.descendant(of: find.byKey(const Key('hub-filter-du')), matching: find.text('01/08/2026')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('hub-filter-au')), matching: find.text('31/08/2026')), findsOneWidget);
+    });
+
     testWidgets('⚠️⚠️ l export suit l onglet actif', (tester) async {
       await afficher(tester);
 
