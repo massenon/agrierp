@@ -18,7 +18,7 @@ use App\Services\SupplierCatalogService;
  */
 class ImportFournisseursService extends ModuleImport
 {
-    public const EMPREINTE_V1 = '0000000000000000000000000000000000000000000000000000000000000000';
+    public const EMPREINTE_V1 = '5210648840b00417b68fb92466b3ff741ab343d35b36c94b417d3ce138d8dc08';
 
     private const CHAMPS = ['name' => 'nom', 'category' => 'categorie', 'phone' => 'telephone', 'address' => 'adresse'];
 

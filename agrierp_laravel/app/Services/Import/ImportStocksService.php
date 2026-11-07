@@ -27,7 +27,7 @@ use App\Support\StadePondeuse;
  */
 class ImportStocksService extends ModuleImport
 {
-    public const EMPREINTE_V1 = 'a5f30dbf8bc43d8a8d7e2e0e8d8de2dcd0fd3d0e7a2d9d6b19fd0d1ab5e8f1c0';
+    public const EMPREINTE_V1 = '89edb3fdc8347a341d96fb8642844c956cc95e596f7815fd329dc96251896157';
 
     public const MODE_FOURCHETTE = 'Fourchette';
 
@@ -103,6 +103,11 @@ class ImportStocksService extends ModuleImport
             new ColonneImport('categorie_effectif', "Catégorie d'effectif", false, 'liste', "Produits de l'aviculture seulement (liste déroulante) ; vide ailleurs.", 'categories_effectif'),
             new ColonneImport('description', 'Description', false, 'texte', '2 000 caractères au plus.'),
         ];
+    }
+
+    protected function attributs(): array
+    {
+        return ['tva' => 'TVA', 'prix_min' => 'prix min', 'prix_max' => 'prix max'];
     }
 
     public function listes(): array
@@ -234,7 +239,12 @@ class ImportStocksService extends ModuleImport
 
         // Les règles du service, telles quelles : fourchette ⇒ les deux prix et max ≥ min, TVA 0–100, stock ≥ 0…
         $service = app(ProductCatalogService::class);
+        $formatMin = isset($erreurs['prix_min']);
         $this->appliquerRegles($donnees, $service->regles($mode ?? '', true), $service->messages(), self::CHAMPS, $erreurs);
+        // Un prix min illisible fausse la comparaison « max ≥ min » : le motif du format suffit, pas un second motif parasite.
+        if ($formatMin && ($erreurs['prix_max'] ?? null) === $service->messages()['price_max.gte']) {
+            unset($erreurs['prix_max']);
+        }
 
         $v = $donnees;
         $v['categorie_libelle'] = $texteCategorie;

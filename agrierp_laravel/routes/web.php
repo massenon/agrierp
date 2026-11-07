@@ -118,6 +118,11 @@ Route::get('/mon-profil', \App\Livewire\Profil\MonProfil::class)
     ->name('profil.index')
     ->middleware('auth');
 
+// PWA-1 (08/11/2026) : « Activer le mode hors ligne » — appairage de ce navigateur comme un poste (caisse hors ligne).
+Route::get('/mode-hors-ligne', \App\Livewire\Profil\ModeHorsLigne::class)
+    ->name('profil.mode-hors-ligne')
+    ->middleware(['auth', 'can:manage-ventes']);
+
 // Sprint 1, ticket 1.5 : aide-a-propos.html → page statique
 Route::get('/aide-a-propos', \App\Livewire\Aide\Index::class)
     ->name('aide.index')

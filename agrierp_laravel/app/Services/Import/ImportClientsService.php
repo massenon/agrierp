@@ -20,7 +20,7 @@ use App\Services\FusionReferentielsService;
  */
 class ImportClientsService extends ModuleImport
 {
-    public const EMPREINTE_V1 = '0000000000000000000000000000000000000000000000000000000000000000';
+    public const EMPREINTE_V1 = '6c5e88100059401585fff5c982453728452e52943f2e167c134dfa8cfb0aa6dd';
 
     private const CHAMPS = ['name' => 'nom', 'phone' => 'telephone', 'email' => 'email', 'city' => 'ville', 'ifu' => 'ifu'];
 

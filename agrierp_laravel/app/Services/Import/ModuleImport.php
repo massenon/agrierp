@@ -175,6 +175,17 @@ abstract class ModuleImport
         return $index;
     }
 
+    /**
+     * Nom de la colonne DANS LES MESSAGES des règles (« Le champ TVA ne doit pas dépasser 100. ») quand le libellé en minuscules
+     * ne se lit pas bien. Le poste reprend ces noms (`importation_repository.dart`).
+     *
+     * @return array<string, string> clé de colonne → nom
+     */
+    protected function attributs(): array
+    {
+        return [];
+    }
+
     /** Colonne par clé. */
     public function colonne(string $cle): ColonneImport
     {
@@ -201,7 +212,7 @@ abstract class ModuleImport
     {
         $attributs = [];
         foreach ($champVersColonne as $champ => $colonne) {
-            $attributs[$champ] = mb_strtolower($this->colonne($colonne)->libelle);
+            $attributs[$champ] = $this->attributs()[$colonne] ?? mb_strtolower($this->colonne($colonne)->libelle);
         }
 
         $validateur = Validator::make($donnees, $regles, $messages, $attributs);

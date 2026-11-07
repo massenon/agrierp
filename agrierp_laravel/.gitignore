@@ -24,3 +24,4 @@ Homestead.yaml
 Thumbs.db
 .env.dusk.local
 /*.zip
+/public/assets/hors-ligne

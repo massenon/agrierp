@@ -1,6 +1,8 @@
 import collapse from '@alpinejs/collapse';
 import './verrou';
 import './aide';
+import './hors-ligne/activation-page';
+import './hors-ligne/deconnexion-web';
 
 /**
  * AgriERP — resources/js/app.js
