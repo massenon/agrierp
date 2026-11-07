@@ -27,7 +27,9 @@ void main() {
         .map((m) => m.group(1)!.replaceAll('&amp;', '&').trim())
         .toList();
     // Ticket VW : « Verrouiller » (verrou de session web) entre Paramètres et le séparateur de Déconnexion.
-    expect(libelles, ['Mon Profil', 'Aide & À Propos', "Contactez l'Éditeur", 'Paramètres', 'Verrouiller', 'Déconnexion']);
+    // PWA-1 : « Mode hors ligne » (activation de la caisse hors ligne du NAVIGATEUR) est une entrée propre au web : le poste
+    // Windows est lui-même hors ligne, il n'a donc pas cette entrée.
+    expect(libelles, ['Mon Profil', 'Mode hors ligne', 'Aide & À Propos', "Contactez l'Éditeur", 'Paramètres', 'Verrouiller', 'Déconnexion']);
   }, skip: sansLaravel);
 
   testWidgets('menu du compte : Paramètres puis, sous un séparateur, Déconnexion qui prévient le socle', (t) async {

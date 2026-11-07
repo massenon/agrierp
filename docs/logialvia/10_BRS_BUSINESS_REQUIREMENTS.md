@@ -85,7 +85,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 | BR-042 | Un seul vocabulaire par filière : « couveuse » n'apparaît que chez Goliaths et Pintades ; les poissons ne « naissent » pas en couveuse (colonne « Nés »). | F3 « Glossaire des filières » | C | M |
 | BR-043 | La ration des poissons-chats se calcule en pourcentage de la biomasse par jour (effectif × poids moyen × taux), par classe de poids, barème éditable ; poids moyen recalculé par pesée d'échantillon tous les 15 jours. TRANCHÉ (DV-01) ; taux = repères à valider. | `16_` DV-01 ; `15_` RM-ELV-09b | C | M |
 | BR-044 | À chaque vente ou récolte de poisson, le poids (kg) ET le nombre de sujets sont saisis ; si le nombre est inconnu il est estimé (kg ÷ poids moyen de la dernière pesée) et la ligne est marquée « estimé ». TRANCHÉ (DV-02). | `16_` DV-02 ; `15_` RM-ELV-12 | C | M |
-| BR-045 | Pintades : stade « pintadeaux » ; incubation 28 jours, durée PARAMÉTRABLE avec fenêtre 26–28 j, deux modes (couveuse, couvaison naturelle), rappels J7, J14, J25. TRANCHÉ (DV-03) ; repères d'incubateur à valider. | `16_` DV-03 ; `15_` RM-COU-01, RM-COU-06 | C | M |
+| BR-045 | Pintades : stade « Poussins » (DV-09) ; incubation 28 jours, durée PARAMÉTRABLE avec fenêtre 26–28 j, deux modes (couveuse, couvaison naturelle), rappels J7, J14, J25. TRANCHÉ (DV-03) ; repères d'incubateur à valider. | `16_` DV-03 ; `15_` RM-COU-01, RM-COU-06 | C | M |
 | BR-046 | L'autonomie de provende a deux seuils paramétrables par ferme : alerte à 7 jours (défaut = délai d'approvisionnement + marge de sécurité), critique à 3 jours. TRANCHÉ (DV-04). | `16_` DV-04 ; `15_` RM-ELV-10 | C | M |
 | BR-047 | Une écriture comptable ne se supprime pas et ne se restaure pas : elle se contre-passe ; elle n'entre jamais dans la corbeille (intangibilité OHADA). TRANCHÉ (DV-05). | `16_` DV-05 ; `15_` RM-CPT-09 | C | M |
 | BR-048 | Le caissier n'accède pas à `/inventaire` (administrateur, et responsable stock s'il existe) ; sur `/factures-mecef` il consulte et réimprime, sans annuler, retransmettre ni créer d'avoir. La matrice fait foi, le code la suit. TRANCHÉ (DV-06). | `16_` DV-06 ; `20_` §3 | C | M |
@@ -129,7 +129,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 10. **Q-TVA-1** Entreprise assujettie à la TVA (taux 0 % et 18 % seulement) ? Une facture simple figure-t-elle dans la déclaration de TVA ?
 11. **Q-ADM-1** Politique de mot de passe (longueur, majuscule, chiffre) ? (logialvia : 8 caractères minimum.)
 12. **Q-VTE-1** Délai de paiement par défaut des ventes à crédit (jours) ?
-13. **Q-DV-1 … Q-DV-8** : nouvelles questions nées des décisions validées du 08/11/2026 (barème en % de biomasse, arrondi de l'estimation, mortalité des pintadeaux, marge de sécurité, responsable stock, onglet Retours et Avoirs, périmètre du comptable, libellé du jeune pintade) : voir `16_DECISIONS_VALIDEES.md` §4.
+13. **Q-DV-1 … Q-DV-8** : nouvelles questions nées des décisions validées du 08/11/2026 (barème en % de biomasse, arrondi de l'estimation, mortalité des poussins de pintade, marge de sécurité, responsable stock, onglet Retours et Avoirs, périmètre du comptable, libellé du jeune pintade) : voir `16_DECISIONS_VALIDEES.md` §4.
 14. Questions FERMÉES le 08/11/2026 : Q-ROL-1, Q-ALR-1, Q-CPT-3, Q-PIS-5, Q-PIS-6, Q-PIN-4 (voir `16_`).
 
 ## 7. Critères d'acceptation du document

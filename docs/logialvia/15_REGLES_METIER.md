@@ -274,7 +274,7 @@ Tableau de configuration (source : `logialvia_app/lib/elevage/domain/entities/co
 | Filière | Cat. 1 (reçoit achats + nés) | Cat. 2 (déduite des ventes) | Cat. 3 / 4 | Libellé achats | Libellé nés | Ration code (g/j) |
 |---|---|---|---|---|---|---|
 | Goliaths | Poussins | **Goliathau** | Mature | Achats | Nés (Couveuse) | 30 / 60 / 110 |
-| Pintades | Poussins (libellé à aligner sur « pintadeaux » : Q-DV-8) | **Pintadau** | Mature | Achats | Nés (Couveuse) | 30 / 60 / 110 (générique, à remplacer par les repères DV-03 validés) |
+| Pintades | Poussins (libellé à aligner sur « Poussins » (DV-09) : Q-DV-8) | **Pintadau** | Mature | Achats | Nés (Couveuse) | 30 / 60 / 110 (générique, à remplacer par les repères DV-03 validés) |
 | Poissons-Chats | Alevin | **Juvénile** | Mature | Achats | Nés | % de biomasse par classe de poids (RM-ELV-09b ; 30/60/110 ÉCARTÉ, DV-01) |
 | Lapins | Lapereau | Chair | Reproducteur | Achats | Nés (Mise bas) | 30 / 60 / 110 |
 | Poulets | Poussin | Poulette | Adulte | Achats | Nés / Transferts | 30 / 60 / 110 |
@@ -312,13 +312,13 @@ Tableau de configuration (source : `logialvia_app/lib/elevage/domain/entities/co
 - Catégories **Poussins / Pintadau / Mature** ; Poussins reçoit achats et nés ; **la vente est déduite de Pintadau** ; mécanisme famille « neutre » RM-ELV-01 ; libellés « Achats » et « Nés (Couveuse) » [configuration_espece.dart].
 - Étapes de cycle : « Naissance (Couveuse) », « Pintadau (0 → 4 mois) », « Mature — Éligible à la Vente » (aucun seuil de poids ni d'âge pour la pintade, contrairement à Goliaths).
 - **Incubation : 28 jours** (corrigé par la Gérante ; `INDEX_MAITRE` et le prototype disaient 27 : à corriger) [`cycle_incubation.dart`, F3 v21] ; **TRANCHÉ (DV-03)** : durée PARAMÉTRABLE (défaut 28 j), fenêtre d'éclosion 26–28 j, deux modes (couveuse / couvaison naturelle), mirages J7 et J14, transfert à l'éclosoir vers J25 avec rappels : RM-COU-01 et RM-COU-06.
-- Ration : barème générique 30 / 60 / 110 g/j (« aucun barème spécifique confirmé », badge « Générique (Aviculture, à confirmer) » [seeder, F3]). **TRANCHÉ (DV-03)** : repères terrain à valider, 10–60 g/jour par pintadeau selon l'âge et 90–120 g/jour adulte (à confirmer avec la fiche de l'aliment). ⚠️ Le barème semé nomme « **Alevins** » le premier stade (`parametres_elevage_seeder.dart`) : terme de poisson, **interdit pour une pintade** ; le stade s'appelle « **pintadeaux** » ; le libellé du barème doit être égal au libellé de la catégorie de la fiche (rapprochement strict par libellé exact, RM-ELV-09) : C-4 TRANCHÉ, libellé exact de la catégorie 1 à fixer (Q-DV-8).
+- Ration : barème générique 30 / 60 / 110 g/j (« aucun barème spécifique confirmé », badge « Générique (Aviculture, à confirmer) » [seeder, F3]). **TRANCHÉ (DV-03)** : repères terrain à valider, 10–60 g/jour par sujet selon l'âge et 90–120 g/jour adulte (à confirmer avec la fiche de l'aliment). ⚠️ Le barème semé nomme « **Alevins** » le premier stade (`parametres_elevage_seeder.dart`) : terme de poisson, **interdit pour une pintade** ; le stade s'appelle « **Poussins** » (DV-09) ; le libellé du barème doit être égal au libellé de la catégorie de la fiche (rapprochement strict par libellé exact, RM-ELV-09) : C-4 TRANCHÉ, libellé exact de la catégorie 1 à fixer (Q-DV-8).
 - Prophylaxie semée : J1 Déparasitage (Levamisole Volaille, rémanence 7), J5 Anti-coccidien 1/4 (Amprolium, rémanence 5), J6 Complément Calcium (CalciBoost), J12 Vaccin Gumboro Rappel (rémanence 0) [seeder].
 - AgriERP ne contient AUCUNE règle de pintade (seul un produit « Pintade », SKU AVI-002) [guide bloc 1].
 
 **À DÉFINIR AVEC LE CLIENT** :
-- **Q-PIN-1 Stades.** Durée exacte du stade pintadeau (« 0 → 4 mois » indicatif) ? Seuil de maturité en âge et en poids (comme les 120 j et 2,8 kg du Goliath) ?
-- **Q-PIN-2 Rations.** TRANCHÉ EN PARTIE (DV-03) : ordres de grandeur 10–60 g/jour par pintadeau selon l'âge, 90–120 g/jour adulte, marqués « repères terrain, à valider ». Reste À DÉFINIR : barème par stade confirmé avec la fiche de l'aliment.
+- **Q-PIN-1 Stades.** Durée exacte du stade du jeune pintadeau (« 0 → 4 mois » indicatif) ? Seuil de maturité en âge et en poids (comme les 120 j et 2,8 kg du Goliath) ?
+- **Q-PIN-2 Rations.** TRANCHÉ EN PARTIE (DV-03) : ordres de grandeur 10–60 g/jour par sujet selon l'âge, 90–120 g/jour adulte, marqués « repères terrain, à valider ». Reste À DÉFINIR : barème par stade confirmé avec la fiche de l'aliment.
 - **Q-PIN-3 Reproducteurs et ponte.** Les reproducteurs (et une éventuelle ponte de pintades) forment-ils une catégorie ou une bande distincte ? Les œufs de pintade se suivent-ils comme ceux des pondeuses (stock d'œufs) ?
 - **Q-PIN-4 Incubation et prophylaxie.** Incubation TRANCHÉE (DV-03) : 28 jours, paramétrable, fenêtre 26–28 j. Reste À DÉFINIR : le calendrier de prophylaxie J1/J5/J6/J12 (calcium à J6 : produit et dose ?).
 
@@ -351,7 +351,7 @@ Q-ELV-1 glossaire lapins (Lapereau/Chair/Reproducteur de logialvia contre Reprod
 | C-1 | B6 BR-ELV-006 : la cascade s'arrête « au premier jour non saisi » ; AgriERP franchit les jours sautés. | Q-ELV-6 ; en attendant, comportement de logialvia. |
 | C-2 | B6 BR-ELV-002 : achats → catégorie la plus jeune ; AgriERP VOL-1 : achats → Jeune ; VOL-2 : achat → Poulette. | Garder la règle de logialvia ; Q-ELV-4. |
 | C-3 | Poissons-Chats : ration 30/60/110 (`configuration_espece.dart`, g/j par sujet) contre **8/25/45** (`parametres_elevage_seeder.dart`). | **TRANCHÉ (DV-01)** : les deux séries sont écartées ; ration en % de la biomasse (RM-ELV-09b). |
-| C-4 | Pintades : le barème semé nomme « Alevins » le stade « Poussins » du code. | **TRANCHÉ (DV-03)** : « Alevins » interdit ; le stade s'appelle « pintadeaux » ; corriger le seeder côté LogiALVIA (hors de ce dépôt) et fixer le libellé exact (Q-DV-8). |
+| C-4 | Pintades : le barème semé nomme « Alevins » le stade « Poussins » du code. | **TRANCHÉ (DV-03)** : « Alevins » interdit ; le stade s'appelle « Poussins » (DV-09) ; corriger le seeder côté LogiALVIA (hors de ce dépôt) et fixer le libellé exact (Q-DV-8). |
 | C-5 | Lapins : reproducteur 110 g/j (code) contre 120 g/j (base semée, confirmé « Référence Cuniculture » ; AgriERP 120). | Q-ELV-2. |
 | C-6 | Incubation Pintade : 27 j (prototype, INDEX_MAITRE) contre 28 j (F3 v21, code `cycle_incubation.dart`). | **TRANCHÉ (DV-03)** : 28 j par défaut, paramétrable, fenêtre 26–28 j ; corriger `INDEX_MAITRE`. |
 | C-7 | Autonomie de provende : H2 « sous 7 jours » contre AgriERP « sous 3 jours ». | **TRANCHÉ (DV-04)** : les deux, comme seuils d'alerte (7 j) et critique (3 j), paramétrables. |

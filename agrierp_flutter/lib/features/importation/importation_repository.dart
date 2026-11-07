@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
+import '../../core/erreurs/message_erreur.dart';
 import '../../core/temps/heure_benin.dart';
 import '../achats/fournisseurs_repository.dart';
 import '../clients/clients_creances_repository.dart';
@@ -765,7 +766,7 @@ class ImportationRepository {
         _memoriser(m, r.valeurs, contexte);
       } catch (e) {
         l.statut = refusee;
-        l.motif = 'Ligne ${l.ligne} : $e';
+        l.motif = 'Ligne ${l.ligne} : ${messageErreur(e)}';
       }
     }
 

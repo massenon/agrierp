@@ -284,7 +284,7 @@ Format d'un scénario : identifiant · rôle · pré-condition · étapes · ré
 | UAT-ELV-08 | éleveur | planifier un soin ; fenêtre « Rappels du jour » | rappel affiché une fois par session, aucune fenêtre vide |
 | UAT-ELV-09 | gérant | vendre un animal sous délai d'attente vétérinaire | vente bloquée ou signalée, jamais silencieuse |
 | UAT-ELV-10 | éleveur | pisciculture : fiche « Poissons-Chats » | libellés Alevin / Juvénile / Mature, colonne « Nés » (sans couveuse) ; tableau de ration en % de biomasse (poids moyen, biomasse, taux), note « repères à valider » ; section pesée d'échantillon ; cas T-DV01-* |
-| UAT-ELV-11 | éleveur | pintades : fiche et couvoir | Poussins / Pintadau / Mature (libellé du jeune : « pintadeaux », jamais « Alevins »), « Nés (Couveuse) » ; incubation 28 j paramétrable, plage 26–28 j, mode couveuse / couvaison naturelle, rappels J7, J14, J25 ; cas T-DV03-* |
+| UAT-ELV-11 | éleveur | pintades : fiche et couvoir | Poussins / Pintadau / Mature (libellé du jeune : « Poussins » (DV-09), jamais « Alevins »), « Nés (Couveuse) » ; incubation 28 j paramétrable, plage 26–28 j, mode couveuse / couvaison naturelle, rappels J7, J14, J25 ; cas T-DV03-* |
 | UAT-ELV-12 | éleveur | goliaths : fiche | Poussins / Goliathau / Mature ; alerte de maturité (règle **À DÉFINIR AVEC LE CLIENT** : combinaison poids/âge) |
 
 ### 8.3 Ventes
@@ -397,7 +397,7 @@ Capture web et capture poste côte à côte à la même largeur : différences d
 | Filière | Tests spécifiques | Ce qui est À DÉFINIR AVEC LE CLIENT |
 |---|---|---|
 | Pisciculture (poissons-chats) | libellés Alevin/Juvénile/Mature ; colonne « Nés » ; ration en % de biomasse (DV-01, jamais 30/60/110 ni 8/25/45) ; vente en kg ET sujets avec indicateur « estimé » (DV-02) ; note « repères à valider » visible ; l'achat d'alevins se saisit en « Achats » | bassins, qualité de l'eau, pesée/échantillonnage, récolte partielle (D-PIS-1 à 4 de `30`) : **aucun test inventé** ; écrire des tests `skip` portant la question |
-| Pintades | libellés Poussins/Pintadau/Mature (jeune : « pintadeaux », jamais « Alevins ») ; « Nés (Couveuse) » ; rations 30/60/110 en attendant les repères validés ; incubation 28 j paramétrable, fenêtre 26–28 j, deux modes, rappels J7/J14/J25 (DV-03) | seuil d'alerte de mortalité des pintadeaux, repères d'incubateur et de poussinière, rations par âge (Q-DV-3) |
+| Pintades | libellés Poussins/Pintadau/Mature (jeune : « Poussins » (DV-09), jamais « Alevins ») ; « Nés (Couveuse) » ; rations 30/60/110 en attendant les repères validés ; incubation 28 j paramétrable, fenêtre 26–28 j, deux modes, rappels J7/J14/J25 (DV-03) | seuil d'alerte de mortalité des poussins de pintade, repères d'incubateur et de poussinière, rations par âge (Q-DV-3) |
 | Goliaths | libellés Poussins/Goliathau/Mature ; rations 30/60/110 avec note « barème générique non confirmé » ; seuils de maturité 2 800 g / 120 jours présents dans le code | barème validé, définition de la maturité, combinaison des seuils (D-GOL-1/2) |
 | Toutes | ajouter une 6ᵉ filière = configuration, pas écran dupliqué : un garde-fou vérifie qu'il n'existe **qu'un** composant de fiche générique paramétré par la configuration | prophylaxie par filière (D-ALL-1) |
 
