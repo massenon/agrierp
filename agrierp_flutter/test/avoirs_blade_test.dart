@@ -238,8 +238,8 @@ void main() {
     expect(chaines, contains('Retour refusé : \$motif'));
   }, skip: saut);
 
-  test('les droits : `authorize(\'manage-ventes\')` sur les deux méthodes qui écrivent, comme au web', () {
-    expect(RegExp(r"authorize\('manage-ventes'\)").allMatches(composant).length, 2);
+  test('les droits : `authorize(\'manage-ventes\')` sur les trois méthodes qui écrivent (saisie, « traité », retransmission MeCeF faite par le serveur), comme au web', () {
+    expect(RegExp(r"authorize\('manage-ventes'\)").allMatches(composant).length, 3);
     final source = codeSeul(fichiers.first);
     expect(source, contains('widget.peutGerer'));
     expect(chaines, contains('Votre rôle ne permet pas cette action.'));

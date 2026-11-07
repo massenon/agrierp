@@ -93,7 +93,7 @@
 
         <div class="bg-white border border-outline-variant rounded-lg p-md mt-lg" id="facturation-mecef">
             <h3 class="text-sm font-bold text-brand-forest mb-xs flex items-center gap-xs">
-                <span class="material-symbols-outlined text-[18px]">verified</span>Facturation normalisée (MeCeF)
+                <span class="material-symbols-outlined text-[18px]">check_circle</span>Facturation normalisée (MeCeF)
             </h3>
             <p class="text-[11px] text-outline mb-md">
                 Choisissez comment les factures sont normalisées auprès de la DGI. Une facture normalisée n'est plus modifiable ni annulable : elle se corrige par un avoir.
