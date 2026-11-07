@@ -56,6 +56,10 @@ flutter test test/caisse_test.dart --plain-name "…"      # one test, by its (F
 flutter build windows --release    # → build\windows\x64\runner\Release\agrierp.exe
 ```
 
+### Version de Flutter figée (`.fvmrc`)
+
+`.fvmrc` fixe la version de Flutter stable avec laquelle le poste est compilé et testé : **3.47.7 (Dart 3.13.5)**. `pubspec.yaml` n'impose qu'un plancher (`sdk: ^3.12.2`) ; sans ce fichier, un SDK plus récent peut casser la compilation Windows sans qu'aucun test le dise (cas déjà payé : `sync_engine.dart`, promotion de nullité d'une variable capturée par une fermeture, corrigée par une copie finale locale). `build_windows.bat` compare `flutter --version --machine` à `.fvmrc` et AVERTIT (jamais d'échec) si elles diffèrent. Changer de version = changer `.fvmrc` après `flutter analyze` + `flutter test` verts sur la nouvelle version. Règle de prévention : ne jamais tester la nullité d'une variable, d'un paramètre ou d'un champ non final CAPTURÉ par une fermeture (`transaction(() async {…})`, `map`, `then`) en comptant sur la promotion ; poser avant la fermeture `final copie = variable;` et tester la copie.
+
 ### Tests that need the real server
 
 `dart_test.yaml` declares an `integration` tag. Those tests (`test/sync_reel_test.dart`) require `php artisan serve --port=8002` in `C:\laragon\www\agrierp`; **without it they mark themselves SKIPPED, never failed** — a permanent red offline ends up ignored for good.

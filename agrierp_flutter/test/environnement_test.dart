@@ -98,6 +98,17 @@ void main() {
       expect(crlf, lf, reason: 'chaque fin de ligne doit être CRLF');
     });
 
+    test('la version de Flutter est figée (.fvmrc) et le script l\'AVERTIT sans jamais échouer', () {
+      final fvm = File('.fvmrc');
+      expect(fvm.existsSync(), isTrue, reason: '.fvmrc absent : aucune version de Flutter figée');
+      expect(RegExp(r'"flutter":\s*"\d+\.\d+\.\d+"').hasMatch(fvm.readAsStringSync()), isTrue);
+      expect(script, contains('--version --machine'));
+      expect(script, contains('.fvmrc'));
+      final avertissements = lignes.where((l) => l.contains('[AVERTISSEMENT]'));
+      expect(avertissements, isNotEmpty);
+      expect(avertissements.any((l) => l.contains('exit')), isFalse, reason: 'un avertissement ne fait jamais échouer');
+    });
+
     test('les environnements acceptés par le script sont exactement ceux de environnement.dart', () {
       final liste = RegExp(r'for %%e in \(([^)]*)\) do').firstMatch(script);
       expect(liste, isNotNull);
