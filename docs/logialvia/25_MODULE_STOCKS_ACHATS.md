@@ -23,7 +23,7 @@ Deux stocks distincts (BR-011) : **produits vendables** (catalogue de la caisse)
 | `/achats` | Achats & Commandes | A | view/manage-achats | W+P |
 | `/fournisseurs` | Fournisseurs | A | view/manage-achats | W+P |
 | `/depenses` | Saisie des Dépenses | A | view/manage-achats | W+P |
-| `/inventaire` | Inventaire daté et valorisé | A C | view-ventes | W+P (lecture) |
+| `/inventaire` | Inventaire daté et valorisé | A (et responsable stock s'il existe : Q-DV-5) | **view-stocks** (TRANCHÉ DV-06 : plus `view-ventes`, caissier exclu) | W+P (lecture) |
 
 ## 3. Gestion des Stocks (`/stocks`) — intrants
 
@@ -31,7 +31,7 @@ Deux stocks distincts (BR-011) : **produits vendables** (catalogue de la caisse)
 **Modale « Ajouter / Modifier un Intrant »** : DÉSIGNATION *, CATÉGORIE *, QUANTITÉ, UNITÉ, SEUIL D'ALERTE, PRIX UNITAIRE (PMP). Suppression : modale de confirmation avec avertissement d'irréversibilité ; « supprimer » ARCHIVE (corbeille) ; la suppression peut échouer si l'article est référencé (message explicatif, jamais une erreur technique).
 **Modale « Ajustement d'inventaire »** : stock théorique (pré-rempli) vs stock physique constaté → écart = physique − théorique ; à la validation le physique REMPLACE le théorique et l'écart est journalisé (type, signe, motif, auteur ; BR-ADM-003). Persistance prouvée en rouvrant l'écran.
 **Modale « Fabrication de Provende »** : une ligne par intrant de catégorie « Intrants Provende » (les 5 semés : Maïs, Soja, Coquille d'huître, Poudre de poisson, Tourteau de palmiste ; un 6e ajouté au stock apparaît) : nom, unité, stock disponible (rouge si sous seuil), champ de quantité ; composition par défaut 25 / 10 / 5 / 3 / 2 kg ; alerte DÈS LA SAISIE (« Maïs (18 kg dispo) ») ; « TOTAL PROVENDE FABRIQUÉE » recalculé à chaque frappe ; bouton « Valider la Fabrication » : première passe de contrôle de TOUS les stocks puis décrément atomique ; sorties négatives signées avec référence commune `FAB-AAAA-NNNN` séquencée sur l'exercice et motif portant le total. Toute sortie d'intrant de provende passe par cette opération (« jamais une simple sortie de stock isolée », CDCT §6.2, §8.3). **Non défini** : aucun article « Provende » fabriqué n'est créé en sortie, aucune recette n'est mémorisée, aucune écriture comptable (transfert interne) : **Q-STK-2, Q-STK-3**.
-**Règles** : PMP' = (stock × PMP + qté × prix) ÷ (stock + qté) (RM-STK-01 ; Q-STK-1) ; critique si stock ≤ seuil (RM-STK-02) ; stock négatif : message et drapeau (H14) ; tout `stock_qty` ne bouge que par `AdjustStockAction` (mouvement écrit dans le MÊME appel) ; verrous de stock par UUID croissants avant toute fiche.
+**Règles** : PMP' = (stock × PMP + qté × prix) ÷ (stock + qté) (RM-STK-01 ; Q-STK-1) ; critique si stock ≤ seuil (RM-STK-02) ; stock négatif : message et drapeau (H14) ; tout `stock_qty` ne bouge que par `AdjustStockAction` (mouvement écrit dans le MÊME appel) ; verrous de stock par UUID croissants avant toute fiche. **Seuils d'autonomie de provende (TRANCHÉ DV-04)** : deux seuils paramétrables par ferme (`29_` §4) : **alerte à 7 jours** (défaut = délai d'approvisionnement du fournisseur + marge de sécurité) et **critique à 3 jours** ; autonomie = stock de provende ÷ ration journalière calculée (`15_` RM-ELV-10) ; jamais bloquant. Le seuil d'alerte par article (`seuil d'alerte`, stock ≤ seuil) reste un mécanisme distinct (RM-STK-02).
 
 ## 4. Catalogue & Seuils (`/catalogue`) — produits vendables
 
@@ -55,7 +55,7 @@ Formulaire (ordre du prototype, en tête de page) : LIBELLÉ DE LA DÉPENSE * (�
 
 ## 8. Inventaire (`/inventaire`, ajout hors prototype, demandé par la Gérante)
 
-Répond à « que détenait l'exploitation à une date, et d'où vient l'écart ? ». Périodes : « Journalier » (défaut), « Hebdomadaire » (depuis le lundi), « Mensuel » (depuis le 1er), « Plage personnalisée » (la dernière borne choisie fait foi). Recherche « Rechercher un article, un code… ». Colonnes : ARTICLE · CATÉGORIE · STOCK INITIAL · ENTRÉES · SORTIES · STOCK FINAL · PMP · VALEUR (intrants) ; PRODUIT · COÛT DE REVIENT · SORTIES (VENTES) · VALEUR (produits finis) ; FILIÈRE · EFFECTIF · DERNIÈRE SAISIE (animaux sur pied). KPI/totaux : TOTAL INTRANTS · TOTAL PRODUITS FINIS · TOTAL ANIMAUX SUR PIED · VALEUR TOTALE DU STOCK · « DONT INTRANTS » · « DONT PRODUITS FINIS ». **Règle** : stock à la date T = stock actuel − mouvements postérieurs à T (jamais le stock d'aujourd'hui sous une date passée) ; l'égalité stock initial + entrées − sorties = stock final doit tenir, sinon la ligne est signalée en tête (« un inventaire qui ne se justifie pas ne se signe pas ») ; intrants au PMP, produits finis au coût de revient, animaux et œufs en incubation COMPTÉS non valorisés ; un produit sans coût : « Non valorisé », hors totaux (« Hors N article(s)… ») ; export PDF paysage avec la base de valorisation. Visible pour admin ET caissier (arbitrage de la Gérante, consigné dans le code). Au poste : hors ligne (lecture sur la base locale). AgriERP : l'inventaire au comptage (`InventaireAuComptageService`, écart calculé contre le grand livre à l'instant du comptage) est une règle distincte, PROPOSÉE (Q-STK-5).
+Répond à « que détenait l'exploitation à une date, et d'où vient l'écart ? ». Périodes : « Journalier » (défaut), « Hebdomadaire » (depuis le lundi), « Mensuel » (depuis le 1er), « Plage personnalisée » (la dernière borne choisie fait foi). Recherche « Rechercher un article, un code… ». Colonnes : ARTICLE · CATÉGORIE · STOCK INITIAL · ENTRÉES · SORTIES · STOCK FINAL · PMP · VALEUR (intrants) ; PRODUIT · COÛT DE REVIENT · SORTIES (VENTES) · VALEUR (produits finis) ; FILIÈRE · EFFECTIF · DERNIÈRE SAISIE (animaux sur pied). KPI/totaux : TOTAL INTRANTS · TOTAL PRODUITS FINIS · TOTAL ANIMAUX SUR PIED · VALEUR TOTALE DU STOCK · « DONT INTRANTS » · « DONT PRODUITS FINIS ». **Règle** : stock à la date T = stock actuel − mouvements postérieurs à T (jamais le stock d'aujourd'hui sous une date passée) ; l'égalité stock initial + entrées − sorties = stock final doit tenir, sinon la ligne est signalée en tête (« un inventaire qui ne se justifie pas ne se signe pas ») ; intrants au PMP, produits finis au coût de revient, animaux et œufs en incubation COMPTÉS non valorisés ; un produit sans coût : « Non valorisé », hors totaux (« Hors N article(s)… ») ; export PDF paysage avec la base de valorisation. **Accès : TRANCHÉ (DV-06)** : administrateur seul (et responsable stock s'il existe, Q-DV-5) ; le caissier n'y accède NI par le menu NI par l'URL (redirection `/dashboard`) : il ne voit ni les coûts de revient ni la valorisation ; l'« arbitrage de la Gérante » consigné dans `permission_service.dart` est annulé, le code suit la matrice (`20_` §3). Au poste : hors ligne (lecture sur la base locale). AgriERP : l'inventaire au comptage (`InventaireAuComptageService`, écart calculé contre le grand livre à l'instant du comptage) est une règle distincte, PROPOSÉE (Q-STK-5).
 
 ## 9. Hors ligne et synchronisation
 
@@ -70,7 +70,7 @@ Un inventaire (comptage) du poste porte `counted_quantity` + `counted_at` ; l'é
 
 ## 10. Notifications
 
-Stock sous seuil (06:05, rôle admin), stock négatif après synchronisation, autonomie de provende, achat en retard de réception (À DÉFINIR, Q-STK-6).
+Stock sous seuil (06:05, rôle admin), stock négatif après synchronisation, autonomie de provende (alerte ≤ 7 j, critique ≤ 3 j : DV-04), achat en retard de réception (À DÉFINIR, Q-STK-6).
 
 ## 11. Critères d'acceptation
 
@@ -81,6 +81,8 @@ Stock sous seuil (06:05, rôle admin), stock négatif après synchronisation, au
 - [ ] Produit vendu : non supprimable, archivable.
 - [ ] Inventaire à une date passée = stock actuel − mouvements postérieurs ; ligne injustifiée signalée.
 - [ ] Un animalier ou un caissier en URL directe `/stocks` : refus.
+- [ ] Un caissier en URL directe `/inventaire` : refus (redirection `/dashboard`), entrée de menu absente ; un comptable aussi (DV-06, matrice `20_` §3).
+- [ ] Autonomie de provende : alerte à ≤ 7 j, critique à ≤ 3 j, seuils modifiés dans Paramètres suivis par l'alerte (DV-04).
 
 ## 12. Tests
 

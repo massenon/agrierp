@@ -20,7 +20,7 @@ Encaisser en moins de 60 secondes (BR-003) avec un stock exact en temps réel (B
 |---|---|---|---|---|---|
 | `/ventes` | Ventes (4 onglets) | A C | view/manage/export-ventes | — | W+P (hors ligne au poste) |
 | `/clients` | Clients et Créances | A C | idem | — | W+P |
-| `/factures-mecef` | Facturation MeCeF | A C | view/manage-facturation | `mecef` | W+P (transmission au serveur) |
+| `/factures-mecef` | Facturation MeCeF | A K ; C en consultation + réimpression seulement (DV-06) | view-facturation (tous) ; manage-facturation (A K, PAS C) | `mecef` | W+P (transmission au serveur) |
 | (modales) | Livraison, Annulation, Enregistrer un Paiement, Ajouter un Client, Émettre une Facture | — | — | — | — |
 
 ## 3. Écran Ventes — KPI persistants (au-dessus des onglets) et 4 onglets
@@ -29,6 +29,7 @@ Encaisser en moins de 60 secondes (BR-003) avec un stock exact en temps réel (B
 
 ### Onglet 1 — « Enregistrer Vente » (POS ; 2 colonnes : grille 2/3, panier 1/3 ; panier en deux rangées, `docs/prd/panier-vente-deux-rangees.md`)
 **Grille produits** : recherche « Rechercher un produit… » (filtrage en direct) ; filtre catégorie « Toutes catégories » (Avicole / Commerce Annexe / Cuniculture / Pisciculture) ; cartes : désignation, catégorie · unité (ex. « Avicole · sujet(s) », « Pisciculture · kg », « Commerce Annexe · paire(s) »), badge de stock (rouge si `stock ≤ seuil`), prix ou fourchette (« 1 500 – 3 500 F ») ; carte grisée non cliquable si `stock = 0`. Produits semés de référence : Goliath mature, Pintade mature, Poulet de chair (sujet), Poussin d'un jour, Œufs de table (plateau), Œufs fertiles goliath/pintade (u), Lapin vif (sujet), Poisson-chat vif (kg), fournitures scolaires, textile.
+**Vente de poisson (TRANCHÉ DV-02)** : « Poisson-chat vif (kg) » reste vendu AU KILO (prix × kg). L'ajout de ce produit au panier ouvre DEUX champs : **« Poids (kg) »** (quantité de la ligne, > 0) et **« Nombre de sujets »** (entier ≥ 1, facultatif) ; si le nombre est vide, il est estimé = kg × 1 000 ÷ poids moyen de la dernière pesée, affiché « N sujets (estimé) » et la ligne est enregistrée avec `count_is_estimated = vrai` ; sans pesée et sans nombre : refus « Saisissez le nombre de sujets : aucune pesée ne permet de l'estimer. ». L'effectif de la catégorie vendue baisse du nombre de sujets (`15_` RM-ELV-12) ; la même saisie s'applique à une récolte (sortie sans vente).
 **Panier** : lignes (désignation, prix × unité, `−`/valeur/`+` borné par le stock, retirer ×) ; texte vide « Panier vide. Cliquez sur un produit pour l'ajouter. » ; champ **Client** (« Client Comptant » par défaut, sinon client enregistré) ; **Mode de règlement** (Espèces · Mobile Money · Avance (Solde Restant Dû)) ; **Condition de paiement** (Comptant / Avance : « Avance » est une condition, pas un canal, F8) ; **Montant reçu** (si Avance : > 0, requis) ; « Payable le » (visible en Avance seulement, RM-VTE-04) ; bouton **Livraison concernée** ; TOTAL en grands caractères (`successDeep`) ; **Encaisser la Vente** (primaire, pleine largeur).
 **Modale Livraison** (`#modal-livraison`) : 4 options : « Livraison gratuite (offerte) », « Livraison assurée par le client », « Prix de livraison inclus dans le montant », « Livraison facturée séparément » (frais > 0 : « Une livraison facturée séparément exige un montant de frais. » ; frais négatifs : « Les frais de livraison ne peuvent pas être négatifs. ») + adresse + contact ; persistée sur la vente ; seuls les frais « facturée » entrent dans le total (AgriERP : drapeau `sales.delivery_in_total` pour les NOUVELLES ventes, frais au taux de la ligne de plus grand montant : RM-TVA-01).
 **Validations** : quantité ≤ stock : « Stock insuffisant (X disponible). » ; panier non vide ; montant reçu > 0 en Avance. **Encaisser** (RM-VTE-01/02/03) : UNE transaction : vente + lignes + décrément du stock de chaque ligne + incrément du compteur de la fiche d'élevage (si animal vivant, via la catégorie d'effectif du produit : RM-ELV-05, Q-ELV-7) ; ordre de verrous : produits (UUID croissants) AVANT toute fiche ; toast avec la référence APRÈS écriture. Écriture comptable générée (RM-CPT-01). Au poste : vente = fait indépendant, jamais fusionné ; le serveur accepte et signale un stock négatif.
@@ -58,7 +59,7 @@ Module invisible tant que MeCeF n'est pas actif ; activable seulement si IFU et 
 
 ## 6. Droits et hors ligne
 
-Caissier : ventes, clients, historique, annulation, facturation MeCeF, avoirs (arbitrage de la Gérante : l'erreur de facturation est commise au comptoir). Animalier : aucun accès. Au poste : tout le périmètre (hors transmission DGI) fonctionne hors ligne ; les références `V-AAAA-NNN` : le numéro n'est jamais inventé au poste quand il y a un serveur — numéro provisoire local remplacé par le numéro serveur à la synchronisation (Q-SYN-2).
+**TRANCHÉ (DV-06, DV-07)** — Caissier : ventes, clients, historique, annulation d'une vente non normalisée ; sur `/factures-mecef` il **CONSULTE et RÉIMPRIME** ses factures, **sans annuler, sans retransmettre, sans créer d'avoir** (boutons « Transmettre à e-MECeF », « Saisir le code de normalisation » et « Émettre un avoir » absents ET refusés par le serveur : `view-facturation` sans `manage-facturation`) ; l'arbitrage antérieur de la Gérante (« l'erreur de facturation est commise au comptoir ») est annulé : la correction d'une facture normalisée par avoir est un geste de l'administrateur ou du comptable. L'onglet « Retours et Avoirs » de `/ventes` pour le caissier : Q-DV-6 (en attendant, aucun avoir sur facture normalisée pour le caissier). Comptable : consulte les ventes, gère la facturation (annuler, retransmettre, avoir : proposé, Q-DV-7). Animalier : aucun accès. Au poste : tout le périmètre (hors transmission DGI) fonctionne hors ligne ; les références `V-AAAA-NNN` : le numéro n'est jamais inventé au poste quand il y a un serveur — numéro provisoire local remplacé par le numéro serveur à la synchronisation (Q-SYN-2).
 
 ## 7. Critères d'acceptation
 
@@ -68,6 +69,8 @@ Caissier : ventes, clients, historique, annulation, facturation MeCeF, avoirs (a
 - [ ] Annulation : stock rétabli, compteur de fiche défait, vente visible dans « Retours et Avoirs ».
 - [ ] Sans délai paramétré : créance « Sans échéance », jamais « En retard », PDF « Rappel de Solde ».
 - [ ] Facture normalisée : plus modifiable ni annulable ; avoir lié ; TTC 11 800 à 18 % : HT 10 000, TVA 1 800.
+- [ ] Caissier sur `/factures-mecef` : liste et réimpression OK ; annuler, retransmettre, créer un avoir : refusés par le serveur (403) et sans bouton (DV-06).
+- [ ] Vente de poisson : poids (kg) ET nombre de sujets exigés ; nombre inconnu → estimé et ligne marquée « estimé » ; effectif baissé du nombre de sujets (DV-02, `15_` RM-ELV-12).
 - [ ] Le jeton e-MECeF n'apparaît dans aucune réponse `/api` ni dans aucun journal.
 - [ ] Aucun toast « Message/Relance envoyé » sans envoi réel.
 

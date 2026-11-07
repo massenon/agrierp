@@ -453,7 +453,7 @@ Légende : « Nul » = acceptation de NULL ; **S** = table synchronisable (porte
 | `verrouillage_minutes` | unsigned smallint | oui | NULL | CHECK ≥ 1 | délai du verrou de session |
 | `is_active` | boolean | non | true | | compte archivé = refus de connexion |
 
-Rôles : `roles`, `permissions`, `model_has_roles`… (tables spatie, clés UUID). Rôles et permissions à amorcer : voir 10.1. logialvia : `UTILISATEURS(nom, identifiant UNIQUE, roleId, motDePasseHash, sel)` — le sel et le hash maison NE SONT PAS repris (section 9.3).
+Rôles : `roles`, `permissions`, `model_has_roles`… (tables spatie, clés UUID). Rôles et permissions à amorcer : voir 10.1. logialvia : `UTILISATEURS(nom, identifiant UNIQUE, roleId, motDePasseHash, sel)` — le sel et le hash maison NE SONT PAS repris (section 9.3). **TRANCHÉ (DV-07)** : quatre rôles semés : `admin`, `comptable`, `caissier`, `animalier`.
 
 ### 5.2 `audit_logs` — journal d'audit
 
@@ -493,6 +493,23 @@ Rôles : `roles`, `permissions`, `model_has_roles`… (tables spatie, clés UUID
 | `recoit_achat_naissances` | boolean | non | false | un seul vrai par filière | catégorie la plus jeune |
 | `deduite_des_ventes` | boolean | non | false | un seul vrai par filière | catégorie commercialisée (Doc 05 §1) |
 
+**Poissons-Chats (TRANCHÉ DV-01)** : `ration_g_par_jour` n'est PAS utilisée (grammes par sujet) ; la ration vient de `fish_ration_classes`. Colonne ajoutée : `poids_moyen_g` decimal(8,1) NULL (poids moyen de la catégorie, mis à jour par la pesée d'échantillon ; NULL = « — »). `biomasse_g` n'est jamais stockée : calculée (effectif × `poids_moyen_g`).
+
+### 5.4b `fish_ration_classes` (S) — barème des poissons en % de biomasse (DV-01) — à créer
+
+| Colonne | Type | Nul | Défaut | Contrainte | Rôle |
+|---|---|---|---|---|---|
+| `id` | uuid | non | | PK | |
+| `species_id` | uuid | non | | FK `livestock_species` RESTRICT | filière poissons |
+| `poids_min_g` | decimal(8,1) | non | | UK (`species_id`,`poids_min_g`) | borne basse incluse |
+| `poids_max_g` | decimal(8,1) | oui | NULL | CHECK > `poids_min_g` | borne haute exclue ; NULL = sans limite (> 500 g) |
+| `taux_pct_biomasse` | decimal(4,1) | non | | CHECK 0 < taux ≤ 100 | taux retenu, % de la biomasse par jour (pas un montant d'argent) |
+| `taux_min_pct`, `taux_max_pct` | decimal(4,1) | oui | NULL | | fourchette de repère (affichage) |
+| `confirme` | boolean | non | false | | `false` = repère à valider par le technicien |
+| `is_active` | boolean | non | true | | CRUD par archivage |
+
+Les classes ne se chevauchent pas (Action). Repères d'amorçage (à valider) : [0 ; 5) 10–20 % ; [5 ; 20) 6–8 % ; [20 ; 100) 3–5 % ; [100 ; 500) 2–3 % ; [500 ; ∞) 1–2 %.
+
 ### 5.5 `feed_ration_standards` (S) — barème de rationnement
 
 | Colonne | Type | Nul | Défaut | Contrainte | Rôle |
@@ -525,6 +542,10 @@ Une ligne par filière et par jour (clé de logialvia, voir 4.2). Colonnes repri
 | `srh`, `ts`, `stock_final_oeufs` | int | oui | NULL | Pondeuses seulement, **calculés** | BR-ELV-008 |
 | `oeufs_pondus`, `oeufs_casses`, `sorties_plateaux` | unsigned int | oui | NULL | | saisies qui produisent les calculés |
 | `poids_general_g` | unsigned int | oui | NULL | | pesée totale du lot, g (poids moyen, GMQ) |
+| `poids_moyen_g` | decimal(8,1) | oui | NULL | CHECK > 0 | poissons (DV-01) : poids moyen issu de la pesée d'échantillon du jour (recopié sur `species_categories.poids_moyen_g`) |
+| `echantillon_nb` | unsigned int | oui | NULL | CHECK ≥ 1 | poissons pesés (min. 30 ou tout l'effectif) |
+| `echantillon_poids_g` | unsigned int | oui | NULL | | poids total de l'échantillon ; `poids_moyen_g` = `echantillon_poids_g` ÷ `echantillon_nb` |
+| `biomasse_g` | unsigned bigint | oui | NULL | **calculé** | effectif × poids moyen, grandeur de suivi (jamais saisie) |
 | `traitement_obs` | text | oui | NULL | | observation du jour |
 | `traitement_valide` | boolean | non | false | | |
 | `is_recorded` | boolean | non | false | | distingue un jour saisi d'un jour projeté |
@@ -547,8 +568,12 @@ Reprend `2026_02_10_000001_create_livestock_lots_table.php` : `id`, `code` UK, `
 | `oeufs_couves` | unsigned int | non | CHECK > 0 | |
 | `poussins_nes` | unsigned int | oui | CHECK ≤ `oeufs_couves` | renseigné à l'éclosion (J+21 pour les volailles) |
 | `statut` | string(30) | non | IN (`En Incubation`,`Éclosion Effectuée`) | |
+| `duree_incubation_jours` | unsigned tinyint | non | CHECK 1..60 | **PARAMÈTRE** (DV-03) : défaut 28 (pintade), 21 (goliath), repris de `company_settings` ou du barème d'espèce à la création |
+| `fenetre_min_jours`, `fenetre_max_jours` | unsigned tinyint | non | CHECK min ≤ durée ≤ max | fenêtre d'éclosion : pintade 26 et 28 ; goliath durée − 2 et durée + 2 |
+| `mode_incubation` | string(24) | non | IN (`couveuse`,`couvaison_naturelle`) défaut `couveuse` | DV-03 ; pas de transfert à l'éclosoir en couvaison naturelle |
+| `transfert_eclosoir_jour` | unsigned tinyint | oui | NULL | J25 par défaut en couveuse (rappel) |
 
-Le champ « Éclosion J+21 » est celui du dictionnaire logialvia ; sa transposition aux pintades et aux goliaths est à confirmer (section 6).
+Le champ « Éclosion J+21 » est celui du dictionnaire logialvia ; **TRANCHÉ (DV-03)** : la durée n'est plus une constante, elle est portée par la ligne (`duree_incubation_jours`, défaut 28 pour la pintade, 21 pour le goliath) avec sa fenêtre ; éclosion prévue = `date_incubation` + durée ; mirages J7 et J14 et transfert J25 génèrent des rappels. Les repères d'incubateur (température, humidité) ne sont PAS stockés.
 
 ### 5.9 `soins` : `infirmerie`, `soins_calendrier`, `calendrier_prophylaxie`, `veterinary_records`
 
@@ -577,7 +602,7 @@ Le champ « Éclosion J+21 » est celui du dictionnaire logialvia ; sa transposi
 | `mecef_*` | voir 5.15 | | | | normalisation |
 | `accounting_entry_id` | uuid | oui | | FK `accounting_entries` | pièce générée |
 
-`sale_lines` : `id`, `sale_id` FK CASCADE, `product_id` FK RESTRICT, `lot_id` FK nullable, `designation` (nom du produit AU MOMENT de la vente, dénormalisé volontairement), `qty` decimal(10,2) > 0, `manual_total_amount` unsignedBigInteger (source du montant), `unit_price` dérivé, `species_code` nullable.
+`sale_lines` (poisson, TRANCHÉ DV-02 : `sold_weight_kg` decimal(10,2) NULL, = `qty` pour « Poisson-chat vif (kg) » ; `sold_count` unsigned int NULL, nombre de sujets sortis de l'effectif ; `count_is_estimated` boolean non nul défaut faux, vrai = nombre estimé (kg × 1 000 ÷ poids moyen de la dernière pesée), jamais présenté comme mesuré ; CHECK `sold_count ≥ 1` quand renseigné ; `sold_count` NULL interdit pour la filière poissons) : `id`, `sale_id` FK CASCADE, `product_id` FK RESTRICT, `lot_id` FK nullable, `designation` (nom du produit AU MOMENT de la vente, dénormalisé volontairement), `qty` decimal(10,2) > 0, `manual_total_amount` unsignedBigInteger (source du montant), `unit_price` dérivé, `species_code` nullable.
 
 ### 5.12 `customers`, `suppliers` (S)
 
@@ -588,12 +613,13 @@ Le champ « Éclosion J+21 » est celui du dictionnaire logialvia ; sa transposi
 - `fiscal_years` : `id`, `year` UK, `status` (`ouvert`/`cloture`), `closed_at` NOT NULL si clôturé (Action), `step1_confirmed_at`. logialvia : `EXERCICE_COMPTABLE(annee PK, isCloture, dateCloture)`.
 - `chart_of_accounts` : `id`, `code` string(20) UK, `label` string(**255**, élargi par `2026_10_10_000001_widen_chart_of_accounts_label.php`), `class` unsignedTinyInteger CHECK 1..8, `parent_id`, `is_active` (logialvia : `archive` ; un compte archivé n'est plus proposé mais ses écritures restent). **Le code et la classe d'un compte portant une écriture sont immuables.**
 - `accounting_entries` : `id`, `fiscal_year_id` FK RESTRICT, `journal` string(10) IN (`VT`,`AC`,`CA`,`OD`, …), `reference` UK par (journal, exercice), `entry_date`, `piece_number`, `sale_id`/`purchase_id` nullables (origine automatique, BR-CPT-003), `is_locked` (exercice clôturé), `cost_center_id` nullable. Index sur `reference` (`2026_10_09_000005`).
+- **Intangibilité (TRANCHÉ DV-05)** : aucune écriture n'est supprimable ni restaurable ; aucune ligne de `corbeille_operations` ne porte le type écriture ; contre-passation = nouvelle écriture inverse reliée par `accounting_entries.reverses_entry_id` (uuid NULL, FK `accounting_entries` RESTRICT, UK : une écriture n'est contre-passée qu'une fois) et `is_reversed` boolean défaut faux sur l'originale (colonnes à ajouter si absentes ; vérifier la migration réelle d'AgriERP avant).
 - `accounting_entry_lines` : `id`, `entry_id` FK CASCADE, `account_id` FK RESTRICT, `debit`, `credit` unsigned bigint, `label`, CHECK `(debit = 0) <> (credit = 0)` (**exactement un des deux > 0**, règle de D1), et pièce équilibrée vérifiée par l'Action (Σdébit = Σcrédit).
 - `accounting_reference_sequences` : clé composite (`journal`,`fiscal_year_id`), `last_number`. Compteur attribué DANS la transaction, sous verrou : jamais de trou ni de doublon.
 
 ### 5.14 `company_settings` (singleton, S partiel)
 
-Colonnes d'AgriERP à reprendre : identité (`company_name`, `promoter_name`, `address`, `phone`, `email`, `ifu`, `rccm`), SMTP (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_user`, `smtp_password_encrypted` cast `encrypted`, `smtp_from_address`), `logo_path`, `favicon_path`, `mecef_*` (5.15), `onboarding_completed_at`, `demo_mode`, `data_reset_at`, `rappel_soins_jours`. **SMS : non repris** (AgriERP l'a supprimé, AUT-3 ; logialvia n'en a jamais eu). Une seule ligne : garde-fou « `company_settings` a exactement 1 ligne ». Réglages SMTP/logo/favicon : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
+**Seuils de ferme (DV-04, DV-03)** : `autonomy_alert_days` unsigned tinyint défaut **7**, `autonomy_critical_days` unsigned tinyint défaut **3**, CHECK `autonomy_critical_days < autonomy_alert_days` (paramétrables par ferme, admin seul, journalisés) ; `autonomy_supplier_lead_days` et `autonomy_safety_margin_days` unsigned tinyint NULL (règle : seuil d'alerte = délai fournisseur + marge ; marge par défaut À DÉFINIR, Q-DV-4) ; `incubation_default_days_pintade` défaut 28, `incubation_window_min_pintade` 26, `incubation_window_max_pintade` 28. Colonnes d'AgriERP à reprendre : identité (`company_name`, `promoter_name`, `address`, `phone`, `email`, `ifu`, `rccm`), SMTP (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_user`, `smtp_password_encrypted` cast `encrypted`, `smtp_from_address`), `logo_path`, `favicon_path`, `mecef_*` (5.15), `onboarding_completed_at`, `demo_mode`, `data_reset_at`, `rappel_soins_jours`. **SMS : non repris** (AgriERP l'a supprimé, AUT-3 ; logialvia n'en a jamais eu). Une seule ligne : garde-fou « `company_settings` a exactement 1 ligne ». Réglages SMTP/logo/favicon : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
 
 ### 5.15 MeCeF : colonnes et tables
 
@@ -621,6 +647,24 @@ La règle de normalisation elle-même : `41_MECEF_EMECEF.md`. Ici, uniquement le
 | `controles_coherence` | résultat des contrôles serveur ↔ poste | | `2026_10_19_000004` |
 | `recovery_codes` | empreinte SHA-256 seule, un seul code actif | | `2026_10_29_000002` |
 
+### 5.17 `import_batches` — journal de l'importation en masse (serveur seulement)
+
+Existe déjà dans le web (migration `agrierp_laravel/database/migrations/2026_11_08_000001_create_import_batches_table.php`, ticket IMPORT-1) ; à reprendre telle quelle pour LogiALVIA si elle manque. Table du SERVEUR : elle ne se synchronise pas, le poste n'en tient aucune copie.
+
+| Colonne | Type | Nul | Défaut | Contrainte | Rôle |
+|---|---|---|---|---|---|
+| `id` | uuid | non | | PK | |
+| `user_id` | uuid | oui | NULL | FK `users` SET NULL | auteur |
+| `module` | string(30) | non | | index composite (`module`,`empreinte`) | module importé |
+| `version_modele` | unsigned smallint | non | | | version du modèle xlsx |
+| `nom_fichier` | string(255) | non | | | |
+| `empreinte` | string(64) | non | | | SHA-256 du fichier (idempotence) |
+| `statut` | string(12) | non | `apercu` | IN (`apercu`,`termine`,`annule`) | |
+| `lues`, `valides`, `ignorees`, `refusees`, `creees` | unsigned int | non | 0 | | compteurs |
+| `avertissement` | string(500) | oui | NULL | | |
+| `lignes`, `rapport` | longText | oui | NULL | | valeurs lues le temps de l'aperçu ; à la fin, seules les lignes REFUSÉES |
+| `termine_le` | timestamp | oui | NULL | | |
+
 ## 6. Filières : pisciculture, pintades, goliaths
 
 ### 6.1 Ce qui est DÉJÀ défini dans les sources de logialvia (à reprendre sans changement)
@@ -629,7 +673,7 @@ Source : `logialvia_app/lib/elevage/domain/entities/configuration_espece.dart`.
 
 | Filière (`code`) | Catégories (position 1/2/3[/4]) | Rations g/j | Achats / Naissances | Particularités |
 |---|---|---|---|---|
-| `poissons-chats` (Pisciculture) | Alevin / Juvénile / Mature | 30 / 60 / 110 | Achats / « Nés » | une `noteRationnement` existe (barème non confirmé, lire le texte exact dans le fichier) ; **pas de couveuse** : l'empoissonnement (achat d'alevins) se saisit en « Achats » |
+| `poissons-chats` (Pisciculture) | Alevin / Juvénile / Mature | % de biomasse par classe de poids (5.4b ; 30/60/110 du code ÉCARTÉ, DV-01) | Achats / « Nés » | la `noteRationnement` devient « Taux de ration = repères à valider par le technicien » ; **pas de couveuse** : l'empoissonnement (achat d'alevins) se saisit en « Achats » |
 | `pintades` | Poussins / Pintadau / Mature | 30 / 60 / 110 | Achats / « Nés (Couveuse) » | volaille, couveuse |
 | `goliaths` | Poussins / Goliathau / Mature | 30 / 60 / 110 | Achats / « Nés (Couveuse) » | seuils de maturité : 2 800 g et 120 jours (≥ 4 mois, ≥ 2,8 kg, éligible à la vente) ; barème = générique réutilisé de l'aviculture, **« aucun barème Goliath spécifique confirmé, à valider avec la Gérante »** |
 | `lapins` | Lapereau / Chair / Reproducteur | 30 / 60 / 110 | Achats / « Nés (Mise bas) » | |
@@ -644,9 +688,9 @@ Autres faits : la catégorie jeune seule reçoit achats et naissances ; la caté
 |---|---|---|---|
 | D-PIS-1 | Bassins / étangs (code, volume, capacité) | AUCUNE table de bassin dans logialvia ; `BANDES` est le seul regroupement | table `ponds` **non créée** tant que non décidée ; `livestock_lots.pond_id` absent |
 | D-PIS-2 | Suivi de la qualité de l'eau (température, pH, oxygène) | absent des 22 fichiers de tables | aucune colonne |
-| D-PIS-3 | Pesée / échantillonnage, taux de conversion alimentaire | seul `poids_general_g` (pesée totale du lot) existe | aucune colonne de plus |
+| D-PIS-3 | Pesée / échantillonnage : **TRANCHÉ (DV-01)** ; taux de conversion alimentaire : À DÉFINIR | pesée d'échantillon tous les 15 jours | colonnes `poids_moyen_g`, `echantillon_*`, `biomasse_g` (5.6) ; aucune colonne d'indice de conversion |
 | D-PIS-4 | Récolte / pêche partielle et tri par calibre | `vente` du jour seulement | aucune table |
-| D-PIN-1 | Cycle d'incubation des pintades (durée avant éclosion) | le dictionnaire logialvia dit J+21 pour `CYCLE_COUVEUSE` en général | pas de colonne « durée » ; ne pas figer 21 j par filière avant décision |
+| D-PIN-1 | Cycle d'incubation des pintades : **TRANCHÉ (DV-03)** : 28 j paramétrable, fenêtre 26–28 j, deux modes | le dictionnaire logialvia disait J+21 en général | colonnes `duree_incubation_jours`, `fenetre_*`, `mode_incubation` (5.8) ; repères d'incubateur non stockés |
 | D-GOL-1 | Barème de rationnement des goliaths | générique, non confirmé | ligne `feed_ration_standards` avec `confirme = false` |
 | D-GOL-2 | Définition exacte de « Goliathau » et de la maturité (alerte à 2 800 g / 120 j) | seuils présents dans le code | `species_maturity_rules` reprend les deux nombres et rien d'autre |
 | D-ALL-1 | Prophylaxie (calendrier de vaccins) des filières piscicole, pintades, goliaths | logialvia a `CALENDRIER_PROPHYLAXIE` générique ; contenu par filière non documenté ici | table vide par défaut, amorçage conditionné à la réponse |
@@ -787,13 +831,13 @@ Pas de reprise directe de base : le poste migré **pousse** ses lignes `pending`
 Règle : un seeder **n'écrit que ce qui est défini par les sources** ; il est idempotent (`updateOrCreate` sur la clé naturelle) et tourne avec `migrate:fresh --seed`.
 
 ### 10.1 Rôles et permissions (`RolesAndPermissionsSeeder`)
-Source de vérité : `/home/user/massenon/logialvia/docs/I1_Matrice_RBAC.md` (à lire) et `logialvia_app/lib/administration/data/seed/`. Les rôles d'AgriERP (`admin`, `compta`, `caisse`, `elevage`) ne sont qu'un modèle ; le nombre et les noms des rôles de LogiALVIA viennent de la matrice. Comptes de démonstration : un par rôle, mot de passe de démonstration unique documenté, **jamais en production** (`DemoUsersSeeder`).
+Source de vérité : `/home/user/massenon/logialvia/docs/I1_Matrice_RBAC.md` (à lire) et `logialvia_app/lib/administration/data/seed/`. **TRANCHÉ (DV-07, DV-06)** : quatre rôles `admin`, `comptable`, `caissier`, `animalier` ; la matrice de `20_MODULES_INDEX.md` §3 fait foi et le seeder la suit : `caissier` = `view/manage/export-ventes` + `view-facturation` SANS `manage-facturation` ; `/inventaire` exige `view-stocks` (jamais donné au caissier) ; `comptable` = comptabilité, rapports, facturation (périmètre à confirmer, Q-DV-7). Comptes de démonstration : un par rôle, mot de passe de démonstration unique documenté, **jamais en production** (`DemoUsersSeeder`).
 
 ### 10.2 Plan comptable SYSCOHADA (`ChartOfAccountsSeeder`)
 Importer `agrierp_laravel/database/data/plan-comptable-syscohada-revise.csv` (1 332 comptes, **insertion seule**) via le service `ImporterPlanSyscohadaService` (mode `dry_run` d'abord) ; ajouter les comptes exigés par logialvia et absents du CSV (liste de D1 §« Groupes » : 101, 121, 131 ; 613, 616, 624, 628 ; 419 et 409 comme `2026_10_09_000003`/`..._000008`). Ne jamais renommer un compte existant. **Empreinte** : voir 11.3.
 
 ### 10.3 Barème de rationnement (`FeedRationStandardsSeeder`)
-Lignes de 6.1 (30/60/110, Pondeuses 30/60/80/110), `confirme = false` pour poissons-chats, goliaths (barème générique non confirmé), `confirme` selon la source pour les autres. Aucun autre chiffre.
+Lignes de 6.1 (30/60/110, Pondeuses 30/60/80/110), `confirme = false` pour goliaths (barème générique non confirmé), `confirme` selon la source pour les autres. **Poissons-chats (DV-01)** : AUCUNE ligne 30/60/110 ni 8/25/45 ; le barème est dans `fish_ration_classes` (5.4b) amorcé avec les fourchettes en repères à valider, `confirme = false`. **Pintades (DV-03)** : le stade du premier barème porte le libellé exact de la catégorie de la fiche, jamais « Alevins ». Aucun autre chiffre.
 
 ### 10.4 Modules actifs (`ModulesConfigSeeder`)
 Liste des modules et leur activation par défaut : `docs/I2_Gestion_Modules_Actifs.md` de logialvia. `modules_config(module_id PK, is_active, species_code nullable)`. Le module MeCeF est **désactivé par défaut** (`MECEF_ACTIF=false`).
@@ -931,8 +975,8 @@ INTERDITS : éditer app_database.g.dart à la main ; committer.
 | Q9 | Règle d'arrondi d'un montant non entier à la conversion en FCFA entiers ? | migration 9.3 étape 5 |
 | Q10 | Accord pour que chaque utilisateur existant reçoive un mot de passe temporaire à la bascule (aucun hash repris) ? | 9.3 étape 6 |
 | Q11 | Durée de conservation des sauvegardes serveur et lieu de stockage ? | section 12 |
-| Q12 | Pisciculture : bassins, qualité de l'eau, pesées/échantillonnage, récolte partielle, prophylaxie — lesquels au périmètre et avec quelles unités ? | D-PIS-1 à 4, D-ALL-1 |
-| Q13 | Pintades : durée d'incubation propre ? Goliaths : barème de rationnement validé par la Gérante, définition de « maturité » ? | D-PIN-1, D-GOL-1/2 |
+| Q12 | Pisciculture : bassins, qualité de l'eau, récolte partielle, prophylaxie — lesquels au périmètre et avec quelles unités ? (pesées/échantillonnage et vente kg + sujets : TRANCHÉS, DV-01, DV-02) | D-PIS-1 à 4, D-ALL-1 |
+| Q13 | Pintades : durée d'incubation TRANCHÉE (DV-03). Goliaths : barème de rationnement validé par la Gérante, définition de « maturité » ? | D-PIN-1, D-GOL-1/2 |
 | Q14 | Plan comptable : le référentiel SYSCOHADA révisé d'AgriERP (1 332 comptes) convient-il, ou le cabinet de LogiALVIA en fournit-il un autre ? | seeder 10.2, empreinte |
 
 ## 15. Critères d'acceptation globaux (« terminé » pour le schéma)
@@ -943,5 +987,5 @@ INTERDITS : éditer app_database.g.dart à la main ; committer.
 4. Chaque table synchronisable existe des deux côtés avec les mêmes colonnes (garde-fou P12 vert) ; `app_database.g.dart` régénéré, jamais édité.
 5. Chaque table du web figure dans le dictionnaire de ce fichier (colonne · type · nul · défaut · contrainte · rôle).
 6. La migration des données de logialvia (P10) : totaux identiques à l'unité, `foreign_key_check` vide, rejeu sans effet.
-7. Les sections « À DÉFINIR » de la section 6.2 n'ont produit aucune table ni colonne.
+7. Les sections « À DÉFINIR » de la section 6.2 n'ont produit aucune table ni colonne ; seules les décisions TRANCHÉES (DV-01 à DV-05) ont produit les colonnes de 5.4, 5.4b, 5.6, 5.8, 5.11, 5.13, 5.14.
 8. `php artisan test --testsuite=Feature` vert ; `flutter analyze && flutter test` verts côté poste (voir `31_TESTING_QA.md`).

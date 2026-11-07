@@ -49,7 +49,7 @@ T4. COUCHES. Crée `app/Livewire/{Module}`, `app/Actions`, `app/Services`, `app/
     module qui écrit en comptabilité ou en stock.
 T5. ROUTES ET DROITS. `routes/web.php` : `Route::get('/x', Composant::class)->name('…')->middleware(['auth','can:view-…'])`
     (jamais la syntaxe contrôleur-tableau pour une page Livewire). Seuls les écrans « profil, tableau de bord,
-    notifications, aide » sont `auth` seuls. Les 3 rôles : `admin`, `caissier`, `animalier`. Test de route : toute
+    notifications, aide » sont `auth` seuls. Les 4 rôles (TRANCHÉ DV-07) : `admin`, `comptable`, `caissier`, `animalier`. Test de route : toute
     route nommée est soit `auth`+`can:`, soit dans une liste blanche explicite.
 T6. NAVIGATION SANS RECHARGEMENT. Applique la section 4 (wire:navigate, persist, progression, pièges).
 T7. FRONT LOCAL. Applique la section 7 (polices, icônes, jetons). `npm run build` ne doit référencer aucune URL externe.
@@ -208,7 +208,7 @@ logialvia/                              dépôt massenon/logialvia (monorepo cib
     │   └── Support/                    ExerciceChoisi, MessagesErreurFr, énumérations
     ├── bootstrap/app.php               middleware, routing, rendu des erreurs en français
     ├── config/                         permission.php (model_morph_key), sanctum.php, livewire.php (publié), mecef.php…
-    ├── database/{migrations,seeders,factories}/   UUID ; RolesAndPermissionsSeeder (3 rôles)
+    ├── database/{migrations,seeders,factories}/   UUID ; RolesAndPermissionsSeeder (4 rôles)
     ├── lang/{fr/validation.php, fr.json}          messages français ; APP_LOCALE=fr
     ├── public/{.htaccess,assets/{fonts,icons,images},manifest.webmanifest,sw.js,offline.html,build/}
     ├── resources/{css/app.css,js/app.js,views/{layouts,components,livewire/{module}/…,errors}}

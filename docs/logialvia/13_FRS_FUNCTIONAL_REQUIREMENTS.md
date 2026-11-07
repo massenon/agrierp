@@ -36,7 +36,7 @@
 | FR-AUT-09 | Mon Profil : nom, identifiant, rôle (lecture seule), changement de mot de passe (ancien requis, nouveau ≠ ancien, confirmation identique, politique). | refus si nouveau = ancien | F9 |
 | FR-AUT-10 | Aide & À Propos (version, guide, FAQ) et Contact éditeur sans faux envoi : le formulaire ne simule pas un envoi. | pas de toast de succès sans écriture | F9 ; A1 §2.3 |
 | FR-AUT-11 | Mot de passe temporaire : sessions et jetons du compte détruits, `must_change_password=true`, audit `user.password_reset`. | connexion suivante bloquée par l'écran de changement | guide bloc 2 |
-| FR-AUT-12 | Rôle `animalier`/`caissier` en URL directe d'un écran interdit : redirection `/dashboard`. | 1 test par (rôle, route) de la matrice | B4 FRS-ADM-01 |
+| FR-AUT-12 | Rôle `animalier`/`caissier`/`comptable` en URL directe d'un écran interdit (ex. caissier sur `/inventaire`, DV-06) : redirection `/dashboard`. | 1 test par (rôle, route) de la matrice à 4 rôles | B4 FRS-ADM-01 |
 
 ## 3. Pilotage (module `22_`)
 
@@ -74,7 +74,7 @@
 | FR-ELV-16 | Ventes ventilées par catégorie d'après le produit (`categorie_effectif`) ; refus AVANT écriture : produit sans catégorie, bande sans départ, vente antérieure au départ, catégorie d'une autre famille. | RM-ELV-05 | guide bloc 1 — Q-ELV-7 |
 | FR-ELV-17 | Bandes : créer (exercice non clos), modifier, archiver (refusé si effectif vivant > 0), restaurer (refusé si code pris). | messages exacts BS-Q3/Q4/Q7 | guide bloc 12 |
 | FR-ELV-18 | Transfert entre bandes de même espèce : fait daté, jamais annulé ; source suffisante CE JOUR et chaque jour suivant. | RM-ELV-06 | guide bloc 12 |
-| FR-ELV-19 | Couvoir : création avec calendrier prévisionnel (mirages J+7, J+14 exacts ; éclosion en fenêtre ± 2 j) ; durée Goliath 21 j, Pintade 28 j. | RM-COU-01 | F3 — Q-PIN-4 |
+| FR-ELV-19 | Couvoir : création avec calendrier prévisionnel (mirages J+7, J+14 exacts ; éclosion en fenêtre ± 2 j pour les Goliaths) ; durée Goliath 21 j ; Pintade : 28 j par défaut, PARAMÉTRABLE, fenêtre 26–28 j (TRANCHÉ DV-03, voir FR-ELV-34). | RM-COU-01 | F3 ; `16_` DV-03 |
 | FR-ELV-20 | Éclosion : `éclos + perdus ≤ chargés`, taux calculés en direct ; option « Recharger la machine » crée un sous-lot dans la MÊME transaction. | RM-COU-02 | F3 |
 | FR-ELV-21 | TER = éclos / (chargés − (clairs J7 + gâtés J14)) ; `null` (« — ») avant l'éclosion et si dénominateur nul ; TER moyen pondéré par œufs retenus. | RM-COU-03/04 | F3 |
 | FR-ELV-22 | Alertes de mirage : due tant que la saisie manque ; retards les plus anciens d'abord ; capacité d'incubateur = signal de surcharge, jamais blocage. | scénario du guide F3 | F3 |
@@ -85,9 +85,11 @@
 | FR-ELV-27 | Infirmerie sans date prévue → aucun rappel ; délai d'attente listé avec date de fin ; produits d'un animal sous délai non vendables (bannière). | scénario | F3 |
 | FR-ELV-28 | Paramètres Élevage : 4 onglets ; barème modifié → recalcul de la provende de la fiche ; barème supprimé → retombe sur la ration de référence, jamais 0 ; préfixe vide refusé. | tests de F3 | F3 |
 | FR-ELV-29 | Rationnement : clé par libellé en ÉGALITÉ stricte normalisée (minuscules, sans accents, tranche d'âge ignorée), jamais par sous-chaîne. | RM-ELV-09 | guide bloc 5 |
-| FR-ELV-30 | Alerte d'autonomie de provende : jamais bloquante ; une par objet et par jour. | RM-ELV-10 | guide bloc 5 — Q-ALR-1 |
-| FR-ELV-31 | Pisciculture : fiche (Alevin, Juvénile, Mature) avec libellés « Achats » / « Nés » ; biomasse, bassin, vente au poids : **À DÉFINIR AVEC LE CLIENT**. | `15_` §7.1 | Q-PIS-1…9 |
-| FR-ELV-32 | Pintades : mêmes mécanismes que Goliaths ; stades/durées/rations propres **À DÉFINIR**. | `15_` §7.2 | Q-PIN-1…4 |
+| FR-ELV-30 | Alerte d'autonomie de provende : jamais bloquante ; une par objet et par jour ; deux niveaux : alerte (défaut 7 j) et critique (défaut 3 j), seuils paramétrables par ferme (TRANCHÉ DV-04, voir FR-ADM-14). | RM-ELV-10 | guide bloc 5 ; `16_` DV-04 |
+| FR-ELV-31 | Pisciculture : fiche (Alevin, Juvénile, Mature) avec libellés « Achats » / « Nés » ; biomasse (effectif × poids moyen) suivie ; vente en kg ET sujets (FR-VTE-19) ; bassin, cycle, qualité de l'eau : **À DÉFINIR AVEC LE CLIENT**. | `15_` §7.1 ; `16_` DV-01, DV-02 | Q-PIS-1…4, 7…9 |
+| FR-ELV-32 | Pintades : mêmes mécanismes que Goliaths ; stade « pintadeaux » (jamais « Alevins ») ; durée du stade, rations par âge, seuil de maturité : repères à valider, **À DÉFINIR**. | `15_` §7.2 ; `16_` DV-03 | Q-PIN-1…3 |
+| FR-ELV-33 | Ration des poissons : effectif × poids moyen × taux (% de biomasse par jour) selon la classe de poids ; barème éditable ; pesée d'échantillon tous les 15 j (5–10 % des sujets, min. 30) recalculant le poids moyen. TRANCHÉ (DV-01). | RM-ELV-09b | `16_` DV-01 |
+| FR-ELV-34 | Incubation : durée (défaut 28 j), fenêtre (26–28 j), mode (couveuse / couvaison naturelle) paramétrables ; éclosion prévue = mise + durée avec plage ; rappels automatiques mirages J7, J14, transfert éclosoir J25 ; taux de fertilité et d'éclosion mesurés. TRANCHÉ (DV-03). | RM-COU-01, RM-COU-06 | `16_` DV-03 |
 
 ## 5. Ventes, clients, facturation (module `24_`)
 
@@ -111,6 +113,8 @@
 | FR-VTE-16 | Facture simple jamais transmise ; normalisée : nom du client obligatoire, IFU vide ou 13 chiffres, AIB 5 % défaut / 1 % / N/A ; une normalisée n'est plus modifiable ni annulable : « Facture normalisée : corrigez-la par un avoir. » | scénarios bloc 19 | guide bloc 19 |
 | FR-VTE-17 | Avoir `FA-AAAA-NNN` désigne la facture d'origine (`origineRef`), ne la modifie jamais. | contre-passation | `facturation_mecef_tables.dart` |
 | FR-VTE-18 | Lettre de relance PDF ; sans échéance : « Rappel de Solde ». | contenu | F4, F7 |
+| FR-VTE-19 | Vente ou récolte de poisson : poids (kg) ET nombre de sujets saisis ; l'effectif baisse du nombre de sujets ; nombre inconnu = estimé (kg ÷ poids moyen de la dernière pesée) et ligne marquée « estimé » ; refus si estimation impossible (aucune pesée). TRANCHÉ (DV-02). | RM-ELV-12 | `16_` DV-02 |
+| FR-VTE-20 | `/factures-mecef` : le caissier consulte et réimprime ses factures ; annuler, retransmettre et créer un avoir lui sont refusés (serveur ET écran). TRANCHÉ (DV-06). | test par (rôle, action) | `16_` DV-06 |
 
 ## 6. Stocks et achats (module `25_`)
 
@@ -127,6 +131,7 @@
 | FR-STK-09 | Valorisation : intrants au PMP, produits finis au coût de revient ; sans coût = « Non valorisé », hors totaux. | RM-STK-03 | F4 |
 | FR-STK-10 | Dépense : un en-tête + N lignes, total = Σ lignes, une écriture. | `docs/prd/depenses-multilignes.md` | AgriERP |
 | FR-STK-11 | Stock négatif après synchronisation d'une vente hors ligne : signalé (notification), jamais refusé. | notification | guide bloc 18 |
+| FR-STK-12 | `/inventaire` réservé à l'administrateur (et au responsable stock s'il existe) ; caissier : redirection `/dashboard`, entrée de menu absente. TRANCHÉ (DV-06). | test par (rôle, route) | `16_` DV-06 |
 
 ## 7. Comptabilité (module `26_`)
 
@@ -139,7 +144,7 @@
 | FR-CPT-05 | Résultat net : UNE source pour Compte de résultat, compte 13 du bilan, point de départ du TAFIRE. | égalité stricte | B6 BR-CPT-005 |
 | FR-CPT-06 | Clôture mensuelle : verrou par mois ; déblocage par admin seul, journalisé ; pas de report à nouveau. | RM-CPT-05 | B6 BR-CPT-006 |
 | FR-CPT-07 | Grand Livre : solde progressif, sens selon la nature du compte. | RM-CPT-02 | F6 §2 |
-| FR-CPT-08 | Écriture manuelle : équilibrée, débit ≠ crédit (2 lignes), exercice ouvert, mois non clôturé ; numéro `OD-AAAA-NNNN` serveur ; archivage = contre-passation. | RM-CPT-04 | guide bloc 13c — Q-CPT-3 |
+| FR-CPT-08 | Écriture manuelle : équilibrée, débit ≠ crédit (2 lignes), exercice ouvert, mois non clôturé ; numéro `OD-AAAA-NNNN` serveur ; archivage = contre-passation. | RM-CPT-04 | guide bloc 13c ; TRANCHÉ (DV-05) |
 | FR-CPT-09 | Plan comptable : créer, modifier (numéro immuable), archiver ; archivage refusé si une écriture cite le compte. | refus | guide bloc 13b ; F6 §10.16 |
 | FR-CPT-10 | Exercice : sélecteur global, statuts Ouvert / Provisoire / Clôturé ; une saisie appartient à l'exercice de SA date ; clôturé = lecture seule avec bandeau. | RM-CPT-07 | guide bloc 4 |
 | FR-CPT-11 | Clôture gardée : échéance passée, étapes 1 et 2 faites, N-1 clos, à-nouveau équilibré ; confirmation textuelle « CLOTURER ». | refus avec motif | J1 ; guide bloc 11 |
@@ -148,6 +153,7 @@
 | FR-CPT-14 | TVA activable : inactive → aucune ligne 443/445, montants HT ; active → TTC. | RM-TVA-01 | AgriERP `TvaSettingService` — Q-TVA-1 |
 | FR-CPT-15 | Déclaration de TVA : seules les ventes réellement transmises (normalisées) sont retenues. | à confirmer avec le cabinet | AgriERP — Q-TVA-1 |
 | FR-CPT-16 | Comptabilité analytique : ventilation par axe (`axeAnalytique`) ; charges communes non réparties sans clé validée. | somme des axes + non affecté = total | F6 §7, v19 |
+| FR-CPT-17 | Aucune écriture comptable n'est supprimable ni restaurable ; correction = contre-passation exacte (même axe analytique) puis nouvelle écriture ; l'écriture n'entre jamais en corbeille. TRANCHÉ (DV-05). | test : aucune route de suppression d'écriture | `16_` DV-05 |
 
 ## 8. Rapports, exports, import (module `28_`)
 
@@ -172,11 +178,13 @@
 | FR-ADM-05 | Utilisateurs : liste, créer (nom, identifiant, rôle, mot de passe ≥ 8 + confirmation), modifier, archiver, réactiver ; le dernier admin ne s'archive pas. | un compte créé peut ouvrir une session | F8 |
 | FR-ADM-06 | Modes de paiement : Espèces et Mobile Money toujours actifs ; Conditions de paiement (délai par défaut). | non désactivables | F8 onglet 4 |
 | FR-ADM-07 | Sauvegarde : générer, exporter, lister, supprimer, restaurer (différée, 4 contrôles). | base précédente conservée | F8 |
-| FR-ADM-08 | Corbeille : archiver (qui gère l'écran), restaurer (tous sauf utilisateur et écriture = admin), purger (admin seul) ; restauration refusée si référence réoccupée. | colonne « Archivé par » remplie | F8 |
+| FR-ADM-08 | Corbeille : archiver (qui gère l'écran), restaurer (tous sauf utilisateur = admin ; les écritures comptables n'y entrent JAMAIS, DV-05), purger (admin seul) ; restauration refusée si référence réoccupée. | colonne « Archivé par » remplie | F8 |
 | FR-ADM-09 | Remise à zéro : double verrou, aperçu chiffré, audit conservé. | RM-ADM-01 | F8 |
 | FR-ADM-10 | Logo/favicon : type par signature, ≤ 2 Mo, nom UUID. | refus | I3 §2 |
 | FR-ADM-11 | SMTP et e-MECeF : réglage avec « Tester la configuration » (un `GET /info/status`, jamais `POST /invoice`) ; jeton masqué « •••• », « Remplacer », « Effacer ». | jamais servi au poste | guide bloc 19 |
 | FR-ADM-12 | Toast en haut à droite, empilés (4 max), croix de fermeture. | rendu | F8 |
+| FR-ADM-13 | Quatre rôles (admin, comptable, caissier, animalier) ; matrice en lecture ; création d'utilisateur : rôle parmi comptable, caissier, animalier (`admin` jamais créable). TRANCHÉ (DV-07). | test de création de chaque rôle | `16_` DV-07 |
+| FR-ADM-14 | Paramètres de ferme : seuil d'alerte d'autonomie (défaut 7 j), seuil critique (défaut 3 j, < alerte), durée d'incubation et fenêtre ; modifiables par l'admin, journalisés. TRANCHÉ (DV-03, DV-04). | refus si critique ≥ alerte | `16_` DV-03, DV-04 |
 
 ## 10. Synchronisation, MeCeF, PWA, alertes (transverses)
 
@@ -195,4 +203,4 @@
 
 ## 11. Questions ouvertes
 
-Reprises de `10_BRS_BUSINESS_REQUIREMENTS.md` §6 : Q-ELV-5/7, Q-PIS-1…9, Q-PIN-1…4, Q-CPT-3/4, Q-TVA-1, Q-VTE-1, Q-IMP-1, Q-ALR-1. Aucune nouvelle question propre au FRS.
+Reprises de `10_BRS_BUSINESS_REQUIREMENTS.md` §6 : Q-ELV-5/7, Q-PIS-1…4 et 7…9, Q-PIN-1…3, Q-CPT-4, Q-TVA-1, Q-VTE-1, Q-IMP-1. FERMÉES le 08/11/2026 (`16_DECISIONS_VALIDEES.md`) : Q-PIS-5, Q-PIS-6, Q-PIN-4, Q-ALR-1, Q-CPT-3, Q-ROL-1. Nouvelles : Q-DV-1 à Q-DV-7 (`16_` §4).

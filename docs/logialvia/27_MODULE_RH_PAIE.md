@@ -19,7 +19,7 @@ Tenir le registre du personnel, pointer, calculer la paie selon le droit bénino
 
 | Route proposée | Écran | Rôles | Droit web | Note |
 |---|---|---|---|---|
-| `/rh` | Hub Personnel & Stages | A | view-rh | nouveau droit `view-rh`/`manage-rh` ; le rôle « comptable » n'existe pas à logialvia (Q-ROL-1) → admin seul |
+| `/rh` | Hub Personnel & Stages | A | view-rh | nouveau droit `view-rh`/`manage-rh` ; le rôle « comptable » existe (DV-07) mais son accès RH n'est pas défini (Q-DV-7, Q-RH-1) → admin seul en attendant |
 | (onglet) | Registre Employés | A | manage-rh | |
 | (onglet) | Registre Stagiaires | A | manage-rh | |
 | (onglet) | Feuille de Pointage | A | manage-rh | |

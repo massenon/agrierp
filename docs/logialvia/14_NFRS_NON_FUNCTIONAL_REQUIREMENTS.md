@@ -74,7 +74,7 @@
 
 | ID | Exigence | Seuil | Mesure | Source | St. |
 |---|---|---|---|---|---|
-| NFR-SEC-01 | Accès par rôle | 0 accès non autorisé par URL directe, au web ET dans les écrans du poste | test par (rôle, route) | NFRS-SEC-01 ; `agrierp_laravel/CLAUDE.md` | C |
+| NFR-SEC-01 | Accès par rôle | 0 accès non autorisé par URL directe, au web ET dans les écrans du poste (4 rôles : admin, comptable, caissier, animalier ; DV-07) | test par (rôle, route) | NFRS-SEC-01 ; `agrierp_laravel/CLAUDE.md` | C |
 | NFR-SEC-02 | Injection SQL | 0 requête construite par concaténation ; API typée (Eloquent/Drift) ; `grep customSelect\|customStatement` justifié | grep avant livraison | NFRS-SEC-02 ; I3 §1 | C |
 | NFR-SEC-03 | Secrets | 0 secret en dur ni versionné ; `.env` non versionné | recherche statique + `git ls-files` | NFRS-SEC-03 ; `CLAUDE.md` racine | C |
 | NFR-SEC-04 | Mots de passe | hachés au serveur (`Hash::make`) ; politique indiquée au champ de Mon Profil de logialvia : « Min. 8 caractères, 1 majuscule, 1 chiffre » (à confirmer, Q-ADM-1) ; jamais journalisés ; jamais SHA-256+sel après la bascule | test de garde sur les colonnes du poste | guide D-SRV-5 ; F8 ; `logialvia/docs/manuel/libelles/31-mon-profil.json` | C/D |
@@ -88,6 +88,7 @@
 | NFR-SEC-12 | Journalisation : audit (suppression, clôture, déclôture, réinitialisation), sécurité (échecs) | 100 % des actions listées | test par action | B6 BR-ADM-003 ; I3 §6 | C |
 | NFR-SEC-13 | Base du poste : droits du dossier applicatif ; chiffrement au repos (`sqlcipher`) non tranché | À DÉFINIR | — | I3 §4 | D |
 | NFR-SEC-14 | Verrou de session inactif (web et poste) | durée réglable, À DÉFINIR par le client | test | `docs/prd/verrou-web.md` | D |
+| NFR-SEC-15 | La matrice des droits est la source unique : aucune permission du code n'est plus large que la matrice (caissier : pas d'`/inventaire`, `view-facturation` sans `manage-facturation`) ; si le client veut d'autres accès, on corrige la matrice | 0 écart matrice ↔ code ; test par (rôle, route, action) | test | `16_` DV-06 | C |
 
 ## 7. Compatibilité et portabilité
 

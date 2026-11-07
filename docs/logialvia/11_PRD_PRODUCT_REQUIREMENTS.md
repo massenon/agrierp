@@ -30,7 +30,7 @@
 | Animalier (Agent d'Élevage) | `animalier` | fiche journalière par filière, couvoir, soins, infirmerie, rappels du jour | ne jamais ressaisir, ne jamais voir un chiffre incohérent avec ce qu'il a compté | Poste (hors ligne) |
 | Caissier (Agent de Vente) | `caissier` | caisse (panier, remise, règlement), historique, retours/avoirs, clients/créances | rapidité face au client, avances/créances simples | Poste (hors ligne) |
 | Administratrice / Gérante / Direction | `admin` | tableaux de bord, stocks, achats, comptabilité, paramètres, utilisateurs, clôture | chiffres fiables au premier coup d'œil, traçabilité | Web |
-| Comptable (persona B2, **sans rôle** en I1) | rattaché à `admin` (Q-ROL-1) | journal, balance, états, clôture | aucune écriture orpheline | Web |
+| Comptable (persona B2) | `comptable` (TRANCHÉ, DV-07) | journal, balance, états, comptabilisation, gestes de facturation interdits au caissier | aucune écriture orpheline ; ne pas être celui qui encaisse | Web |
 | Administrateur système (nouveau) | hors application | serveur, sauvegardes, mises à jour | continuité de service | Hors application |
 
 ## 3. Portée par module (vue produit ; détail dans `20_MODULES_INDEX.md` et `21_` à `29_`)
@@ -78,8 +78,8 @@ Surface : W = web, P = poste, WP = les deux. HL = comportement hors ligne au pos
 | PR-018 | Calendrier de soins (3 onglets), infirmerie, décès reporté sur la fiche avec choix de catégorie. | WP | oui | décès : bouton « Confirmer » inactif tant qu'aucune catégorie n'est choisie | F3 | C |
 | PR-019 | Prophylaxie datée par bande (mise en bande, jour de cycle) et fenêtre « Rappels du jour » une fois par session. | WP | oui | jamais de fenêtre vide ; jamais au déverrouillage | guide bloc 6 | P |
 | PR-020 | Paramètres Élevage : rationnement, calendriers de prophylaxie, types de provende (lecture seule), numérotation (préfixes Enclos/Cage/Bande/Bassin). | WP | oui | préfixe vide refusé | F3 | C |
-| PR-021 | Pisciculture : fiche, bassins, biomasse, aliment, vente. | WP | oui | **À DÉFINIR** : `15_REGLES_METIER.md` §7.1, questions Q-PIS-1 à Q-PIS-9 | configuration_espece.dart | D |
-| PR-022 | Pintades : fiche et rationnement propres. | WP | oui | **À DÉFINIR** §7.2, Q-PIN-1 à Q-PIN-4 | idem | D |
+| PR-021 | Pisciculture : fiche, bassins, biomasse, ration en % de la biomasse (TRANCHÉ DV-01), vente en kg ET sujets (TRANCHÉ DV-02). | WP | oui | taux de ration = repères à valider ; reste **À DÉFINIR** : `15_REGLES_METIER.md` §7.1 (Q-PIS-1 à Q-PIS-4, Q-PIS-7 à Q-PIS-9), `16_` DV-01/DV-02 | configuration_espece.dart | D |
+| PR-022 | Pintades : stade « pintadeaux », incubation 28 j paramétrable (fenêtre 26–28), rappels J7/J14/J25 (TRANCHÉ DV-03). | WP | oui | repères à valider ; reste **À DÉFINIR** §7.2 (Q-PIN-1 à Q-PIN-3), `16_` DV-03 | idem | D |
 | PR-023 | Goliaths : maturité 4 mois / 2,8 kg, vente déduite de « Goliathau ». | WP | oui | test dédié (vente ne touche pas Mature) | F3 | C (Q-GOL-1) |
 
 ### 4.3 Ventes, clients, facturation

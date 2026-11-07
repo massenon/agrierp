@@ -209,8 +209,8 @@ Les onglets de la fiche Poulets/Pondeuses : `logialvia/docs/H2_Onglets_Fiche_Pou
   `UNIQUE(espece, date)`) ? Si oui, la fiche devient par bande (guide, E2).
 - Q-FIL-5 Alertes de maturité (poids/âge) : seuls Goliaths (2800 g) ont des seuils dans le code ; les valeurs des
   autres filières sont-elles à saisir par le client dans Paramètres Élevage ?
-- Q-ROL-1 Rôle comptable : LogiALVIA a 3 rôles et réserve la comptabilité à `admin`. Le client veut-il un 4e rôle
-  `comptable` (comme AgriERP) ? Tant qu'il n'a pas répondu : 3 rôles.
+- Q-ROL-1 Rôle comptable : TRANCHÉ (DV-07, 08/11/2026) : 4 rôles (`admin`, `comptable`, `caissier`, `animalier`) ; périmètre
+  exact du comptable : Q-DV-7 (`16_DECISIONS_VALIDEES.md`).
 - Q-AFF-1 Affichage d'un KPI sans donnée : E7 §1 de logialvia admet « 0 FCFA » ; la règle de ce projet est « — » pour
   une valeur non calculable. Confirmer : zéro réel = « 0 », non calculable = « — ».
 

@@ -25,35 +25,38 @@
 
 **Permissions web** (modèle `agrierp_laravel/database/seeders/RolesAndPermissionsSeeder.php`, adapté) : `view-<m>` (voir), `manage-<m>` (écrire), plus `archive-elevage`, `export-<m>`, `close-fiscal-year`, `manage-users`, `manage-modules`. Modules : `elevage`, `ventes`, `achats`, `stocks`, `facturation`, `comptabilite`, `rapports`, `parametres` (+ `rh` si accepté, Q-RH-1). **Deux niveaux obligatoires** : route `->middleware(['auth','can:view-<m>'])` ET `$this->authorize('manage-<m>')` en première ligne de chaque méthode mutante ; le masquage de menu est cosmétique. Au poste : `PermissionService.estAutorise(role, route)` + `ModulesActifsProvider.estActif`, alimenté par la matrice du serveur.
 
-## 3. Rôles et matrice RBAC (3 rôles — écart avec les 4 d'AgriERP)
+## 3. Rôles et matrice RBAC (4 rôles — TRANCHÉ (DV-07), `16_DECISIONS_VALIDEES.md`)
 
-**Écart à signaler** : logialvia = **3 rôles** (`admin` « Administratrice », `caissier` « Agent de Vente », `animalier` « Agent d'Élevage » ; I1 corrigé par K4 §8/§10 ; `logialvia_app/lib/administration/domain/entities/role_utilisateur.dart`) ; AgriERP = **4 rôles** (`admin`, `comptable`, `caissier`, `animalier`). B1/B2/B3 de logialvia citent « Comptable » à tort. Décision : garder 3 ; tout droit comptable → `admin` (Q-ROL-1).
+**Décision TRANCHÉE (DV-07, 08/11/2026)** : **4 rôles** — `admin` « Administrateur/Administratrice », `comptable` « Comptable », `caissier` « Agent de Vente », `animalier` « Agent d'Élevage » (modèle AgriERP : `RolesAndPermissionsSeeder.php`). Celui qui encaisse n'est pas celui qui comptabilise. LogiALVIA n'en avait que 3 (`role_utilisateur.dart`) : le poste et ses libellés sont à aligner (ancien Q-ROL-1 fermé). **Le code suit la matrice** (DV-06) : si le client veut d'autres accès, on corrige la matrice, pas l'inverse. Le périmètre du comptable ci-dessous est PROPOSÉ (calqué sur AgriERP) et reste à confirmer (Q-DV-7).
 
-| Permission web | admin | caissier | animalier |
-|---|:--:|:--:|:--:|
-| `view/manage/archive/export-elevage` | oui | non | oui |
-| `view/manage/export-ventes` (caisse, clients, inventaire) | oui | oui | non |
-| `view/manage-facturation` (MeCeF, avoirs) | oui | oui | non |
-| `view/manage-achats` (achats, fournisseurs, dépenses) | oui | non | non |
-| `view/manage-stocks` (stocks, catalogue) | oui | non | non |
-| `view/manage-comptabilite`, `close-fiscal-year` | oui | non | non |
-| `view/export-rapports` | oui | non | non |
-| `view/manage-parametres`, `manage-users`, `manage-modules` | oui | non | non |
-| `/parametres/elevage` : rations, prophylaxie, numérotation | oui | non | oui (limité : pas d'activation de filière) |
-| `/dashboard`, `/profil`, `/aide`, `/contact` | oui | oui | oui (auth seule) |
+| Permission web | admin | comptable | caissier | animalier |
+|---|:--:|:--:|:--:|:--:|
+| `view/manage/archive/export-elevage` | oui | non | non | oui |
+| `view/manage/export-ventes` (caisse, clients) | oui | consultation (proposé) | oui | non |
+| `view-facturation` : CONSULTER et RÉIMPRIMER les factures (`/factures-mecef`) | oui | oui | **oui** (DV-06) | non |
+| `manage-facturation` : annuler, retransmettre, créer un avoir | oui | oui (proposé) | **non** (DV-06) | non |
+| `view-stocks` : `/stocks`, `/catalogue` ET `/inventaire` | oui (et responsable stock s'il existe : Q-DV-5) | non | **non** (DV-06) | non |
+| `manage-stocks` (stocks, catalogue) | oui | non | non | non |
+| `view/manage-achats` (achats, fournisseurs, dépenses) | oui | consultation (proposé) | non | non |
+| `view/manage-comptabilite` | oui | oui | non | non |
+| `close-fiscal-year` | oui | à confirmer (Q-DV-7) | non | non |
+| `view/export-rapports` | oui | oui | non | non |
+| `view/manage-parametres`, `manage-users`, `manage-modules` | oui | non | non | non |
+| `/parametres/elevage` : rations, prophylaxie, numérotation, seuils de provende | oui | non | non | oui (limité : pas d'activation de filière ; seuils de ferme : admin seul) |
+| `/dashboard`, `/profil`, `/aide`, `/contact` | oui | oui | oui | oui (auth seule) |
 
-**Écarts documentation ↔ code à ne pas « corriger par prudence »** : (1) I1 §2 met Inventaire en « ✅ admin » seulement ; le code (`permission_service.dart`) l'ouvre aussi au caissier (« ARBITRÉ PAR LA GÉRANTE » : il voit coûts de revient et valorisation) ; (2) `/factures-mecef` est ouvert au caissier (la facturation et l'avoir se font au comptoir) ; (3) la description du caissier en I1 §1 dit « consultation Stocks » mais sa liste de routes n'inclut pas `/stocks` : la consultation visée est le badge de stock du POS (Q-ROL-2) ; (4) le menu du caissier ne comporte pas `/catalogue` : le lien produit → catégorie d'effectif (RM-ELV-05) est donc un geste admin.
+**Écarts documentation ↔ code : TRANCHÉS (DV-06)** — le code suit la matrice, on ne « corrige » plus la matrice d'après le code : (1) `/inventaire` n'est PLUS ouvert au caissier (I1 §2 avait raison : admin seulement, et responsable stock s'il existe ; `permission_service.dart` à corriger : l'« arbitrage de la Gérante » est annulé) ; (2) `/factures-mecef` : le caissier consulte et réimprime, mais n'annule pas, ne retransmet pas, ne crée pas d'avoir (l'erreur de facturation se corrige par l'administrateur ou le comptable) ; (3) la description du caissier en I1 §1 dit « consultation Stocks » mais sa liste de routes n'inclut pas `/stocks` : la consultation visée est le badge de stock du POS (Q-ROL-2, inchangée) ; (4) le menu du caissier ne comporte pas `/catalogue` : le lien produit → catégorie d'effectif (RM-ELV-05) est donc un geste admin.
 
 ## 4. Carte des routes (37) — poste existant = web cible
 
-Légende rôles : A admin · C caissier · N animalier. « Surf. » : W web, P poste (P⁻ = lecture seule ou demande). « Module actif » : conditionne menu ET accès direct.
+Légende rôles : A admin · K comptable · C caissier · N animalier. « Surf. » : W web, P poste (P⁻ = lecture seule ou demande). « Module actif » : conditionne menu ET accès direct.
 
 | # | Route | Écran | Fichier | Onglets / sections | Rôles | Droit web | Module actif | Dépend de |
 |---|---|---|---|---|---|---|---|---|
 | 1 | `/` | Splash | `21_` | séquence de démarrage | public | — | — | — |
 | 2 | `/welcome` | Accueil | `21_` | bouton « Se Connecter » | public | — | — | — |
 | 3 | `/login` | Connexion | `21_` | — | public | — | — | 1, 2 |
-| 4 | `/dashboard` | Tableau de bord | `22_` | 7 sections, 8 KPI | A C N | auth | — | 12–19, 28 |
+| 4 | `/dashboard` | Tableau de bord | `22_` | 7 sections, 8 KPI | A K C N | auth | — | 12–19, 28 |
 | 5 | `/elevage/dashboard` | Dashboard Élevage | `22_` | 4 sections | A N | view-elevage | — | 6–11 |
 | 6 | `/elevage/goliaths` | Fiche Goliaths | `23_` | grille / hebdomadaire | A N | view-elevage | toujours actif | 11, 14 |
 | 7 | `/elevage/pintades` | Fiche Pintades | `23_` | idem | A N | view-elevage | toujours actif | 11, 14 |
@@ -66,27 +69,27 @@ Légende rôles : A admin · C caissier · N animalier. « Surf. » : W web, P p
 | 14 | `/parametres/elevage` | Paramètres Élevage | `23_` | « Rationnement », « Calendriers Prophylaxie », « Intrants de Provende », « Numérotation Bandes & Sujets » | A N | view-elevage | — | 17 |
 | 15 | `/ventes` | Ventes | `24_` | « Enregistrer Vente », « Devis Prestations », « Historique des Ventes », « Retours et Avoirs » | A C | view-ventes | — | 17, 18, 6–10 |
 | 16 | `/clients` | Clients et Créances | `24_` | clients, créances, événements CRM | A C | view-ventes | — | 15 |
-| 17 | `/inventaire` | Inventaire daté et valorisé | `25_` | Journalier / Hebdomadaire / Mensuel / Plage personnalisée | A C | view-ventes | — | 18, 19 |
-| 18 | `/factures-mecef` | Facturation MeCeF | `24_` | filtres À transmettre / Normalisée / Rejetée | A C | view-facturation | `mecef` | 15, 3 |
+| 17 | `/inventaire` | Inventaire daté et valorisé | `25_` | Journalier / Hebdomadaire / Mensuel / Plage personnalisée | A | view-stocks | — | 18, 19 |
+| 18 | `/factures-mecef` | Facturation MeCeF | `24_` | filtres À transmettre / Normalisée / Rejetée | A K C (C : consultation + réimpression seulement, DV-06) | view-facturation (manage-facturation : A K) | `mecef` | 15, 3 |
 | 19 | `/achats` | Achats & Commandes | `25_` | panier d'achat, commandes | A | view-achats | — | 20, 21 |
 | 20 | `/fournisseurs` | Fournisseurs | `25_` | fournisseurs, dettes | A | view-achats | — | — |
 | 21 | `/depenses` | Saisie des Dépenses | `25_` | formulaire + liste | A | view-achats | — | 25 |
 | 22 | `/stocks` | Gestion des Stocks | `25_` | articles, journal des mouvements | A | view-stocks | — | — |
 | 23 | `/catalogue` | Catalogue & Seuils | `25_` | catalogue, seuils d'alerte | A | view-stocks | — | — |
-| 24 | `/comptabilite` | Hub Comptabilité | `26_` | tuiles | A | view-comptabilite | — | 25–31 |
-| 25 | `/comptabilite/journal` | Journal Comptable | `26_` | — | A | view-comptabilite | — | plan |
-| 26 | `/comptabilite/grand-livre` | Grand Livre | `26_` | — | A | view-comptabilite | — | 25 |
-| 27 | `/comptabilite/balance` | Balance Générale | `26_` | — | A | view-comptabilite | — | 25 |
-| 28 | `/comptabilite/plan` | Plan Comptable | `26_` | — | A | view-comptabilite | — | — |
-| 29 | `/comptabilite/analytique` | Comptabilité Analytique | `26_` | — | A | view-comptabilite | — | 25 |
-| 30 | `/comptabilite/etats-financiers` | États Financiers | `26_` | « Bilan », « Compte de Résultat », « Flux de Trésorerie », « Notes Annexes » | A | view-comptabilite | — | 27 |
-| 31 | `/comptabilite/bilan` | Bilan de l'Entreprise | `26_` | — | A | view-comptabilite | — | 30 |
-| 32 | `/comptabilite/cloture` | Clôture d'Exercice | `26_` | clôture périodique, annuelle | A | view-comptabilite + close-fiscal-year | — | 27 |
-| 33 | `/rapports` | Rapports & Exports | `28_` | « Recettes et Dépenses », « État de Trésorerie », « Créances Clients », « Dettes Fournisseurs », « Rapport Élevage », « Rapport de Stocks » | A | view-rapports | — | 25, 15, 6–10 |
+| 24 | `/comptabilite` | Hub Comptabilité | `26_` | tuiles | A K | view-comptabilite | — | 25–31 |
+| 25 | `/comptabilite/journal` | Journal Comptable | `26_` | — | A K | view-comptabilite | — | plan |
+| 26 | `/comptabilite/grand-livre` | Grand Livre | `26_` | — | A K | view-comptabilite | — | 25 |
+| 27 | `/comptabilite/balance` | Balance Générale | `26_` | — | A K | view-comptabilite | — | 25 |
+| 28 | `/comptabilite/plan` | Plan Comptable | `26_` | — | A K | view-comptabilite | — | — |
+| 29 | `/comptabilite/analytique` | Comptabilité Analytique | `26_` | — | A K | view-comptabilite | — | 25 |
+| 30 | `/comptabilite/etats-financiers` | États Financiers | `26_` | « Bilan », « Compte de Résultat », « Flux de Trésorerie », « Notes Annexes » | A K | view-comptabilite | — | 27 |
+| 31 | `/comptabilite/bilan` | Bilan de l'Entreprise | `26_` | — | A K | view-comptabilite | — | 30 |
+| 32 | `/comptabilite/cloture` | Clôture d'Exercice | `26_` | clôture périodique, annuelle | A K | view-comptabilite + close-fiscal-year | — | 27 |
+| 33 | `/rapports` | Rapports & Exports | `28_` | « Recettes et Dépenses », « État de Trésorerie », « Créances Clients », « Dettes Fournisseurs », « Rapport Élevage », « Rapport de Stocks » | A K | view-rapports | — | 25, 15, 6–10 |
 | 34 | `/parametres/generaux` | Paramètres Généraux | `29_` | « Modules Actifs », « Données de l'Entreprise », « Gestion Utilisateurs », « Modes de Paiement », « Sauvegardes », « Corbeille », « Données de Test » | A | view-parametres | — | — |
-| 35 | `/profil` | Mon Profil | `21_` | mot de passe, métadonnées de session, journal personnel | A C N | auth | — | 3 |
-| 36 | `/aide` | Aide & À Propos | `21_` | modules, FAQ | A C N | auth | — | — |
-| 37 | `/contact` | Contactez l'Éditeur | `21_` | « Question Générale », « Signaler un Problème » | A C N | auth | — | — |
+| 35 | `/profil` | Mon Profil | `21_` | mot de passe, métadonnées de session, journal personnel | A K C N | auth | — | 3 |
+| 36 | `/aide` | Aide & À Propos | `21_` | modules, FAQ | A K C N | auth | — | — |
+| 37 | `/contact` | Contactez l'Éditeur | `21_` | « Question Générale », « Signaler un Problème » | A K C N | auth | — | — |
 
 Entrées de menu (8 groupes, `navigation_model.dart` / F2) : PILOTAGE ; ÉLEVAGE & COUVEUSE ; VENTES & CLIENTS (Ventes, Clients et Créances, Inventaire, Facturation MeCeF) ; ACHATS & FOURNISSEURS (Achats & Commandes, Fournisseurs, Saisie Dépenses) ; STOCKS & CATALOGUE ; COMPTABILITÉ (Comptabilité, Grand Livre, Balance Générale, États Financiers, Bilan) ; PARAMÈTRES ; ÉDITIONS (Rapports). `/comptabilite/journal`, `/plan`, `/analytique`, `/cloture` ne sont atteignables que par les tuiles du hub (comportement du prototype).
 

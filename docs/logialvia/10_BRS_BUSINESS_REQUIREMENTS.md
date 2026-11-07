@@ -30,7 +30,7 @@ ALLMANY ET COMPAGNIE (promoteur : SIDI ALI Raïmatou ; « la Gérante » dans le
 | Direction / Gérante (admin) | Pilotage, rentabilité, chiffres fiables, arbitre les questions ouvertes | B1 §3 |
 | Animalier (« Agent d'Élevage ») | Saisie quotidienne rapide, sans ambiguïté | B1 §3, I1 |
 | Caissier (« Agent de Vente ») | Encaissement fluide devant un client | B1 §3, I1 |
-| Comptable | Cité en B1/B2/B3 mais **aucun rôle comptable** en I1 (voir §5, écart E-ROL) | B1 §5, I1 §1 |
+| Comptable | Rôle à part entière : TRANCHÉ (DV-07, `16_DECISIONS_VALIDEES.md`) ; celui qui encaisse n'est pas celui qui comptabilise (voir §5, E-ROL) | B1 §5, DV-07 |
 | Éditeur / FAGUEZ SARL – PAEB | Livre et maintient ; support | F1 pied de carte, F9 |
 | DGI (Bénin) | Facturation normalisée MeCeF/e-MECeF | B6 BR-ADM-004, guide bloc 19 |
 | Administrateur du serveur web (NOUVEAU) | Hébergement, sauvegardes, mises à jour | guide 14.2 D-SRV-7 |
@@ -57,9 +57,9 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 | BR-014 | La conformité fiscale MeCeF n'est activable que si IFU et RCCM sont renseignés. | B6 BR-ADM-004 ; F8 onglet 2 | C | M |
 | BR-015 | La facturation distingue facture simple (jamais transmise) et facture normalisée (transmise à la DGI), avec avoir pour toute correction d'une facture normalisée. | guide bloc 19 ; `logialvia_app/lib/commercial/data/tables/facturation_mecef_tables.dart` | P | M |
 | BR-016 | Devise unique : franc CFA (entiers pour les montants facturés). Dates métier à l'heure du Bénin (UTC+1 fixe). Interface exclusivement en français. | B1 §7 ; B3 §5 ; guide 14.1 | C | M |
-| BR-017 | Trois rôles (admin, caissier, animalier) ; chacun ne voit que ses modules ; aucun rôle comptable tant que le client n'arbitre pas. | I1 ; B6 BR-ADM-001 | C | M |
+| BR-017 | **Quatre rôles** (administrateur, comptable, caissier, animalier) ; chacun ne voit que ses modules ; le comptable comptabilise, le caissier encaisse. TRANCHÉ (DV-07). | I1 ; B6 BR-ADM-001 ; `16_` DV-07 | C | M |
 | BR-018 | Les filières Poissons-Chats, Poulets/Pondeuses et Lapins sont activables/désactivables sans perte de données (désactivées par défaut) ; Goliaths et Pintades sont toujours actives. | I2 ; F8 onglet 1 | C | M |
-| BR-019 | Toute suppression significative est journalisée (qui, quand, quoi) ; « supprimer » archive et passe par une corbeille ; seule l'admin purge. | B6 BR-ADM-003 ; F8 « Corbeille » | C | M |
+| BR-019 | Toute suppression significative est journalisée (qui, quand, quoi) ; « supprimer » archive et passe par une corbeille ; seule l'admin purge ; **les écritures comptables n'entrent jamais en corbeille** (contre-passation). TRANCHÉ (DV-05). | B6 BR-ADM-003 ; F8 « Corbeille » | C | M |
 | BR-020 | Un serveur web central existe (Laravel + Livewire) : décision du client du 07/11/2026. Le web devient le maître des règles, le poste lui est fidèle. | guide §0 et 14.1 | C | M |
 | BR-021 | Plusieurs postes et le web partagent les mêmes données ; la synchronisation est automatique, jamais silencieuse en cas d'échec ; la règle de conflit dépend de la nature de la donnée. | guide bloc 16 | P | M |
 | BR-022 | Un compte se crée, se modifie, s'archive, se réactive ; l'admin réinitialise un mot de passe oublié (temporaire, changement forcé) ; pas de réinitialisation par e-mail. | guide bloc 2 | P | M |
@@ -83,6 +83,13 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 | BR-040 | Modes de règlement : Espèces et Mobile Money ; « Avance » est une condition de paiement (statut), non un canal. | F8 onglet 4 | C | M |
 | BR-041 | Un module bien documenté pour l'utilisateur : aide par écran, visite guidée, manuel PDF. | `logialvia_app/lib/core/tour/tour_guide.dart` ; `logialvia/docs/manuel/` | C | S |
 | BR-042 | Un seul vocabulaire par filière : « couveuse » n'apparaît que chez Goliaths et Pintades ; les poissons ne « naissent » pas en couveuse (colonne « Nés »). | F3 « Glossaire des filières » | C | M |
+| BR-043 | La ration des poissons-chats se calcule en pourcentage de la biomasse par jour (effectif × poids moyen × taux), par classe de poids, barème éditable ; poids moyen recalculé par pesée d'échantillon tous les 15 jours. TRANCHÉ (DV-01) ; taux = repères à valider. | `16_` DV-01 ; `15_` RM-ELV-09b | C | M |
+| BR-044 | À chaque vente ou récolte de poisson, le poids (kg) ET le nombre de sujets sont saisis ; si le nombre est inconnu il est estimé (kg ÷ poids moyen de la dernière pesée) et la ligne est marquée « estimé ». TRANCHÉ (DV-02). | `16_` DV-02 ; `15_` RM-ELV-12 | C | M |
+| BR-045 | Pintades : stade « pintadeaux » ; incubation 28 jours, durée PARAMÉTRABLE avec fenêtre 26–28 j, deux modes (couveuse, couvaison naturelle), rappels J7, J14, J25. TRANCHÉ (DV-03) ; repères d'incubateur à valider. | `16_` DV-03 ; `15_` RM-COU-01, RM-COU-06 | C | M |
+| BR-046 | L'autonomie de provende a deux seuils paramétrables par ferme : alerte à 7 jours (défaut = délai d'approvisionnement + marge de sécurité), critique à 3 jours. TRANCHÉ (DV-04). | `16_` DV-04 ; `15_` RM-ELV-10 | C | M |
+| BR-047 | Une écriture comptable ne se supprime pas et ne se restaure pas : elle se contre-passe ; elle n'entre jamais dans la corbeille (intangibilité OHADA). TRANCHÉ (DV-05). | `16_` DV-05 ; `15_` RM-CPT-09 | C | M |
+| BR-048 | Le caissier n'accède pas à `/inventaire` (administrateur, et responsable stock s'il existe) ; sur `/factures-mecef` il consulte et réimprime, sans annuler, retransmettre ni créer d'avoir. La matrice fait foi, le code la suit. TRANCHÉ (DV-06). | `16_` DV-06 ; `20_` §3 | C | M |
+| BR-049 | Séparation des fonctions : le périmètre du comptable (comptabilité, rapports, gestes de facturation interdits au caissier) est distinct de celui du caissier ; périmètre exact à confirmer (Q-DV-7). | `16_` DV-07 | P | M |
 
 ## 4. Objectifs mesurables (reprise de B1/B2)
 
@@ -99,29 +106,31 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 
 | Réf. | Constat | Décision proposée |
 |---|---|---|
-| E-ROL | B1 §5, B2 §3, B3 SRS-F-09 parlent de 4 rôles (« Comptable ») ; I1 (corrigé par K4 §8/§10) prouve **3 rôles** (`sidebar.js` : « aucun rôle comptable »). AgriERP en a 4 (`admin`, `comptable`, `caissier`, `animalier` : `agrierp_laravel/database/seeders/RolesAndPermissionsSeeder.php`). | Garder 3 ; tout droit comptable → admin ; question Q-ROL-1. Corriger B1/B2/B3 dans logialvia. |
+| E-ROL | B1 §5, B2 §3, B3 SRS-F-09 parlent de 4 rôles (« Comptable ») ; I1 (corrigé par K4) prouvait 3 rôles ; AgriERP en a 4. | **TRANCHÉ (DV-07)** : 4 rôles (admin, comptable, caissier, animalier). Corriger I1/K4 dans logialvia. |
 | E-SRV | B1 §6 : « pas de synchronisation multi-postes, pas de serveur central » ; A1 §5 : « pas de backend » ; F3 : « aucun serveur HTTP n'est embarqué ». | Périmètre élargi par la décision du 07/11/2026 (BR-020/021) ; amender B1 §6 et A1 §5. |
 | E-MOB | B1 §6 : « application mobile hors périmètre ». | Le web est responsive/PWA ; mobile natif reste hors périmètre ; hors ligne navigateur : BR-025 (D). |
 | E-RH | B1 §6 : RH/paie hors périmètre ; le client la liste dans la mission « paie ». | BR-033 (D) ; module `27_MODULE_RH_PAIE.md` écrit en option. |
 | E-PIN | `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` §0 : 5 filières (B1) vs 6 identifiants dans le code (`poulets` et `pondeuses` séparés). | Compter 6 identifiants, 5 écrans de fiche (poulets+pondeuses = 1 écran à 2 onglets). |
-| E-INC | Incubation Pintade : prototype et INDEX_MAITRE 27 j ; F3 v21 : « la pintade incube 28 jours, pas 27 » (correction de la Gérante). | Retenir 28 (source la plus récente) ; confirmer Q-PIN-4. |
+| E-INC | Incubation Pintade : prototype et INDEX_MAITRE 27 j ; F3 v21 : 28 j (correction de la Gérante). | **TRANCHÉ (DV-03)** : 28 j, paramétrable, fenêtre 26–28 j ; corriger `INDEX_MAITRE`. |
 | E-SEC | F1 : SHA-256 + sel au poste ; avec le web : hash serveur, jeton par poste, PIN PBKDF2 (guide D-SRV-5). | Appliquer D-SRV-5 ; reprise des comptes par mots de passe temporaires. |
 | E-ID | logialvia : clés entières autoincrémentées ; web partagé : UUID. | Migration UUID (guide D-SRV-3), palier Drift `from < 27`. |
 
 ## 6. Questions ouvertes au client (à poser telles quelles)
 
-1. **Q-ROL-1** Faut-il un rôle « comptable » distinct de l'admin (voir E-ROL) ? Si oui, quelles pages (Comptabilité, Rapports, RH) ?
+1. **Q-ROL-1** TRANCHÉ (DV-07) : rôle « comptable » distinct, 4 rôles. Reste le périmètre exact du comptable : Q-DV-7.
 2. **Q-RH-1** La paie et le registre du personnel (employés, stagiaires, pointage) doivent-ils entrer dans LogiALVIA ? Si oui : combien d'employés, quel barème d'impôt sur salaires et quels taux CNSS/VPS pratiqués chez ALLMANY ?
 3. **Q-IMP-1** Quels modules importer par xlsx (stocks, produits, clients, fournisseurs, plan comptable, effectifs de départ des bandes) et dans quel ordre ?
 4. **Q-PWA-1** Besoin explicite de travailler sans réseau dans un navigateur (tablette, téléphone) ? Quels appareils, combien de temps hors ligne ?
 5. **Q-HEB-1** Hébergeur, nom de domaine, qui administre le serveur et télécharge les sauvegardes ?
 6. **Q-MEC-1** Mode MeCeF visé : e-MECeF en ligne (sans boîtier) ou boîtier ? Jeton e-MECeF, IFU et RCCM disponibles ?
-7. **Q-PIS-1 … Q-GOL-1** : voir `15_REGLES_METIER.md` §7 (pisciculture, pintades, goliaths).
+7. **Q-PIS-1 … Q-GOL-1** : voir `15_REGLES_METIER.md` §7 (pisciculture, pintades, goliaths) ; Q-PIS-5, Q-PIS-6 et Q-PIN-4 TRANCHÉES (DV-01, DV-02, DV-03).
 8. **Q-ELV-1 … Q-ELV-7** : voir `15_REGLES_METIER.md` §1 (glossaire lapins, départ obligatoire, cascade, ventes ventilées).
-9. **Q-CPT-1 … Q-CPT-5** : voir `15_REGLES_METIER.md` §5 et `26_MODULE_COMPTABILITE_EXERCICES.md`.
+9. **Q-CPT-1 … Q-CPT-5** (Q-CPT-3 TRANCHÉE, DV-05) : voir `15_REGLES_METIER.md` §5 et `26_MODULE_COMPTABILITE_EXERCICES.md`.
 10. **Q-TVA-1** Entreprise assujettie à la TVA (taux 0 % et 18 % seulement) ? Une facture simple figure-t-elle dans la déclaration de TVA ?
 11. **Q-ADM-1** Politique de mot de passe (longueur, majuscule, chiffre) ? (logialvia : 8 caractères minimum.)
 12. **Q-VTE-1** Délai de paiement par défaut des ventes à crédit (jours) ?
+13. **Q-DV-1 … Q-DV-8** : nouvelles questions nées des décisions validées du 08/11/2026 (barème en % de biomasse, arrondi de l'estimation, mortalité des pintadeaux, marge de sécurité, responsable stock, onglet Retours et Avoirs, périmètre du comptable, libellé du jeune pintade) : voir `16_DECISIONS_VALIDEES.md` §4.
+14. Questions FERMÉES le 08/11/2026 : Q-ROL-1, Q-ALR-1, Q-CPT-3, Q-PIS-5, Q-PIS-6, Q-PIN-4 (voir `16_`).
 
 ## 7. Critères d'acceptation du document
 

@@ -134,11 +134,58 @@ Source : `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` § 2 et § 6, « calculé à la 
 |---|---|---|
 | Fiche journalière d'une filière avec les catégories 30/60/110 (Alevin/Juvénile/Mature, Poussins/Pintadau/Mature, Poussins/Goliathau/Mature) : effectifs, mortalité, dons, ventes sur la catégorie commercialisée, achats/naissances sur la catégorie jeune | `configuration_espece.dart` + Doc 05 §1 de logialvia + GUIDE § 2 | À écrire : la règle générique existe, les chiffres sont à calculer |
 | Alerte de maturité goliaths (2 800 g ET/OU 120 jours) | `configuration_espece.dart` (`poidsMaturiteGrammes`, `ageMaturiteJours`) | **La combinaison (ET ou OU) n'est pas tranchée dans mes sources : À DÉFINIR AVEC LE CLIENT** |
-| Autonomie alimentaire | GUIDE § 6 : alerte rouge en rupture, sous 3 jours ou sans produit de provende | seuil 3 j : à confirmer pour LogiALVIA |
+| Autonomie alimentaire | GUIDE § 6 + DV-04 : deux seuils paramétrables (alerte 7 j, critique 3 j) ; rupture ou sans produit = critique | TRANCHÉ (DV-04) : cas T-DV04-* ci-dessous |
 | Vente avec avance, créance, avoir | `docs/B6_Regles_Metier.md` de logialvia ; Actions AgriERP | à calculer au ticket |
 | Montants FCFA entiers : conversion d'un `REAL` de logialvia | règle d'arrondi inconnue | **À DÉFINIR AVEC LE CLIENT** (Q9 de `30`) |
 | TVA / groupes de taxe, e-MECeF | `41_MECEF_EMECEF.md` | voir ce fichier |
 | Clôture d'exercice, balance | `J1_Bascule_Cloture_Exercice.md` de logialvia | à calculer |
+
+### 4.3 Jeux calculés à la main des décisions validées du 08/11/2026 (DV-01 à DV-07)
+
+Chaque valeur ci-dessous est calculée à la main (calculette), jamais en lançant le code ; les règles sont dans `15_REGLES_METIER.md` (RM-ELV-09b, RM-ELV-10, RM-ELV-12, RM-COU-01/06, RM-CPT-09) et `16_DECISIONS_VALIDEES.md`. **Les taux de ration utilisés sont des valeurs d'ESSAI au milieu des fourchettes de repère : ils ne constituent pas un barème et ne doivent jamais être amorcés comme « confirmés ».**
+
+| Id | Règle | Entrées | Sortie attendue |
+|---|---|---|---|
+| T-DV01-1 | Ration en % de biomasse (DV-01) | 1 000 juvéniles, poids moyen 50 g, classe 20–100 g, taux d'essai 4 % | biomasse 50 000 g ; ration **2 000 g/j** (2,0 kg) |
+| T-DV01-2 | idem, alevins | 2 000 sujets, 2 g, classe < 5 g, taux d'essai 15 % | biomasse 4 000 g ; **600 g/j** |
+| T-DV01-3 | idem, > 500 g | 200 sujets, 600 g, classe ≥ 500 g, taux d'essai 1,5 % | biomasse 120 000 g ; **1 800 g/j** |
+| T-DV01-4 | Total de la fiche poissons | T-DV01-1 + 2 + 3 | 2 000 + 600 + 1 800 = 4 400 g = **4,4 kg** |
+| T-DV01-5 | Borne de classe | poids moyen exactement 20 g | classe 20–100 g (borne basse incluse), jamais 5–20 g |
+| T-DV01-6 | Poids moyen inconnu | catégorie sans pesée | ration « — », jamais 0 ni valeur en g/tête |
+| T-DV01-7 | Pesée d'échantillon | effectif 500 ; 36 poissons pesés, 1 800 g | poids moyen **50 g** ; 36 ≥ 30 et 7,2 % ∈ [5 % ; 10 %] : valide |
+| T-DV01-8 | Taille minimale de l'échantillon | effectif 300 (5 % = 15) ; effectif 20 | au moins **30** poissons ; tout l'effectif (**20**) |
+| T-DV01-9 | Séries écartées | amorçage du barème des poissons | aucune ligne 30/60/110 ni 8/25/45 (garde sur la source) |
+| T-DV02-1 | Vente kg + sujets estimée (DV-02) | 12,5 kg, poids moyen 500 g, effectif 120, nombre inconnu | 12 500 ÷ 500 = **25 sujets, « estimé »** ; effectif **95** |
+| T-DV02-2 | Vente avec nombre mesuré | 10 kg et 27 sujets saisis, effectif 120 | effectif **93** ; `count_is_estimated` = faux |
+| T-DV02-3 | Estimation arrondie | 10 kg, poids moyen 350 g | 10 000 ÷ 350 = 28,571 → **29, « estimé »** |
+| T-DV02-4 | Refus : nombre > effectif | 29 sujets saisis, effectif 20 | refus avant écriture : « Le nombre de sujets (29) dépasse l'effectif disponible (20). » |
+| T-DV02-5 | Refus : estimation impossible | aucune pesée, nombre inconnu | refus : « Saisissez le nombre de sujets : aucune pesée ne permet de l'estimer. » |
+| T-DV02-6 | Biomasse de suivi | poids moyen 350 g ; effectif 120 puis 93 | **42 000 g** puis **32 550 g** |
+| T-DV02-7 | Prix au kilo | 10 kg à 2 500 F le kg | montant de la ligne **25 000 F** (le prix ne dépend pas du nombre de sujets) |
+| T-DV03-1 | Calendrier pintade en couveuse (DV-03) | mise en incubation le 01/08/2026, durée 28 | mirage 1 **08/08**, mirage 2 **15/08**, transfert éclosoir **26/08**, éclosion prévue **29/08**, plage **27/08 → 29/08** |
+| T-DV03-2 | idem | mise le 15/11/2026 | **22/11**, **29/11**, transfert **10/12**, éclosion prévue **13/12**, plage **11/12 → 13/12** |
+| T-DV03-3 | Durée paramétrée | durée 27, fenêtre 26–28, mise le 01/08/2026 | éclosion prévue **28/08**, plage inchangée 27/08 → 29/08 |
+| T-DV03-4 | Couvaison naturelle | mise le 15/11/2026, mode `couvaison_naturelle` | mêmes dates, AUCUN transfert à l'éclosoir |
+| T-DV03-5 | Fenêtre incohérente | durée 30, fenêtre 26–28 | refus (min ≤ durée ≤ max) |
+| T-DV03-6 | Libellé interdit | barème et fiche pintades | aucune occurrence de « Alevins » (garde sur la source) |
+| T-DV04-1 | Autonomie, aucune alerte (DV-04) | ration 6 080 g/j ; stock 50 kg | 50 000 ÷ 6 080 = **8,2 j** : rien |
+| T-DV04-2 | Autonomie, alerte | stock 30 kg | **4,9 j** : alerte (≤ 7), pas critique (> 3) |
+| T-DV04-3 | Autonomie, critique | stock 15 kg | **2,5 j** : alerte ET critique |
+| T-DV04-4 | Bornes | 42 560 g ; 42 561 g ; 18 240 g ; 18 241 g | 7,0 j : alerte ; 7,0002 j : rien ; 3,0 j : critique ; 3,0002 j : alerte seulement |
+| T-DV04-5 | Seuil calculé | délai fournisseur 5 j + marge 2 j ; puis 10 j + 3 j | seuil d'alerte **7** ; puis **13** (limite 79 040 g) |
+| T-DV04-6 | Seuils invalides | alerte 7, critique 7 | refus (critique doit être < alerte) |
+| T-DV05-1 | Contre-passation (DV-05) | écriture D 531 8 000 / C 701 8 000 erronée ; correction à 7 000 | contre-passation D 701 8 000 / C 531 8 000 ; nouvelle D 531 7 000 / C 701 7 000 ; solde 531 **7 000 D**, 701 **7 000 C** |
+| T-DV05-2 | Pas de corbeille | archiver une écriture | aucune route ni action ; aucun type « écriture » dans la liste blanche de la corbeille |
+| T-DV05-3 | Double contre-passation | contre-passer deux fois la même écriture | seconde refusée |
+| T-DV05-4 | Exercice clos | contre-passer une écriture d'un exercice clos | refus |
+| T-DV06-1 | Droits du caissier (DV-06) | caissier : GET `/inventaire` | refus (redirection `/dashboard`), menu sans entrée |
+| T-DV06-2 | idem | caissier : liste et réimpression sur `/factures-mecef` | autorisées |
+| T-DV06-3 | idem | caissier : annuler, retransmettre, créer un avoir (serveur) | 403 chacune ; boutons absents |
+| T-DV06-4 | Matrice = code | comparer la matrice de `20_` §3 et les permissions semées | 0 écart ; permission plus large que la matrice = échec |
+| T-DV07-1 | Quatre rôles (DV-07) | semis des rôles | exactement `admin`, `comptable`, `caissier`, `animalier` |
+| T-DV07-2 | Comptable | `/comptabilite/*` et `/rapports` | accès ; `/ventes` en encaissement : refus |
+| T-DV07-3 | Séparation | le compte qui encaisse ne peut pas saisir d'écriture manuelle | refus du caissier sur `/comptabilite/journal` |
+
 
 ## 5. Commandes
 
@@ -232,12 +279,12 @@ Format d'un scénario : identifiant · rôle · pré-condition · étapes · ré
 | UAT-ELV-03 | éleveur | rouvrir un jour déjà saisi | les valeurs saisies sont intactes (colonnes `oeufs_pondus`… conservées) |
 | UAT-ELV-04 | éleveur | modifier un jour passé | les jours suivants sont recalculés (cascade unique) |
 | UAT-ELV-05 | éleveur | rationnement du jour d'une fiche | tableau par catégorie × ration (valeurs de 4.2 pour un cas connu) ; barème « non confirmé » signalé par sa note |
-| UAT-ELV-06 | éleveur | alerte d'autonomie alimentaire | rouge en rupture / sous le seuil ; n'empêche jamais l'enregistrement |
+| UAT-ELV-06 | éleveur | alerte d'autonomie alimentaire | « alerte » à ≤ 7 j, « critique » à ≤ 3 j (seuils de la ferme, DV-04) ; n'empêche jamais l'enregistrement |
 | UAT-ELV-07 | éleveur | mettre des œufs en couveuse puis enregistrer l'éclosion | `poussins_nés ≤ œufs couvés`, statut « Éclosion Effectuée » |
 | UAT-ELV-08 | éleveur | planifier un soin ; fenêtre « Rappels du jour » | rappel affiché une fois par session, aucune fenêtre vide |
 | UAT-ELV-09 | gérant | vendre un animal sous délai d'attente vétérinaire | vente bloquée ou signalée, jamais silencieuse |
-| UAT-ELV-10 | éleveur | pisciculture : fiche « Poissons-Chats » | libellés Alevin / Juvénile / Mature, colonne « Nés » (sans couveuse), rations 30/60/110 avec note de barème non confirmé |
-| UAT-ELV-11 | éleveur | pintades : fiche | Poussins / Pintadau / Mature, « Nés (Couveuse) » |
+| UAT-ELV-10 | éleveur | pisciculture : fiche « Poissons-Chats » | libellés Alevin / Juvénile / Mature, colonne « Nés » (sans couveuse) ; tableau de ration en % de biomasse (poids moyen, biomasse, taux), note « repères à valider » ; section pesée d'échantillon ; cas T-DV01-* |
+| UAT-ELV-11 | éleveur | pintades : fiche et couvoir | Poussins / Pintadau / Mature (libellé du jeune : « pintadeaux », jamais « Alevins »), « Nés (Couveuse) » ; incubation 28 j paramétrable, plage 26–28 j, mode couveuse / couvaison naturelle, rappels J7, J14, J25 ; cas T-DV03-* |
 | UAT-ELV-12 | éleveur | goliaths : fiche | Poussins / Goliathau / Mature ; alerte de maturité (règle **À DÉFINIR AVEC LE CLIENT** : combinaison poids/âge) |
 
 ### 8.3 Ventes
@@ -252,6 +299,8 @@ Format d'un scénario : identifiant · rôle · pré-condition · étapes · ré
 | UAT-VTE-06 | caissier | facture normalisée e-MECeF (module actif) | code, NIM, compteur, lien de vérification renseignés (voir `41`) ; module inactif : registre sans colonne MeCeF |
 | UAT-VTE-07 | caissier | avoir sur une vente normalisée | avoir lié, normalisé si le module est actif |
 | UAT-VTE-08 | caissier | vente d'un produit sans catégorie d'effectif | refus AVANT toute écriture, message français |
+| UAT-VTE-09 | caissier | vendre 12,5 kg de poisson, nombre de sujets laissé vide | ligne « 25 sujets (estimé) » (poids moyen 500 g), effectif −25, indicateur « estimé » persisté ; cas T-DV02-* |
+| UAT-VTE-10 | caissier | `/factures-mecef` : consulter, réimprimer, tenter annuler / retransmettre / avoir ; `/inventaire` | consultation et réimpression OK ; les trois gestes refusés ; `/inventaire` refusé (DV-06) |
 
 ### 8.4 Stocks et achats
 
@@ -347,8 +396,8 @@ Capture web et capture poste côte à côte à la même largeur : différences d
 
 | Filière | Tests spécifiques | Ce qui est À DÉFINIR AVEC LE CLIENT |
 |---|---|---|
-| Pisciculture (poissons-chats) | libellés Alevin/Juvénile/Mature ; colonne « Nés » ; rations 30/60/110 ; note de barème non confirmé visible ; l'achat d'alevins se saisit en « Achats » | bassins, qualité de l'eau, pesée/échantillonnage, récolte partielle (D-PIS-1 à 4 de `30`) : **aucun test inventé** ; écrire des tests `skip` portant la question |
-| Pintades | libellés Poussins/Pintadau/Mature ; « Nés (Couveuse) » ; rations 30/60/110 | durée d'incubation propre (D-PIN-1) |
+| Pisciculture (poissons-chats) | libellés Alevin/Juvénile/Mature ; colonne « Nés » ; ration en % de biomasse (DV-01, jamais 30/60/110 ni 8/25/45) ; vente en kg ET sujets avec indicateur « estimé » (DV-02) ; note « repères à valider » visible ; l'achat d'alevins se saisit en « Achats » | bassins, qualité de l'eau, pesée/échantillonnage, récolte partielle (D-PIS-1 à 4 de `30`) : **aucun test inventé** ; écrire des tests `skip` portant la question |
+| Pintades | libellés Poussins/Pintadau/Mature (jeune : « pintadeaux », jamais « Alevins ») ; « Nés (Couveuse) » ; rations 30/60/110 en attendant les repères validés ; incubation 28 j paramétrable, fenêtre 26–28 j, deux modes, rappels J7/J14/J25 (DV-03) | seuil d'alerte de mortalité des pintadeaux, repères d'incubateur et de poussinière, rations par âge (Q-DV-3) |
 | Goliaths | libellés Poussins/Goliathau/Mature ; rations 30/60/110 avec note « barème générique non confirmé » ; seuils de maturité 2 800 g / 120 jours présents dans le code | barème validé, définition de la maturité, combinaison des seuils (D-GOL-1/2) |
 | Toutes | ajouter une 6ᵉ filière = configuration, pas écran dupliqué : un garde-fou vérifie qu'il n'existe **qu'un** composant de fiche générique paramétré par la configuration | prophylaxie par filière (D-ALL-1) |
 
@@ -533,9 +582,9 @@ INTERDITS : déclarer « fonctionne » pour ce qui n'a été vu qu'en test serve
 ## 15. Questions ouvertes
 
 1. Les **quatre classes d'écran** : confirmer la classification de la section 9 avec `04_UI_UX_DESIGN_SYSTEM.md` (mes sources ne les nomment pas).
-2. **Rôles** de LogiALVIA : liste exacte tirée de `docs/I1_Matrice_RBAC.md` (non relue en détail ici) pour nommer les comptes de recette.
+2. **Rôles** de LogiALVIA : TRANCHÉ (DV-07) : `admin`, `comptable`, `caissier`, `animalier` ; un compte de recette par rôle ; périmètre du comptable : Q-DV-7.
 3. **Alerte de maturité des goliaths** : les deux seuils (2 800 g, 120 jours) se combinent-ils par ET ou par OU ?
-4. **Seuil d'autonomie alimentaire** (3 jours chez AgriERP) : identique pour LogiALVIA ?
+4. ~~Seuil d'autonomie alimentaire~~ TRANCHÉ (DV-04) : 7 j alerte, 3 j critique. Reste : marge de sécurité (Q-DV-4).
 5. **Règle d'arrondi FCFA** (Q9 de `30`) : sans elle, le test de migration des montants échoue plutôt que d'arrondir.
 6. **Base réelle d'un poste logialvia** : le client peut-il en fournir une copie pour T4 ?
 7. **Poste Windows réel et matériel de la ferme** pour la recette finale : disponibles quand ?

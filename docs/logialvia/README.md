@@ -12,7 +12,7 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 1. **Architecture** : application Laravel 12 + Livewire 3, plate et pragmatique (`app/Livewire/{Module}`, `Actions`, `Services`, `Models`, `Support`) ; PAS d'hexagonal/DDD au web (le Flutter garde ses trois couches par module).
 2. **Points de passage uniques** : `AccountingEntryService::record()` pour toute écriture comptable, `AdjustStockAction::execute()` pour tout mouvement de stock, passerelle MeCeF résolue par sa fabrique ; contourner l'un d'eux casse un invariant invisible.
 3. **Données** : MySQL/MariaDB, clés UUID partout (`users.id` compris, `uuidMorphs` pour Spatie), suppression logique seulement, schéma PARTAGÉ avec le poste Drift.
-4. **Droits à deux niveaux** : route `auth` + `can:view-*`, puis `$this->authorize('manage-*')` en première ligne de toute méthode qui écrit ; trois rôles (`admin`, `caissier`, `animalier`).
+4. **Droits à deux niveaux** : route `auth` + `can:view-*`, puis `$this->authorize('manage-*')` en première ligne de toute méthode qui écrit ; quatre rôles (`admin`, `comptable`, `caissier`, `animalier` : TRANCHÉ DV-07).
 5. **Navigation rapide « comme Vue/Node »** : `wire:navigate` de Livewire 3 (mode SPA-like) + barre de progression + `@persist` pour les toasts, le verrou de session, l'invitation PWA ; ni Vue, ni Inertia, ni Node en production.
 6. **Stack** : PHP 8.3, Laravel 12.65, Livewire 3.8, Sanctum 4 (jeton par poste), Spatie Permission 7, Tailwind 3.4 + PostCSS + Vite 5, Alpine fourni par Livewire (jamais démarré à la main), Material Symbols Outlined local.
 7. **Librairies Composer (liste fermée)** : `laravel/framework`, `livewire/livewire`, `laravel/sanctum`, `spatie/laravel-permission`, `barryvdh/laravel-dompdf` ; conditionnelles : `simple-qrcode` (QR), `maatwebsite/excel` (tableur, seulement si le client le confirme) ; dev : Dusk, Pint, PHPUnit. **Pas** de Reverb (jamais câblé chez AgriERP).
@@ -23,7 +23,7 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 12. **Conformité de design** : chaque conteneur, ligne, colonne, espacement, alignement, animation et hiérarchie visuelle est IDENTIQUE au poste LogiALVIA : charte marine `#1F3864` + or `#B58B2A` (15 couleurs), espacements `xs/sm/md/lg/xl` = 4/8/16/24/32 px, `text-xs` = 13,6 px, rayon 8 px, modale ombre `shadow-xl`.
 13. **Responsive sur 4 classes** : Desktop ≥ 1280, Laptop 1024–1279, Tablet 641–1023, Mobile ≤ 640 (tableaux en cartes à 640 px exactement, barre latérale à `lg`=1024, KPI en 4 colonnes dès 768).
 14. **Preuve de conformité** : jetons partagés comparés par test, gardes qui lisent les sources (`conformite_structure`, `fidelite_libelles`), captures de référence à cinq largeurs, check-list K2 écran par écran, audit de conformité par écran (prompt B de `04_UI_UX_DESIGN_SYSTEM.md`).
-15. **Règle d'or** : rien d'inventé. Toute règle absente des sources (barème Goliaths, barème Poissons-Chats, plan comptable, rôle comptable…) est marquée « À DÉFINIR AVEC LE CLIENT » avec une question précise ; les valeurs d'AgriERP ne remplacent JAMAIS celles de LogiALVIA.
+15. **Règle d'or** : rien d'inventé. Toute règle absente des sources et des décisions validées (`16_DECISIONS_VALIDEES.md`) (barème Goliaths, taux de ration des poissons, plan comptable, périmètre du comptable…) est marquée « À DÉFINIR AVEC LE CLIENT » avec une question précise ; les valeurs d'AgriERP ne remplacent JAMAIS celles de LogiALVIA.
 
 ---
 
@@ -43,6 +43,7 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 | `13_FRS_FUNCTIONAL_REQUIREMENTS.md` | Exigences fonctionnelles | Après 12 | 12 |
 | `14_NFRS_NON_FUNCTIONAL_REQUIREMENTS.md` | Exigences non fonctionnelles (performance, sécurité, disponibilité…) | Après 12-13 | 12, 13 |
 | `15_REGLES_METIER.md` | Règles métier numérotées (BR-XXX-NNN : effectifs, ventes, stocks, comptabilité…) | Avant tout module qui calcule | 10 à 14 |
+| `16_DECISIONS_VALIDEES.md` | Registre des décisions validées par le client le 08/11/2026 (DV-01 à DV-07 : ration des poissons en % de biomasse, vente de poisson kg + sujets, pintades/incubation 28 j, seuils d'autonomie 7 j/3 j, corbeille sans écritures, droits du caissier, 4 rôles) ; ce qui reste À DÉFINIR ; repères zootechniques = ordres de grandeur à valider | Avant tout calcul de ration, de vente de poisson, d'incubation, d'autonomie, et avant toute matrice de droits | 10 à 15 |
 | `20_MODULES_*` | Un prompt PAR MODULE (pilotage, élevage, commercial, stocks, achats, comptabilité, rapports, administration, compte) | Un module par session, dans l'ordre du guide de portage | 01 à 04, 15, 30 |
 | `30_DATABASE_ENGINEERING.md` | Schéma partagé UUID, migrations, migration des données existantes du poste, seeders | Avant la première migration métier | 02, 15 |
 | `31_TESTING_QA.md` | Stratégie de tests, jeux de cas, parité web-poste, recette, mutation | Avant de coder un module, puis à chaque ticket | 03, 15, 20 |
@@ -52,7 +53,7 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 | `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md` | Réglages d'administration : MeCeF, SMTP, logo, favicon (secrets chiffrés) | Module Administration | 02, 03, 41 |
 | `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` | Appairage du poste, synchronisation, modale de synchro, alertes | Après le socle et les premiers modules | 02, 30, 15 |
 
-Les fichiers 10 à 15, 20 à 32 et 40 à 43 sont rédigés par d'autres sessions ; on les désigne ici par leur nom, sans en recopier le contenu. Un fichier cité mais absent du dossier est « à produire » : ne PAS l'inventer, le demander.
+Les fichiers 10 à 16, 20 à 32 et 40 à 43 sont rédigés par d'autres sessions ; on les désigne ici par leur nom, sans en recopier le contenu. Un fichier cité mais absent du dossier est « à produire » : ne PAS l'inventer, le demander.
 
 ---
 
@@ -60,7 +61,7 @@ Les fichiers 10 à 15, 20 à 32 et 40 à 43 sont rédigés par d'autres sessions
 
 ```
 Phase 0  Cadrage          README -> GUIDE_PORTAGE -> 01_MASTER_PROMPT
-Phase 1  Exigences        10 BRS -> 11 PRD -> 12 SRS -> 13 FRS -> 14 NFRS -> 15 REGLES_METIER
+Phase 1  Exigences        10 BRS -> 11 PRD -> 12 SRS -> 13 FRS -> 14 NFRS -> 15 REGLES_METIER -> 16 DECISIONS_VALIDEES
 Phase 2  Socle web (W0)   02 ARCHITECTURE -> 03 STANDARDS -> 04 DESIGN SYSTEM -> 30 DATABASE -> 31 TESTING -> 32 SKILLS
 Phase 3  Modules          20_MODULES_* (un module = une session, ordre du guide de portage)
 Phase 4  Intégrations     43 APPAIRAGE/SYNCHRO -> 41 MECEF -> 42 CONFIG -> 40 PWA (si confirmé)
@@ -70,7 +71,7 @@ Phase 5  Recette          audit de conformité écran par écran (04, prompt B) 
 Ordre de portage des blocs (repris du guide, §1) : socle serveur + schéma UUID (14, 8) -> appairage (15) -> synchronisation (16) -> modale de synchronisation (17, avec 3 et 4) -> bandes (12) -> fiches par filière (1) -> rationnement (5) -> prophylaxie et rappels (6) -> clôture, seuils, aide (11, 13) -> import/export (7) -> notifications (18) -> MeCeF (19) -> installateur (10) -> PWA (20) et import xlsx (21) seulement si confirmés. Voir le tableau récapitulatif du guide pour les dépendances exactes.
 
 Règles de séquencement :
-- Aucun module (`20_MODULES_*`) avant que 01, 02, 03, 04, 15 et 30 aient été exécutés et relus.
+- Aucun module (`20_MODULES_*`) avant que 01, 02, 03, 04, 15, 16 et 30 aient été exécutés et relus.
 - Aucune migration métier avant la décision sur la langue des noms de tables (voir `03_DEVELOPMENT_STANDARDS.md`, « À DÉFINIR ») et sur les UUID du poste.
 - Aucun écran « terminé » sans l'audit de conformité de design (prompt B de `04_UI_UX_DESIGN_SYSTEM.md`) et sans la définition de terminé de `01_MASTER_PROMPT.md`.
 
@@ -87,7 +88,7 @@ Règles de séquencement :
 7. **Rapport au format du MASTER PROMPT** (ticket, fait, vérifié, non fait, écarts, questions, risques), court et factuel.
 8. **Documentation vivante.** Un doc faux découvert en route se corrige dans le même ensemble de changements (A2 §7 de logialvia) ; ces prompts eux-mêmes se mettent à jour quand une source change.
 9. **Sources en conflit** : on suit la hiérarchie du MASTER PROMPT (web validé -> poste/prototype -> docs de logialvia -> règles d'AgriERP) ; une contradiction se documente et se fait trancher, elle ne se résout pas en silence.
-10. **Particularités LogiALVIA** : six filières déjà configurées (`goliaths`, `pintades`, `lapins`, `poissons-chats`, `poulets`, `pondeuses`) pilotées par UN écran générique ; les barèmes Goliaths et Poissons-Chats sont « non confirmés » dans les sources : question au client avant tout calcul de ration pour ces filières.
+10. **Particularités LogiALVIA** : six filières déjà configurées (`goliaths`, `pintades`, `lapins`, `poissons-chats`, `poulets`, `pondeuses`) pilotées par UN écran générique ; le barème Goliaths est « non confirmé » dans les sources (question au client avant tout calcul de ration) ; la ration des poissons-chats est TRANCHÉE en % de biomasse (DV-01), ses taux restent des repères à valider.
 
 ---
 
@@ -130,7 +131,7 @@ Règles de séquencement :
 - Le prototype HTML de LogiALVIA (31 pages) n'est PAS dans le dépôt cloné (`logialvia/` ne contient que `docs/`, `logialvia_app/`, `logo/`) : plusieurs mesures visuelles restent « à confirmer » tant qu'il n'est pas fourni.
 - Les outils `audit_typographie.py` / `apparier_typographie.py` cités par les docs de logialvia sont absents de `logialvia/logialvia_app/outils/`.
 - LogiALVIA est en Roboto (variable, locale), marine/or ; AgriERP en Inter, vert/jaune : ne pas mélanger les chartes.
-- Trois rôles chez LogiALVIA (comptabilité réservée à `admin`), quatre chez AgriERP.
+- Quatre rôles (TRANCHÉ DV-07, 08/11/2026 : `admin`, `comptable`, `caissier`, `animalier`) ; LogiALVIA n'en avait que trois (comptabilité réservée à `admin`).
 - Aucun CSP ni analyse statique chez AgriERP : ce sont des propositions nouvelles, pas des acquis.
 - Reverb et `maatwebsite/excel` figurent dans le `composer.json` d'AgriERP sans usage réel : ne pas les copier par réflexe.
 - Contrastes mesurés sous le seuil AA dans la charte de LogiALVIA (or sur blanc 3,14:1, `outline` sur fond de page 4,32:1, `success-deep` sur son fond 4,24:1) : décision du client requise (`04_UI_UX_DESIGN_SYSTEM.md`, §2 et Q-DS-2).
@@ -141,8 +142,8 @@ Règles de séquencement :
 2. Police : Roboto (poste) ou Inter (AgriERP) (02, 04).
 3. Contrastes de la charte : or lisible sur fond clair, texte secondaire, badge succès (04).
 4. Classes d'écran validées ; usage réel en tablette/mobile (04).
-5. Barèmes de rationnement Goliaths et Poissons-Chats ; stades de passage ; plusieurs bandes par filière (01).
-6. Rôle `comptable` : oui/non (01).
+5. Barèmes de rationnement Goliaths ; taux de ration des poissons-chats en % de biomasse à valider par le technicien (DV-01) ; stades de passage ; plusieurs bandes par filière (01).
+6. ~~Rôle `comptable` : oui/non~~ TRANCHÉ (DV-07) ; reste le périmètre du comptable (Q-DV-7). Autres questions nées des décisions : `16_DECISIONS_VALIDEES.md` §4.
 7. Plan comptable (SYSCOHADA ?), PWA hors ligne, import xlsx, mode sombre (02).
 8. Langue des noms de tables du schéma partagé (03).
 9. Copie du prototype HTML (04).

@@ -18,16 +18,16 @@ Comptabilité de « niveau professionnel » conforme SYSCOHADA révisé : chaque
 
 | Route | Écran | Rôles | Droit web | Accès |
 |---|---|---|---|---|
-| `/comptabilite` | Hub Comptabilité | A | view-comptabilite | barre latérale |
-| `/comptabilite/journal` | Journal Comptable | A | idem (écriture : manage-comptabilite) | tuile du hub |
-| `/comptabilite/grand-livre` | Grand Livre | A | idem | barre latérale |
-| `/comptabilite/balance` | Balance Générale | A | idem | barre latérale |
-| `/comptabilite/plan` | Plan Comptable | A | idem | tuile du hub |
-| `/comptabilite/analytique` | Comptabilité Analytique | A | idem | tuile du hub |
-| `/comptabilite/etats-financiers` | États Financiers (4 onglets) | A | idem | barre latérale |
-| `/comptabilite/bilan` | Bilan de l'Entreprise | A | idem | barre latérale + accès rapide + tuile |
-| `/comptabilite/cloture` | Clôture d'Exercice | A | + `close-fiscal-year` | tuile du hub |
-Un SEUL composant/ViewModel pour les 9 écrans (ils lisent les mêmes écritures et doivent afficher le même résultat net : BR-CPT-005). **Un seul rôle y accède : `admin`** (pas de comptable : Q-ROL-1). Exercice choisi : sélecteur de la barre du haut (RM-CPT-07), jamais un sélecteur par écran.
+| `/comptabilite` | Hub Comptabilité | A K | view-comptabilite | barre latérale |
+| `/comptabilite/journal` | Journal Comptable | A K | idem (écriture : manage-comptabilite) | tuile du hub |
+| `/comptabilite/grand-livre` | Grand Livre | A K | idem | barre latérale |
+| `/comptabilite/balance` | Balance Générale | A K | idem | barre latérale |
+| `/comptabilite/plan` | Plan Comptable | A K | idem | tuile du hub |
+| `/comptabilite/analytique` | Comptabilité Analytique | A K | idem | tuile du hub |
+| `/comptabilite/etats-financiers` | États Financiers (4 onglets) | A K | idem | barre latérale |
+| `/comptabilite/bilan` | Bilan de l'Entreprise | A K | idem | barre latérale + accès rapide + tuile |
+| `/comptabilite/cloture` | Clôture d'Exercice | A K | + `close-fiscal-year` | tuile du hub |
+Un SEUL composant/ViewModel pour les 9 écrans (ils lisent les mêmes écritures et doivent afficher le même résultat net : BR-CPT-005). **Deux rôles y accèdent : `admin` et `comptable`** (TRANCHÉ DV-07 : celui qui encaisse n'est pas celui qui comptabilise ; le caissier et l'animalier n'y accèdent pas ; `close-fiscal-year` : admin, comptable à confirmer, Q-DV-7). Exercice choisi : sélecteur de la barre du haut (RM-CPT-07), jamais un sélecteur par écran.
 
 ## 3. Hub (`/comptabilite`)
 
@@ -36,7 +36,7 @@ Un SEUL composant/ViewModel pour les 9 écrans (ils lisent les mêmes écritures
 ## 4. Journal Comptable
 
 Colonnes : **JAL** (code journal de logialvia : VT ventes, AC achats, CA caisse, OD — Opérations Diverses ; `comptabilite_tables.dart`) · DATE · N° PIÈCE · COMPTE · LIBELLÉ · DÉBIT · CRÉDIT ; ligne de TOTAUX : TOTAL DÉBIT (PÉRIODE), TOTAL CRÉDIT (PÉRIODE), ÉQUILIBRE (badge vert si égaux). Recherche « Libellé, compte, n° de pièce… » ; filtre exercice/période ; pagination 25 lignes (« 27 lignes dans l'exercice 2026 — page 1 sur 2 », Précédent / Suivant). Infobulle d'une écriture automatique : « Écriture générée automatiquement par V-2026-001 » (non modifiable ici ; correction = événement source ou contre-passation). Le tableau représente une écriture RÉELLE à N lignes (écart délibéré avec le prototype qui ne le savait pas).
-**Bouton « Nouvelle Écriture »** (OD — Opérations Diverses) → modale : date * (exercice OUVERT, mois non clôturé), libellé *, lignes (compte *, débit OU crédit, jamais les deux), contrôle d'équilibre AVANT écriture : « Pièce déséquilibrée : débit X ≠ crédit Y. » ; « Les montants ne peuvent être négatifs. » ; « Le compte est obligatoire. » ; « Le libellé est obligatoire. » ; « Une écriture porte un débit OU un crédit, jamais les deux. » ; « Saisissez un montant au débit ou au crédit. » ; débit ≠ crédit pour une écriture à deux lignes ; numéro `OD-AAAA-NNNN` attribué par le SERVEUR (année de l'écriture ; RM-CPT-08) ; une écriture à plus de deux lignes, verrouillée ou d'à-nouveau ne se retouche pas ; **archivage = contre-passation exacte** (jamais suppression ; Q-CPT-3 : logialvia a `supprimerPiece`). Source unique : `AccountingEntryService::record()` / `recordManual()`.
+**Bouton « Nouvelle Écriture »** (OD — Opérations Diverses) → modale : date * (exercice OUVERT, mois non clôturé), libellé *, lignes (compte *, débit OU crédit, jamais les deux), contrôle d'équilibre AVANT écriture : « Pièce déséquilibrée : débit X ≠ crédit Y. » ; « Les montants ne peuvent être négatifs. » ; « Le compte est obligatoire. » ; « Le libellé est obligatoire. » ; « Une écriture porte un débit OU un crédit, jamais les deux. » ; « Saisissez un montant au débit ou au crédit. » ; débit ≠ crédit pour une écriture à deux lignes ; numéro `OD-AAAA-NNNN` attribué par le SERVEUR (année de l'écriture ; RM-CPT-08) ; une écriture à plus de deux lignes, verrouillée ou d'à-nouveau ne se retouche pas ; **archivage = contre-passation exacte** (jamais suppression ni corbeille : TRANCHÉ DV-05, Q-CPT-3 fermée ; `supprimerPiece` de logialvia est retirée et le type « écriture » sort de la corbeille, `29_` onglet 6). **Contre-passation** : bouton « Contre-passer » sur une écriture non verrouillée d'un exercice ouvert (mois non clôturé) ; crée l'écriture inverse exacte (débits et crédits échangés, même axe analytique, libellé « Contre-passation de <n° pièce> », date du jour, numéro serveur) ; l'originale reste visible, marquée « Contre-passée » ; on saisit ensuite une nouvelle écriture correcte (`15_` RM-CPT-09). Refus : exercice clos, mois clôturé, déjà contre-passée. Une écriture ne se restaure jamais. Source unique : `AccountingEntryService::record()` / `recordManual()`.
 **Écritures automatiques** (RM-CPT-01) par événement : vente (D 531 ou 512 ou 411 / C 701 ou 707 [+ C 443 si TVA]), règlement de créance (D 531/512 / C 411), avance reçue (419), achat (D 601/602 [+ D 445] / C 401 ou trésorerie), dépense (D charge / C trésorerie), soins vétérinaires (622), annulation (contre-passation avec le MÊME axe analytique), avoir (inverse), paie (si module), immobilisation, dotation. Numéros de comptes repris tels quels des sources, à valider par l'expert-comptable (Q-CPT-1).
 
 ## 5. Grand Livre, Balance, Plan comptable
@@ -87,7 +87,8 @@ Les écritures automatiques sont écrites par le SERVEUR à la réception de la 
 - [ ] Journal d'un exercice clos : boutons remplacés par un cadenas ; écritures manuelles dans un mois clos refusées sauf déblocage admin journalisé.
 - [ ] Plan : archivage d'un compte cité refusé ; numéro immuable ; empreinte du CSV vérifiée.
 - [ ] Bilan de l'Entreprise : sans apport au 101, écart rouge sur sa ligne (le bandeau n'est jamais « équilibré » par construction).
-- [ ] Un animalier/caissier en URL directe `/comptabilite/*` : refus.
+- [ ] Un animalier/caissier en URL directe `/comptabilite/*` : refus ; le comptable y accède (DV-07).
+- [ ] Écriture erronée D 531 8 000 / C 701 8 000 : contre-passation D 701 8 000 / C 531 8 000 puis nouvelle écriture 7 000 ; aucune route de suppression ni de restauration d'écriture ; une seconde contre-passation est refusée (DV-05).
 
 ## 12. Tests
 
