@@ -65,6 +65,9 @@ dependencies:
   # Ticket CFG-2 — « Envoyer un e-mail de test » RÉEL depuis l'onglet Email (SMTP) du poste.
   mailer: ^7.2.0
   file_picker: ^11.0.3
+  desktop_drop: ^0.8.4
+  # CONF-2 : décode l'ICO du favicon pour l'aperçu (déjà au verrou comme dépendance de `pdf`, version 4.3.0).
+  image: ^4.3.0
 
 dev_dependencies:
   flutter_test:

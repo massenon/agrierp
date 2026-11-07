@@ -4,11 +4,13 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/config/apercu_image.dart';
 import '../../core/config/fichiers_entreprise.dart';
 import '../../core/database/app_database.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/zone_depot.dart';
 import '../comptabilite/documents_comptabilite.dart';
 import '../rh/calcul_paie.dart';
 import 'reglages_ferme_repository.dart';
@@ -134,6 +136,17 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
   Future<void> _choisir(String genre) async {
     final f = await widget.choisirFichier(genre);
     if (f == null || !mounted) return;
+    _poser(genre, f);
+  }
+
+  /// CONF-2 : un fichier DÉPOSÉ par glisser-déposer suit EXACTEMENT le chemin du clic (`_poser`) : il est gardé tel quel,
+  /// puis jugé à l'enregistrement par `FichiersEntreprise.valider` (mêmes règles, mêmes messages que le web).
+  Future<void> _deposer(String genre, FichierChoisi f) async {
+    if (!mounted) return;
+    _poser(genre, f);
+  }
+
+  void _poser(String genre, FichierChoisi f) {
     setState(() {
       if (genre == 'logo') { _logo = f; } else { _favicon = f; }
       _erreurs = {..._erreurs}..remove(genre == 'logo' ? 'logoFile' : 'faviconFile');
@@ -173,6 +186,7 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
   Widget _depotFichier(String genre, String titre, String invite, String aide, IconData icone, FichierChoisi? choisi, Uint8List? actuel, double hauteur) {
     final erreur = _erreurs[genre == 'logo' ? 'logoFile' : 'faviconFile'];
     final image = choisi?.octets ?? actuel;
+    final apercu = image == null ? null : apercuAffichable(image);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -189,21 +203,30 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
           ],
         ),
         const SizedBox(height: AgriSpacing.xs),
-        InkWell(
-          key: Key('entreprise-$genre'),
-          onTap: () => _choisir(genre),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AgriSpacing.md),
-            decoration: BoxDecoration(border: Border.all(color: AgriColors.outlineVariant), borderRadius: BorderRadius.circular(AgriRadius.lg)),
-            child: Column(children: [
-              // Flutter ne dessine pas l'ICO : le nom du fichier et l'icône suffisent alors.
-              if (image != null && FichiersEntreprise.typeDuContenu(image) != 'ico')
-                Image.memory(image, height: hauteur, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
-              Icon(icone, size: 40, color: AgriColors.outlineVariant),
-              Text(choisi?.nom ?? invite, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline)),
-              Text(aide, key: Key('entreprise-$genre-aide'), style: const TextStyle(fontSize: 10, color: AgriColors.outline)),
-            ]),
+        ZoneDepot(
+          key: Key('entreprise-$genre-depot'),
+          surFichier: (f) => _deposer(genre, f),
+          enfant: (_, survol) => InkWell(
+            key: Key('entreprise-$genre'),
+            onTap: () => _choisir(genre),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              // Survol : bordure et fond d'accent, comme `:class="survol ? 'border-brand-emerald bg-surface-zebra' : …"` du Blade.
+              decoration: BoxDecoration(
+                color: survol ? AgriColors.surfaceZebra : null,
+                border: Border.all(color: survol ? AgriColors.brandEmerald : AgriColors.outlineVariant, width: survol ? 2 : 1),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
+              child: Column(children: [
+                // Aperçu dessiné pour PNG / JPEG / WEBP ET pour l'ICO (décodé par `apercuAffichable`, CONF-2).
+                if (apercu != null)
+                  Image.memory(apercu, key: Key('entreprise-$genre-apercu'), height: hauteur, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                Icon(icone, size: 40, color: AgriColors.outlineVariant),
+                Text(choisi?.nom ?? invite, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline)),
+                Text(aide, key: Key('entreprise-$genre-aide'), style: const TextStyle(fontSize: 10, color: AgriColors.outline)),
+              ]),
+            ),
           ),
         ),
         if (erreur != null) Text(erreur, key: Key('entreprise-$genre-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
@@ -268,9 +291,9 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
           champReglage(p, 'cnssEmployerFamilyRate', 'CNSS patronale — prestations familiales (%)', _famille, _erreurs, nombre: true),
           champReglage(p, 'cnssEmployerRiskRate', 'CNSS patronale — risques professionnels (%)', _risque, _erreurs, nombre: true),
           const SizedBox(height: AgriSpacing.sm),
-          _depotFichier('logo', "Logo de l'Entreprise", 'Cliquer pour choisir un logo', 'PNG carré, fond transparent recommandé, max 2 Mo', SymbolesAgri.add_photo_alternate, _logo, _logoActuel, 48),
+          _depotFichier('logo', "Logo de l'Entreprise", 'Glisser-déposer ou cliquer pour choisir un logo', 'PNG carré, fond transparent recommandé, max 2 Mo', SymbolesAgri.add_photo_alternate, _logo, _logoActuel, 48),
           const SizedBox(height: AgriSpacing.sm),
-          _depotFichier('favicon', "Favicon (Icône d'Onglet)", 'Cliquer pour choisir un favicon', 'ICO ou PNG 32x32px, max 500 Ko', SymbolesAgri.web, _favicon, _faviconActuel, 32),
+          _depotFichier('favicon', "Favicon (Icône d'Onglet)", 'Glisser-déposer ou cliquer pour choisir un favicon', 'ICO ou PNG 32x32px, max 500 Ko', SymbolesAgri.web, _favicon, _faviconActuel, 32),
         ]),
       ),
       actions: [

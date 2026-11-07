@@ -43,9 +43,9 @@ class IdentiteVisuelleTest extends TestCase
     public function test_sans_fichier_choisi_le_repli_d_installation_sert_et_son_type_est_juste(): void
     {
         $this->assertNull(IdentiteVisuelle::logoUrl());
-        $this->assertStringEndsWith('assets/images/logo_favicon.webp', IdentiteVisuelle::faviconUrl());
-        $this->assertSame('image/webp', IdentiteVisuelle::faviconType());
-        $this->assertSame(public_path('assets/images/logo.png'), IdentiteVisuelle::logoCheminPdf());
+        $this->assertStringEndsWith('assets/images/favicon.ico', IdentiteVisuelle::faviconUrl());
+        $this->assertSame('image/x-icon', IdentiteVisuelle::faviconType());
+        $this->assertSame(public_path('assets/images/logo_ferme_ecole_officiel.png'), IdentiteVisuelle::logoCheminPdf());
     }
 
     public function test_le_logo_choisi_est_servi_avec_son_cache_busting(): void
@@ -76,7 +76,7 @@ class IdentiteVisuelleTest extends TestCase
         CompanySetting::current()->update(['logo_path' => 'company/disparu.png', 'favicon_path' => 'company/disparu.ico']);
 
         $this->assertNull(IdentiteVisuelle::logoUrl());
-        $this->assertStringEndsWith('logo_favicon.webp', IdentiteVisuelle::faviconUrl());
+        $this->assertStringEndsWith('assets/images/favicon.ico', IdentiteVisuelle::faviconUrl());
     }
 
     public function test_le_layout_declare_l_icone_choisie_avec_le_bon_type(): void
@@ -86,33 +86,61 @@ class IdentiteVisuelleTest extends TestCase
         $html = $this->get('/login')->assertOk()->getContent();
 
         $this->assertMatchesRegularExpression('#<link rel="icon" type="image/vnd\.microsoft\.icon" href="[^"]*storage/company/f\.ico\?v=\d+">#', $html);
-        $this->assertStringNotContainsString('type="image/png" href="'.asset('assets/images/logo_favicon.webp'), $html);
+        $this->assertStringNotContainsString('logo_favicon.webp', $html);
     }
 
     public function test_le_layout_sans_icone_choisie_garde_le_repli_avec_son_vrai_type(): void
     {
         $html = $this->get('/login')->assertOk()->getContent();
 
-        $this->assertStringContainsString('<link rel="icon" type="image/webp" href="'.asset('assets/images/logo_favicon.webp').'">', $html);
+        $this->assertStringContainsString('<link rel="icon" type="image/x-icon" href="'.asset('assets/images/favicon.ico').'">', $html);
     }
 
-    public function test_la_page_de_connexion_affiche_le_logo_choisi(): void
+    public function test_les_icones_par_defaut_sont_celles_de_la_ferme_et_de_vrais_fichiers(): void
     {
-        $this->get('/login')->assertOk()->assertDontSee('data-logo-entreprise', false);
+        $ico = (string) file_get_contents(public_path('assets/images/favicon.ico'));
+        $this->assertSame('image/vnd.microsoft.icon', IdentiteVisuelle::typeMime($ico));
+        $this->assertSame(4, unpack('v', substr($ico, 4, 2))[1], 'ICO de 4 tailles : 16, 32, 48, 64');
+        $png = (string) file_get_contents(public_path('assets/images/favicon-32.png'));
+        $this->assertSame('image/png', IdentiteVisuelle::typeMime($png));
+        $this->assertSame([32, 32], array_slice(getimagesizefromstring($png), 0, 2));
+        // Le logo de repli des documents est une image que DomPDF dessine.
+        $logo = (string) file_get_contents(IdentiteVisuelle::logoCheminPdf());
+        $this->assertContains(IdentiteVisuelle::typeMime($logo), ['image/png', 'image/jpeg']);
+    }
 
+    /** CONF-2 (décision du client du 08/11/2026) : LE TRACTEUR NE CHANGE JAMAIS — le logo choisi ne sert qu'aux documents et à l'onglet. */
+    public function test_la_connexion_garde_l_icone_tracteur_meme_avec_un_logo_choisi(): void
+    {
         $this->ranger('logo', 'abc.png', base64_decode(self::PNG));
 
-        $this->get('/login')->assertOk()->assertSee('data-logo-entreprise', false)->assertSee('storage/company/abc.png?v=', false);
+        $this->get('/login')->assertOk()
+            ->assertSee('agriculture', false)
+            ->assertDontSee('data-logo-entreprise', false)
+            ->assertDontSee('storage/company/abc.png', false);
     }
 
-    public function test_la_barre_laterale_affiche_le_logo_choisi(): void
+    public function test_la_barre_laterale_garde_l_icone_tracteur_meme_avec_un_logo_choisi(): void
     {
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $admin = User::create(['name' => 'Admin', 'username' => 'adm', 'email' => 'adm@x.bj', 'password' => bcrypt('x'), 'is_active' => true]);
         $admin->assignRole('admin');
         $this->ranger('logo', 'abc.png', base64_decode(self::PNG));
 
-        $this->actingAs($admin)->get('/dashboard')->assertOk()->assertSee('storage/company/abc.png?v=', false);
+        $this->actingAs($admin)->get('/dashboard')->assertOk()
+            ->assertSee('style="font-size:26px;">agriculture</span>', false)
+            ->assertDontSee('storage/company/abc.png', false);
+    }
+
+    public function test_les_sources_du_tracteur_ne_lisent_jamais_le_logo_choisi(): void
+    {
+        foreach (['layouts/app.blade.php', 'livewire/auth/login.blade.php', 'components/verrou-session.blade.php'] as $vue) {
+            $src = (string) file_get_contents(resource_path('views/'.$vue));
+            $this->assertStringContainsString('>agriculture</span>', $src, $vue);
+            $this->assertStringNotContainsString('IdentiteVisuelle::logo', $src, $vue);
+            $this->assertStringNotContainsString('logo-entreprise', $src, $vue);
+        }
+        $this->assertFileDoesNotExist(resource_path('views/components/logo-entreprise.blade.php'));
     }
 
     public function test_le_pdf_emploie_le_logo_choisi_png_et_garde_le_repli_pour_un_format_que_dompdf_ne_dessine_pas(): void
@@ -122,7 +150,7 @@ class IdentiteVisuelleTest extends TestCase
 
         // Un logo webp sert au web ; le PDF garde le logo d'installation.
         $this->ranger('logo', 'abc.webp', 'RIFF'."\x00\x00\x00\x00".'WEBPVP8 ');
-        $this->assertSame(public_path('assets/images/logo.png'), IdentiteVisuelle::logoCheminPdf());
+        $this->assertSame(public_path('assets/images/logo_ferme_ecole_officiel.png'), IdentiteVisuelle::logoCheminPdf());
     }
 
     public function test_l_en_tete_des_pdf_serveur_recoit_le_chemin_du_logo_choisi(): void

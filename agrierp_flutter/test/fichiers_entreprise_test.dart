@@ -3,8 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:agrierp/core/config/fichiers_entreprise.dart';
-import 'package:agrierp/core/widgets/logo_entreprise.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'chemins_depot.dart';
@@ -84,42 +82,21 @@ void main() {
     });
   });
 
-  group('logo dans l\'interface', () {
-    late Directory dossier;
-
-    setUp(() async {
-      dossier = await Directory.systemTemp.createTemp('logo_ui');
-      FichiersEntreprise.courant = FichiersEntreprise(dossier: () async => dossier);
-    });
-    tearDown(() async {
-      FichiersEntreprise.courant = FichiersEntreprise();
-      await dossier.delete(recursive: true);
-    });
-
-    testWidgets('sans logo choisi : l\'icône d\'installation ; avec : l\'image, redessinée au changement', (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: LogoEntreprise(taille: 30, couleurRepli: Colors.yellow)));
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
-      expect(find.byKey(const Key('logo-entreprise')), findsNothing);
-      expect(find.byType(Icon), findsOneWidget);
-
-      await tester.runAsync(() => FichiersEntreprise.courant.enregistrer('logo', png, 'logo.png'));
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
-      expect(find.byKey(const Key('logo-entreprise')), findsOneWidget);
-
-      await tester.runAsync(() => FichiersEntreprise.courant.effacer('logo'));
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
-      expect(find.byKey(const Key('logo-entreprise')), findsNothing);
-    });
-
-    test('la barre latérale et la connexion emploient le composant (jamais l\'icône en dur)', () {
+  group('CONF-2 : le tracteur ne change jamais', () {
+    test('barre latérale, connexion et verrouillage gardent l\'icône `agriculture`, jamais le logo choisi', () {
       for (final f in ['lib/main.dart', 'lib/features/auth/login_screen.dart']) {
         final src = File(f).readAsStringSync();
-        expect(src, contains('LogoEntreprise('), reason: f);
-        expect(src.contains('const Icon(SymbolesAgri.agriculture') || RegExp(r'const Icon\(\s*SymbolesAgri\.agriculture').hasMatch(src), isFalse, reason: f);
+        expect(RegExp(r'Icon\(\s*SymbolesAgri\.agriculture').hasMatch(src), isTrue, reason: f);
+        expect(src, isNot(contains('LogoEntreprise')), reason: f);
+        expect(src, isNot(contains('FichiersEntreprise')), reason: f);
       }
+      // L'écran de verrouillage emploie le cadre de la connexion (même panneau, même marque).
+      for (final f in ['lib/features/verrou/ecran_verrou.dart', 'lib/features/verrou/ecran_definir_pin.dart']) {
+        final src = File(f).readAsStringSync();
+        expect(src, contains('CadreConnexion'), reason: f);
+        expect(src, isNot(contains('FichiersEntreprise')), reason: f);
+      }
+      expect(File('lib/core/widgets/logo_entreprise.dart').existsSync(), isFalse);
     });
   });
 }

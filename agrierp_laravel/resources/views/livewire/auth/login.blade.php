@@ -2,7 +2,7 @@
 
     <aside class="relative hidden lg:flex lg:w-[50%] flex-col justify-between p-8 overflow-hidden" style="background: linear-gradient(180deg, rgba(5,46,22,0.10) 0%, rgba(0,33,13,0.55) 100%), url('{{ asset('assets/images/image_login.png') }}'); background-size: cover; background-position: center;">
         <div class="relative z-10 flex items-center gap-2">
-            <x-logo-entreprise :taille="30" />
+            <span class="material-symbols-outlined text-accent-yellow" style="font-size:26px;">agriculture</span>
             <h1 class="text-white font-extrabold text-lg">LogiAgri<span class="text-brand-maize">ERP</span></h1>
         </div>
         <div class="relative z-10 flex-1"></div>
@@ -25,7 +25,7 @@
         <div class="my-auto mx-auto w-full max-w-[440px] space-y-5">
             <div class="flex flex-col items-center text-center gap-1">
                 <div class="flex items-center gap-2">
-                    <x-logo-entreprise :taille="44" classe="text-brand-emerald" />
+                    <span class="material-symbols-outlined text-brand-emerald" style="font-size:38px;">agriculture</span>
                     <div class="flex flex-col items-start leading-none">
                         <span class="text-[22px] font-black text-brand-forest tracking-tight">LogiAgri<span class="text-brand-maize-ink">ERP</span></span>
                         <span class="text-[9px] uppercase tracking-widest text-brand-emerald font-extrabold mt-0.5">Ferme Olouwachegoun</span>

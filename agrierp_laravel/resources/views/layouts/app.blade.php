@@ -55,7 +55,7 @@
         x-cloak>
         <div class="px-md py-lg border-b border-white/10">
             <div class="flex items-center gap-xs">
-                <x-logo-entreprise :taille="30" />
+                <span class="material-symbols-outlined text-accent-yellow" style="font-size:26px;">agriculture</span>
                 <h1 class="text-white font-extrabold text-lg">LogiAgri<span class="text-accent-yellow">ERP</span></h1>
             </div>
             <p class="text-[10px] text-white/50 uppercase tracking-wider mt-xs">Ferme École Olouwachegoun</p>

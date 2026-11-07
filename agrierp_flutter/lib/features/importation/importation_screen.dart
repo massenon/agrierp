@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -10,6 +11,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/zone_depot.dart';
 import 'importation_repository.dart';
 
 /// Fichier choisi par l'utilisateur (injecté en test).
@@ -87,9 +89,15 @@ class _ImportationScreenState extends State<ImportationScreen> {
   }
 
   Future<void> _deposer() async {
-    final m = _module!;
     final f = await widget.choisirFichier();
     if (f == null) return;
+    await _analyserFichier(f);
+  }
+
+  /// CONF-2 : un fichier déposé par glisser-déposer suit le MÊME chemin que le clic (`_analyserFichier` : mêmes refus, mêmes messages).
+  Future<void> _analyserFichier(FichierChoisi f) async {
+    if (_occupe || _module == null) return;
+    final m = _module!;
     setState(() {
       _occupe = true;
       _erreur = null;
@@ -375,24 +383,34 @@ class _ImportationScreenState extends State<ImportationScreen> {
         children: [
           Text('3 · DÉPOSER LE FICHIER « ${m.libelle.toUpperCase()} »', style: const TextStyle(fontSize: AgriTypography.sm, fontWeight: FontWeight.bold, color: AgriColors.brandForest)),
           const SizedBox(height: AgriSpacing.sm),
-          InkWell(
-            key: const Key('importation-zone-depot'),
-            onTap: _occupe ? null : _deposer,
-            child: Container(
+          ZoneDepot(
+            key: const Key('importation-depot-glisser'),
+            actif: !_occupe,
+            surFichier: _analyserFichier,
+            enfant: (_, survol) => InkWell(
+              key: const Key('importation-zone-depot'),
+              onTap: _occupe ? null : _deposer,
+              child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(AgriSpacing.lg),
-              decoration: BoxDecoration(border: Border.all(color: AgriColors.outlineVariant, width: 2), borderRadius: BorderRadius.circular(AgriRadius.lg)),
+              // Survol : bordure et fond d'accent (`border-brand-emerald bg-brand-emerald/10` du Blade).
+              decoration: BoxDecoration(
+                color: survol ? AgriColors.brandEmerald.withValues(alpha: 0.10) : null,
+                border: Border.all(color: survol ? AgriColors.brandEmerald : AgriColors.outlineVariant, width: 2),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
               child: Column(
                 children: [
-                  const Icon(SymbolesAgri.cloud_upload, color: AgriColors.brandEmerald, size: 36),
+                  const Icon(SymbolesAgri.upload_file, color: AgriColors.brandEmerald, size: 36),
                   const SizedBox(height: AgriSpacing.xs),
-                  const Text('Cliquez pour choisir votre fichier .xlsx', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: FontWeight.bold)),
+                  const Text('Glissez votre fichier .xlsx ici, ou cliquez pour le choisir', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: FontWeight.bold)),
                   Text(
                     'Modèle « ${m.libelle} », version ${m.version} — 5 Mo et 5 000 lignes au plus',
                     style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
                   ),
                 ],
               ),
+            ),
             ),
           ),
           const SizedBox(height: AgriSpacing.md),

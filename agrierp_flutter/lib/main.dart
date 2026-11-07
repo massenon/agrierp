@@ -23,7 +23,6 @@ import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
 import 'core/widgets/acces_rapide.dart';
 import 'core/widgets/aide_flottante.dart';
-import 'core/widgets/logo_entreprise.dart';
 import 'features/recherche/recherche_globale_champ.dart';
 import 'features/recherche/recherche_globale_repository.dart';
 import 'core/widgets/modale_agri.dart';
@@ -1823,7 +1822,7 @@ class _BarreLaterale extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const LogoEntreprise(taille: 30, couleurRepli: AgriColors.accentYellow),
+                    const Icon(SymbolesAgri.agriculture, color: AgriColors.accentYellow, size: 26),
                     const SizedBox(width: AgriSpacing.sm),
                     // « Agri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
                     RichText(

@@ -21,10 +21,17 @@ use Illuminate\Support\Facades\Storage;
  */
 final class IdentiteVisuelle
 {
-    /** Logo et icône d'INSTALLATION : le repli quand rien n'est choisi. */
-    public const LOGO_REPLI = 'assets/images/logo.png';
+    /**
+     * CONF-2 — le repli quand rien n'est choisi est le logo OFFICIEL de la Ferme École OLOUWACHEGOUN (jamais le tracteur, qui
+     * reste fixe dans la barre latérale, la connexion et le verrouillage). ⚠️ Le fichier porte l'extension .png mais son
+     * contenu est un JPEG (DomPDF et les navigateurs jugent le contenu, jamais le nom) ; l'icône du site, elle, est un vrai
+     * `.ico` multi-tailles et un vrai PNG 32 px générés de ce logo par `outils/generer_favicon_ferme.py`.
+     */
+    public const LOGO_REPLI = 'assets/images/logo_ferme_ecole_officiel.png';
 
-    public const FAVICON_REPLI = 'assets/images/logo_favicon.webp';
+    public const FAVICON_REPLI = 'assets/images/favicon.ico';
+
+    public const FAVICON_REPLI_PNG = 'assets/images/favicon-32.png';
 
     /** Types MIME que DomPDF sait dessiner (le webp n'en fait pas partie : un logo webp sert au web, le PDF garde le repli). */
     private const TYPES_PDF = ['image/png', 'image/jpeg', 'image/gif'];
@@ -57,7 +64,7 @@ final class IdentiteVisuelle
         $chemin = self::cheminDisque('favicon');
 
         if ($chemin === null) {
-            return 'image/webp';
+            return 'image/x-icon';
         }
 
         return self::typeMime((string) @file_get_contents($chemin, false, null, 0, 16)) ?? 'application/octet-stream';
