@@ -62,9 +62,9 @@ Widget _formulaire(Map<String, String> erreurs, String prefixe, List<Widget> cha
 
 // ── PA-3 · Données de l'entreprise ─────────────────────────────────────────
 
-/// Sélecteur de fichier image du poste (logo, favicon), injectable.
-Future<FichierChoisi?> choisirImage() async {
-  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: FichiersEntreprise.extensions, dialogTitle: 'Choisir une image');
+/// Sélecteur de fichier image du poste (logo, favicon), injectable : les formats proposés sont ceux du genre (CONF-1).
+Future<FichierChoisi?> choisirImage(String genre) async {
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: FichiersEntreprise.extensionsParGenre[genre], dialogTitle: 'Choisir une image');
   if (r == null || r.files.isEmpty || r.files.first.path == null) return null;
   final f = r.files.first;
   return (nom: f.name, octets: await File(f.path!).readAsBytes());
@@ -75,7 +75,7 @@ Future<bool> ouvrirEntreprise({
   required ReglagesFermeRepository depot,
   required CompanySetting? existante,
   required bool estAdmin,
-  Future<FichierChoisi?> Function() choisirFichier = choisirImage,
+  Future<FichierChoisi?> Function(String genre) choisirFichier = choisirImage,
 }) async {
   final ok = await afficherModale<bool>(
     context: context,
@@ -87,7 +87,7 @@ Future<bool> ouvrirEntreprise({
 class _ModaleEntreprise extends StatefulWidget {
   const _ModaleEntreprise({required this.depot, required this.e, required this.estAdmin, required this.choisirFichier});
 
-  final Future<FichierChoisi?> Function() choisirFichier;
+  final Future<FichierChoisi?> Function(String genre) choisirFichier;
   final ReglagesFermeRepository depot;
   final CompanySetting? e;
   final bool estAdmin;
@@ -132,7 +132,7 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
   }
 
   Future<void> _choisir(String genre) async {
-    final f = await widget.choisirFichier();
+    final f = await widget.choisirFichier(genre);
     if (f == null || !mounted) return;
     setState(() {
       if (genre == 'logo') { _logo = f; } else { _favicon = f; }
@@ -140,13 +140,54 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
     });
   }
 
-  Widget _depotFichier(String genre, String titre, String invite, FichierChoisi? choisi, Uint8List? actuel, double hauteur) {
+  /// Ticket CONF-1 — « Supprimer » le logo ou le favicon, après confirmation ; l'ancien fichier part du poste et du serveur.
+  Future<void> _supprimer(String genre) async {
+    final cible = genre == 'logo' ? 'le logo' : "l'icône du site";
+    final ok = await afficherModale<bool>(
+      context: context,
+      confirmation: true,
+      constructeur: (c) => ModaleConfirmation(
+        titre: 'Supprimer $cible',
+        message: "Supprimer $cible de l'entreprise ? Le fichier sera effacé.",
+        icone: SymbolesAgri.delete,
+        couleurIcone: AgriColors.errorDeep,
+        actions: [
+          BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(c).pop(false)),
+          BoutonModalePrimaire(key: Key('entreprise-$genre-supprimer-confirmer'), libelle: 'Supprimer', onPressed: () => Navigator.of(c).pop(true)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await widget.depot.supprimerFichierEntreprise(genre, estAdmin: widget.estAdmin);
+    } on ReglageRefuse catch (r) {
+      setState(() => _erreurs = r.erreurs);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      if (genre == 'logo') { _logo = null; _logoActuel = null; } else { _favicon = null; _faviconActuel = null; }
+    });
+  }
+
+  Widget _depotFichier(String genre, String titre, String invite, String aide, IconData icone, FichierChoisi? choisi, Uint8List? actuel, double hauteur) {
     final erreur = _erreurs[genre == 'logo' ? 'logoFile' : 'faviconFile'];
     final image = choisi?.octets ?? actuel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(titre.toUpperCase(), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+        Row(
+          children: [
+            Expanded(child: Text(titre.toUpperCase(), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest))),
+            if (actuel != null)
+              TextButton.icon(
+                key: Key('entreprise-$genre-supprimer'),
+                onPressed: () => _supprimer(genre),
+                icon: const Icon(SymbolesAgri.delete, size: 16, color: AgriColors.errorDeep),
+                label: const Text('Supprimer', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.errorDeep)),
+              ),
+          ],
+        ),
         const SizedBox(height: AgriSpacing.xs),
         InkWell(
           key: Key('entreprise-$genre'),
@@ -156,8 +197,12 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
             padding: const EdgeInsets.all(AgriSpacing.md),
             decoration: BoxDecoration(border: Border.all(color: AgriColors.outlineVariant), borderRadius: BorderRadius.circular(AgriRadius.lg)),
             child: Column(children: [
-              if (image != null) Image.memory(image, height: hauteur, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+              // Flutter ne dessine pas l'ICO : le nom du fichier et l'icône suffisent alors.
+              if (image != null && FichiersEntreprise.typeDuContenu(image) != 'ico')
+                Image.memory(image, height: hauteur, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+              Icon(icone, size: 40, color: AgriColors.outlineVariant),
               Text(choisi?.nom ?? invite, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline)),
+              Text(aide, key: Key('entreprise-$genre-aide'), style: const TextStyle(fontSize: 10, color: AgriColors.outline)),
             ]),
           ),
         ),
@@ -223,9 +268,9 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
           champReglage(p, 'cnssEmployerFamilyRate', 'CNSS patronale — prestations familiales (%)', _famille, _erreurs, nombre: true),
           champReglage(p, 'cnssEmployerRiskRate', 'CNSS patronale — risques professionnels (%)', _risque, _erreurs, nombre: true),
           const SizedBox(height: AgriSpacing.sm),
-          _depotFichier('logo', "Logo de l'Entreprise", 'Cliquer pour choisir un logo', _logo, _logoActuel, 48),
+          _depotFichier('logo', "Logo de l'Entreprise", 'Cliquer pour choisir un logo', 'PNG carré, fond transparent recommandé, max 2 Mo', SymbolesAgri.add_photo_alternate, _logo, _logoActuel, 48),
           const SizedBox(height: AgriSpacing.sm),
-          _depotFichier('favicon', "Favicon (Icône d'Onglet)", 'Cliquer pour choisir un favicon', _favicon, _faviconActuel, 32),
+          _depotFichier('favicon', "Favicon (Icône d'Onglet)", 'Cliquer pour choisir un favicon', 'ICO ou PNG 32x32px, max 500 Ko', SymbolesAgri.web, _favicon, _faviconActuel, 32),
         ]),
       ),
       actions: [

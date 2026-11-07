@@ -217,9 +217,8 @@ class MecefTestConfigurationTest extends TestCase
         $lecteur->assignRole('animalier');
         Http::fake();
 
-        Livewire::actingAs($lecteur)->test(FacturationEmecef::class)->call('tester')->assertForbidden();
-        Livewire::actingAs($lecteur)->test(FacturationEmecef::class)->call('save')->assertForbidden();
-        Livewire::actingAs($lecteur)->test(FacturationEmecef::class)->call('effacerJeton')->assertForbidden();
+        // CONF-1 : l'onglet lui-même refuse l'ouverture (avant, seules les actions étaient refusées).
+        Livewire::actingAs($lecteur)->test(FacturationEmecef::class)->assertForbidden();
         Http::assertNothingSent();
     }
 

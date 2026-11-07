@@ -172,6 +172,21 @@ return [
     | Messages propres à un champ et à une règle (« champ.règle »). Vide : chaque écran passe ses
     | messages particuliers à `validate()`, au plus près de la règle.
     */
+    /*
+    | Ticket CONF-1 — logo et icône de l'entreprise : MÊMES messages au web (`DonneesEntreprise`), à l'API (demande `entreprise`
+    | du poste) et au poste (`FichiersEntreprise`, qui les recopie mot pour mot : garde `fichiers_entreprise_test`).
+    */
+    'fichiers_entreprise' => [
+        'logo' => [
+            'format' => 'Le logo doit être une image PNG, JPG ou WEBP.',
+            'taille' => 'Le logo ne doit pas dépasser 2 Mo.',
+        ],
+        'favicon' => [
+            'format' => "L'icône du site doit être un fichier ICO ou PNG.",
+            'taille' => "L'icône du site ne doit pas dépasser 500 Ko.",
+        ],
+    ],
+
     'custom' => [
         // Fiche client : l'IFU, facultatif, compte 13 chiffres (client des factures normalisées).
         'ifu' => ['regex' => "L'IFU du client doit comporter 13 chiffres (laissez-le vide pour un client sans IFU)."],

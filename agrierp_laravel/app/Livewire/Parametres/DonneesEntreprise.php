@@ -94,6 +94,47 @@ class DonneesEntreprise extends Component
         return CompanySetting::current();
     }
 
+    /** CONF-1 : un fichier déposé est jugé tout de suite (même règle que l'enregistrement) ; refusé, il est retiré de la zone. */
+    public function updatedLogoFile(): void
+    {
+        $this->jugerDepot('logo');
+    }
+
+    public function updatedFaviconFile(): void
+    {
+        $this->jugerDepot('favicon');
+    }
+
+    private function jugerDepot(string $genre): void
+    {
+        $propriete = $genre.'File';
+        $this->resetErrorBag($propriete);
+
+        if (! $this->{$propriete}) {
+            return;
+        }
+
+        [, $erreur] = app(\App\Services\EntrepriseService::class)
+            ->jugerFichier($genre, $this->{$propriete}->get(), $this->{$propriete}->getClientOriginalName());
+
+        if ($erreur !== null) {
+            $this->{$propriete} = null;
+            $this->addError($propriete, $erreur);
+        }
+    }
+
+    /** CONF-1 : « Supprimer » le logo ou le favicon (confirmation côté vue) ; l'ancien fichier part du disque. */
+    public function supprimerFichier(string $genre): void
+    {
+        $this->authorize('manage-parametres');
+        abort_unless(in_array($genre, ['logo', 'favicon'], true), 404);
+
+        app(\App\Services\EntrepriseService::class)->supprimerFichier($genre);
+
+        $this->reset([$genre.'File']);
+        $this->dispatch('toast', message: $genre === 'logo' ? "Logo de l'entreprise supprimé." : "Icône du site supprimée.", type: 'success');
+    }
+
     public function save(): void
     {
         $this->authorize('manage-parametres');
@@ -101,19 +142,25 @@ class DonneesEntreprise extends Component
         $service = app(\App\Services\EntrepriseService::class);
 
         // Les règles `mecef*` ne s'appliquent qu'à la demande du poste et à l'onglet « Facturation normalisée (e-MECeF) » : pas ici.
-        $this->validate(array_filter($service->regles(), fn ($cle) => ! str_starts_with($cle, 'mecef'), ARRAY_FILTER_USE_KEY) + [
-            'logoFile' => ['nullable', 'image', 'max:2048'],
-            'faviconFile' => ['nullable', 'image', 'max:500'],
-        ], \App\Services\EntrepriseService::MESSAGES);
+        // Les fichiers n'ont plus la règle `image` de Laravel (elle refuse l'ICO) : `EntrepriseService::fichiersDepuis` les juge.
+        $this->validate(array_filter($service->regles(), fn ($cle) => ! str_starts_with($cle, 'mecef'), ARRAY_FILTER_USE_KEY), \App\Services\EntrepriseService::MESSAGES);
 
-        $fichiers = [];
-
-        if ($this->logoFile) {
-            $fichiers['logo_path'] = $this->logoFile->store('company', 'public');
+        // CONF-1 : TOUT est jugé avant d'écrire quoi que ce soit (logo ET favicon), puis les fichiers sont rangés.
+        $entrees = [];
+        foreach (['logo' => $this->logoFile, 'favicon' => $this->faviconFile] as $genre => $fichier) {
+            if ($fichier) {
+                $entrees[$genre] = ['octets' => $fichier->get(), 'nom' => $fichier->getClientOriginalName()];
+            }
         }
 
-        if ($this->faviconFile) {
-            $fichiers['favicon_path'] = $this->faviconFile->store('company', 'public');
+        try {
+            $fichiers = $service->fichiersDepuis($entrees);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ, $messages[0]);
+            }
+
+            return;
         }
 
         try {

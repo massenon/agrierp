@@ -18,6 +18,7 @@ abstract final class SymbolesAgri {
   static const IconData add_box = IconData(0xe146, fontFamily: famille);
   static const IconData add_circle = IconData(0xe147, fontFamily: famille);
   static const IconData add_circle_outline = IconData(0xe147, fontFamily: famille);
+  static const IconData add_photo_alternate = IconData(0xe43e, fontFamily: famille);
   static const IconData add_shopping_cart = IconData(0xe854, fontFamily: famille);
   static const IconData admin_panel_settings = IconData(0xef3d, fontFamily: famille);
   static const IconData agriculture = IconData(0xea79, fontFamily: famille);
@@ -201,6 +202,7 @@ abstract final class SymbolesAgri {
   static const IconData visibility = IconData(0xe417, fontFamily: famille);
   static const IconData visibility_off = IconData(0xe8f5, fontFamily: famille);
   static const IconData warning = IconData(0xe002, fontFamily: famille);
+  static const IconData web = IconData(0xe051, fontFamily: famille);
   static const IconData wifi = IconData(0xe63e, fontFamily: famille);
   static const IconData wifi_find = IconData(0xeb31, fontFamily: famille);
   static const IconData wifi_off = IconData(0xe648, fontFamily: famille);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/widgets/logo_entreprise.dart';
 
 /// `prototype_html/login.html` → écran de connexion Desktop.
 ///
@@ -515,11 +516,7 @@ class _ContenuPanneauFerme extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(
-              SymbolesAgri.agriculture,
-              color: AgriColors.accentYellow,
-              size: 26,
-            ),
+            const LogoEntreprise(taille: 30, couleurRepli: AgriColors.accentYellow),
             const SizedBox(width: AgriSpacing.sm),
             RichText(
               text: const TextSpan(
@@ -616,11 +613,7 @@ class _EnTeteMarque extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              SymbolesAgri.agriculture,
-              color: AgriColors.brandEmerald,
-              size: 38,
-            ),
+            const LogoEntreprise(taille: 44, couleurRepli: AgriColors.brandEmerald),
             const SizedBox(width: AgriSpacing.sm),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,

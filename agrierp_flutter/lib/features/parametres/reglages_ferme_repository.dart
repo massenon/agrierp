@@ -227,6 +227,23 @@ class ReglagesFermeRepository {
     );
   }
 
+  /// Ticket CONF-1 — « Supprimer » le logo ou le favicon : le fichier du poste est effacé et une demande `entreprise` (la fiche
+  /// tirée reprise telle quelle + `logoSupprimer` / `faviconSupprimer`) fait effacer l'ancien fichier au serveur.
+  Future<void> supprimerFichierEntreprise(String genre, {required bool estAdmin}) async {
+    final e = await entreprise();
+    if (e == null) {
+      throw const ReglageRefuse({'formulaire': 'Identité de la ferme non synchronisée : lancez une synchronisation avant de supprimer un fichier.'});
+    }
+    String taux(double? v, double defaut) => _s(v ?? defaut);
+    await enregistrerEntreprise(
+      raisonSociale: e.companyName ?? '', promoteur: e.promoterName ?? '', adresse: e.address ?? '', telephone: e.phone ?? '', email: e.email ?? '',
+      ifu: e.ifu ?? '', rccm: e.rccm ?? '', tva: e.tvaEnabled,
+      vps: taux(e.vpsRate, 4), cnssSalarie: taux(e.cnssEmployeeRate, 3.6), cnssPension: taux(e.cnssEmployerPensionRate, 6.4),
+      cnssFamille: taux(e.cnssEmployerFamilyRate, 9), cnssRisque: taux(e.cnssEmployerRiskRate, 2), estAdmin: estAdmin,
+      supprimer: {genre},
+    );
+  }
+
   static String _s(double v) => v == v.roundToDouble() ? v.round().toString() : v.toString();
 
   Future<void> enregistrerEntreprise({
@@ -246,6 +263,7 @@ class ReglagesFermeRepository {
     required bool estAdmin,
     FichierChoisi? logo,
     FichierChoisi? favicon,
+    Set<String> supprimer = const {},
     String? mecefMode,
     String mecefApiUrl = '',
     String mecefOperateurId = '',
@@ -258,19 +276,27 @@ class ReglagesFermeRepository {
     );
     final refusFichiers = <String, String>{
       for (final (champ, genre, f) in [('logoFile', 'logo', logo), ('faviconFile', 'favicon', favicon)])
-        if (f != null && FichiersEntreprise.valider(genre, f.nom, f.octets.length) != null) champ: FichiersEntreprise.valider(genre, f.nom, f.octets.length)!,
+        if (f != null && FichiersEntreprise.valider(genre, f.nom, f.octets) != null) champ: FichiersEntreprise.valider(genre, f.nom, f.octets)!,
     };
     if (refus.isNotEmpty || refusFichiers.isNotEmpty) throw ReglageRefuse({...refus, ...refusFichiers});
 
     // Ticket AUT-2 — le fichier est gardé tout de suite sur le poste (autonomie) ; la demande ne porte que le drapeau, les octets
     // sont lus au moment d'envoyer.
     for (final (genre, f) in [('logo', logo), ('favicon', favicon)]) {
-      if (f != null) await fichiersEntreprise.enregistrer(genre, f.octets, f.nom);
+      if (f != null) {
+        await fichiersEntreprise.enregistrer(genre, f.octets, f.nom);
+      } else if (supprimer.contains(genre)) {
+        // Ticket CONF-1 — « Supprimer » : le fichier part du poste tout de suite, la demande rejoue la suppression au serveur
+        // (qui efface son ancien fichier du disque), comme la demande `entreprise` d'un téléversement.
+        await fichiersEntreprise.effacer(genre);
+      }
     }
 
     await _ecrire('entreprise', {
       if (logo != null) 'logoNom': logo.nom,
       if (favicon != null) 'faviconNom': favicon.nom,
+      if (logo == null && supprimer.contains('logo')) 'logoSupprimer': true,
+      if (favicon == null && supprimer.contains('favicon')) 'faviconSupprimer': true,
       'companyName': raisonSociale.trim(), 'promoterName': promoteur.trim(), 'address': adresse.trim(), 'phone': telephone.trim(),
       'email': email.trim(), 'ifu': ifu.trim(), 'rccm': rccm.trim(), 'tvaEnabled': tva,
       'vpsRate': _nombre(vps), 'cnssEmployeeRate': _nombre(cnssSalarie), 'cnssEmployerPensionRate': _nombre(cnssPension),

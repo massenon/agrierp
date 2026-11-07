@@ -68,7 +68,8 @@ class ViderSessionsTest extends TestCase
         $this->sessionsEtJetons();
         $this->actingAs($this->compte('comptable'));
 
-        Livewire::test(GestionUtilisateurs::class)->call('viderSessions')->assertForbidden();
+        // CONF-1 : l'onglet refuse l'ouverture sans `manage-users`, donc l'action n'est même pas atteignable.
+        Livewire::test(GestionUtilisateurs::class)->assertForbidden();
 
         $this->assertSame(2, DB::table('personal_access_tokens')->count());
     }

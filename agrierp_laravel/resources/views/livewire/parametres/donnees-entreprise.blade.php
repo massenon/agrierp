@@ -64,11 +64,22 @@
             </div>
 
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md">
-                <p class="text-xs font-bold text-brand-forest uppercase">Logo de l'Entreprise</p>
-                <label class="border-2 border-dashed border-outline-variant rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
-                    <input wire:model="logoFile" type="file" accept="image/*" class="hidden">
+                <div class="flex items-center justify-between gap-sm">
+                    <p class="text-xs font-bold text-brand-forest uppercase">Logo de l'Entreprise</p>
                     @if($this->settings->logo_path)
-                        <img src="{{ asset('storage/'.$this->settings->logo_path) }}" class="h-12 mx-auto mb-xs object-contain" alt="Logo actuel">
+                        <button type="button" wire:click="supprimerFichier('logo')" wire:confirm="Supprimer le logo de l'entreprise ? Le fichier sera effacé." class="h-8 px-sm border border-error-deep/40 text-error-deep rounded-lg text-[11px] font-bold hover:bg-error-bg flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">delete</span>Supprimer</button>
+                    @endif
+                </div>
+                {{-- CONF-1 : glisser-déposer par directives Alpine `x-on:` posées dans la vue (aucun script à part) ; un fichier déposé passe par le même `<input>` que le clic. --}}
+                <label x-data="{ survol: false, apercu: null, deposer(e) { if (e.dataTransfer.files.length) { $refs.entree.files = e.dataTransfer.files; $refs.entree.dispatchEvent(new Event('change', { bubbles: true })); } } }"
+                    x-on:dragover.prevent="survol = true" x-on:dragleave.prevent="survol = false" x-on:drop.prevent="survol = false; deposer($event)"
+                    :class="survol ? 'border-brand-emerald bg-surface-zebra' : 'border-outline-variant'"
+                    class="border-2 border-dashed rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
+                    <input x-ref="entree" x-on:change="apercu = $event.target.files.length ? URL.createObjectURL($event.target.files[0]) : null" wire:model="logoFile" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="hidden">
+                    @if($logoFile)
+                        <img x-show="apercu" :src="apercu" class="h-12 mx-auto mb-xs object-contain" alt="Aperçu du fichier choisi">
+                    @elseif($this->settings->logo_path)
+                        <img src="{{ \App\Support\IdentiteVisuelle::logoUrl() }}" class="h-12 mx-auto mb-xs object-contain" alt="Logo actuel">
                     @endif
                     <span class="material-symbols-outlined text-outline-variant" style="font-size:40px;">add_photo_alternate</span>
                     <p class="text-xs text-outline mt-xs font-semibold">{{ $logoFile ? $logoFile->getClientOriginalName() : 'Glisser-déposer ou cliquer pour choisir un logo' }}</p>
@@ -77,11 +88,22 @@
                 @error('logoFile') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md">
-                <p class="text-xs font-bold text-brand-forest uppercase">Favicon (Icône d'Onglet)</p>
-                <label class="border-2 border-dashed border-outline-variant rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
-                    <input wire:model="faviconFile" type="file" accept="image/*" class="hidden">
+                <div class="flex items-center justify-between gap-sm">
+                    <p class="text-xs font-bold text-brand-forest uppercase">Favicon (Icône d'Onglet)</p>
                     @if($this->settings->favicon_path)
-                        <img src="{{ asset('storage/'.$this->settings->favicon_path) }}" class="h-8 mx-auto mb-xs object-contain" alt="Favicon actuel">
+                        <button type="button" wire:click="supprimerFichier('favicon')" wire:confirm="Supprimer l'icône du site de l'entreprise ? Le fichier sera effacé." class="h-8 px-sm border border-error-deep/40 text-error-deep rounded-lg text-[11px] font-bold hover:bg-error-bg flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">delete</span>Supprimer</button>
+                    @endif
+                </div>
+                {{-- CONF-1 : glisser-déposer par directives Alpine `x-on:` posées dans la vue (aucun script à part) ; un fichier déposé passe par le même `<input>` que le clic. --}}
+                <label x-data="{ survol: false, apercu: null, deposer(e) { if (e.dataTransfer.files.length) { $refs.entree.files = e.dataTransfer.files; $refs.entree.dispatchEvent(new Event('change', { bubbles: true })); } } }"
+                    x-on:dragover.prevent="survol = true" x-on:dragleave.prevent="survol = false" x-on:drop.prevent="survol = false; deposer($event)"
+                    :class="survol ? 'border-brand-emerald bg-surface-zebra' : 'border-outline-variant'"
+                    class="border-2 border-dashed rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
+                    <input x-ref="entree" x-on:change="apercu = $event.target.files.length ? URL.createObjectURL($event.target.files[0]) : null" wire:model="faviconFile" type="file" accept=".ico,.png,image/png,image/x-icon,image/vnd.microsoft.icon" class="hidden">
+                    @if($faviconFile)
+                        <img x-show="apercu" :src="apercu" class="h-8 mx-auto mb-xs object-contain" alt="Aperçu du fichier choisi">
+                    @elseif($this->settings->favicon_path)
+                        <img src="{{ \App\Support\IdentiteVisuelle::faviconUrl() }}" class="h-8 mx-auto mb-xs object-contain" alt="Favicon actuel">
                     @endif
                     <span class="material-symbols-outlined text-outline-variant" style="font-size:40px;">web</span>
                     <p class="text-xs text-outline mt-xs font-semibold">{{ $faviconFile ? $faviconFile->getClientOriginalName() : 'Glisser-déposer ou cliquer pour choisir un favicon' }}</p>

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:agrierp/core/config/envoi_email_test.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
@@ -12,6 +14,8 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'chemins_depot.dart';
 
 /// Ticket VC-2 — LES RELANCES DE CLIENTS SE FONT (ET SE DEMANDENT) AU POSTE (`relances-clients.blade.php`).
 ///
@@ -226,6 +230,31 @@ void main() {
       expect(conflit.reason, contains('pas de numéro'));
       await moteur.relancer(conflit);
       expect((await relances()).single.syncStatus, SyncStatus.pending);
+    });
+
+    test('CONF-1 · une relance e-mail que le serveur refuse faute de SMTP reste conflict avec le motif exact, jamais synchronisée', () async {
+      const motif = "Aucun serveur SMTP n'est configuré : la relance n'a pas été envoyée. Configurez l'e-mail dans Paramètres > Email (SMTP).";
+      final r = await depot.relancer(creanceId: uuid('abcd1234r1'), canal: 'email', message: 'Bonjour');
+      expect(r.alreadySent, isFalse, reason: 'sans SMTP du poste, c\'est le serveur qui doit envoyer');
+      serveur.refus['customer_reminders'] = {r.id: motif};
+
+      await moteur.synchroniser();
+
+      expect((await relances()).single.syncStatus, SyncStatus.conflict);
+      final conflit = (await db.select(db.syncConflicts).get()).firstWhere((c) => c.sourceTable == 'customer_reminders');
+      expect(conflit.reason, motif);
+    });
+
+    test('CONF-1 · le motif est celui du serveur, mot pour mot (RelanceClientService::MOTIF_SANS_SMTP)', () {
+      final fichier = File('$dossierLaravel/app/Services/RelanceClientService.php');
+      if (!fichier.existsSync()) {
+        markTestSkipped('agrierp_laravel introuvable (AGRIERP_LARAVEL) : parité du motif non vérifiée.');
+        return;
+      }
+      expect(
+        fichier.readAsStringSync(),
+        contains("Aucun serveur SMTP n'est configuré : la relance n'a pas été envoyée. Configurez l'e-mail dans Paramètres > Email (SMTP)."),
+      );
     });
 
     test('⚠️⚠️ le tirage n\'écrase pas une relance pending et ajoute celles du web', () async {

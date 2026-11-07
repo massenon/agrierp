@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 154 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 156 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -53,6 +53,7 @@ class LibellesAudit {
     'sale.validated': 'Vente validée',
     'sale.cancelled': 'Vente annulée',
     'sale.mecef_retried': 'Retransmission MeCeF',
+    'company_settings.fichier_supprime': 'Logo ou icône de l\'entreprise supprimé',
     'company_settings.mecef_updated': 'Réglage de la facturation normalisée (MeCeF) modifié',
     'pos.item_added': 'Article ajouté au panier POS',
     'quote.created': 'Devis créé',
@@ -90,6 +91,7 @@ class LibellesAudit {
     'expense.updated': 'Dépense modifiée',
     'expense.archived': 'Dépense archivée',
     'product.created': 'Produit créé',
+    'import.masse': 'Importation en masse',
     'product.updated': 'Produit modifié',
     'product.archived': 'Produit archivé',
     'product.merged': 'Produit du poste fusionné avec une fiche existante',

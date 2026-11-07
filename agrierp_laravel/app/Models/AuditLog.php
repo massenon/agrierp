@@ -143,6 +143,7 @@ class AuditLog extends Model
         'sale.validated' => 'Vente validée',
         'sale.cancelled' => 'Vente annulée',
         'sale.mecef_retried' => 'Retransmission MeCeF',
+        'company_settings.fichier_supprime' => "Logo ou icône de l'entreprise supprimé",
         'company_settings.mecef_updated' => 'Réglage de la facturation normalisée (MeCeF) modifié',
         'pos.item_added' => 'Article ajouté au panier POS',
         'quote.created' => 'Devis créé',

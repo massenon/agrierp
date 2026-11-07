@@ -215,10 +215,8 @@ class ReinitialisationDonneesTest extends TestCase
 
         // ⚠️ On verifie la GARANTIE — rien n'est efface — plutot que la forme
         // du refus, qui depend du harnais Livewire.
-        Livewire::test(ReinitialisationDonnees::class)
-            ->set('confirmation', 'REINITIALISER')
-            ->call('reinitialiser')
-            ->assertForbidden();
+        // CONF-1 : l'onglet refuse désormais l'OUVERTURE (avant : seule l'action était refusée).
+        Livewire::test(ReinitialisationDonnees::class)->assertForbidden();
 
         $this->assertEquals(1, Sale::count(), 'la vente est intacte');
         $this->assertEquals(1, Supplier::count());

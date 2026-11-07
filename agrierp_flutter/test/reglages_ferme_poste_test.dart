@@ -58,6 +58,17 @@ class _Connectivite implements Connectivity {
   Stream<List<ConnectivityResult>> get onConnectivityChanged => const Stream.empty();
 }
 
+/// Fichiers de l'entreprise EN MÉMOIRE pour les tests d'écran (les E/S réelles ne s'achèvent pas dans le temps simulé de `testWidgets`).
+class _FichiersMemoire extends FichiersEntreprise {
+  final octets = <String, Uint8List>{};
+
+  @override
+  Future<Uint8List?> lire(String genre) async => octets[genre];
+
+  @override
+  Future<void> effacer(String genre) async => octets.remove(genre);
+}
+
 void main() {
   late AppDatabase db;
   late _Serveur serveur;
@@ -257,19 +268,86 @@ void main() {
     });
 
     test('⚠️ refus avant d\'écrire : format inconnu, favicon au-delà de 500 Ko ; rien n\'est gardé', () async {
-      final r = await refus(() => enregistrer(logo: (nom: 'x.pdf', octets: png), favicon: (nom: 'f.png', octets: Uint8List(600 * 1024))));
+      final r = await refus(() => enregistrer(logo: (nom: 'x.pdf', octets: png), favicon: (nom: 'f.png', octets: Uint8List.fromList([...png, ...Uint8List(600 * 1024)]))));
 
-      expect(r['logoFile'], 'Le logo doit être une image (png, jpg, gif, bmp ou webp).');
-      expect(r['faviconFile'], 'Le favicon ne doit pas dépasser 500 Ko.');
+      // CONF-1 : mêmes messages que le web (`lang/fr/validation.php`).
+      expect(r['logoFile'], 'Le logo doit être une image PNG, JPG ou WEBP.');
+      expect(r['faviconFile'], "L'icône du site ne doit pas dépasser 500 Ko.");
       expect(await FichiersEntreprise.courant.fichier('logo'), isNull);
       expect(await demandes(), isEmpty);
     });
 
-    test('un logo GIF reste affiché mais les PDF gardent celui de l\'installation (le moteur PDF ne lit que PNG et JPEG)', () async {
-      await FichiersEntreprise.courant.enregistrer('logo', png, 'ferme.gif');
+    test('un logo WEBP reste affiché mais les PDF gardent celui de l\'installation (le moteur PDF ne lit que PNG et JPEG)', () async {
+      await FichiersEntreprise.courant.enregistrer('logo', png, 'ferme.webp');
 
       expect(await FichiersEntreprise.courant.fichier('logo'), isNotNull);
       expect(await FichiersEntreprise.courant.logoPourPdf(), isNull);
+    });
+
+    // ── CONF-1 ───────────────────────────────────────────────────────────────
+
+    final ico = Uint8List.fromList([0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 32, 0, 4, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0]);
+
+    test('CONF-1 · le favicon ICO est accepté (que la règle `image` de Laravel refusait) ; le logo refuse l\'ICO', () async {
+      await enregistrer(favicon: (nom: 'favicon.ico', octets: ico));
+      expect(await FichiersEntreprise.courant.lire('favicon'), ico);
+
+      final r = await refus(() => enregistrer(logo: (nom: 'logo.ico', octets: ico)));
+      expect(r['logoFile'], 'Le logo doit être une image PNG, JPG ou WEBP.');
+    });
+
+    test('CONF-1 · tout est jugé AVANT d\'écrire : un logo valide n\'est pas gardé quand le favicon est refusé', () async {
+      final r = await refus(() => enregistrer(logo: (nom: 'logo.png', octets: png), favicon: (nom: 'f.ico', octets: Uint8List.fromList([1, 2, 3]))));
+
+      expect(r.keys, ['faviconFile']);
+      expect(r['faviconFile'], "L'icône du site doit être un fichier ICO ou PNG.");
+      expect(await FichiersEntreprise.courant.fichier('logo'), isNull);
+      expect(await demandes(), isEmpty);
+    });
+
+    test('CONF-1 · l\'en-tête du contenu décide, jamais le seul nom : un texte nommé .png est refusé', () async {
+      final r = await refus(() => enregistrer(logo: (nom: 'logo.png', octets: Uint8List.fromList('ceci est du texte'.codeUnits))));
+      expect(r['logoFile'], 'Le logo doit être une image PNG, JPG ou WEBP.');
+    });
+
+    test('CONF-1 · « Supprimer » efface le fichier du poste et rejoue la suppression au serveur (demande `entreprise`)', () async {
+      await entrepriseVerrouillee();
+      await (db.update(db.companySettings)).write(const CompanySettingsCompanion(ifu: Value('3201700000000')));
+      await FichiersEntreprise.courant.enregistrer('logo', png, 'ferme.png');
+      await FichiersEntreprise.courant.enregistrer('favicon', ico, 'f.ico');
+
+      await depot.supprimerFichierEntreprise('logo', estAdmin: true);
+
+      expect(await FichiersEntreprise.courant.fichier('logo'), isNull);
+      expect(await FichiersEntreprise.courant.fichier('favicon'), isNotNull);
+      final d = (await demandes()).single;
+      expect(d.kind, 'entreprise');
+      final payload = jsonDecode(d.payload) as Map<String, dynamic>;
+      expect(payload['logoSupprimer'], true);
+      expect(payload.containsKey('faviconSupprimer'), isFalse);
+      expect(payload.containsKey('logoNom'), isFalse);
+
+      await moteur.synchroniser();
+      final envoye = ((serveur.envois.single['settings_requests'] as List).single as Map)['payload'] as Map;
+      expect(envoye['logoSupprimer'], true);
+      expect(envoye.containsKey('logoB64'), isFalse);
+    });
+
+    test('CONF-1 · supprimé au web : le fichier venu du serveur s\'efface ; un fichier choisi au poste et pas encore envoyé reste', () async {
+      await FichiersEntreprise.courant.enregistrer('logo', png, 'company/abc.png', sourceServeur: 'company/abc.png');
+      await FichiersEntreprise.courant.enregistrer('favicon', ico, 'f.ico'); // posé au poste : aucun chemin retenu
+      final client = Dio()
+        ..interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+          h.resolve(Response<Map<String, dynamic>>(requestOptions: o, statusCode: 200, data: o.path.contains('pull')
+              ? {'server_time': '2026-10-28T12:00:00Z', 'company_settings': {'company_name': 'Ferme', 'logo_path': null, 'favicon_path': null}}
+              : {}));
+        }));
+      final m = SyncEngine(database: db, client: client, deviceId: 'poste-test', connectivity: _Connectivite(), maintenant: () => DateTime(2026, 10, 28, 14), coffre: coffre);
+
+      await m.synchroniser();
+
+      expect(await FichiersEntreprise.courant.fichier('logo'), isNull);
+      expect(await FichiersEntreprise.courant.fichier('favicon'), isNotNull);
     });
 
     test('un nouveau chemin servi par le web fait télécharger le fichier ; le même chemin ne le retélécharge pas', () async {
@@ -300,6 +378,44 @@ void main() {
   });
 
   group('écran', () {
+    testWidgets('CONF-1 · la modale porte les aides exactes, « Supprimer » (avec confirmation) rejoue la suppression', (tester) async {
+      tester.view.physicalSize = const Size(1700, 3200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      // ⚠️ Les E/S réelles n'avancent pas dans le temps simulé de `testWidgets` : fichiers EN MÉMOIRE (la vraie écriture est couverte plus haut).
+      final fichiers = _FichiersMemoire();
+      fichiers.octets['logo'] = Uint8List.fromList(base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+      await entrepriseVerrouillee();
+      await (db.update(db.companySettings)).write(const CompanySettingsCompanion(ifu: Value('3201700000000')));
+      depot = ReglagesFermeRepository(database: db, deviceId: 'poste-test', horloge: () => DateTime(2026, 10, 28, 10), fichiersEntreprise: fichiers);
+      await tester.pumpWidget(MaterialApp(home: ParametresGenerauxScreen(
+        depot: ParametresGenerauxRepository(database: db), reglages: depot, estAdmin: true, ongletInitial: "Données de l'Entreprise",
+      )));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('entreprise-modifier')));
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
+
+      expect(find.text('PNG carré, fond transparent recommandé, max 2 Mo'), findsOneWidget);
+      expect(find.text('ICO ou PNG 32x32px, max 500 Ko'), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-logo-supprimer')), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-favicon-supprimer')), findsNothing, reason: 'aucun favicon à supprimer');
+
+      await tester.ensureVisible(find.byKey(const Key('entreprise-logo-supprimer')));
+      await tester.tap(find.byKey(const Key('entreprise-logo-supprimer')));
+      await tester.pumpAndSettle();
+      expect(find.text("Supprimer le logo de l'entreprise ? Le fichier sera effacé."), findsOneWidget);
+      expect(fichiers.octets['logo'], isNotNull, reason: 'rien n\'est effacé avant la confirmation');
+
+      await tester.tap(find.byKey(const Key('entreprise-logo-supprimer-confirmer')));
+      await tester.pumpAndSettle();
+
+      expect(fichiers.octets['logo'], isNull);
+      final d = (await tester.runAsync(demandes))!.single;
+      expect((jsonDecode(d.payload) as Map)['logoSupprimer'], true);
+      expect(find.byKey(const Key('entreprise-logo-supprimer')), findsNothing);
+    });
+
     testWidgets('⚠️ « Données de l\'Entreprise » : modifier écrit la demande ; le barème et les SMS s\'ouvrent en sous-pages', (tester) async {
       tester.view.physicalSize = const Size(1700, 2600);
       tester.view.devicePixelRatio = 1;

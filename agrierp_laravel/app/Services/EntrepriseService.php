@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Models\User;
+use App\Support\IdentiteVisuelle;
 use App\Support\MecefMode;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -45,22 +46,117 @@ class EntrepriseService
     /** Taille maximale décodée, en octets : celles de `DonneesEntreprise` (logo 2 048 Ko, favicon 500 Ko). */
     public const TAILLES_FICHIERS = ['logo' => 2048 * 1024, 'favicon' => 500 * 1024];
 
-    private const EXTENSIONS = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif', 'image/bmp' => 'bmp', 'image/webp' => 'webp'];
+    /**
+     * CONF-1 — formats admis : le LOGO en PNG, JPG ou WEBP ; le FAVICON en ICO ou PNG. Jugés sur le CONTENU (en-tête binaire),
+     * jamais sur le seul nom du fichier : la règle `image` de Laravel refuse l'ICO, un nom `.png` peut cacher n'importe quoi.
+     * Le SVG est refusé (il peut porter un script).
+     */
+    public const FORMATS = [
+        'logo' => ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'],
+        'favicon' => ['image/vnd.microsoft.icon' => 'ico', 'image/png' => 'png'],
+    ];
+
+    /** Extensions de NOM acceptées (en plus de l'en-tête) quand le nom du fichier est connu (web ; le poste le juge à son bout). */
+    public const EXTENSIONS_NOM = [
+        'logo' => ['png', 'jpg', 'jpeg', 'webp'],
+        'favicon' => ['ico', 'png'],
+    ];
+
+    /** Champ de formulaire (web) de chaque genre : les erreurs s'affichent sous le bon champ. */
+    private const CHAMPS = ['logo' => 'logoFile', 'favicon' => 'faviconFile'];
+
+    /** @return string message français du refus (le MÊME au web et au poste : `lang/fr/validation.php`, groupe `fichiers_entreprise`) */
+    public static function messageFichier(string $genre, string $motif): string
+    {
+        return (string) __('validation.fichiers_entreprise.'.$genre.'.'.$motif);
+    }
 
     /**
-     * Ticket AUT-2 — logo et favicon ENVOYÉS PAR LE POSTE (`logoB64`, `faviconB64`) : mêmes limites que le web, rangés au même
-     * endroit (`company`, disque public). Retourne les colonnes `logo_path` / `favicon_path` à passer à `enregistrer`.
+     * Ticket CONF-1 — juge UN fichier (octets + nom d'origine s'il est connu). Retourne l'extension à ranger, ou le message de refus.
+     *
+     * @return array{0: ?string, 1: ?string} [extension, message d'erreur]
+     */
+    public function jugerFichier(string $genre, string $octets, ?string $nomOrigine = null): array
+    {
+        $mime = IdentiteVisuelle::typeMime($octets);
+        $extension = self::FORMATS[$genre][$mime] ?? null;
+
+        if ($nomOrigine !== null && $nomOrigine !== '' && ! in_array(strtolower(pathinfo($nomOrigine, PATHINFO_EXTENSION)), self::EXTENSIONS_NOM[$genre], true)) {
+            return [null, self::messageFichier($genre, 'format')];
+        }
+
+        // Un ICO n'est pas lisible par GD ; un PNG/JPEG/WEBP doit l'être (en-tête valide ne suffit pas à faire une image).
+        if ($extension === null || ($mime !== 'image/vnd.microsoft.icon' && @getimagesizefromstring($octets) === false) || ($mime === 'image/vnd.microsoft.icon' && ! $this->icoCoherent($octets))) {
+            return [null, self::messageFichier($genre, 'format')];
+        }
+
+        if (strlen($octets) > self::TAILLES_FICHIERS[$genre]) {
+            return [null, self::messageFichier($genre, 'taille')];
+        }
+
+        return [$extension, null];
+    }
+
+    /** L'annuaire d'un ICO (6 octets d'en-tête + 16 par image) tient dans le fichier. */
+    private function icoCoherent(string $octets): bool
+    {
+        $nombre = unpack('v', substr($octets, 4, 2))[1] ?? 0;
+
+        return $nombre >= 1 && strlen($octets) >= 6 + 16 * $nombre;
+    }
+
+    /**
+     * Ticket CONF-1 — TOUS les fichiers sont jugés AVANT d'en écrire un seul (un logo valide n'est plus rangé quand le favicon est refusé).
+     *
+     * @param array<string, array{octets: string, nom?: ?string}> $entrees par genre (`logo`, `favicon`)
+     * @return array<string, string> colonnes `logo_path` / `favicon_path` rangées
+     *
+     * @throws ValidationException un message par fichier refusé, sous le champ du formulaire (`logoFile`, `faviconFile`)
+     */
+    public function fichiersDepuis(array $entrees): array
+    {
+        $extensions = [];
+        $erreurs = [];
+
+        foreach ($entrees as $genre => $entree) {
+            [$extension, $erreur] = $this->jugerFichier($genre, $entree['octets'], $entree['nom'] ?? null);
+
+            if ($erreur !== null) {
+                $erreurs[self::CHAMPS[$genre]] = $erreur;
+            } else {
+                $extensions[$genre] = $extension;
+            }
+        }
+
+        if ($erreurs !== []) {
+            throw ValidationException::withMessages($erreurs);
+        }
+
+        $fichiers = [];
+        foreach ($extensions as $genre => $extension) {
+            $chemin = 'company/'.Str::uuid().'.'.$extension;
+            Storage::disk('public')->put($chemin, $entrees[$genre]['octets']);
+            $fichiers[$genre.'_path'] = $chemin;
+        }
+
+        return $fichiers;
+    }
+
+    /**
+     * Ticket AUT-2 — logo et favicon ENVOYÉS PAR LE POSTE (`logoB64`, `faviconB64`), ou leur suppression (`logoSupprimer`,
+     * `faviconSupprimer` : la colonne repasse à `null`, l'ancien fichier est effacé par `enregistrer`). Mêmes règles, mêmes
+     * messages et même rangement que le web. Retourne les colonnes `logo_path` / `favicon_path` à passer à `enregistrer`.
      *
      * @param array<string, mixed> $p
-     * @return array<string, string>
+     * @return array<string, ?string>
      *
-     * @throws ValidationException fichier illisible, trop gros ou qui n'est pas une image
+     * @throws ValidationException fichier illisible, d'un format refusé ou trop gros — AVANT toute écriture
      */
     public function fichiersDepuisBase64(array $p): array
     {
-        $fichiers = [];
+        $entrees = [];
 
-        foreach (['logo' => 'logoFile', 'favicon' => 'faviconFile'] as $genre => $champ) {
+        foreach (['logo', 'favicon'] as $genre) {
             $b64 = $p[$genre.'B64'] ?? null;
 
             if (! is_string($b64) || $b64 === '') {
@@ -68,22 +164,39 @@ class EntrepriseService
             }
 
             $octets = base64_decode($b64, true);
-            $info = $octets === false ? false : @getimagesizefromstring($octets);
+            $entrees[$genre] = ['octets' => $octets === false ? '' : $octets];
+        }
 
-            if ($octets === false || $info === false || ! isset(self::EXTENSIONS[$info['mime'] ?? ''])) {
-                throw ValidationException::withMessages([$champ => 'Le '.$genre.' doit être une image (png, jpg, gif, bmp ou webp).']);
+        $fichiers = $this->fichiersDepuis($entrees);
+
+        foreach (['logo', 'favicon'] as $genre) {
+            if (! isset($fichiers[$genre.'_path']) && filter_var($p[$genre.'Supprimer'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $fichiers[$genre.'_path'] = null;
             }
-
-            if (strlen($octets) > self::TAILLES_FICHIERS[$genre]) {
-                throw ValidationException::withMessages([$champ => 'Le '.$genre.' ne doit pas dépasser '.(self::TAILLES_FICHIERS[$genre] / 1024).' Ko.']);
-            }
-
-            $chemin = 'company/'.Str::uuid().'.'.self::EXTENSIONS[$info['mime']];
-            Storage::disk('public')->put($chemin, $octets);
-            $fichiers[$genre.'_path'] = $chemin;
         }
 
         return $fichiers;
+    }
+
+    /** Ticket CONF-1 — « Supprimer » le logo ou le favicon : la colonne repasse à `null`, le fichier est effacé du disque. */
+    public function supprimerFichier(string $genre): void
+    {
+        abort_unless(isset(self::CHAMPS[$genre]), 404);
+
+        $settings = CompanySetting::current();
+        $ancien = $settings->{$genre.'_path'};
+
+        $settings->update([$genre.'_path' => null]);
+        $this->effacer($ancien);
+
+        AuditLog::record('company_settings.fichier_supprime', 'parametres');
+    }
+
+    private function effacer(?string $chemin): void
+    {
+        if (is_string($chemin) && $chemin !== '' && str_starts_with($chemin, 'company/')) {
+            Storage::disk('public')->delete($chemin);
+        }
     }
 
     public const MESSAGES = [
@@ -94,11 +207,39 @@ class EntrepriseService
 
     /**
      * @param array{companyName: string, promoterName?: ?string, address?: ?string, phone?: ?string, email?: ?string, ifu: string, rccm?: ?string, tvaEnabled?: bool, vpsRate: mixed, cnssEmployeeRate: mixed, cnssEmployerPensionRate: mixed, cnssEmployerFamilyRate: mixed, cnssEmployerRiskRate: mixed} $v
-     * @param array<string, string> $fichiers colonnes `logo_path` / `favicon_path` déjà rangées
+     * @param array<string, ?string> $fichiers colonnes `logo_path` / `favicon_path` déjà rangées (`null` = fichier supprimé)
      *
      * @throws ValidationException taux arrêtés et auteur non administrateur
      */
     public function enregistrer(array $v, ?User $auteur, array $fichiers = []): void
+    {
+        $avant = CompanySetting::current()->only(['logo_path', 'favicon_path']);
+
+        try {
+            $this->ecrire($v, $auteur, $fichiers);
+        } catch (\Throwable $e) {
+            // Refus (IFU, taux arrêtés…) : les fichiers qui viennent d'être rangés pour cette demande ne restent pas sur le disque.
+            foreach ($fichiers as $nouveau) {
+                $this->effacer($nouveau);
+            }
+
+            throw $e;
+        }
+
+        // CONF-1 — un fichier remplacé ou supprimé ne s'accumule pas sur le disque : l'ANCIEN est effacé une fois la base à jour.
+        foreach (['logo_path', 'favicon_path'] as $colonne) {
+            if (array_key_exists($colonne, $fichiers) && $avant[$colonne] !== null && $avant[$colonne] !== $fichiers[$colonne]) {
+                $this->effacer($avant[$colonne]);
+
+                if ($fichiers[$colonne] === null) {
+                    AuditLog::record('company_settings.fichier_supprime', 'parametres');
+                }
+            }
+        }
+    }
+
+    /** @param array<string, ?string> $fichiers */
+    private function ecrire(array $v, ?User $auteur, array $fichiers): void
     {
         $settings = CompanySetting::current();
 

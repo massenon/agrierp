@@ -7892,7 +7892,14 @@ class SyncEngine {
   Future<void> _tirerFichiersEntreprise(Map<String, Object?> l) async {
     for (final genre in FichiersEntreprise.genres) {
       final chemin = l['${genre}_path'];
-      if (chemin is! String || chemin.isEmpty) continue;
+      if (chemin is! String || chemin.isEmpty) {
+        // Ticket CONF-1 — supprimé au web : le fichier qui VENAIT du serveur (chemin retenu) s'efface aussi ici ; un fichier choisi au
+        // poste et pas encore envoyé (aucun chemin retenu) reste.
+        try {
+          if (await FichiersEntreprise.courant.sourceServeur(genre) != null) await FichiersEntreprise.courant.effacer(genre);
+        } catch (_) {}
+        continue;
+      }
       try {
         if (await FichiersEntreprise.courant.sourceServeur(genre) == chemin) continue;
         final r = await _client.get<List<int>>('/api/sync/company-file/$genre', options: Options(responseType: ResponseType.bytes));

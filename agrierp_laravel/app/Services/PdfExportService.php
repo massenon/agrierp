@@ -34,7 +34,8 @@ class PdfExportService
             'reportTitle' => $title,
             'period' => $period,
             'author' => auth()->user()?->name ?? 'Système',
-            'companyLogo' => public_path('assets/images/logo.png'),
+            // CONF-1 : le logo CHOISI (PNG/JPEG/GIF lisible par DomPDF), sinon le logo d'installation.
+            'companyLogo' => \App\Support\IdentiteVisuelle::logoCheminPdf(),
             'companyName' => 'LA FERME ÉCOLE OLOUWACHEGOUN',
             'companyActivities' => "Production Animale | Production Végétale | Transformation Alimentaire | "
                 ."Fabrication de Cages Galvanisées | Formation Agricole | Suivi-Appui et Conseil Agricoles",

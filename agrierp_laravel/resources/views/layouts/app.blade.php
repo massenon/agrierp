@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiAgriERP | {{ $title ?? 'Ferme École Olouwachegoun' }}</title>
     <meta name="author" content="Dr Rhodes MASSENON, Contact: +2290151335040">
-    <link rel="icon" type="image/png" href="{{ asset('assets/images/logo_favicon.webp') }}">
+    {{-- CONF-1 : l'icône CHOISIE (type MIME déduit du fichier, `?v=` = date du fichier), sinon celle d'installation. --}}
+    <link rel="icon" type="{{ \App\Support\IdentiteVisuelle::faviconType() }}" href="{{ \App\Support\IdentiteVisuelle::faviconUrl() }}">
     <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/Inter-latin.woff2" crossorigin>
     <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/MaterialSymbolsOutlined.woff2" crossorigin>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
@@ -54,7 +55,7 @@
         x-cloak>
         <div class="px-md py-lg border-b border-white/10">
             <div class="flex items-center gap-xs">
-                <span class="material-symbols-outlined text-accent-yellow" style="font-size:26px;">agriculture</span>
+                <x-logo-entreprise :taille="30" />
                 <h1 class="text-white font-extrabold text-lg">LogiAgri<span class="text-accent-yellow">ERP</span></h1>
             </div>
             <p class="text-[10px] text-white/50 uppercase tracking-wider mt-xs">Ferme École Olouwachegoun</p>

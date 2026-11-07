@@ -52,7 +52,7 @@ class FacturationEmecef extends Component
 
         // Le mode effectif (le mode `simule` des environnements de développement s'affiche « Désactivé »).
         $this->mecefMode = in_array($reglage->mode(), MecefMode::REGLABLES, true) ? $reglage->mode() : MecefMode::DESACTIVE;
-        $this->ifu = (string) $settings->ifu;
+        $this->ifu = (string) $reglage->emecef()['ifu'];  // saisi, sinon `SGMEF_DEFAULT_IFU`
         // CONF-1 : l'adresse en service (saisie, sinon `SGMEF_API_URL`, sinon l'environnement d'essai) ; le jeton de `.env` n'est jamais lu ici.
         $this->mecefApiUrl = $reglage->emecef()['url'];
         $this->mecefOperateurId = (string) $settings->mecef_operateur_id;
