@@ -377,7 +377,7 @@ class CaisseWebInterblocageTest extends TestCase
     public function test_la_vente_est_relue_sous_verrou_avant_le_controle_deja_transmise(): void
     {
         $source = (string) file_get_contents(app_path('Services/Mecef/FacturationMecefService.php'));
-        $controle = strpos($source, "if (\$sale->mecef_status === 'transmise')");
+        $controle = strpos($source, "if (\$objet->mecef_status === MecefEtat::NORMALISEE)");
         $this->assertNotFalse($controle, 'le contrôle « déjà transmise » a disparu');
         $this->assertStringContainsString('->lockForUpdate()', substr($source, 0, $controle),
             'sans verrou, deux retransmissions simultanées liraient toutes deux « erreur » et factureraient deux fois');

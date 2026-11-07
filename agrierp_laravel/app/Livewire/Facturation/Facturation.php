@@ -5,6 +5,7 @@ namespace App\Livewire\Facturation;
 use App\Models\AuditLog;
 use App\Models\Sale;
 use App\Services\Mecef\FacturationMecefService;
+use App\Support\MecefEtat;
 use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -55,7 +56,7 @@ class Facturation extends Component
     /** Ticket VC-5 : le module MeCeF (transmission DGI) est-il activé ? Sinon la page est un registre de factures simple. */
     public function getMecefActifProperty(): bool
     {
-        return (bool) config('mecef.actif');
+        return app(\App\Services\Mecef\MecefReglage::class)->actif();
     }
 
     public function getKpisProperty(): array
@@ -77,14 +78,15 @@ class Facturation extends Component
             'factures_mois' => (clone $monthSales)->count(),
             'transmises' => (clone $monthSales)->where('mecef_status', 'transmise')->count(),
             'en_attente' => (clone $monthSales)->where('mecef_status', 'en_attente')->count(),
-            'erreurs' => (clone $monthSales)->where('mecef_status', 'erreur')->count(),
+            'erreurs' => (clone $monthSales)->whereIn('mecef_status', [MecefEtat::REFUSEE, MecefEtat::EXPIREE])->count(),
         ];
     }
 
     /** Ticket EX7 (EF9) — les factures de l'exercice AFFICHÉ, PAGINÉES (25 par page), au lieu des 100 dernières. */
     public function getSalesProperty()
     {
-        $statusMap = ['Transmise' => 'transmise', 'En attente' => 'en_attente', 'Erreur MeCeF' => 'erreur'];
+        // MECEF-1 — les libellés du filtre sont ceux de `MecefEtat` (clés stockées inchangées : `transmise` = Normalisée).
+        $statusMap = array_flip(MecefEtat::LIBELLES);
         [$debut, $fin] = ExerciceChoisi::bornes();
 
         return Sale::with('customer')
@@ -113,7 +115,7 @@ class Facturation extends Component
 
     public function getQrSvgProperty(): ?string
     {
-        if (! $this->viewingSale || ! $this->viewingSale->mecef_qr_ref) {
+        if (! $this->viewingSale || ! $this->viewingSale->estNormalisee() || ! $this->viewingSale->mecef_qr_ref) {
             return null;
         }
 

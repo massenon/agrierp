@@ -34,7 +34,40 @@ class Sale extends Model
         // divergent que pour une vente encaissee hors ligne et remontee
         // plus tard — c'est exactement le cas ou la difference compte.
         'sold_at',
+        // MECEF-1 — ce que la DGI renvoie de la facture normalisée (écrits par `FacturationMecefService`, jamais par un poste).
+        'mecef_uid', 'mecef_code', 'mecef_nim', 'mecef_compteurs', 'mecef_normalise_le', 'mecef_message',
     ];
+
+    /**
+     * MECEF-1 — LE VERROU D'UNE FACTURE NORMALISÉE. Seules ces colonnes bougent encore après la normalisation (le lien
+     * comptable, l'horodatage) ; tout le reste — client, montants, mode de règlement, statut (donc l'annulation) — est refusé.
+     */
+    private const COLONNES_LIBRES_APRES_NORMALISATION = ['accounting_entry_id', 'updated_at'];
+
+    protected static function booted(): void
+    {
+        static::updating(function (Sale $vente): void {
+            if ($vente->getOriginal('mecef_status') !== \App\Support\MecefEtat::NORMALISEE) {
+                return;
+            }
+
+            if (array_diff(array_keys($vente->getDirty()), self::COLONNES_LIBRES_APRES_NORMALISATION) !== []) {
+                throw new \App\Exceptions\FactureNormaliseeException();
+            }
+        });
+
+        static::deleting(function (Sale $vente): void {
+            if ($vente->mecef_status === \App\Support\MecefEtat::NORMALISEE) {
+                throw new \App\Exceptions\FactureNormaliseeException();
+            }
+        });
+    }
+
+    /** MECEF-1 — la facture est-elle normalisée (déclarée à la DGI) ? Alors elle est verrouillée : seul un avoir la corrige. */
+    public function estNormalisee(): bool
+    {
+        return $this->mecef_status === \App\Support\MecefEtat::NORMALISEE;
+    }
 
     protected function casts(): array
     {
@@ -46,6 +79,7 @@ class Sale extends Model
             'change_due' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
             'sold_at' => 'datetime',
+            'mecef_normalise_le' => 'datetime',
         ];
     }
 

@@ -21,6 +21,22 @@ class SaleLine extends Model
         'lot_id',
     ];
 
+    /** MECEF-1 — les lignes d'une facture normalisée sont figées : ni ajout, ni modification, ni suppression. */
+    protected static function booted(): void
+    {
+        $garde = function (SaleLine $ligne): void {
+            $vente = Sale::query()->whereKey($ligne->sale_id)->first(['id', 'mecef_status']);
+
+            if ($vente?->estNormalisee()) {
+                throw new \App\Exceptions\FactureNormaliseeException();
+            }
+        };
+
+        static::creating($garde);
+        static::updating($garde);
+        static::deleting($garde);
+    }
+
     protected function casts(): array
     {
         return [

@@ -327,5 +327,43 @@ void main() {
       expect((await demandes()).single.kind, 'entreprise');
       expect(find.byKey(const Key('reglage-message')), findsOneWidget);
     });
+
+    // MECEF-1 — « Facturation normalisée (MeCeF) » : mêmes libellés que le web ; le jeton ne se saisit PAS au poste.
+    testWidgets('⚠️ le mode MeCeF se règle au poste (demande), le jeton jamais : un témoin « configuré / non configuré » seulement', (tester) async {
+      tester.view.physicalSize = const Size(1700, 2600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await entrepriseVerrouillee();
+      await db.into(db.appSettings).insertOnConflictUpdate(AppSettingsCompanion.insert(key: 'mecef.jeton_configure', value: '1'));
+      await tester.pumpWidget(MaterialApp(home: ParametresGenerauxScreen(
+        depot: ParametresGenerauxRepository(database: db), reglages: depot, estAdmin: true, ongletInitial: "Données de l'Entreprise",
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('entreprise-modifier')));
+      await tester.pumpAndSettle();
+      expect(find.text('Facturation normalisée (MeCeF)'), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-mecefApiUrl')), findsNothing, reason: 'désactivé : aucun champ e-MECeF');
+
+      await tester.tap(find.byKey(const Key('entreprise-mecefMode')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('e-MECeF (en ligne)').last);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('entreprise-mecefApiUrl')), findsOneWidget);
+      expect(find.byKey(const Key('entreprise-jeton-etat')), findsOneWidget);
+      expect(find.text('••••••••••••'), findsOneWidget, reason: 'jeton configuré au serveur : masqué');
+      expect(find.byType(TextField).evaluate().where((e) => (e.widget as TextField).obscureText), isEmpty, reason: 'aucune saisie de secret au poste');
+
+      await tester.enterText(find.byKey(const Key('entreprise-ifu')), '3201700000000');
+      await tester.enterText(find.byKey(const Key('entreprise-mecefOperateurNom')), 'Awa');
+      await tester.tap(find.byKey(const Key('entreprise-enregistrer')));
+      await tester.pumpAndSettle();
+
+      final p = jsonDecode((await demandes()).single.payload) as Map<String, dynamic>;
+      expect(p['mecefMode'], 'emecef');
+      expect(p['mecefOperateurNom'], 'Awa');
+      expect(p.keys.where((k) => k.toLowerCase().contains('jeton')), isEmpty);
+    });
   });
 }

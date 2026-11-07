@@ -64,7 +64,17 @@ class DocumentOfficiel {
     this.filigrane,
     this.noteDePied,
     this.fichier,
+    this.mentions = const [],
+    this.codeQr,
   });
+
+  /// MECEF-1 — lignes de mentions sous le tableau (facture normalisée : code MeCeF/DGI, NIM, compteurs, date) et [codeQr],
+  /// la DONNÉE DGI dont le QR est rendu à droite (`exports.facture-vente` du web : même bloc). Vides : rien n'est ajouté —
+  /// aucune mention n'est inventée pour une facture non normalisée.
+  final List<String> mentions;
+
+  /// Donnée du QR renvoyée par la DGI (jamais construite au poste).
+  final String? codeQr;
 
   /// 🔴→✅ Ticket U11 — NOM DU FICHIER PDF, celui que le web donne au même export (`streamDownload(…, 'stocks-'.
   /// now()->format('Y-m-d').'.pdf')`), avec deux marques remplacées à l'édition par la date du poste :
@@ -232,6 +242,30 @@ class ExportOfficiel {
               child: pw.Text(
                 doc.noteDePied!,
                 style: const pw.TextStyle(fontSize: 9, color: _encreTexte),
+              ),
+            ),
+          if (doc.mentions.isNotEmpty || doc.codeQr != null)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 6),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      for (final m in doc.mentions)
+                        pw.Text(m, style: const pw.TextStyle(fontSize: 9, color: _encreTexte)),
+                    ],
+                  ),
+                  if (doc.codeQr != null)
+                    pw.BarcodeWidget(
+                      barcode: pw.Barcode.qrCode(),
+                      data: doc.codeQr!,
+                      width: 90,
+                      height: 90,
+                    ),
+                ],
               ),
             ),
         ],

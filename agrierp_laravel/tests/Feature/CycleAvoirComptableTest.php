@@ -88,7 +88,6 @@ class CycleAvoirComptableTest extends TestCase
             'total' => 59_000,
             'delivery_fee' => 0,
             'status' => 'validee',
-            'mecef_status' => 'transmise',
         ]);
 
         SaleLine::create([
@@ -98,6 +97,10 @@ class CycleAvoirComptableTest extends TestCase
             'unit_price' => 5_900,
             'manual_total_amount' => 59_000,
         ]);
+
+        // MECEF-1 : une facture normalisée est figée — ses lignes se posent AVANT la normalisation du fixture.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $this->vente->id)->update(['mecef_status' => 'transmise']);
+        $this->vente->refresh();
 
         app(\App\Actions\RecordSaleAccountingEntryAction::class)->execute($this->vente->fresh('lines'));
     }

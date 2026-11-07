@@ -91,6 +91,63 @@
             </div>
         </div>
 
+        <div class="bg-white border border-outline-variant rounded-lg p-md mt-lg" id="facturation-mecef">
+            <h3 class="text-sm font-bold text-brand-forest mb-xs flex items-center gap-xs">
+                <span class="material-symbols-outlined text-[18px]">verified</span>Facturation normalisée (MeCeF)
+            </h3>
+            <p class="text-[11px] text-outline mb-md">
+                Choisissez comment les factures sont normalisées auprès de la DGI. Une facture normalisée n'est plus modifiable ni annulable : elle se corrige par un avoir.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
+                <div class="sm:col-span-2">
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de facturation normalisée</label>
+                    <select wire:model.live="mecefMode" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
+                        @foreach(\App\Support\MecefMode::LIBELLES as $valeur => $libelle)
+                            <option value="{{ $valeur }}">{{ $libelle }}</option>
+                        @endforeach
+                    </select>
+                    @error('mecefMode') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                    @if($mecefMode === 'boitier')
+                        <p class="text-[10px] text-outline mt-xs">Mode boîtier : la transmission se fera par le poste Windows où le boîtier est branché. Le réglage est enregistré, mais rien n'est encore transmis : les factures restent en attente.</p>
+                    @elseif($mecefMode === 'desactive')
+                        <p class="text-[10px] text-outline mt-xs">Aucune facture n'est transmise : la facturation reste un registre avec facture PDF.</p>
+                    @endif
+                </div>
+
+                @if($mecefMode === 'emecef')
+                    <div class="sm:col-span-2">
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Adresse de l'API e-MECeF</label>
+                        <input wire:model="mecefApiUrl" type="url" placeholder="{{ \App\Support\MecefMode::URL_PAR_DEFAUT }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('mecefApiUrl') ? 'is-invalid' : 'border-outline-variant' }}">
+                        <p class="text-[10px] text-outline mt-xs">Production : {{ \App\Support\MecefMode::URL_PAR_DEFAUT }}. Pour essayer sans valeur fiscale, saisissez ici l'adresse de l'environnement de test communiquée par la DGI.</p>
+                        @error('mecefApiUrl') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Jeton e-MECeF (JWT)</label>
+                        @if($this->jetonConfigure && ! $remplacerJeton)
+                            <div class="flex items-center gap-sm">
+                                <span class="flex-1 h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center tracking-widest">••••••••••••</span>
+                                <button type="button" wire:click="$set('remplacerJeton', true)" class="px-md h-11 rounded-lg border border-outline-variant text-xs font-bold text-brand-forest hover:bg-surface-zebra">Remplacer</button>
+                            </div>
+                        @else
+                            <input wire:model="mecefJeton" type="password" autocomplete="off" placeholder="Collez le jeton délivré par la DGI" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                        @endif
+                        <p class="text-[10px] text-outline mt-xs">Secret : chiffré sur le serveur, jamais affiché, jamais envoyé aux postes. Il se saisit sur le web.</p>
+                        @error('mecefJeton') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Identifiant de l'opérateur</label>
+                        <input wire:model="mecefOperateurId" type="text" placeholder="1" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Nom de l'opérateur (caissier par défaut)</label>
+                        <input wire:model="mecefOperateurNom" type="text" placeholder="Caissier" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    </div>
+                    <div class="sm:col-span-2 bg-info-blue/10 border border-info-blue/20 rounded-lg p-sm text-[10px] text-brand-forest">L'IFU transmis est celui des Informations Légales &amp; Fiscales ci-dessus : il doit comporter 13 chiffres.</div>
+                @endif
+            </div>
+        </div>
+
         <div class="bg-white border border-outline-variant rounded-lg p-md mt-lg">
             <h3 class="text-sm font-bold text-brand-forest mb-md flex items-center gap-xs">
                 <span class="material-symbols-outlined text-[18px]">receipt_long</span>Régime de TVA

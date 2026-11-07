@@ -40761,6 +40761,62 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _mecefCodeMeta = const VerificationMeta(
+    'mecefCode',
+  );
+  @override
+  late final GeneratedColumn<String> mecefCode = GeneratedColumn<String>(
+    'mecef_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefNimMeta = const VerificationMeta(
+    'mecefNim',
+  );
+  @override
+  late final GeneratedColumn<String> mecefNim = GeneratedColumn<String>(
+    'mecef_nim',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefCompteursMeta = const VerificationMeta(
+    'mecefCompteurs',
+  );
+  @override
+  late final GeneratedColumn<String> mecefCompteurs = GeneratedColumn<String>(
+    'mecef_compteurs',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefNormaliseLeMeta = const VerificationMeta(
+    'mecefNormaliseLe',
+  );
+  @override
+  late final GeneratedColumn<DateTime> mecefNormaliseLe =
+      GeneratedColumn<DateTime>(
+        'mecef_normalise_le',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _mecefMessageMeta = const VerificationMeta(
+    'mecefMessage',
+  );
+  @override
+  late final GeneratedColumn<String> mecefMessage = GeneratedColumn<String>(
+    'mecef_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -40779,6 +40835,11 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
     customerName,
     mecefStatus,
     mecefQrRef,
+    mecefCode,
+    mecefNim,
+    mecefCompteurs,
+    mecefNormaliseLe,
+    mecefMessage,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -40906,6 +40967,45 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
         ),
       );
     }
+    if (data.containsKey('mecef_code')) {
+      context.handle(
+        _mecefCodeMeta,
+        mecefCode.isAcceptableOrUnknown(data['mecef_code']!, _mecefCodeMeta),
+      );
+    }
+    if (data.containsKey('mecef_nim')) {
+      context.handle(
+        _mecefNimMeta,
+        mecefNim.isAcceptableOrUnknown(data['mecef_nim']!, _mecefNimMeta),
+      );
+    }
+    if (data.containsKey('mecef_compteurs')) {
+      context.handle(
+        _mecefCompteursMeta,
+        mecefCompteurs.isAcceptableOrUnknown(
+          data['mecef_compteurs']!,
+          _mecefCompteursMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mecef_normalise_le')) {
+      context.handle(
+        _mecefNormaliseLeMeta,
+        mecefNormaliseLe.isAcceptableOrUnknown(
+          data['mecef_normalise_le']!,
+          _mecefNormaliseLeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mecef_message')) {
+      context.handle(
+        _mecefMessageMeta,
+        mecefMessage.isAcceptableOrUnknown(
+          data['mecef_message']!,
+          _mecefMessageMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -40981,6 +41081,26 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
         DriftSqlType.string,
         data['${effectivePrefix}mecef_qr_ref'],
       ),
+      mecefCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_code'],
+      ),
+      mecefNim: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_nim'],
+      ),
+      mecefCompteurs: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_compteurs'],
+      ),
+      mecefNormaliseLe: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}mecef_normalise_le'],
+      ),
+      mecefMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_message'],
+      ),
     );
   }
 
@@ -41024,6 +41144,16 @@ class Sale extends DataClass implements Insertable<Sale> {
 
   /// Référence portée par le QR de la facture normalisée (NIM + signature).
   final String? mecefQrRef;
+
+  /// MECEF-1 (schéma v84) — ce que la DGI a renvoyé de la facture NORMALISÉE, tiré du serveur et JAMAIS écrit par le poste
+  /// (comme `mecef_status`) : code MeCeF/DGI, NIM du dispositif, compteurs, instant de la normalisation, et le motif français
+  /// d'une transmission en attente ou refusée. Servent le statut de l'écran Facturation et les mentions de la facture PDF.
+  /// `mecef_status` garde ses clés d'avant : `transmise` = « Normalisée », `erreur` = « Refusée » ; `expiree` est nouvelle.
+  final String? mecefCode;
+  final String? mecefNim;
+  final String? mecefCompteurs;
+  final DateTime? mecefNormaliseLe;
+  final String? mecefMessage;
   const Sale({
     required this.id,
     required this.deviceId,
@@ -41041,6 +41171,11 @@ class Sale extends DataClass implements Insertable<Sale> {
     this.customerName,
     this.mecefStatus,
     this.mecefQrRef,
+    this.mecefCode,
+    this.mecefNim,
+    this.mecefCompteurs,
+    this.mecefNormaliseLe,
+    this.mecefMessage,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -41077,6 +41212,21 @@ class Sale extends DataClass implements Insertable<Sale> {
     if (!nullToAbsent || mecefQrRef != null) {
       map['mecef_qr_ref'] = Variable<String>(mecefQrRef);
     }
+    if (!nullToAbsent || mecefCode != null) {
+      map['mecef_code'] = Variable<String>(mecefCode);
+    }
+    if (!nullToAbsent || mecefNim != null) {
+      map['mecef_nim'] = Variable<String>(mecefNim);
+    }
+    if (!nullToAbsent || mecefCompteurs != null) {
+      map['mecef_compteurs'] = Variable<String>(mecefCompteurs);
+    }
+    if (!nullToAbsent || mecefNormaliseLe != null) {
+      map['mecef_normalise_le'] = Variable<DateTime>(mecefNormaliseLe);
+    }
+    if (!nullToAbsent || mecefMessage != null) {
+      map['mecef_message'] = Variable<String>(mecefMessage);
+    }
     return map;
   }
 
@@ -41110,6 +41260,21 @@ class Sale extends DataClass implements Insertable<Sale> {
       mecefQrRef: mecefQrRef == null && nullToAbsent
           ? const Value.absent()
           : Value(mecefQrRef),
+      mecefCode: mecefCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefCode),
+      mecefNim: mecefNim == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefNim),
+      mecefCompteurs: mecefCompteurs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefCompteurs),
+      mecefNormaliseLe: mecefNormaliseLe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefNormaliseLe),
+      mecefMessage: mecefMessage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefMessage),
     );
   }
 
@@ -41137,6 +41302,13 @@ class Sale extends DataClass implements Insertable<Sale> {
       customerName: serializer.fromJson<String?>(json['customerName']),
       mecefStatus: serializer.fromJson<String?>(json['mecefStatus']),
       mecefQrRef: serializer.fromJson<String?>(json['mecefQrRef']),
+      mecefCode: serializer.fromJson<String?>(json['mecefCode']),
+      mecefNim: serializer.fromJson<String?>(json['mecefNim']),
+      mecefCompteurs: serializer.fromJson<String?>(json['mecefCompteurs']),
+      mecefNormaliseLe: serializer.fromJson<DateTime?>(
+        json['mecefNormaliseLe'],
+      ),
+      mecefMessage: serializer.fromJson<String?>(json['mecefMessage']),
     );
   }
   @override
@@ -41161,6 +41333,11 @@ class Sale extends DataClass implements Insertable<Sale> {
       'customerName': serializer.toJson<String?>(customerName),
       'mecefStatus': serializer.toJson<String?>(mecefStatus),
       'mecefQrRef': serializer.toJson<String?>(mecefQrRef),
+      'mecefCode': serializer.toJson<String?>(mecefCode),
+      'mecefNim': serializer.toJson<String?>(mecefNim),
+      'mecefCompteurs': serializer.toJson<String?>(mecefCompteurs),
+      'mecefNormaliseLe': serializer.toJson<DateTime?>(mecefNormaliseLe),
+      'mecefMessage': serializer.toJson<String?>(mecefMessage),
     };
   }
 
@@ -41181,6 +41358,11 @@ class Sale extends DataClass implements Insertable<Sale> {
     Value<String?> customerName = const Value.absent(),
     Value<String?> mecefStatus = const Value.absent(),
     Value<String?> mecefQrRef = const Value.absent(),
+    Value<String?> mecefCode = const Value.absent(),
+    Value<String?> mecefNim = const Value.absent(),
+    Value<String?> mecefCompteurs = const Value.absent(),
+    Value<DateTime?> mecefNormaliseLe = const Value.absent(),
+    Value<String?> mecefMessage = const Value.absent(),
   }) => Sale(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -41198,6 +41380,15 @@ class Sale extends DataClass implements Insertable<Sale> {
     customerName: customerName.present ? customerName.value : this.customerName,
     mecefStatus: mecefStatus.present ? mecefStatus.value : this.mecefStatus,
     mecefQrRef: mecefQrRef.present ? mecefQrRef.value : this.mecefQrRef,
+    mecefCode: mecefCode.present ? mecefCode.value : this.mecefCode,
+    mecefNim: mecefNim.present ? mecefNim.value : this.mecefNim,
+    mecefCompteurs: mecefCompteurs.present
+        ? mecefCompteurs.value
+        : this.mecefCompteurs,
+    mecefNormaliseLe: mecefNormaliseLe.present
+        ? mecefNormaliseLe.value
+        : this.mecefNormaliseLe,
+    mecefMessage: mecefMessage.present ? mecefMessage.value : this.mecefMessage,
   );
   Sale copyWithCompanion(SalesCompanion data) {
     return Sale(
@@ -41231,6 +41422,17 @@ class Sale extends DataClass implements Insertable<Sale> {
       mecefQrRef: data.mecefQrRef.present
           ? data.mecefQrRef.value
           : this.mecefQrRef,
+      mecefCode: data.mecefCode.present ? data.mecefCode.value : this.mecefCode,
+      mecefNim: data.mecefNim.present ? data.mecefNim.value : this.mecefNim,
+      mecefCompteurs: data.mecefCompteurs.present
+          ? data.mecefCompteurs.value
+          : this.mecefCompteurs,
+      mecefNormaliseLe: data.mecefNormaliseLe.present
+          ? data.mecefNormaliseLe.value
+          : this.mecefNormaliseLe,
+      mecefMessage: data.mecefMessage.present
+          ? data.mecefMessage.value
+          : this.mecefMessage,
     );
   }
 
@@ -41252,13 +41454,18 @@ class Sale extends DataClass implements Insertable<Sale> {
           ..write('soldAt: $soldAt, ')
           ..write('customerName: $customerName, ')
           ..write('mecefStatus: $mecefStatus, ')
-          ..write('mecefQrRef: $mecefQrRef')
+          ..write('mecefQrRef: $mecefQrRef, ')
+          ..write('mecefCode: $mecefCode, ')
+          ..write('mecefNim: $mecefNim, ')
+          ..write('mecefCompteurs: $mecefCompteurs, ')
+          ..write('mecefNormaliseLe: $mecefNormaliseLe, ')
+          ..write('mecefMessage: $mecefMessage')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     deviceId,
     syncStatus,
@@ -41275,7 +41482,12 @@ class Sale extends DataClass implements Insertable<Sale> {
     customerName,
     mecefStatus,
     mecefQrRef,
-  );
+    mecefCode,
+    mecefNim,
+    mecefCompteurs,
+    mecefNormaliseLe,
+    mecefMessage,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -41295,7 +41507,12 @@ class Sale extends DataClass implements Insertable<Sale> {
           other.soldAt == this.soldAt &&
           other.customerName == this.customerName &&
           other.mecefStatus == this.mecefStatus &&
-          other.mecefQrRef == this.mecefQrRef);
+          other.mecefQrRef == this.mecefQrRef &&
+          other.mecefCode == this.mecefCode &&
+          other.mecefNim == this.mecefNim &&
+          other.mecefCompteurs == this.mecefCompteurs &&
+          other.mecefNormaliseLe == this.mecefNormaliseLe &&
+          other.mecefMessage == this.mecefMessage);
 }
 
 class SalesCompanion extends UpdateCompanion<Sale> {
@@ -41315,6 +41532,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
   final Value<String?> customerName;
   final Value<String?> mecefStatus;
   final Value<String?> mecefQrRef;
+  final Value<String?> mecefCode;
+  final Value<String?> mecefNim;
+  final Value<String?> mecefCompteurs;
+  final Value<DateTime?> mecefNormaliseLe;
+  final Value<String?> mecefMessage;
   final Value<int> rowid;
   const SalesCompanion({
     this.id = const Value.absent(),
@@ -41333,6 +41555,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     this.customerName = const Value.absent(),
     this.mecefStatus = const Value.absent(),
     this.mecefQrRef = const Value.absent(),
+    this.mecefCode = const Value.absent(),
+    this.mecefNim = const Value.absent(),
+    this.mecefCompteurs = const Value.absent(),
+    this.mecefNormaliseLe = const Value.absent(),
+    this.mecefMessage = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -41352,6 +41579,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     this.customerName = const Value.absent(),
     this.mecefStatus = const Value.absent(),
     this.mecefQrRef = const Value.absent(),
+    this.mecefCode = const Value.absent(),
+    this.mecefNim = const Value.absent(),
+    this.mecefCompteurs = const Value.absent(),
+    this.mecefNormaliseLe = const Value.absent(),
+    this.mecefMessage = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -41376,6 +41608,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     Expression<String>? customerName,
     Expression<String>? mecefStatus,
     Expression<String>? mecefQrRef,
+    Expression<String>? mecefCode,
+    Expression<String>? mecefNim,
+    Expression<String>? mecefCompteurs,
+    Expression<DateTime>? mecefNormaliseLe,
+    Expression<String>? mecefMessage,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -41395,6 +41632,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       if (customerName != null) 'customer_name': customerName,
       if (mecefStatus != null) 'mecef_status': mecefStatus,
       if (mecefQrRef != null) 'mecef_qr_ref': mecefQrRef,
+      if (mecefCode != null) 'mecef_code': mecefCode,
+      if (mecefNim != null) 'mecef_nim': mecefNim,
+      if (mecefCompteurs != null) 'mecef_compteurs': mecefCompteurs,
+      if (mecefNormaliseLe != null) 'mecef_normalise_le': mecefNormaliseLe,
+      if (mecefMessage != null) 'mecef_message': mecefMessage,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -41416,6 +41658,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     Value<String?>? customerName,
     Value<String?>? mecefStatus,
     Value<String?>? mecefQrRef,
+    Value<String?>? mecefCode,
+    Value<String?>? mecefNim,
+    Value<String?>? mecefCompteurs,
+    Value<DateTime?>? mecefNormaliseLe,
+    Value<String?>? mecefMessage,
     Value<int>? rowid,
   }) {
     return SalesCompanion(
@@ -41435,6 +41682,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       customerName: customerName ?? this.customerName,
       mecefStatus: mecefStatus ?? this.mecefStatus,
       mecefQrRef: mecefQrRef ?? this.mecefQrRef,
+      mecefCode: mecefCode ?? this.mecefCode,
+      mecefNim: mecefNim ?? this.mecefNim,
+      mecefCompteurs: mecefCompteurs ?? this.mecefCompteurs,
+      mecefNormaliseLe: mecefNormaliseLe ?? this.mecefNormaliseLe,
+      mecefMessage: mecefMessage ?? this.mecefMessage,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -41492,6 +41744,21 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     if (mecefQrRef.present) {
       map['mecef_qr_ref'] = Variable<String>(mecefQrRef.value);
     }
+    if (mecefCode.present) {
+      map['mecef_code'] = Variable<String>(mecefCode.value);
+    }
+    if (mecefNim.present) {
+      map['mecef_nim'] = Variable<String>(mecefNim.value);
+    }
+    if (mecefCompteurs.present) {
+      map['mecef_compteurs'] = Variable<String>(mecefCompteurs.value);
+    }
+    if (mecefNormaliseLe.present) {
+      map['mecef_normalise_le'] = Variable<DateTime>(mecefNormaliseLe.value);
+    }
+    if (mecefMessage.present) {
+      map['mecef_message'] = Variable<String>(mecefMessage.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -41517,6 +41784,11 @@ class SalesCompanion extends UpdateCompanion<Sale> {
           ..write('customerName: $customerName, ')
           ..write('mecefStatus: $mecefStatus, ')
           ..write('mecefQrRef: $mecefQrRef, ')
+          ..write('mecefCode: $mecefCode, ')
+          ..write('mecefNim: $mecefNim, ')
+          ..write('mecefCompteurs: $mecefCompteurs, ')
+          ..write('mecefNormaliseLe: $mecefNormaliseLe, ')
+          ..write('mecefMessage: $mecefMessage, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -42171,6 +42443,95 @@ class $CreditNotesTable extends CreditNotes
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _mecefStatusMeta = const VerificationMeta(
+    'mecefStatus',
+  );
+  @override
+  late final GeneratedColumn<String> mecefStatus = GeneratedColumn<String>(
+    'mecef_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefUidMeta = const VerificationMeta(
+    'mecefUid',
+  );
+  @override
+  late final GeneratedColumn<String> mecefUid = GeneratedColumn<String>(
+    'mecef_uid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefQrRefMeta = const VerificationMeta(
+    'mecefQrRef',
+  );
+  @override
+  late final GeneratedColumn<String> mecefQrRef = GeneratedColumn<String>(
+    'mecef_qr_ref',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefCodeMeta = const VerificationMeta(
+    'mecefCode',
+  );
+  @override
+  late final GeneratedColumn<String> mecefCode = GeneratedColumn<String>(
+    'mecef_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefNimMeta = const VerificationMeta(
+    'mecefNim',
+  );
+  @override
+  late final GeneratedColumn<String> mecefNim = GeneratedColumn<String>(
+    'mecef_nim',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefCompteursMeta = const VerificationMeta(
+    'mecefCompteurs',
+  );
+  @override
+  late final GeneratedColumn<String> mecefCompteurs = GeneratedColumn<String>(
+    'mecef_compteurs',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mecefNormaliseLeMeta = const VerificationMeta(
+    'mecefNormaliseLe',
+  );
+  @override
+  late final GeneratedColumn<DateTime> mecefNormaliseLe =
+      GeneratedColumn<DateTime>(
+        'mecef_normalise_le',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _mecefMessageMeta = const VerificationMeta(
+    'mecefMessage',
+  );
+  @override
+  late final GeneratedColumn<String> mecefMessage = GeneratedColumn<String>(
+    'mecef_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -42187,6 +42548,14 @@ class $CreditNotesTable extends CreditNotes
     inspectionNotes,
     status,
     createdAt,
+    mecefStatus,
+    mecefUid,
+    mecefQrRef,
+    mecefCode,
+    mecefNim,
+    mecefCompteurs,
+    mecefNormaliseLe,
+    mecefMessage,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -42295,6 +42664,69 @@ class $CreditNotesTable extends CreditNotes
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('mecef_status')) {
+      context.handle(
+        _mecefStatusMeta,
+        mecefStatus.isAcceptableOrUnknown(
+          data['mecef_status']!,
+          _mecefStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mecef_uid')) {
+      context.handle(
+        _mecefUidMeta,
+        mecefUid.isAcceptableOrUnknown(data['mecef_uid']!, _mecefUidMeta),
+      );
+    }
+    if (data.containsKey('mecef_qr_ref')) {
+      context.handle(
+        _mecefQrRefMeta,
+        mecefQrRef.isAcceptableOrUnknown(
+          data['mecef_qr_ref']!,
+          _mecefQrRefMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mecef_code')) {
+      context.handle(
+        _mecefCodeMeta,
+        mecefCode.isAcceptableOrUnknown(data['mecef_code']!, _mecefCodeMeta),
+      );
+    }
+    if (data.containsKey('mecef_nim')) {
+      context.handle(
+        _mecefNimMeta,
+        mecefNim.isAcceptableOrUnknown(data['mecef_nim']!, _mecefNimMeta),
+      );
+    }
+    if (data.containsKey('mecef_compteurs')) {
+      context.handle(
+        _mecefCompteursMeta,
+        mecefCompteurs.isAcceptableOrUnknown(
+          data['mecef_compteurs']!,
+          _mecefCompteursMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mecef_normalise_le')) {
+      context.handle(
+        _mecefNormaliseLeMeta,
+        mecefNormaliseLe.isAcceptableOrUnknown(
+          data['mecef_normalise_le']!,
+          _mecefNormaliseLeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mecef_message')) {
+      context.handle(
+        _mecefMessageMeta,
+        mecefMessage.isAcceptableOrUnknown(
+          data['mecef_message']!,
+          _mecefMessageMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -42362,6 +42794,38 @@ class $CreditNotesTable extends CreditNotes
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      mecefStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_status'],
+      ),
+      mecefUid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_uid'],
+      ),
+      mecefQrRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_qr_ref'],
+      ),
+      mecefCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_code'],
+      ),
+      mecefNim: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_nim'],
+      ),
+      mecefCompteurs: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_compteurs'],
+      ),
+      mecefNormaliseLe: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}mecef_normalise_le'],
+      ),
+      mecefMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mecef_message'],
+      ),
     );
   }
 
@@ -42399,6 +42863,18 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
 
   /// Le JOUR DU FAIT (heure du Bénin), pas celui de l'envoi : l'écriture inverse et le stock en portent la date.
   final DateTime createdAt;
+
+  /// MECEF-1 (schéma v84) — la facture d'avoir (`FA`) d'un avoir sur une vente NORMALISÉE : état, donnée du QR, code
+  /// MeCeF/DGI, NIM, compteurs, instant, motif. Nuls tant que la vente d'origine n'est pas normalisée. Tirés du serveur,
+  /// JAMAIS écrits par le poste. `mecef_uid` (identifiant DGI) reste au serveur : jamais servi, donc toujours nul ici.
+  final String? mecefStatus;
+  final String? mecefUid;
+  final String? mecefQrRef;
+  final String? mecefCode;
+  final String? mecefNim;
+  final String? mecefCompteurs;
+  final DateTime? mecefNormaliseLe;
+  final String? mecefMessage;
   const AvoirClient({
     required this.id,
     required this.deviceId,
@@ -42414,6 +42890,14 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
     this.inspectionNotes,
     required this.status,
     required this.createdAt,
+    this.mecefStatus,
+    this.mecefUid,
+    this.mecefQrRef,
+    this.mecefCode,
+    this.mecefNim,
+    this.mecefCompteurs,
+    this.mecefNormaliseLe,
+    this.mecefMessage,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -42446,6 +42930,30 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
     }
     map['status'] = Variable<String>(status);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || mecefStatus != null) {
+      map['mecef_status'] = Variable<String>(mecefStatus);
+    }
+    if (!nullToAbsent || mecefUid != null) {
+      map['mecef_uid'] = Variable<String>(mecefUid);
+    }
+    if (!nullToAbsent || mecefQrRef != null) {
+      map['mecef_qr_ref'] = Variable<String>(mecefQrRef);
+    }
+    if (!nullToAbsent || mecefCode != null) {
+      map['mecef_code'] = Variable<String>(mecefCode);
+    }
+    if (!nullToAbsent || mecefNim != null) {
+      map['mecef_nim'] = Variable<String>(mecefNim);
+    }
+    if (!nullToAbsent || mecefCompteurs != null) {
+      map['mecef_compteurs'] = Variable<String>(mecefCompteurs);
+    }
+    if (!nullToAbsent || mecefNormaliseLe != null) {
+      map['mecef_normalise_le'] = Variable<DateTime>(mecefNormaliseLe);
+    }
+    if (!nullToAbsent || mecefMessage != null) {
+      map['mecef_message'] = Variable<String>(mecefMessage);
+    }
     return map;
   }
 
@@ -42473,6 +42981,30 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
           : Value(inspectionNotes),
       status: Value(status),
       createdAt: Value(createdAt),
+      mecefStatus: mecefStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefStatus),
+      mecefUid: mecefUid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefUid),
+      mecefQrRef: mecefQrRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefQrRef),
+      mecefCode: mecefCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefCode),
+      mecefNim: mecefNim == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefNim),
+      mecefCompteurs: mecefCompteurs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefCompteurs),
+      mecefNormaliseLe: mecefNormaliseLe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefNormaliseLe),
+      mecefMessage: mecefMessage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mecefMessage),
     );
   }
 
@@ -42498,6 +43030,16 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
       inspectionNotes: serializer.fromJson<String?>(json['inspectionNotes']),
       status: serializer.fromJson<String>(json['status']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      mecefStatus: serializer.fromJson<String?>(json['mecefStatus']),
+      mecefUid: serializer.fromJson<String?>(json['mecefUid']),
+      mecefQrRef: serializer.fromJson<String?>(json['mecefQrRef']),
+      mecefCode: serializer.fromJson<String?>(json['mecefCode']),
+      mecefNim: serializer.fromJson<String?>(json['mecefNim']),
+      mecefCompteurs: serializer.fromJson<String?>(json['mecefCompteurs']),
+      mecefNormaliseLe: serializer.fromJson<DateTime?>(
+        json['mecefNormaliseLe'],
+      ),
+      mecefMessage: serializer.fromJson<String?>(json['mecefMessage']),
     );
   }
   @override
@@ -42520,6 +43062,14 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
       'inspectionNotes': serializer.toJson<String?>(inspectionNotes),
       'status': serializer.toJson<String>(status),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'mecefStatus': serializer.toJson<String?>(mecefStatus),
+      'mecefUid': serializer.toJson<String?>(mecefUid),
+      'mecefQrRef': serializer.toJson<String?>(mecefQrRef),
+      'mecefCode': serializer.toJson<String?>(mecefCode),
+      'mecefNim': serializer.toJson<String?>(mecefNim),
+      'mecefCompteurs': serializer.toJson<String?>(mecefCompteurs),
+      'mecefNormaliseLe': serializer.toJson<DateTime?>(mecefNormaliseLe),
+      'mecefMessage': serializer.toJson<String?>(mecefMessage),
     };
   }
 
@@ -42538,6 +43088,14 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
     Value<String?> inspectionNotes = const Value.absent(),
     String? status,
     DateTime? createdAt,
+    Value<String?> mecefStatus = const Value.absent(),
+    Value<String?> mecefUid = const Value.absent(),
+    Value<String?> mecefQrRef = const Value.absent(),
+    Value<String?> mecefCode = const Value.absent(),
+    Value<String?> mecefNim = const Value.absent(),
+    Value<String?> mecefCompteurs = const Value.absent(),
+    Value<DateTime?> mecefNormaliseLe = const Value.absent(),
+    Value<String?> mecefMessage = const Value.absent(),
   }) => AvoirClient(
     id: id ?? this.id,
     deviceId: deviceId ?? this.deviceId,
@@ -42557,6 +43115,18 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
         : this.inspectionNotes,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
+    mecefStatus: mecefStatus.present ? mecefStatus.value : this.mecefStatus,
+    mecefUid: mecefUid.present ? mecefUid.value : this.mecefUid,
+    mecefQrRef: mecefQrRef.present ? mecefQrRef.value : this.mecefQrRef,
+    mecefCode: mecefCode.present ? mecefCode.value : this.mecefCode,
+    mecefNim: mecefNim.present ? mecefNim.value : this.mecefNim,
+    mecefCompteurs: mecefCompteurs.present
+        ? mecefCompteurs.value
+        : this.mecefCompteurs,
+    mecefNormaliseLe: mecefNormaliseLe.present
+        ? mecefNormaliseLe.value
+        : this.mecefNormaliseLe,
+    mecefMessage: mecefMessage.present ? mecefMessage.value : this.mecefMessage,
   );
   AvoirClient copyWithCompanion(CreditNotesCompanion data) {
     return AvoirClient(
@@ -42580,6 +43150,24 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
           : this.inspectionNotes,
       status: data.status.present ? data.status.value : this.status,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      mecefStatus: data.mecefStatus.present
+          ? data.mecefStatus.value
+          : this.mecefStatus,
+      mecefUid: data.mecefUid.present ? data.mecefUid.value : this.mecefUid,
+      mecefQrRef: data.mecefQrRef.present
+          ? data.mecefQrRef.value
+          : this.mecefQrRef,
+      mecefCode: data.mecefCode.present ? data.mecefCode.value : this.mecefCode,
+      mecefNim: data.mecefNim.present ? data.mecefNim.value : this.mecefNim,
+      mecefCompteurs: data.mecefCompteurs.present
+          ? data.mecefCompteurs.value
+          : this.mecefCompteurs,
+      mecefNormaliseLe: data.mecefNormaliseLe.present
+          ? data.mecefNormaliseLe.value
+          : this.mecefNormaliseLe,
+      mecefMessage: data.mecefMessage.present
+          ? data.mecefMessage.value
+          : this.mecefMessage,
     );
   }
 
@@ -42599,13 +43187,21 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
           ..write('decision: $decision, ')
           ..write('inspectionNotes: $inspectionNotes, ')
           ..write('status: $status, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('mecefStatus: $mecefStatus, ')
+          ..write('mecefUid: $mecefUid, ')
+          ..write('mecefQrRef: $mecefQrRef, ')
+          ..write('mecefCode: $mecefCode, ')
+          ..write('mecefNim: $mecefNim, ')
+          ..write('mecefCompteurs: $mecefCompteurs, ')
+          ..write('mecefNormaliseLe: $mecefNormaliseLe, ')
+          ..write('mecefMessage: $mecefMessage')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     deviceId,
     syncStatus,
@@ -42620,7 +43216,15 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
     inspectionNotes,
     status,
     createdAt,
-  );
+    mecefStatus,
+    mecefUid,
+    mecefQrRef,
+    mecefCode,
+    mecefNim,
+    mecefCompteurs,
+    mecefNormaliseLe,
+    mecefMessage,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -42638,7 +43242,15 @@ class AvoirClient extends DataClass implements Insertable<AvoirClient> {
           other.decision == this.decision &&
           other.inspectionNotes == this.inspectionNotes &&
           other.status == this.status &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.mecefStatus == this.mecefStatus &&
+          other.mecefUid == this.mecefUid &&
+          other.mecefQrRef == this.mecefQrRef &&
+          other.mecefCode == this.mecefCode &&
+          other.mecefNim == this.mecefNim &&
+          other.mecefCompteurs == this.mecefCompteurs &&
+          other.mecefNormaliseLe == this.mecefNormaliseLe &&
+          other.mecefMessage == this.mecefMessage);
 }
 
 class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
@@ -42656,6 +43268,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
   final Value<String?> inspectionNotes;
   final Value<String> status;
   final Value<DateTime> createdAt;
+  final Value<String?> mecefStatus;
+  final Value<String?> mecefUid;
+  final Value<String?> mecefQrRef;
+  final Value<String?> mecefCode;
+  final Value<String?> mecefNim;
+  final Value<String?> mecefCompteurs;
+  final Value<DateTime?> mecefNormaliseLe;
+  final Value<String?> mecefMessage;
   final Value<int> rowid;
   const CreditNotesCompanion({
     this.id = const Value.absent(),
@@ -42672,6 +43292,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
     this.inspectionNotes = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.mecefStatus = const Value.absent(),
+    this.mecefUid = const Value.absent(),
+    this.mecefQrRef = const Value.absent(),
+    this.mecefCode = const Value.absent(),
+    this.mecefNim = const Value.absent(),
+    this.mecefCompteurs = const Value.absent(),
+    this.mecefNormaliseLe = const Value.absent(),
+    this.mecefMessage = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CreditNotesCompanion.insert({
@@ -42689,6 +43317,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
     this.inspectionNotes = const Value.absent(),
     this.status = const Value.absent(),
     required DateTime createdAt,
+    this.mecefStatus = const Value.absent(),
+    this.mecefUid = const Value.absent(),
+    this.mecefQrRef = const Value.absent(),
+    this.mecefCode = const Value.absent(),
+    this.mecefNim = const Value.absent(),
+    this.mecefCompteurs = const Value.absent(),
+    this.mecefNormaliseLe = const Value.absent(),
+    this.mecefMessage = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deviceId = Value(deviceId),
@@ -42712,6 +43348,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
     Expression<String>? inspectionNotes,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
+    Expression<String>? mecefStatus,
+    Expression<String>? mecefUid,
+    Expression<String>? mecefQrRef,
+    Expression<String>? mecefCode,
+    Expression<String>? mecefNim,
+    Expression<String>? mecefCompteurs,
+    Expression<DateTime>? mecefNormaliseLe,
+    Expression<String>? mecefMessage,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -42729,6 +43373,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
       if (inspectionNotes != null) 'inspection_notes': inspectionNotes,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
+      if (mecefStatus != null) 'mecef_status': mecefStatus,
+      if (mecefUid != null) 'mecef_uid': mecefUid,
+      if (mecefQrRef != null) 'mecef_qr_ref': mecefQrRef,
+      if (mecefCode != null) 'mecef_code': mecefCode,
+      if (mecefNim != null) 'mecef_nim': mecefNim,
+      if (mecefCompteurs != null) 'mecef_compteurs': mecefCompteurs,
+      if (mecefNormaliseLe != null) 'mecef_normalise_le': mecefNormaliseLe,
+      if (mecefMessage != null) 'mecef_message': mecefMessage,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -42748,6 +43400,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
     Value<String?>? inspectionNotes,
     Value<String>? status,
     Value<DateTime>? createdAt,
+    Value<String?>? mecefStatus,
+    Value<String?>? mecefUid,
+    Value<String?>? mecefQrRef,
+    Value<String?>? mecefCode,
+    Value<String?>? mecefNim,
+    Value<String?>? mecefCompteurs,
+    Value<DateTime?>? mecefNormaliseLe,
+    Value<String?>? mecefMessage,
     Value<int>? rowid,
   }) {
     return CreditNotesCompanion(
@@ -42765,6 +43425,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
       inspectionNotes: inspectionNotes ?? this.inspectionNotes,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      mecefStatus: mecefStatus ?? this.mecefStatus,
+      mecefUid: mecefUid ?? this.mecefUid,
+      mecefQrRef: mecefQrRef ?? this.mecefQrRef,
+      mecefCode: mecefCode ?? this.mecefCode,
+      mecefNim: mecefNim ?? this.mecefNim,
+      mecefCompteurs: mecefCompteurs ?? this.mecefCompteurs,
+      mecefNormaliseLe: mecefNormaliseLe ?? this.mecefNormaliseLe,
+      mecefMessage: mecefMessage ?? this.mecefMessage,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -42816,6 +43484,30 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (mecefStatus.present) {
+      map['mecef_status'] = Variable<String>(mecefStatus.value);
+    }
+    if (mecefUid.present) {
+      map['mecef_uid'] = Variable<String>(mecefUid.value);
+    }
+    if (mecefQrRef.present) {
+      map['mecef_qr_ref'] = Variable<String>(mecefQrRef.value);
+    }
+    if (mecefCode.present) {
+      map['mecef_code'] = Variable<String>(mecefCode.value);
+    }
+    if (mecefNim.present) {
+      map['mecef_nim'] = Variable<String>(mecefNim.value);
+    }
+    if (mecefCompteurs.present) {
+      map['mecef_compteurs'] = Variable<String>(mecefCompteurs.value);
+    }
+    if (mecefNormaliseLe.present) {
+      map['mecef_normalise_le'] = Variable<DateTime>(mecefNormaliseLe.value);
+    }
+    if (mecefMessage.present) {
+      map['mecef_message'] = Variable<String>(mecefMessage.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -42839,6 +43531,14 @@ class CreditNotesCompanion extends UpdateCompanion<AvoirClient> {
           ..write('inspectionNotes: $inspectionNotes, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
+          ..write('mecefStatus: $mecefStatus, ')
+          ..write('mecefUid: $mecefUid, ')
+          ..write('mecefQrRef: $mecefQrRef, ')
+          ..write('mecefCode: $mecefCode, ')
+          ..write('mecefNim: $mecefNim, ')
+          ..write('mecefCompteurs: $mecefCompteurs, ')
+          ..write('mecefNormaliseLe: $mecefNormaliseLe, ')
+          ..write('mecefMessage: $mecefMessage, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -70990,6 +71690,11 @@ typedef $$SalesTableCreateCompanionBuilder =
       Value<String?> customerName,
       Value<String?> mecefStatus,
       Value<String?> mecefQrRef,
+      Value<String?> mecefCode,
+      Value<String?> mecefNim,
+      Value<String?> mecefCompteurs,
+      Value<DateTime?> mecefNormaliseLe,
+      Value<String?> mecefMessage,
       Value<int> rowid,
     });
 typedef $$SalesTableUpdateCompanionBuilder =
@@ -71010,6 +71715,11 @@ typedef $$SalesTableUpdateCompanionBuilder =
       Value<String?> customerName,
       Value<String?> mecefStatus,
       Value<String?> mecefQrRef,
+      Value<String?> mecefCode,
+      Value<String?> mecefNim,
+      Value<String?> mecefCompteurs,
+      Value<DateTime?> mecefNormaliseLe,
+      Value<String?> mecefMessage,
       Value<int> rowid,
     });
 
@@ -71099,6 +71809,31 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<String> get mecefQrRef => $composableBuilder(
     column: $table.mecefQrRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefCode => $composableBuilder(
+    column: $table.mecefCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefNim => $composableBuilder(
+    column: $table.mecefNim,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefCompteurs => $composableBuilder(
+    column: $table.mecefCompteurs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get mecefNormaliseLe => $composableBuilder(
+    column: $table.mecefNormaliseLe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefMessage => $composableBuilder(
+    column: $table.mecefMessage,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -71191,6 +71926,31 @@ class $$SalesTableOrderingComposer
     column: $table.mecefQrRef,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get mecefCode => $composableBuilder(
+    column: $table.mecefCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefNim => $composableBuilder(
+    column: $table.mecefNim,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefCompteurs => $composableBuilder(
+    column: $table.mecefCompteurs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get mecefNormaliseLe => $composableBuilder(
+    column: $table.mecefNormaliseLe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefMessage => $composableBuilder(
+    column: $table.mecefMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SalesTableAnnotationComposer
@@ -71264,6 +72024,27 @@ class $$SalesTableAnnotationComposer
     column: $table.mecefQrRef,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get mecefCode =>
+      $composableBuilder(column: $table.mecefCode, builder: (column) => column);
+
+  GeneratedColumn<String> get mecefNim =>
+      $composableBuilder(column: $table.mecefNim, builder: (column) => column);
+
+  GeneratedColumn<String> get mecefCompteurs => $composableBuilder(
+    column: $table.mecefCompteurs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get mecefNormaliseLe => $composableBuilder(
+    column: $table.mecefNormaliseLe,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mecefMessage => $composableBuilder(
+    column: $table.mecefMessage,
+    builder: (column) => column,
+  );
 }
 
 class $$SalesTableTableManager
@@ -71310,6 +72091,11 @@ class $$SalesTableTableManager
                 Value<String?> customerName = const Value.absent(),
                 Value<String?> mecefStatus = const Value.absent(),
                 Value<String?> mecefQrRef = const Value.absent(),
+                Value<String?> mecefCode = const Value.absent(),
+                Value<String?> mecefNim = const Value.absent(),
+                Value<String?> mecefCompteurs = const Value.absent(),
+                Value<DateTime?> mecefNormaliseLe = const Value.absent(),
+                Value<String?> mecefMessage = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion(
                 id: id,
@@ -71328,6 +72114,11 @@ class $$SalesTableTableManager
                 customerName: customerName,
                 mecefStatus: mecefStatus,
                 mecefQrRef: mecefQrRef,
+                mecefCode: mecefCode,
+                mecefNim: mecefNim,
+                mecefCompteurs: mecefCompteurs,
+                mecefNormaliseLe: mecefNormaliseLe,
+                mecefMessage: mecefMessage,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -71348,6 +72139,11 @@ class $$SalesTableTableManager
                 Value<String?> customerName = const Value.absent(),
                 Value<String?> mecefStatus = const Value.absent(),
                 Value<String?> mecefQrRef = const Value.absent(),
+                Value<String?> mecefCode = const Value.absent(),
+                Value<String?> mecefNim = const Value.absent(),
+                Value<String?> mecefCompteurs = const Value.absent(),
+                Value<DateTime?> mecefNormaliseLe = const Value.absent(),
+                Value<String?> mecefMessage = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion.insert(
                 id: id,
@@ -71366,6 +72162,11 @@ class $$SalesTableTableManager
                 customerName: customerName,
                 mecefStatus: mecefStatus,
                 mecefQrRef: mecefQrRef,
+                mecefCode: mecefCode,
+                mecefNim: mecefNim,
+                mecefCompteurs: mecefCompteurs,
+                mecefNormaliseLe: mecefNormaliseLe,
+                mecefMessage: mecefMessage,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -71640,6 +72441,14 @@ typedef $$CreditNotesTableCreateCompanionBuilder =
       Value<String?> inspectionNotes,
       Value<String> status,
       required DateTime createdAt,
+      Value<String?> mecefStatus,
+      Value<String?> mecefUid,
+      Value<String?> mecefQrRef,
+      Value<String?> mecefCode,
+      Value<String?> mecefNim,
+      Value<String?> mecefCompteurs,
+      Value<DateTime?> mecefNormaliseLe,
+      Value<String?> mecefMessage,
       Value<int> rowid,
     });
 typedef $$CreditNotesTableUpdateCompanionBuilder =
@@ -71658,6 +72467,14 @@ typedef $$CreditNotesTableUpdateCompanionBuilder =
       Value<String?> inspectionNotes,
       Value<String> status,
       Value<DateTime> createdAt,
+      Value<String?> mecefStatus,
+      Value<String?> mecefUid,
+      Value<String?> mecefQrRef,
+      Value<String?> mecefCode,
+      Value<String?> mecefNim,
+      Value<String?> mecefCompteurs,
+      Value<DateTime?> mecefNormaliseLe,
+      Value<String?> mecefMessage,
       Value<int> rowid,
     });
 
@@ -71740,6 +72557,46 @@ class $$CreditNotesTableFilterComposer
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get mecefStatus => $composableBuilder(
+    column: $table.mecefStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefUid => $composableBuilder(
+    column: $table.mecefUid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefQrRef => $composableBuilder(
+    column: $table.mecefQrRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefCode => $composableBuilder(
+    column: $table.mecefCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefNim => $composableBuilder(
+    column: $table.mecefNim,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefCompteurs => $composableBuilder(
+    column: $table.mecefCompteurs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get mecefNormaliseLe => $composableBuilder(
+    column: $table.mecefNormaliseLe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mecefMessage => $composableBuilder(
+    column: $table.mecefMessage,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$CreditNotesTableOrderingComposer
@@ -71820,6 +72677,46 @@ class $$CreditNotesTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get mecefStatus => $composableBuilder(
+    column: $table.mecefStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefUid => $composableBuilder(
+    column: $table.mecefUid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefQrRef => $composableBuilder(
+    column: $table.mecefQrRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefCode => $composableBuilder(
+    column: $table.mecefCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefNim => $composableBuilder(
+    column: $table.mecefNim,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefCompteurs => $composableBuilder(
+    column: $table.mecefCompteurs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get mecefNormaliseLe => $composableBuilder(
+    column: $table.mecefNormaliseLe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mecefMessage => $composableBuilder(
+    column: $table.mecefMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CreditNotesTableAnnotationComposer
@@ -71879,6 +72776,40 @@ class $$CreditNotesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get mecefStatus => $composableBuilder(
+    column: $table.mecefStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mecefUid =>
+      $composableBuilder(column: $table.mecefUid, builder: (column) => column);
+
+  GeneratedColumn<String> get mecefQrRef => $composableBuilder(
+    column: $table.mecefQrRef,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mecefCode =>
+      $composableBuilder(column: $table.mecefCode, builder: (column) => column);
+
+  GeneratedColumn<String> get mecefNim =>
+      $composableBuilder(column: $table.mecefNim, builder: (column) => column);
+
+  GeneratedColumn<String> get mecefCompteurs => $composableBuilder(
+    column: $table.mecefCompteurs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get mecefNormaliseLe => $composableBuilder(
+    column: $table.mecefNormaliseLe,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mecefMessage => $composableBuilder(
+    column: $table.mecefMessage,
+    builder: (column) => column,
+  );
 }
 
 class $$CreditNotesTableTableManager
@@ -71926,6 +72857,14 @@ class $$CreditNotesTableTableManager
                 Value<String?> inspectionNotes = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> mecefStatus = const Value.absent(),
+                Value<String?> mecefUid = const Value.absent(),
+                Value<String?> mecefQrRef = const Value.absent(),
+                Value<String?> mecefCode = const Value.absent(),
+                Value<String?> mecefNim = const Value.absent(),
+                Value<String?> mecefCompteurs = const Value.absent(),
+                Value<DateTime?> mecefNormaliseLe = const Value.absent(),
+                Value<String?> mecefMessage = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CreditNotesCompanion(
                 id: id,
@@ -71942,6 +72881,14 @@ class $$CreditNotesTableTableManager
                 inspectionNotes: inspectionNotes,
                 status: status,
                 createdAt: createdAt,
+                mecefStatus: mecefStatus,
+                mecefUid: mecefUid,
+                mecefQrRef: mecefQrRef,
+                mecefCode: mecefCode,
+                mecefNim: mecefNim,
+                mecefCompteurs: mecefCompteurs,
+                mecefNormaliseLe: mecefNormaliseLe,
+                mecefMessage: mecefMessage,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -71960,6 +72907,14 @@ class $$CreditNotesTableTableManager
                 Value<String?> inspectionNotes = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 required DateTime createdAt,
+                Value<String?> mecefStatus = const Value.absent(),
+                Value<String?> mecefUid = const Value.absent(),
+                Value<String?> mecefQrRef = const Value.absent(),
+                Value<String?> mecefCode = const Value.absent(),
+                Value<String?> mecefNim = const Value.absent(),
+                Value<String?> mecefCompteurs = const Value.absent(),
+                Value<DateTime?> mecefNormaliseLe = const Value.absent(),
+                Value<String?> mecefMessage = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CreditNotesCompanion.insert(
                 id: id,
@@ -71976,6 +72931,14 @@ class $$CreditNotesTableTableManager
                 inspectionNotes: inspectionNotes,
                 status: status,
                 createdAt: createdAt,
+                mecefStatus: mecefStatus,
+                mecefUid: mecefUid,
+                mecefQrRef: mecefQrRef,
+                mecefCode: mecefCode,
+                mecefNim: mecefNim,
+                mecefCompteurs: mecefCompteurs,
+                mecefNormaliseLe: mecefNormaliseLe,
+                mecefMessage: mecefMessage,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

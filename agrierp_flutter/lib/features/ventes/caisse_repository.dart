@@ -8,6 +8,7 @@ import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
 import '../clients/clients_creances_repository.dart';
 import '../elevage/fiche_journaliere_repository.dart';
+import 'facturation_repository.dart' show FactureNormaliseeRefusee, StatutMecef;
 
 /// Ligne du panier de caisse.
 class LignePanier {
@@ -402,6 +403,9 @@ class CaisseRepository {
   Future<bool> annulerVente(String venteId) async {
     final vente = await (_db.select(_db.sales)..where((t) => t.id.equals(venteId))).getSingleOrNull();
     if (vente == null || vente.status == 'annulee') return false;
+
+    // MECEF-1 — une facture NORMALISÉE ne s'annule pas (même refus, même message qu'au web) : seul un avoir la corrige.
+    if (StatutMecef.depuis(vente.mecefStatus) == StatutMecef.transmise) throw const FactureNormaliseeRefusee();
 
     await (_db.update(_db.sales)..where((t) => t.id.equals(venteId))).write(
       SalesCompanion(

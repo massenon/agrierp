@@ -20,6 +20,7 @@ use App\Models\Sale;
  * le ticket 4.4 : seul le stock suit. Le poste reprend ce périmètre à l'identique (doctrine, article 5) ; la
  * contre-passation d'une vente annulée est une question ouverte du client (`docs/PLAN_FINALISATION.md`).
  *
+ * @throws \App\Exceptions\FactureNormaliseeException  MECEF-1 : vente normalisée, à corriger par un avoir
  * @return bool  `true` si la vente vient d'être annulée, `false` si elle l'était déjà
  */
 class AnnulerVenteAction
@@ -30,6 +31,11 @@ class AnnulerVenteAction
 
         if ($sale->status === 'annulee') {
             return false;
+        }
+
+        // MECEF-1 — une facture normalisée ne s'annule pas : refusé AVANT de toucher au stock (un avoir la corrige).
+        if ($sale->estNormalisee()) {
+            throw new \App\Exceptions\FactureNormaliseeException();
         }
 
         foreach ($sale->lines as $line) {

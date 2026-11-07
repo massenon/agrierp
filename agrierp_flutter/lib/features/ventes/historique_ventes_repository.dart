@@ -8,6 +8,7 @@ import '../../core/database/sync_columns.dart';
 import '../../core/export/pdf_recu.dart';
 import 'avoirs_repository.dart';
 import 'caisse_repository.dart';
+import 'facturation_repository.dart' show StatutMecef;
 
 /// Les quatre cartes de `historique-ventes.blade.php`, calculées comme `HistoriqueVentes::getKpisProperty()`.
 class KpisHistorique {
@@ -54,6 +55,9 @@ class LigneVente {
   final bool envoyee;
 
   bool get annulee => vente.status == 'annulee';
+
+  /// MECEF-1 — facture normalisée : lecture seule, ni annulation ni modification (un avoir la corrige).
+  bool get normalisee => StatutMecef.depuis(vente.mecefStatus) == StatutMecef.transmise;
 
   /// `$sale->status === 'annulee' ? 0 : $sale->total - $reste`.
   double get paye => annulee ? 0 : vente.total - reste;

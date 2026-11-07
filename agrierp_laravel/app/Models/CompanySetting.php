@@ -34,6 +34,8 @@ class CompanySetting extends Model
         'tva_enabled', 'tva_default_rate', 'vps_rate', 'cnss_employee_rate',
         'cnss_employer_pension_rate', 'cnss_employer_family_rate', 'cnss_employer_risk_rate',
         'payroll_settings_edited_at', 'payroll_settings_edited_by',
+        // MECEF-1 — mode de facturation normalisée ; le jeton JWT est un SECRET chiffré, jamais servi au poste.
+        'mecef_mode', 'mecef_api_url', 'mecef_jeton_encrypted', 'mecef_operateur_id', 'mecef_operateur_nom',
     ];
 
     protected function casts(): array
@@ -42,6 +44,7 @@ class CompanySetting extends Model
             'smtp_password_encrypted' => 'encrypted',
             'twilio_auth_token_encrypted' => 'encrypted',
             'vonage_api_secret_encrypted' => 'encrypted',
+            'mecef_jeton_encrypted' => 'encrypted',
             'payroll_settings_edited_at' => 'datetime',
             'data_reset_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',

@@ -18,6 +18,7 @@ import '../../core/widgets/toast_agri.dart';
 import '../../core/temps/heure_benin.dart';
 import 'avoirs_repository.dart';
 import 'elements_ventes.dart';
+import 'facturation_repository.dart' show FactureNormaliseeRefusee, messageFactureNormalisee;
 import 'historique_ventes_repository.dart';
 
 /// Onglet « Historique des Ventes » du hub Ventes & Devis — `resources/views/livewire/ventes/historique-ventes.blade.php`
@@ -568,7 +569,17 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
             couleur: AgriColors.infoBlue,
             onPressed: () => setState(() => _voirId = v.id),
           ),
-          if (!l.annulee)
+          // MECEF-1 — facture normalisée : le cadenas remplace « Annuler » (même texte qu'au web).
+          if (!l.annulee && l.normalisee)
+            Tooltip(
+              message: messageFactureNormalisee,
+              child: Padding(
+                key: Key('vente-verrou-${v.id}'),
+                padding: const EdgeInsets.all(AgriSpacing.xs),
+                child: Icon(SymbolesAgri.lock, size: 18, color: AgriColors.outlineVariant),
+              ),
+            )
+          else if (!l.annulee)
             LectureSeule.infobulle(
               motifLecture,
               boutonIconeTableau(
@@ -627,7 +638,14 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
       ToastAgri.afficher(context, HistoriqueVentesOnglet.refusDroit, type: TypeToast.erreur);
       return;
     }
-    final annulee = await widget.depot.annuler(id);
+    final bool annulee;
+    try {
+      annulee = await widget.depot.annuler(id);
+    } on FactureNormaliseeRefusee {
+      // MECEF-1 — même refus et même message qu'au web.
+      if (mounted) ToastAgri.afficher(context, messageFactureNormalisee, type: TypeToast.erreur);
+      return;
+    }
     if (!mounted) return;
     if (annulee) {
       ToastAgri.afficher(context, HistoriqueVentesOnglet.toastAnnuleeAuPoste, type: TypeToast.avertissement);

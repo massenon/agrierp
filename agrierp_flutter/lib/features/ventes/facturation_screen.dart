@@ -1,6 +1,7 @@
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/comptabilite/exercice_choisi.dart';
 import '../../core/theme/agri_tokens.dart';
@@ -51,12 +52,13 @@ class FacturationScreen extends StatefulWidget {
 }
 
 class _FacturationScreenState extends State<FacturationScreen> {
-  /// Filtres de la maquette, dans son ordre.
+  /// Filtres du web (`facturation.blade.php`, MECEF-1 : les libellés de `MecefEtat`), dans son ordre.
   static const filtres = <String>[
     'Tous les statuts',
-    'Transmise',
+    'Normalisée',
     'En attente',
-    'Erreur MeCeF',
+    'Refusée',
+    'Expirée',
   ];
 
   String _filtre = filtres.first;
@@ -280,7 +282,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
             // lequel des deux problèmes se pose.
             CarteKpi(
               libelle: 'Erreur MeCeF',
-              valeur: '${d.compte(StatutMecef.erreur)}',
+              valeur: '${d.compte(StatutMecef.erreur) + d.compte(StatutMecef.expiree)}',
               legende: d.enAttenteDEnvoi > 0
                   ? '${d.enAttenteDEnvoi} facture(s) pas encore envoyée(s)'
                   : 'Toutes les ventes sont parties',
@@ -430,7 +432,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
                         ),
                       ),
                       if (_mecef)
-                        Expanded(flex: 4, child: _pastilleStatut(lignes[i])),
+                        Expanded(flex: 4, child: _statutAvecMotif(lignes[i])),
                       Expanded(
                         flex: 2,
                         child: Align(
@@ -501,11 +503,34 @@ class _FacturationScreenState extends State<FacturationScreen> {
     ),
   );
 
+  /// MECEF-1 — la pastille, et sous elle le MOTIF (français, venu de la DGI ou de la passerelle) d'une facture en attente,
+  /// refusée ou expirée : comme `facturation.blade.php`.
+  Widget _statutAvecMotif(LigneFacture f) {
+    final motif = f.statut == StatutMecef.transmise ? null : f.vente.mecefMessage;
+    if (motif == null || motif.isEmpty) return _pastilleStatut(f);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _pastilleStatut(f),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            motif,
+            key: Key('motif-mecef-${f.vente.id}'),
+            style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _pastilleStatut(LigneFacture f) {
     final (couleur, libelle) = switch (f.statut) {
       StatutMecef.transmise => (AgriColors.brandEmerald, f.statut.libelle),
       StatutMecef.enAttente => (AgriColors.accentYellow, f.statut.libelle),
       StatutMecef.erreur => (AgriColors.errorRed, f.statut.libelle),
+      StatutMecef.expiree => (AgriColors.errorRed, f.statut.libelle),
       StatutMecef.jamais => (
         AgriColors.outline,
         f.envoyee ? f.statut.libelle : 'Vente pas encore envoyée',
@@ -538,14 +563,16 @@ class _FacturationScreenState extends State<FacturationScreen> {
     );
   }
 
-  /// La modale « Facture Normalisee MeCeF » de la maquette.
+  /// La modale « Facture Normalisee MeCeF ».
   ///
-  /// ⚠️ **LE QR N'EST PAS DESSINÉ, SA RÉFÉRENCE EST AFFICHÉE.** Le code est
-  /// produit par le dispositif MeCeF et imprimé sur la facture officielle par
-  /// la surface web ; le poste n'a pas la chaîne d'édition. Dessiner un QR à
-  /// partir de la seule référence produirait une image d'apparence officielle
-  /// que rien ne certifie.
+  /// MECEF-1 — le QR est DESSINÉ à partir de la DONNÉE renvoyée par la DGI (`mecef_qr_ref`, jamais construite au poste) :
+  /// il n'y en a un que pour une facture NORMALISÉE ; une facture en attente, refusée ou expirée ne montre ni QR ni
+  /// mention inventée, mais son motif. Les mentions (code MeCeF/DGI, NIM, compteurs, date) sont celles de la DGI.
   void _ouvrirFacture(LigneFacture f) {
+    final v = f.vente;
+    final le = v.mecefNormaliseLe;
+    String heure(DateTime d) =>
+        '${_date(d)} à ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}:${d.second.toString().padLeft(2, '0')}';
     afficherModale<void>(
       context: context,
       constructeur: (context) => ModaleAgri(
@@ -555,39 +582,38 @@ class _FacturationScreenState extends State<FacturationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _ligneDetail('Date', _date(f.vente.soldAt)),
-            _ligneDetail('Montant TTC', '${_montant(f.vente.total)} FCFA'),
-            _ligneDetail('Mode de paiement', f.vente.paymentMode),
+            _ligneDetail('Date', _date(v.soldAt)),
+            _ligneDetail('Montant TTC', '${_montant(v.total)} FCFA'),
+            _ligneDetail('Mode de paiement', v.paymentMode),
             _ligneDetail('Statut MeCeF', f.statut.libelle),
+            if (f.normalisee && (v.mecefCode ?? '').isNotEmpty) _ligneDetail('Code MeCeF/DGI', v.mecefCode!),
+            if (f.normalisee && (v.mecefNim ?? '').isNotEmpty) _ligneDetail('NIM', v.mecefNim!),
+            if (f.normalisee && (v.mecefCompteurs ?? '').isNotEmpty) _ligneDetail('Compteurs', v.mecefCompteurs!),
+            if (f.normalisee && le != null) _ligneDetail('Normalisée le', heure(le)),
+            if (!f.normalisee && (v.mecefMessage ?? '').isNotEmpty) _ligneDetail('Motif', v.mecefMessage!),
             const SizedBox(height: AgriSpacing.sm),
-            const Text(
-              'RÉFÉRENCE MeCeF',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: AgriTypography.gras,
-                color: AgriColors.outline,
+            if (f.normalisee && v.mecefQrRef != null) ...[
+              Center(
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(AgriSpacing.sm),
+                  child: QrImageView(key: const Key('qr-facture'), data: v.mecefQrRef!, size: 180),
+                ),
               ),
-            ),
-            const SizedBox(height: AgriSpacing.xs),
-            SelectableText(
-              f.vente.mecefQrRef ?? '— Facture non transmise —',
-              style: const TextStyle(
-                fontSize: AgriTypography.sm,
-                fontFamily: 'monospace',
-                fontWeight: AgriTypography.gras,
-                color: AgriColors.brandForest,
+              const SizedBox(height: AgriSpacing.xs),
+              SelectableText(
+                v.mecefQrRef!,
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontFamily: 'monospace',
+                  color: AgriColors.outline,
+                ),
               ),
-            ),
-            const SizedBox(height: AgriSpacing.sm),
-            const Text(
-              "Le code QR de la facture officielle est imprimé depuis la "
-              'surface web : il est produit par le dispositif MeCeF, et le '
-              'poste ne peut pas le certifier lui-même.',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                color: AgriColors.outline,
+            ] else
+              const Text(
+                'Aucune référence MeCeF disponible pour cette facture.',
+                style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
               ),
-            ),
           ],
         ),
         actions: [
@@ -612,11 +638,16 @@ class _FacturationScreenState extends State<FacturationScreen> {
             color: AgriColors.outline,
           ),
         ),
-        Text(
-          valeur,
-          style: const TextStyle(
-            fontSize: AgriTypography.xs,
-            fontWeight: AgriTypography.gras,
+        const SizedBox(width: AgriSpacing.sm),
+        // MECEF-1 : un motif français peut être long — il passe à la ligne au lieu de déborder.
+        Flexible(
+          child: Text(
+            valeur,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: AgriTypography.xs,
+              fontWeight: AgriTypography.gras,
+            ),
           ),
         ),
       ],

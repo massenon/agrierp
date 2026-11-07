@@ -1657,6 +1657,16 @@ class Sales extends Table with SyncColumns {
 
   /// Référence portée par le QR de la facture normalisée (NIM + signature).
   TextColumn get mecefQrRef => text().nullable()();
+
+  /// MECEF-1 (schéma v84) — ce que la DGI a renvoyé de la facture NORMALISÉE, tiré du serveur et JAMAIS écrit par le poste
+  /// (comme `mecef_status`) : code MeCeF/DGI, NIM du dispositif, compteurs, instant de la normalisation, et le motif français
+  /// d'une transmission en attente ou refusée. Servent le statut de l'écran Facturation et les mentions de la facture PDF.
+  /// `mecef_status` garde ses clés d'avant : `transmise` = « Normalisée », `erreur` = « Refusée » ; `expiree` est nouvelle.
+  TextColumn get mecefCode => text().nullable()();
+  TextColumn get mecefNim => text().nullable()();
+  TextColumn get mecefCompteurs => text().nullable()();
+  DateTimeColumn get mecefNormaliseLe => dateTime().nullable()();
+  TextColumn get mecefMessage => text().nullable()();
 }
 
 /// Achat saisi au poste, ou reçu du serveur.
@@ -1810,6 +1820,18 @@ class CreditNotes extends Table with SyncColumns {
 
   /// Le JOUR DU FAIT (heure du Bénin), pas celui de l'envoi : l'écriture inverse et le stock en portent la date.
   DateTimeColumn get createdAt => dateTime()();
+
+  /// MECEF-1 (schéma v84) — la facture d'avoir (`FA`) d'un avoir sur une vente NORMALISÉE : état, donnée du QR, code
+  /// MeCeF/DGI, NIM, compteurs, instant, motif. Nuls tant que la vente d'origine n'est pas normalisée. Tirés du serveur,
+  /// JAMAIS écrits par le poste. `mecef_uid` (identifiant DGI) reste au serveur : jamais servi, donc toujours nul ici.
+  TextColumn get mecefStatus => text().nullable()();
+  TextColumn get mecefUid => text().nullable()();
+  TextColumn get mecefQrRef => text().nullable()();
+  TextColumn get mecefCode => text().nullable()();
+  TextColumn get mecefNim => text().nullable()();
+  TextColumn get mecefCompteurs => text().nullable()();
+  DateTimeColumn get mecefNormaliseLe => dateTime().nullable()();
+  TextColumn get mecefMessage => text().nullable()();
 }
 
 /// La Corbeille servie par le serveur (`corbeille`) — INSTANTANÉ en lecture seule (ticket ARC3, PRD `docs/prd/archives.md`).
@@ -2397,7 +2419,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 83;
+  int get schemaVersion => 84;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3078,6 +3100,30 @@ class AppDatabase extends _$AppDatabase {
       if (from < 75) {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v84 — ticket MECEF-1 : ce que la DGI renvoie d'une facture normalisée (vente `FV`, avoir `FA`), tiré du serveur.
+      if (from < 84) {
+        for (final colonne in <GeneratedColumn>[
+          sales.mecefCode,
+          sales.mecefNim,
+          sales.mecefCompteurs,
+          sales.mecefNormaliseLe,
+          sales.mecefMessage,
+        ]) {
+          await _ajouterColonneSiAbsente(m, sales, colonne);
+        }
+        for (final colonne in <GeneratedColumn>[
+          creditNotes.mecefStatus,
+          creditNotes.mecefUid,
+          creditNotes.mecefQrRef,
+          creditNotes.mecefCode,
+          creditNotes.mecefNim,
+          creditNotes.mecefCompteurs,
+          creditNotes.mecefNormaliseLe,
+          creditNotes.mecefMessage,
+        ]) {
+          await _ajouterColonneSiAbsente(m, creditNotes, colonne);
+        }
       }
       // v83 — ticket VOL-2 : quatrième emplacement (Poussin ponte) et passages des fiches de volailles pondeuses.
       if (from < 83) {

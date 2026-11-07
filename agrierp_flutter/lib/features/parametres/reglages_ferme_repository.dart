@@ -98,6 +98,8 @@ class ReglagesFermeRepository {
     required String cnssFamille,
     required String cnssRisque,
     required bool estAdmin,
+    String? mecefMode,
+    String? mecefApiUrl,
   }) async {
     final e = <String, String>{};
     if (raisonSociale.trim().isEmpty) {
@@ -111,6 +113,21 @@ class ReglagesFermeRepository {
       e['ifu'] = "L'IFU doit contenir uniquement des chiffres.";
     } else if (ifu.trim().length > 50) {
       e['ifu'] = 'Le champ IFU ne doit pas dépasser 50 caractères.';
+    }
+    // MECEF-1 — `EntrepriseService::enregistrer` / `regles`, mot pour mot.
+    if (mecefMode != null && !modesMecef.contains(mecefMode)) {
+      e['mecefMode'] = 'Le mode de facturation normalisée doit être : désactivé, e-MECeF ou boîtier.';
+    }
+    if (mecefMode == 'emecef' && !RegExp(r'^\d{13}$').hasMatch(ifu.trim()) && e['ifu'] == null) {
+      e['ifu'] = "L'IFU doit comporter 13 chiffres pour la facturation e-MECeF.";
+    }
+    if (mecefApiUrl != null && mecefApiUrl.trim().isNotEmpty) {
+      final u = Uri.tryParse(mecefApiUrl.trim());
+      if (u == null || !(u.scheme == 'http' || u.scheme == 'https') || u.host.isEmpty) {
+        e['mecefApiUrl'] = "L'adresse de l'API e-MECeF doit être une adresse web complète (https://…).";
+      } else if (mecefApiUrl.trim().length > 255) {
+        e['mecefApiUrl'] = "Le champ mecef api url ne doit pas dépasser 255 caractères.";
+      }
     }
     if (email.trim().isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.trim())) {
       e['email'] = 'Le champ adresse e-mail doit être une adresse e-mail valide.';
@@ -148,6 +165,33 @@ class ReglagesFermeRepository {
     return e;
   }
 
+  /// MECEF-1 — les trois modes réglables (`App\Support\MecefMode::REGLABLES`), avec les libellés du web (`MecefMode::LIBELLES`).
+  static const modesMecef = ['desactive', 'emecef', 'boitier'];
+  static const libellesModesMecef = {
+    'desactive': 'Désactivé',
+    'emecef': 'e-MECeF (en ligne)',
+    'boitier': 'Boîtier MeCeF (à venir)',
+  };
+
+  /// Adresse de l'API e-MECeF proposée par défaut (`MecefMode::URL_PAR_DEFAUT`).
+  static const urlEmecefParDefaut = 'https://developper.impots.bj/sygmef-emcf/api';
+
+  /// MECEF-1 — le réglage servi par le tirage (`app_settings`) : mode, adresse, opérateur et UN BOOLÉEN « jeton configuré ».
+  /// ⚠️ Le jeton lui-même n'existe PAS au poste (secret du serveur) : il se saisit sur le web.
+  Future<({String mode, String apiUrl, String operateurId, String operateurNom, bool jetonConfigure})> reglageMecef() async {
+    final lignes = {
+      for (final l in await (database.select(database.appSettings)..where((s) => s.key.like('mecef.%'))).get()) l.key: l.value,
+    };
+    final mode = lignes['mecef.mode'];
+    return (
+      mode: modesMecef.contains(mode) ? mode! : 'desactive',
+      apiUrl: (lignes['mecef.api_url'] ?? '').isEmpty ? urlEmecefParDefaut : lignes['mecef.api_url']!,
+      operateurId: lignes['mecef.operateur_id'] ?? '',
+      operateurNom: lignes['mecef.operateur_nom'] ?? '',
+      jetonConfigure: lignes['mecef.jeton_configure'] == '1',
+    );
+  }
+
   static String _s(double v) => v == v.roundToDouble() ? v.round().toString() : v.toString();
 
   Future<void> enregistrerEntreprise({
@@ -167,10 +211,15 @@ class ReglagesFermeRepository {
     required bool estAdmin,
     FichierChoisi? logo,
     FichierChoisi? favicon,
+    String? mecefMode,
+    String mecefApiUrl = '',
+    String mecefOperateurId = '',
+    String mecefOperateurNom = '',
   }) async {
     final refus = await validerEntreprise(
       raisonSociale: raisonSociale, ifu: ifu, email: email, vps: vps, cnssSalarie: cnssSalarie,
       cnssPension: cnssPension, cnssFamille: cnssFamille, cnssRisque: cnssRisque, estAdmin: estAdmin,
+      mecefMode: mecefMode, mecefApiUrl: mecefApiUrl,
     );
     final refusFichiers = <String, String>{
       for (final (champ, genre, f) in [('logoFile', 'logo', logo), ('faviconFile', 'favicon', favicon)])
@@ -191,6 +240,11 @@ class ReglagesFermeRepository {
       'email': email.trim(), 'ifu': ifu.trim(), 'rccm': rccm.trim(), 'tvaEnabled': tva,
       'vpsRate': _nombre(vps), 'cnssEmployeeRate': _nombre(cnssSalarie), 'cnssEmployerPensionRate': _nombre(cnssPension),
       'cnssEmployerFamilyRate': _nombre(cnssFamille), 'cnssEmployerRiskRate': _nombre(cnssRisque),
+      // MECEF-1 — le mode, l'adresse et l'opérateur partent dans la demande ; JAMAIS un jeton (saisi au web seulement).
+      if (mecefMode != null) ...{
+        'mecefMode': mecefMode, 'mecefApiUrl': mecefApiUrl.trim(),
+        'mecefOperateurId': mecefOperateurId.trim(), 'mecefOperateurNom': mecefOperateurNom.trim(),
+      },
     });
   }
 

@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Services\Mecef\FakeMecefGateway;
 use App\Services\Mecef\MecefGatewayInterface;
 use App\Support\DatesValidationFr;
 use Illuminate\Support\ServiceProvider;
@@ -23,7 +22,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(MecefGatewayInterface::class, FakeMecefGateway::class);
+        // MECEF-1 : la passerelle suit le mode réglé (désactivé / e-MECeF / boîtier ; `FakeMecefGateway` en dev et tests).
+        $this->app->bind(MecefGatewayInterface::class, fn () => \App\Services\Mecef\MecefGatewayFactory::make());
     }
 
     public function boot(): void

@@ -917,3 +917,22 @@ Décision du client (05/11/2026) : même principe que VOL-1 pour la fiche Pondeu
 
 
 **VOL-2 — décisions du client du 05/11/2026** : (1) rations 130 / 80 / 30 g/j confirmées, CRUD par Paramètres Élevage (web + poste) ; (2) demande du départ à la création d'une bande : non faite, le départ reste demandé à l'ouverture de la fiche ; (3) produit « Poussin d'un jour (ponte) » créé (semoir + migration `…000007`) ; (4) migrations VOL-1/VOL-2 jouées sur MariaDB 10.11 : `migrate:fresh --seed`, rollback de 3 paliers puis re-migration, enum `livestock_transfers.categorie` = repro/sevre/jeune/quatre. Rendu navigateur / Windows : toujours non vérifié.
+
+## MECEF-1 ✅ (07/11/2026) e-MECeF en ligne, mode boîtier paramétrable, facture normalisée verrouillée (web d'abord, puis poste, Drift v84)
+
+Décisions du client (07/11/2026) : la ferme a un compte e-MECeF (API en ligne de la DGI, sans boîtier) ; d'autres structures utilisent un boîtier (Eltrade CC300) et la ferme en achètera un : les deux modes se paramètrent. Une facture normalisée n'est plus modifiable ni annulable : toute correction passe par un avoir lié à la facture d'origine.
+
+| Point | Livraison |
+|---|---|
+| Mode | `desactive` (défaut) / `emecef` (transmission par le SERVEUR) / `boitier` (squelette : « Mode boîtier : transmission par le poste non encore disponible. », rien transmis). Paramètres > Données de l'Entreprise, web ET poste (demande `entreprise`). `mecef_actif` dérivé ; `config/mecef.php` = valeur par défaut (phpunit l'allume : passerelle de démonstration). |
+| Jeton JWT | Secret : chiffré, masqué, jamais servi au poste (seulement `mecef_jeton_configure`), jamais journalisé ; saisi au web seulement. |
+| `EmecefGateway` | `POST /invoice` puis `PUT /invoice/{uid}/confirm`, un seul essai de création, `uid` gardé, reprise par confirmation seule, états en attente / normalisée / refusée / expirée, motifs français, jamais d'exception qui bloque la vente. Constructeur unique `MecefFactureBuilder`. |
+| Intégrité | Vente normalisée verrouillée (modèle, lignes, annulation, web + poste, même message) ; correction par avoir `FA` (`reference` = uid d'origine) transmis par le même mécanisme. |
+| Facture PDF | QR de la DGI + code MeCeF/DGI, NIM, compteurs, date et heure, web et poste ; rien d'inventé sans normalisation. |
+| Poste | Drift v84 (colonnes `mecef_*` de `sales` et `credit_notes`, tirées, jamais écrites) ; Facturation : statuts Normalisée / En attente / Refusée / Expirée + motif ; lecture seule de la facture normalisée. |
+
+**MECEF-2 (boîtier par le poste) : à faire à l'achat du boîtier**, contrat déjà défini : le poste appelle `http://localhost:38917/check` puis `/bill` avec le MÊME `MecefFactureBuilder`, vérifie que `qr_code` est rempli (le pilote répond 200 même en échec), puis synchronise le résultat ; pilote sans authentification : n'écouter que localhost. (Le builder est aujourd'hui en PHP : MECEF-2 le fera soit porter en Dart avec parité exécutée, soit servir la charge par le serveur ; à trancher.)
+
+**Non vérifié** : AUCUN appel réel à la DGI (ni jeton ni IFU) — chemins, noms de champs, détection de l'expiration et reprise par confirmation seule d'après un paquet non officiel, non confirmés par la documentation DGI (injoignable) ; arrondis des prix unitaires non entiers ; confirmation d'une facture déjà confirmée ; MySQL/MariaDB réel (migration `mecef_status` enum → texte essayée sous SQLite seulement) ; rendu Windows réel du QR du PDF du poste ; suites complètes.
+**Restes / décisions à prendre** : numérotation propre de la facture normalisée ; IFU et AIB du client (absents de la base) ; frais de livraison hors facture DGI ; avoirs du poste : pas d'écran de statut d'avoir ; clés `transmise` / `erreur` conservées (renommer en `normalisee` / `refusee` demande une migration des données, des tests et du poste).
+

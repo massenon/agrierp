@@ -98,7 +98,7 @@ class VentesDateEffectiveTest extends TestCase
         $vente = new Sale([
             'customer_id' => $this->client->id, 'payment_mode' => 'especes',
             'subtotal' => $montant, 'discount' => 0, 'total' => $montant, 'delivery_fee' => 0,
-            'status' => 'validee', 'mecef_status' => 'transmise', 'sold_at' => $vendueLe,
+            'status' => 'validee', 'sold_at' => $vendueLe,
         ]);
         $vente->created_at = $enregistreeLe;
         $vente->updated_at = $enregistreeLe;
@@ -109,7 +109,10 @@ class VentesDateEffectiveTest extends TestCase
             'unit_price' => $montant, 'manual_total_amount' => $montant, 'is_manual_price' => true,
         ]);
 
-        return $vente;
+        // MECEF-1 : une facture normalisée est figée — ses lignes se posent AVANT la normalisation du fixture.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $vente->id)->update(['mecef_status' => 'transmise']);
+
+        return $vente->refresh();
     }
 
     /** @return array<int, string> */

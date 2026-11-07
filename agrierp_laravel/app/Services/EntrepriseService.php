@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Models\User;
+use App\Support\MecefMode;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -31,6 +32,13 @@ class EntrepriseService
             'cnssEmployerPensionRate' => ['required', 'numeric', 'min:0', 'max:20'],
             'cnssEmployerFamilyRate' => ['required', 'numeric', 'min:0', 'max:20'],
             'cnssEmployerRiskRate' => ['required', 'numeric', 'min:1', 'max:4'],
+            // MECEF-1 — facturation normalisée. `sometimes` : un poste plus ancien n'envoie pas ces clés, le réglage reste tel quel.
+            'mecefMode' => ['sometimes', 'in:'.implode(',', MecefMode::REGLABLES)],
+            'mecefApiUrl' => ['sometimes', 'nullable', 'url', 'max:255'],
+            'mecefOperateurId' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'mecefOperateurNom' => ['sometimes', 'nullable', 'string', 'max:100'],
+            // Le jeton JWT est un SECRET : saisi au web seulement, vide = conservé.
+            'mecefJeton' => ['sometimes', 'nullable', 'string', 'max:4000'],
         ];
     }
 
@@ -78,7 +86,11 @@ class EntrepriseService
         return $fichiers;
     }
 
-    public const MESSAGES = ['ifu.regex' => "L'IFU doit contenir uniquement des chiffres."];
+    public const MESSAGES = [
+        'ifu.regex' => "L'IFU doit contenir uniquement des chiffres.",
+        'mecefMode.in' => 'Le mode de facturation normalisée doit être : désactivé, e-MECeF ou boîtier.',
+        'mecefApiUrl.url' => "L'adresse de l'API e-MECeF doit être une adresse web complète (https://…).",
+    ];
 
     /**
      * @param array{companyName: string, promoterName?: ?string, address?: ?string, phone?: ?string, email?: ?string, ifu: string, rccm?: ?string, tvaEnabled?: bool, vpsRate: mixed, cnssEmployeeRate: mixed, cnssEmployerPensionRate: mixed, cnssEmployerFamilyRate: mixed, cnssEmployerRiskRate: mixed} $v
@@ -89,6 +101,11 @@ class EntrepriseService
     public function enregistrer(array $v, ?User $auteur, array $fichiers = []): void
     {
         $settings = CompanySetting::current();
+
+        // MECEF-1 — e-MECeF exige l'IFU à 13 chiffres : refusé AVANT d'écrire quoi que ce soit.
+        if (($v['mecefMode'] ?? null) === MecefMode::EMECEF && ! preg_match('/^\d{13}$/', (string) $v['ifu'])) {
+            throw ValidationException::withMessages(['ifu' => "L'IFU doit comporter 13 chiffres pour la facturation e-MECeF."]);
+        }
 
         $tauxModifies = $settings->payrollSettingsLocked() && (
             (float) $settings->vps_rate !== (float) $v['vpsRate']
@@ -104,6 +121,8 @@ class EntrepriseService
                 .'. Seul un administrateur peut les modifier.']);
         }
 
+        $mecefAvant = $settings->only(['mecef_mode', 'mecef_api_url']);
+
         $settings->update([
             'company_name' => $v['companyName'],
             'promoter_name' => ($v['promoterName'] ?? null) ?: null,
@@ -118,12 +137,43 @@ class EntrepriseService
             'cnss_employer_pension_rate' => $v['cnssEmployerPensionRate'],
             'cnss_employer_family_rate' => $v['cnssEmployerFamilyRate'],
             'cnss_employer_risk_rate' => $v['cnssEmployerRiskRate'],
-        ] + $fichiers);
+        ] + $this->colonnesMecef($v) + $fichiers);
 
         if ($tauxModifies || ! $settings->payrollSettingsLocked()) {
             $settings->fresh()->markPayrollSettingsEdited($auteur);
         }
 
         AuditLog::record('company_settings.updated', 'parametres');
+
+        // Journal SANS valeur : on sait que le réglage a changé, jamais ce que contient le jeton.
+        if ($this->mecefAChange($mecefAvant, $settings, $v)) {
+            AuditLog::record('company_settings.mecef_updated', 'parametres');
+        }
+    }
+
+    /** @return array<string, mixed> les seules colonnes MeCeF présentes dans la demande (absentes : réglage conservé) */
+    private function colonnesMecef(array $v): array
+    {
+        $colonnes = [];
+
+        foreach (['mecefMode' => 'mecef_mode', 'mecefApiUrl' => 'mecef_api_url', 'mecefOperateurId' => 'mecef_operateur_id', 'mecefOperateurNom' => 'mecef_operateur_nom'] as $cle => $colonne) {
+            if (array_key_exists($cle, $v)) {
+                $colonnes[$colonne] = ($v[$cle] ?? null) === '' ? null : ($v[$cle] ?? null);
+            }
+        }
+
+        if (is_string($v['mecefJeton'] ?? null) && trim($v['mecefJeton']) !== '') {
+            $colonnes['mecef_jeton_encrypted'] = trim($v['mecefJeton']);
+        }
+
+        return $colonnes;
+    }
+
+    /** @param array<string, mixed> $avant `mecef_mode` et `mecef_api_url` d'avant l'écriture */
+    private function mecefAChange(array $avant, CompanySetting $apres, array $v): bool
+    {
+        return trim((string) ($v['mecefJeton'] ?? '')) !== ''
+            || $apres->mecef_mode !== $avant['mecef_mode']
+            || $apres->mecef_api_url !== $avant['mecef_api_url'];
     }
 }

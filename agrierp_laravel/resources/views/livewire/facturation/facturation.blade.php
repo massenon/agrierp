@@ -38,9 +38,9 @@
             @if($this->mecefActif)
             <select wire:model.live="statusFilter" class="border border-outline-variant rounded-lg text-xs px-sm py-2 bg-white w-full md:w-auto">
                 <option value="">Tous les statuts</option>
-                <option value="Transmise">Transmise</option>
-                <option value="En attente">En attente</option>
-                <option value="Erreur MeCeF">Erreur MeCeF</option>
+                @foreach(\App\Support\MecefEtat::LIBELLES as $libelleEtat)
+                    <option value="{{ $libelleEtat }}">{{ $libelleEtat }}</option>
+                @endforeach
             </select>
             @endif
         </div>
@@ -66,20 +66,25 @@
                             @if($this->mecefActif)
                             <td data-label="Statut MeCeF" class="px-md py-sm">
                                 @if($sale->mecef_status === 'transmise')
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Transmise</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Normalisée</span>
                                 @elseif($sale->mecef_status === 'erreur')
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">Erreur MeCeF</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">Refusée</span>
+                                @elseif($sale->mecef_status === 'expiree')
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">Expirée</span>
                                 @else
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">En attente</span>
+                                @endif
+                                @if($sale->mecef_status !== 'transmise' && $sale->mecef_message)
+                                    <p class="text-[10px] text-outline mt-xs max-w-xs">{{ $sale->mecef_message }}</p>
                                 @endif
                             </td>
                             @endif
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="imprimerFacture('{{ $sale->id }}')" class="text-brand-emerald hover:text-brand-forest p-1 w-10 h-10 inline-flex items-center justify-center" title="Imprimer la facture (PDF)" aria-label="Imprimer la facture (PDF)"><span class="material-symbols-outlined text-[18px]">picture_as_pdf</span></button>
-                                @if($this->mecefActif && $sale->mecef_qr_ref)
+                                @if($this->mecefActif && $sale->mecef_status === 'transmise' && $sale->mecef_qr_ref)
                                     <button type="button" wire:click="showMecef('{{ $sale->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Facture normalisée MeCeF"><span class="material-symbols-outlined text-[18px]">qr_code_2</span></button>
                                 @endif
-                                @if($this->mecefActif && $sale->mecef_status === 'erreur')
+                                @if($this->mecefActif && $sale->mecef_status !== 'transmise')
                                     <button type="button" wire:click="retryMecef('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retransmettre au MeCeF"><span class="material-symbols-outlined text-[18px]">refresh</span></button>
                                 @endif
                             </td>
@@ -99,6 +104,12 @@
             @if($this->qrSvg)
                 <div class="bg-white border border-outline-variant rounded-lg p-md inline-block">
                     {!! $this->qrSvg !!}
+                </div>
+                <div class="text-[11px] text-outline mt-md text-left space-y-[2px]">
+                    @if($this->viewingSale->mecef_code)<p>Code MeCeF/DGI : <span class="font-mono">{{ $this->viewingSale->mecef_code }}</span></p>@endif
+                    @if($this->viewingSale->mecef_nim)<p>NIM : <span class="font-mono">{{ $this->viewingSale->mecef_nim }}</span></p>@endif
+                    @if($this->viewingSale->mecef_compteurs)<p>Compteurs : <span class="font-mono">{{ $this->viewingSale->mecef_compteurs }}</span></p>@endif
+                    @if($this->viewingSale->mecef_normalise_le)<p>Normalisée le {{ $this->viewingSale->mecef_normalise_le->format('d/m/Y à H:i:s') }}</p>@endif
                 </div>
                 <p class="text-[11px] font-mono text-outline mt-md break-all">{{ $this->viewingSale->mecef_qr_ref }}</p>
             @else

@@ -113,7 +113,12 @@
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="view('{{ $sale->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Voir"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
                                 @if($sale->status !== 'annulee')
-                                    <button @lectureSeule type="button" wire:click="confirmCancel('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Annuler"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                    @if($sale->estNormalisee())
+                                        {{-- MECEF-1 — facture normalisée : ni annulation ni modification, un avoir la corrige. --}}
+                                        <span class="text-outline p-1 inline-flex opacity-50 cursor-not-allowed" title="Facture normalisée : corrigez-la par un avoir."><span class="material-symbols-outlined text-[18px]">lock</span></span>
+                                    @else
+                                        <button @lectureSeule type="button" wire:click="confirmCancel('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Annuler"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                    @endif
                                 @endif
                             </td>
                         </tr>

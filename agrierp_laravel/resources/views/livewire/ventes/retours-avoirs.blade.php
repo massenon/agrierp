@@ -70,8 +70,15 @@
                                 @else
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">En attente</span>
                                 @endif
+                                {{-- MECEF-1 — facture d'avoir (FA) : seulement quand la facture d'origine est normalisée. --}}
+                                @if($note->mecef_status)
+                                    <p class="text-[10px] text-outline mt-xs">Avoir MeCeF : {{ \App\Support\MecefEtat::libelle($note->mecef_status) }}@if($note->mecef_status !== 'transmise' && $note->mecef_message) — {{ $note->mecef_message }}@endif</p>
+                                @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @if($note->mecef_status && $note->mecef_status !== 'transmise')
+                                    <button type="button" wire:click="retryMecef('{{ $note->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retransmettre au MeCeF"><span class="material-symbols-outlined text-[18px]">refresh</span></button>
+                                @endif
                                 @if($note->status === 'en_attente')
                                     <button type="button" wire:click="markAsTreated('{{ $note->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Marquer comme traité"><span class="material-symbols-outlined text-[18px]">check_circle</span></button>
                                 @endif

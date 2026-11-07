@@ -112,6 +112,13 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
   late final _famille = TextEditingController(text: _n(widget.e?.cnssEmployerFamilyRate, 9));
   late final _risque = TextEditingController(text: _n(widget.e?.cnssEmployerRiskRate, 2));
   late bool _tva = widget.e?.tvaEnabled ?? true;
+
+  // MECEF-1 — facturation normalisée : le mode, l'adresse de l'API e-MECeF, l'opérateur ; le jeton ne se saisit PAS ici.
+  String _mecefMode = 'desactive';
+  bool _jetonConfigure = false;
+  final _mecefUrl = TextEditingController(text: ReglagesFermeRepository.urlEmecefParDefaut);
+  final _mecefOpId = TextEditingController();
+  final _mecefOpNom = TextEditingController();
   Map<String, String> _erreurs = const {};
   FichierChoisi? _logo;
   FichierChoisi? _favicon;
@@ -125,6 +132,17 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
   }
 
   Future<void> _chargerActuels() async {
+    // MECEF-1 : le réglage vient de la base (rapide) — lu AVANT les fichiers du logo (disque), qui peuvent tarder.
+    final m = await widget.depot.reglageMecef();
+    if (mounted) {
+      setState(() {
+        _mecefMode = m.mode;
+        _jetonConfigure = m.jetonConfigure;
+        _mecefUrl.text = m.apiUrl;
+        _mecefOpId.text = m.operateurId;
+        _mecefOpNom.text = m.operateurNom;
+      });
+    }
     final l = await widget.depot.fichiersEntreprise.lire('logo');
     final f = await widget.depot.fichiersEntreprise.lire('favicon');
     if (mounted) setState(() { _logoActuel = l; _faviconActuel = f; });
@@ -172,6 +190,7 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
         ifu: _ifu.text, rccm: _rccm.text, tva: _tva, vps: _vps.text, cnssSalarie: _salarie.text, cnssPension: _pension.text,
         cnssFamille: _famille.text, cnssRisque: _risque.text, estAdmin: widget.estAdmin,
         logo: _logo, favicon: _favicon,
+        mecefMode: _mecefMode, mecefApiUrl: _mecefUrl.text, mecefOperateurId: _mecefOpId.text, mecefOperateurNom: _mecefOpNom.text,
       );
     } on ReglageRefuse catch (r) {
       setState(() => _erreurs = r.erreurs);
@@ -179,6 +198,68 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
     }
     if (mounted) Navigator.of(context).pop(true);
   }
+
+  /// MECEF-1 — « Facturation normalisée (MeCeF) » : mêmes libellés que `donnees-entreprise.blade.php`.
+  Widget _blocMecef(String p) => Padding(
+    padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Facturation normalisée (MeCeF)', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          "Choisissez comment les factures sont normalisées auprès de la DGI. Une facture normalisée n'est plus modifiable ni annulable : elle se corrige par un avoir.",
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        _etiquette('Mode de facturation normalisée'),
+        DropdownButtonFormField<String>(
+          key: const Key('entreprise-mecefMode'),
+          initialValue: _mecefMode,
+          isDense: true,
+          isExpanded: true,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+          items: [
+            for (final m in ReglagesFermeRepository.modesMecef) DropdownMenuItem(value: m, child: Text(ReglagesFermeRepository.libellesModesMecef[m]!)),
+          ],
+          onChanged: (v) => setState(() => _mecefMode = v ?? 'desactive'),
+        ),
+        _erreur(_erreurs['mecefMode'], const Key('entreprise-erreur-mecefMode')),
+        if (_mecefMode == 'boitier')
+          const Text(
+            "Mode boîtier : la transmission se fera par le poste Windows où le boîtier est branché. Le réglage est enregistré, mais rien n'est encore transmis : les factures restent en attente.",
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+        if (_mecefMode == 'desactive')
+          const Text(
+            "Aucune facture n'est transmise : la facturation reste un registre avec facture PDF.",
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+        if (_mecefMode == 'emecef') ...[
+          const SizedBox(height: AgriSpacing.sm),
+          champReglage(p, 'mecefApiUrl', "Adresse de l'API e-MECeF", _mecefUrl, _erreurs, indice: ReglagesFermeRepository.urlEmecefParDefaut),
+          _etiquette('Jeton e-MECeF (JWT)'),
+          Text(
+            _jetonConfigure ? '••••••••••••' : 'Aucun jeton enregistré',
+            key: const Key('entreprise-jeton-etat'),
+            style: const TextStyle(fontSize: AgriTypography.sm, letterSpacing: 2),
+          ),
+          const Text(
+            'Secret : chiffré sur le serveur, jamais affiché, jamais envoyé aux postes. Il se saisit sur le web.',
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+          const SizedBox(height: AgriSpacing.sm),
+          champReglage(p, 'mecefOperateurId', "Identifiant de l'opérateur", _mecefOpId, _erreurs, indice: '1'),
+          champReglage(p, 'mecefOperateurNom', "Nom de l'opérateur (caissier par défaut)", _mecefOpNom, _erreurs, indice: 'Caissier'),
+          const Text(
+            "L'IFU transmis est celui des Informations Légales & Fiscales ci-dessus : il doit comporter 13 chiffres.",
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+        ],
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +276,7 @@ class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
           champReglage(p, 'email', 'Email de Contact', _email, _erreurs, indice: 'contact@fermeolouwachegoun.com'),
           champReglage(p, 'ifu', 'Identifiant Fiscal Unique (IFU) *', _ifu, _erreurs, indice: 'ex : 3202601234567'),
           champReglage(p, 'rccm', 'Registre du Commerce (RCCM)', _rccm, _erreurs),
+          _blocMecef(p),
           SwitchListTile(
             key: const Key('entreprise-tva'),
             contentPadding: EdgeInsets.zero,

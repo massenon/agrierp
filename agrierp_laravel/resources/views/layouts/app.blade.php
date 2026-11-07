@@ -110,7 +110,7 @@
             @hasanyrole(['admin', 'caissier'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">FACTURATION</p>
             <div class="space-y-xs mb-sm">
-                <x-sidebar-link href="/facturation" icon="receipt_long" :label="config('mecef.actif') ? 'Facturation & MeCeF' : 'Facturation'" />
+                <x-sidebar-link href="/facturation" icon="receipt_long" :label="app(\App\Services\Mecef\MecefReglage::class)->actif() ? 'Facturation & MeCeF' : 'Facturation'" />
             </div>
             @endhasanyrole
 

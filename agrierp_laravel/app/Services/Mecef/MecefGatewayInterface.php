@@ -27,7 +27,12 @@ interface MecefGatewayInterface
     /**
      * Transmet une vente au dispositif MeCeF.
      *
-     * @return array{success: bool, qr_ref: ?string, message: string}
+     * MECEF-1 : la réponse peut porter, EN PLUS, `etat` (`MecefEtat` : `en_attente` = à retenter, `erreur` = refusée,
+     * `expiree`) quand la transmission n'a pas abouti — sans lui, un échec est « refusée » comme avant — et `details`
+     * (`uid`, `code`, `nim`, `compteurs`, `date`) : ce que la DGI a renvoyé, y compris l'`uid` d'une facture créée mais
+     * pas encore confirmée.
+     *
+     * @return array{success: bool, qr_ref: ?string, message: string, etat?: string, details?: array<string, mixed>}
      */
     public function transmit(Sale $sale): array;
 }

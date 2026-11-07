@@ -36,10 +36,25 @@
     <strong>Total TTC : {{ number_format($sale->total, 0, ',', ' ') }} FCFA</strong>
 </p>
 
-<p style="font-size:11px;margin-top:14px;">
-    @if($sale->mecef_status === 'transmise' && $sale->mecef_qr_ref)
-        Facture normalisée MeCeF — référence : {{ $sale->mecef_qr_ref }}
-    @else
-        Facture émise sans certification MeCeF.
-    @endif
-</p>
+{{-- MECEF-1 — les mentions de la facture NORMALISÉE viennent de la DGI ; sans normalisation, aucune mention inventée. --}}
+@if($sale->estNormalisee() && $sale->mecef_qr_ref)
+    @php
+        $qrSvg = (string) \SimpleSoftwareIO\QrCode\Facades\QrCode::size(110)->margin(0)->generate($sale->mecef_qr_ref);
+    @endphp
+    <table style="width:100%;margin-top:14px;font-size:11px;" id="mentions-mecef">
+        <tr>
+            <td style="vertical-align:top;">
+                <strong>Facture normalisée MeCeF</strong>@unless($sale->mecef_code) — référence : {{ $sale->mecef_qr_ref }}@endunless<br>
+                @if($sale->mecef_code) Code MeCeF/DGI : {{ $sale->mecef_code }}<br> @endif
+                @if($sale->mecef_nim) NIM : {{ $sale->mecef_nim }}<br> @endif
+                @if($sale->mecef_compteurs) Compteurs : {{ $sale->mecef_compteurs }}<br> @endif
+                @if($sale->mecef_normalise_le) Normalisée le {{ $sale->mecef_normalise_le->format('d/m/Y à H:i:s') }}<br> @endif
+            </td>
+            <td style="width:120px;text-align:right;vertical-align:top;">
+                <img src="data:image/svg+xml;base64,{{ base64_encode($qrSvg) }}" width="110" height="110" alt="QR code DGI">
+            </td>
+        </tr>
+    </table>
+@else
+    <p style="font-size:11px;margin-top:14px;">Facture émise sans certification MeCeF.</p>
+@endif

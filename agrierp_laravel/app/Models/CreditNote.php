@@ -12,6 +12,8 @@ class CreditNote extends Model
     protected $fillable = [
         'credit_note_number', 'sale_id', 'product_id', 'qty', 'amount',
         'reason', 'decision', 'inspection_notes', 'status', 'accounting_entry_id',
+        // MECEF-1 — facture d'avoir `FA` (NULL tant que la vente d'origine n'est pas normalisée).
+        'mecef_status', 'mecef_uid', 'mecef_qr_ref', 'mecef_code', 'mecef_nim', 'mecef_compteurs', 'mecef_normalise_le', 'mecef_message',
     ];
 
     protected function casts(): array
@@ -19,6 +21,7 @@ class CreditNote extends Model
         return [
             'qty' => 'decimal:2',
             'amount' => 'decimal:2',
+            'mecef_normalise_le' => 'datetime',
         ];
     }
 

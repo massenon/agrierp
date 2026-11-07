@@ -4,11 +4,15 @@ import '../../core/export/document_officiel.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 
-/// Statut de normalisation fiscale d'une facture, tel que la maquette le nomme.
+/// Statut de normalisation fiscale d'une facture, tel que le web le nomme (`App\Support\MecefEtat`).
+///
+/// ⚠️ MECEF-1 : les CLÉS stockées sont celles d'avant (`transmise`, `erreur`) — seuls les libellés changent :
+/// `transmise` = « Normalisée », `erreur` = « Refusée » ; `expiree` (facture non confirmée à temps chez la DGI) est nouvelle.
 enum StatutMecef {
-  transmise('transmise', 'Transmise'),
+  transmise('transmise', 'Normalisée'),
   enAttente('en_attente', 'En attente'),
-  erreur('erreur', 'Erreur MeCeF'),
+  erreur('erreur', 'Refusée'),
+  expiree('expiree', 'Expirée'),
 
   /// ⚠️⚠️ **JAMAIS TRANSMISE** — le statut serveur est nul. C'était le cas de
   /// TOUTE vente encaissée hors ligne avant le ticket 14.80 : le canal d'envoi
@@ -23,6 +27,18 @@ enum StatutMecef {
 
   static StatutMecef depuis(String? code) =>
       values.firstWhere((s) => s.code == code, orElse: () => jamais);
+}
+
+/// MECEF-1 — le refus d'une facture normalisée, MÊME message qu'au web (`FactureNormaliseeException::MESSAGE`).
+const messageFactureNormalisee = 'Facture normalisée : corrigez-la par un avoir.';
+
+/// MECEF-1 — une facture normalisée est en LECTURE SEULE : le poste l'annule ou la modifie jamais, il applique le même refus
+/// que le web (même message). Seul un avoir la corrige.
+class FactureNormaliseeRefusee implements Exception {
+  const FactureNormaliseeRefusee();
+
+  @override
+  String toString() => messageFactureNormalisee;
 }
 
 /// Une ligne du tableau des factures.
@@ -41,6 +57,9 @@ class LigneFacture {
   final bool envoyee;
 
   StatutMecef get statut => StatutMecef.depuis(vente.mecefStatus);
+
+  /// MECEF-1 — facture normalisée : LECTURE SEULE (ni annulation, ni modification), seul un avoir la corrige.
+  bool get normalisee => statut == StatutMecef.transmise;
 
   String get client => vente.customerName ?? 'Client de passage';
 }
@@ -98,6 +117,12 @@ class FacturationRepository {
     return ligne == null ? mecefParDefaut : ligne.value == '1';
   }
 
+  /// MECEF-1 — le mode servi par le tirage (`desactive` · `emecef` · `boitier`) ; `null` tant que le serveur ne l'a pas dit.
+  Future<String?> mecefMode() async {
+    final ligne = await (database.select(database.appSettings)..where((s) => s.key.equals('mecef.mode'))).getSingleOrNull();
+    return ligne == null || ligne.value.isEmpty ? null : ligne.value;
+  }
+
   Future<void> definirMecefActif(bool actif) => database.into(database.appSettings).insertOnConflictUpdate(
     AppSettingsCompanion.insert(key: cleMecefActif, value: actif ? '1' : '0'),
   );
@@ -146,11 +171,24 @@ class DocumentsFacturation {
   static String _jour(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
+  static String _heure(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}:${d.second.toString().padLeft(2, '0')}';
+
   static String _quantite(double q) => q == q.roundToDouble() ? q.round().toString() : q.toString().replaceAll('.', ',');
 
   static DocumentOfficiel facture(LigneFacture f, List<({String designation, double quantite, double montant})> lignes) {
     final v = f.vente;
     final certifiee = f.statut == StatutMecef.transmise && v.mecefQrRef != null;
+    final le = v.mecefNormaliseLe;
+    // Mêmes mentions que `exports.facture-vente` : celles de la DGI, rien d'inventé sans normalisation.
+    final mentions = !certifiee
+        ? const <String>[]
+        : [
+            if ((v.mecefCode ?? '').isNotEmpty) 'Code MeCeF/DGI : ${v.mecefCode}',
+            if ((v.mecefNim ?? '').isNotEmpty) 'NIM : ${v.mecefNim}',
+            if ((v.mecefCompteurs ?? '').isNotEmpty) 'Compteurs : ${v.mecefCompteurs}',
+            if (le != null) 'Normalisée le ${_jour(le)} à ${_heure(le)}',
+          ];
     return DocumentOfficiel(
       titre: 'Facture ${f.numero}',
       sousTitre: 'Du ${_jour(v.soldAt)} — Client : ${f.client}',
@@ -164,7 +202,11 @@ class DocumentsFacturation {
             DonneesDocument([l.designation, _quantite(l.quantite), _montant(l.quantite > 0 ? l.montant / l.quantite : 0), _montant(l.montant)]),
         TotalDocument(['Total TTC', '', '', _montant(v.total)], premiere: true),
       ],
-      noteDePied: certifiee ? 'Facture normalisée MeCeF — référence : ${v.mecefQrRef}' : 'Facture émise sans certification MeCeF.',
+      noteDePied: certifiee
+          ? 'Facture normalisée MeCeF${(v.mecefCode ?? '').isEmpty ? ' — référence : ${v.mecefQrRef}' : ''}'
+          : 'Facture émise sans certification MeCeF.',
+      mentions: mentions,
+      codeQr: certifiee ? v.mecefQrRef : null,
     );
   }
 }

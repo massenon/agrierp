@@ -2904,6 +2904,25 @@ class SyncEngine {
         AppSettingsCompanion.insert(key: 'mecef.actif', value: l['mecef_actif'] == true ? '1' : '0'),
       );
     }
+    // MECEF-1 — le mode (`desactive` · `emecef` · `boitier`), l'adresse de l'API, l'opérateur et UN BOOLÉEN « jeton configuré » :
+    // jamais le jeton lui-même (le serveur ne le sert pas). Clés absentes (serveur antérieur) : rien n'est touché.
+    for (final (cleServeur, cleLocale) in const [
+      ('mecef_mode', 'mecef.mode'),
+      ('mecef_api_url', 'mecef.api_url'),
+      ('mecef_operateur_id', 'mecef.operateur_id'),
+      ('mecef_operateur_nom', 'mecef.operateur_nom'),
+    ]) {
+      if (l.containsKey(cleServeur)) {
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(key: cleLocale, value: (l[cleServeur] ?? '').toString()),
+        );
+      }
+    }
+    if (l['mecef_jeton_configure'] is bool) {
+      await _db.into(_db.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(key: 'mecef.jeton_configure', value: l['mecef_jeton_configure'] == true ? '1' : '0'),
+      );
+    }
 
     final delaiServi = l.containsKey('rappel_soins_jours');
     final delai = l['rappel_soins_jours'];
@@ -4020,6 +4039,12 @@ class SyncEngine {
         status: Value((l['status'] ?? 'validee') as String),
         mecefStatus: Value(l['mecef_status'] as String?),
         mecefQrRef: Value(l['mecef_qr_ref'] as String?),
+        // MECEF-1 — ce que la DGI a renvoyé (le poste ne les écrit JAMAIS : statut, mentions et QR de la facture PDF).
+        mecefCode: Value(l['mecef_code'] as String?),
+        mecefNim: Value(l['mecef_nim'] as String?),
+        mecefCompteurs: Value(l['mecef_compteurs'] as String?),
+        mecefNormaliseLe: Value(_date(l['mecef_normalise_le'])),
+        mecefMessage: Value(l['mecef_message'] as String?),
         soldAt: vendueLe,
       );
 
@@ -4992,6 +5017,14 @@ class SyncEngine {
           decision: Value(decision as String?),
           inspectionNotes: Value(notes),
           status: Value(statut as String),
+          // MECEF-1 — facture d'avoir (FA) : tirée, jamais écrite par le poste.
+          mecefStatus: Value(l['mecef_status'] as String?),
+          mecefQrRef: Value(l['mecef_qr_ref'] as String?),
+          mecefCode: Value(l['mecef_code'] as String?),
+          mecefNim: Value(l['mecef_nim'] as String?),
+          mecefCompteurs: Value(l['mecef_compteurs'] as String?),
+          mecefNormaliseLe: Value(_date(l['mecef_normalise_le'])),
+          mecefMessage: Value(l['mecef_message'] as String?),
           // Heure MURALE du serveur, lue telle quelle : le jour du web doit rester le jour.
           createdAt: date,
         ),

@@ -1281,7 +1281,15 @@ class SyncController extends Controller
                     'payroll_locked' => $entreprise->payrollSettingsLocked(),
                     'payroll_edited_at' => $entreprise->payroll_settings_edited_at?->format('d/m/Y à H:i'),
                     // Ticket VC-5 — le module MeCeF est-il activé ? (`config/mecef.php`) : le poste montre ou masque ses colonnes MeCeF.
-                    'mecef_actif' => (bool) config('mecef.actif'),
+                    // MECEF-1 — `mecef_actif` est DÉRIVÉ du mode (tout sauf `desactive`). Le poste reçoit le mode, l'adresse de l'API,
+                    // l'opérateur et un BOOLÉEN « jeton configuré » : JAMAIS le jeton lui-même (secret, ni en clair ni chiffré).
+                    'mecef_actif' => app(\App\Services\Mecef\MecefReglage::class)->actif(),
+                    'mecef_mode' => in_array(app(\App\Services\Mecef\MecefReglage::class)->mode(), \App\Support\MecefMode::REGLABLES, true)
+                        ? app(\App\Services\Mecef\MecefReglage::class)->mode() : \App\Support\MecefMode::DESACTIVE,
+                    'mecef_jeton_configure' => app(\App\Services\Mecef\MecefReglage::class)->jetonConfigure(),
+                    'mecef_api_url' => $entreprise->mecef_api_url,
+                    'mecef_operateur_id' => $entreprise->mecef_operateur_id,
+                    'mecef_operateur_nom' => $entreprise->mecef_operateur_nom,
                     // Ticket AUT-2 — chemins du logo et du favicon : le poste télécharge le fichier quand le chemin change.
                     'logo_path' => $entreprise->logo_path,
                     'favicon_path' => $entreprise->favicon_path,
@@ -1784,6 +1792,12 @@ class SyncController extends Controller
                     'status' => $vente->status,
                     'mecef_status' => $vente->mecef_status,
                     'mecef_qr_ref' => $vente->mecef_qr_ref,
+                    // MECEF-1 — ce que la DGI a renvoyé (le poste ne les écrit JAMAIS : il les lit, pour le statut et le PDF).
+                    'mecef_code' => $vente->mecef_code,
+                    'mecef_nim' => $vente->mecef_nim,
+                    'mecef_compteurs' => $vente->mecef_compteurs,
+                    'mecef_normalise_le' => $vente->mecef_normalise_le?->toIso8601String(),
+                    'mecef_message' => $vente->mecef_message,
                     'sold_at' => $vente->date_effective?->toIso8601String(),
                 ],
                 'lignes' => [
@@ -1823,7 +1837,8 @@ class SyncController extends Controller
                 'requete' => fn () => \App\Models\CreditNote::query()
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                     ->select(['id', 'credit_note_number', 'sale_id', 'product_id', 'qty', 'amount', 'reason', 'decision',
-                        'inspection_notes', 'status', 'created_at', 'updated_at']),
+                        'inspection_notes', 'status', 'mecef_status', 'mecef_qr_ref', 'mecef_code', 'mecef_nim', 'mecef_compteurs',
+                        'mecef_normalise_le', 'mecef_message', 'created_at', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
                 'enJson' => fn (\App\Models\CreditNote $a) => [
                     'id' => $a->id,
@@ -1836,6 +1851,14 @@ class SyncController extends Controller
                     'decision' => $a->decision,
                     'inspection_notes' => $a->inspection_notes,
                     'status' => $a->status,
+                    // MECEF-1 — facture d'avoir (FA) : lue par le poste, jamais écrite par lui.
+                    'mecef_status' => $a->mecef_status,
+                    'mecef_qr_ref' => $a->mecef_qr_ref,
+                    'mecef_code' => $a->mecef_code,
+                    'mecef_nim' => $a->mecef_nim,
+                    'mecef_compteurs' => $a->mecef_compteurs,
+                    'mecef_normalise_le' => $a->mecef_normalise_le?->toIso8601String(),
+                    'mecef_message' => $a->mecef_message,
                     'created_at' => $a->created_at?->format('Y-m-d H:i:s'),
                 ],
             ],
@@ -2158,6 +2181,12 @@ class SyncController extends Controller
             }
         }
 
+        // MECEF-1 — les avoirs reçus sur une facture NORMALISÉE partent comme factures d'avoir `FA`, eux aussi APRÈS la
+        // transaction (jamais dans un essai rejoué). Un avoir sur une vente non normalisée n'a pas d'objet : rien ne part.
+        foreach (array_unique($this->avoirsAFacturer) as $avoirRecu) {
+            app(FacturationMecefService::class)->facturerAvoir($avoirRecu);
+        }
+
         // 🔴→✅ Ticket U13 — ALERTE D'AUTONOMIE ALIMENTAIRE des fiches saisies au poste, comme `saveDay()` au web : APRÈS
         // la validation de l'envoi (comme le web après sa transaction ; un envoi rejoué sur interblocage ne la lève donc
         // qu'une fois), avec les mêmes règles et le même dédoublonnage (`AlerteAutonomieFicheService`). Un échec de la
@@ -2193,6 +2222,7 @@ class SyncController extends Controller
         $this->fichesPortantLesVentes = [];
         $this->ventesAFacturer = [];
         $this->fichesSaisiesAuPoste = [];
+        $this->avoirsAFacturer = [];
 
         $result = [
             'cles_invalides' => $clesInvalides,
@@ -3460,6 +3490,14 @@ class SyncController extends Controller
      * @var array<int, string>
      */
     private array $ventesAFacturer = [];
+
+    /**
+     * MECEF-1 — avoirs reçus (ou connus mais pas encore normalisés), transmis comme factures d'avoir après la transaction
+     * de l'envoi. Vidée au début de chaque essai.
+     *
+     * @var array<int, string>
+     */
+    private array $avoirsAFacturer = [];
 
     /**
      * Ticket U13 — identifiants (au SERVEUR : celui de la fiche occupante après une fusion S-T9) des fiches ACCEPTÉES
@@ -5500,6 +5538,10 @@ class SyncController extends Controller
                     $service->marquerTraite($existant);
                 }
 
+                if ($existant->mecef_status !== \App\Support\MecefEtat::NORMALISEE) {
+                    $this->avoirsAFacturer[] = $existant->id;
+                }
+
                 $accepted[] = $valides['id'];
             } catch (ValidationException $e) {
                 $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
@@ -6712,6 +6754,11 @@ class SyncController extends Controller
                             app(\App\Actions\AnnulerVenteAction::class)->execute(Sale::with('lines')->find($saleData['id']));
                         } catch (NoOpenFiscalYearException|ClosedFiscalYearException $e) {
                             $rejected[] = ['id' => $saleData['id'], 'reason' => 'Annulation refusée : '.$e->getMessage()];
+
+                            continue;
+                        } catch (\App\Exceptions\FactureNormaliseeException $e) {
+                            // MECEF-1 — même refus et même message qu'au web.
+                            $rejected[] = ['id' => $saleData['id'], 'reason' => $e->getMessage()];
 
                             continue;
                         }

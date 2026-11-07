@@ -17,7 +17,7 @@ use App\Models\Sale;
  * l'action de retransmission de l'écran Facturation — jamais 100% de
  * succès artificiel qui masquerait ce cas d'usage réel.
  */
-class FakeMecefGateway implements MecefGatewayInterface
+class FakeMecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
 {
     public function transmit(Sale $sale): array
     {
@@ -38,6 +38,16 @@ class FakeMecefGateway implements MecefGatewayInterface
             'success' => true,
             'qr_ref' => "{$nim}|{$signature}",
             'message' => 'Facture transmise avec succès au dispositif MeCeF (simulation dev).',
+        ];
+    }
+
+    /** MECEF-1 — avoir simulé : même règle que la vente, jamais un vrai identifiant DGI. */
+    public function transmitAvoir(\App\Models\CreditNote $avoir): array
+    {
+        return [
+            'success' => true,
+            'qr_ref' => 'NIM-AVOIR-'.strtoupper(substr($avoir->id, 0, 8)).'|'.strtoupper(substr(hash('sha256', $avoir->id.$avoir->amount), 0, 16)),
+            'message' => 'Facture d\'avoir transmise avec succès au dispositif MeCeF (simulation dev).',
         ];
     }
 }

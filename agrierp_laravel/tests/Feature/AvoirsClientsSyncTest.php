@@ -474,12 +474,16 @@ class AvoirsClientsSyncTest extends TestCase
         $servis = collect($pages)->flatMap(fn ($p) => $p['credit_notes'] ?? []);
 
         $this->assertSame(['id', 'credit_note_number', 'sale_id', 'product_id', 'qty', 'amount', 'reason', 'decision',
-            'inspection_notes', 'status', 'created_at'], array_keys($servis->sole()));
+            'inspection_notes', 'status', 'mecef_status', 'mecef_qr_ref', 'mecef_code', 'mecef_nim', 'mecef_compteurs',
+            'mecef_normalise_le', 'mecef_message', 'created_at'], array_keys($servis->sole()));
         $this->assertEquals([
             'id' => $d['id'], 'credit_note_number' => 'AV-2026-001', 'sale_id' => $this->vente->id,
             'product_id' => $this->oeufs->id, 'qty' => 2.0, 'amount' => 11800.0, 'reason' => 'Plaquette détériorée',
             'decision' => 'reintegre', 'inspection_notes' => null, 'status' => 'en_attente',
             'created_at' => '2026-10-21 09:30:00',
+            // MECEF-1 : avoir sur une vente non normalisée, aucune facture d'avoir.
+            'mecef_status' => null, 'mecef_qr_ref' => null, 'mecef_code' => null, 'mecef_nim' => null, 'mecef_compteurs' => null,
+            'mecef_normalise_le' => null, 'mecef_message' => null,
         ], $servis->sole());
 
         $animalier = $this->tirer($this->compte('animalier'));
@@ -583,6 +587,9 @@ class AvoirsClientsSyncTest extends TestCase
 
         $this->assertSame([
             'accounting_entry_id', 'amount', 'created_at', 'credit_note_number', 'decision', 'id', 'inspection_notes',
+            // MECEF-1 — la facture d'avoir (FA) : ce que la DGI a renvoyé, tiré au poste (jamais écrit par lui).
+            'mecef_code', 'mecef_compteurs', 'mecef_message', 'mecef_nim', 'mecef_normalise_le', 'mecef_qr_ref', 'mecef_status',
+            'mecef_uid',
             'product_id', 'qty', 'reason', 'sale_id', 'status', 'updated_at',
         ], $colonnes);
     }
