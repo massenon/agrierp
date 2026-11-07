@@ -138,6 +138,16 @@ return [
                 "Le stock ne se corrige pas ici : utilisez « Ajustement / Correction » dans Gestion Stocks.",
             ],
         ],
+        '/importation-masse' => [
+            'titre' => 'Importation en masse',
+            'puces' => [
+                "Six étapes : choisir le module (Stocks, Clients ou Fournisseurs), télécharger le modèle Excel, déposer le fichier, vérifier l'aperçu, confirmer, lire le rapport.",
+                "Le modèle contient une feuille « Instructions », la feuille « Données » à remplir et des listes déroulantes. Ne renommez pas les en-têtes ; les montants sont des francs CFA entiers.",
+                "L'aperçu valide chaque ligne sans rien écrire : valides, ignorées (déjà présentes) et refusées, avec le motif, la ligne et la colonne.",
+                "Une fiche déjà présente est ignorée, jamais modifiée : un produit déjà au catalogue ne reçoit pas de stock initial supplémentaire.",
+                "Le rapport se télécharge en Excel ; corrigez les lignes refusées puis ré-importez le fichier : seules elles entrent.",
+            ],
+        ],
         '/gestion-stocks' => [
             'titre' => 'Gestion des Stocks',
             'puces' => [

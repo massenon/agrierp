@@ -283,8 +283,14 @@ Route::get('/seuils-alerte', \App\Livewire\Stocks\SeuilsAlerte::class)
     ->name('stocks.seuils')
     ->middleware(['auth', 'can:view-stocks']);
 
+// Ticket IMPORT-1 : « Importation en masse » (tableur xlsx, modèle à télécharger) → Livewire\Stocks\ImportationMasse.
+// `can:importation-masse` (Gate de AppServiceProvider) = au moins un des droits manage-stocks / manage-ventes / manage-achats.
+Route::get('/importation-masse', \App\Livewire\Stocks\ImportationMasse::class)
+    ->name('stocks.importation')
+    ->middleware(['auth', 'can:importation-masse']);
+
 // Sprint 7, ticket 7.1 : facturation.html → Livewire\Facturation\Facturation
-Route::get('/facturation', \App\Livewire\Facturation\Facturation::class)
+Route::get('/facturation',\App\Livewire\Facturation\Facturation::class)
     ->name('facturation.index')
     ->middleware(['auth', 'can:view-facturation']);
 

@@ -88,11 +88,9 @@
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Catégorie *</label>
                 <select wire:model="category" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('category') ? 'is-invalid' : 'border-outline-variant' }}">
                     <option value="">-- Sélectionner --</option>
-                    <option>Aliments</option>
-                    <option>Produits vétérinaires</option>
-                    <option>Intrants agricoles</option>
-                    <option>Matériel</option>
-                    <option>Autre</option>
+                    @foreach(\App\Services\SupplierCatalogService::CATEGORIES as $categorieFournisseur)
+                    <option>{{ $categorieFournisseur }}</option>
+                    @endforeach
                 </select>
                 @error('category') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>

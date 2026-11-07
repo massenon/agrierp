@@ -31,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
         // Un champ numérique vidé au clavier vaut 0 au lieu de casser l'écran (voir la classe).
         \App\Support\ChampNumeriqueVide::enregistrer();
 
+        // Ticket IMPORT-1 — l'écran « Importation en masse » s'ouvre à qui peut importer AU MOINS un module : le droit du module
+        // (`manage-stocks`, `manage-ventes`, `manage-achats`) reste vérifié à chaque lecture et écriture (`ImportMasseService`).
+        \Illuminate\Support\Facades\Gate::define('importation-masse', fn ($user) => $user->canAny(['manage-stocks', 'manage-ventes', 'manage-achats']));
+
         // ⚠️⚠️ TICKET 14.65 — POLITIQUE DE MOT DE PASSE CENTRALISEE. Les deux
         // seuls endroits qui posent un mot de passe (`ResetPassword` et
         // `GestionUtilisateurs`) exigeaient `min:8` et rien d'autre :

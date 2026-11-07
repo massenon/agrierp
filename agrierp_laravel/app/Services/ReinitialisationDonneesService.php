@@ -122,6 +122,8 @@ class ReinitialisationDonneesService
     public static function tablesTransactionnelles(): array
     {
         return [
+            // Ticket IMPORT-1 — journal de l'importation en masse (valeurs lues des lignes refusées comprises).
+            'import_batches',
             // Ventes et clientèle
             // Ticket VC-1 : encaissements de créances reçus des postes (idempotence) — AVANT les créances et les clients
             // qu'ils référencent (clés étrangères).

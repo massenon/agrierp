@@ -183,6 +183,8 @@ class AuditLog extends Model
         'expense.updated' => 'Dépense modifiée',
         'expense.archived' => 'Dépense archivée',
         'product.created' => 'Produit créé',
+        // Ticket IMPORT-1 — UNE ligne par fichier importé en masse (module, version, compteurs ; jamais le contenu).
+        'import.masse' => 'Importation en masse',
         'product.updated' => 'Produit modifié',
         'product.archived' => 'Produit archivé',
         'product.merged' => 'Produit du poste fusionné avec une fiche existante',
