@@ -248,8 +248,6 @@ class ImportationMasse extends Component
 
     public function render()
     {
-        return view('livewire.stocks.importation-masse', [
-            'title' => 'Stocks & Produits > Importation en masse',
-        ]);
+        return view('livewire.stocks.importation-masse', ['title' => 'Stocks & Produits > Importation en masse']);
     }
 }

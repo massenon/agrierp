@@ -88,9 +88,6 @@
             <div class="space-y-xs mb-sm">
                 <x-sidebar-link href="/ventes-devis" icon="point_of_sale" label="Ventes & Devis" />
                 <x-sidebar-link href="/creances-clients" icon="payments" label="Clients et Créances" />
-                @role('caissier')
-                <x-sidebar-link href="/importation-masse" icon="upload_file" label="Importation en masse" />
-                @endrole
             </div>
             @endhasanyrole
 
@@ -106,8 +103,6 @@
             <div class="space-y-xs mb-sm">
                 <x-sidebar-link href="/gestion-stocks" icon="inventory_2" label="Gestion Stocks" />
                 <x-sidebar-link href="/catalogue-produits" icon="category" label="Catalogue Produits" />
-                {{-- Ticket IMPORT-1 : importation en masse par tableur xlsx (droit du module vérifié à l'écran et au serveur). --}}
-                <x-sidebar-link href="/importation-masse" icon="upload_file" label="Importation en masse" />
             </div>
             @endhasanyrole
 
@@ -125,11 +120,21 @@
                 <x-sidebar-link href="/personnel-stages" icon="badge" label="Personnel & Stages" />
             </div>
 
+            @endhasanyrole
+
+            {{-- Ticket IMPORT-1 : « Importation en masse » (tableur xlsx) dans le groupe ADMINISTRATION, visible à qui peut importer
+                 au moins un module (manage-stocks / manage-ventes / manage-achats) ; la route reste protégée par `can:importation-masse`. --}}
+            @if(auth()->user()->hasRole('admin') || auth()->user()->can('importation-masse'))
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">ADMINISTRATION</p>
             <div class="space-y-xs mb-sm">
+                @role('admin')
                 <x-sidebar-link href="/administration" icon="folder_shared" label="Administration & Document" />
+                @endrole
+                @can('importation-masse')
+                <x-sidebar-link href="/importation-masse" icon="upload_file" label="Importation en masse" />
+                @endcan
             </div>
-            @endhasanyrole
+            @endif
 
             @hasanyrole(['admin', 'comptable'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">COMPTABILITÉ & ADMIN</p>
