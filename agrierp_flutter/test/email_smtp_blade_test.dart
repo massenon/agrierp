@@ -170,8 +170,11 @@ void main() {
     final poste = ParametresGenerauxScreen.onglets.map((o) => o.$1).toList();
 
     int apres(List<String> l, String a, String b) => l.indexOf(b) - l.indexOf(a);
-    expect(apres(web, "Données de l'Entreprise", 'Email (SMTP)'), 1);
-    expect(apres(poste, "Données de l'Entreprise", ParametresGenerauxScreen.ongletEmailSmtp), 1);
+    // MECEF-3 : l'onglet « Facturation normalisée (e-MECeF) » s'intercale entre les Données de l'Entreprise et l'Email.
+    expect(apres(web, "Données de l'Entreprise", ParametresGenerauxScreen.ongletFacturationEmecef), 1);
+    expect(apres(poste, "Données de l'Entreprise", ParametresGenerauxScreen.ongletFacturationEmecef), 1);
+    expect(apres(web, ParametresGenerauxScreen.ongletFacturationEmecef, 'Email (SMTP)'), 1);
+    expect(apres(poste, ParametresGenerauxScreen.ongletFacturationEmecef, ParametresGenerauxScreen.ongletEmailSmtp), 1);
     expect(apres(web, 'Gestion Utilisateurs', 'Postes & Appairage'), 1);
     expect(apres(poste, 'Gestion Utilisateurs', ParametresGenerauxScreen.ongletAppairage), 1);
     expect(web, contains(ParametresGenerauxScreen.ongletEmailSmtp));

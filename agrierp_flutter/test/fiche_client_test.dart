@@ -271,6 +271,7 @@ void main() {
         'phone': '+229 97 12 34 56',
         'email': 'regis@ferme.bj',
         'city': 'Adja-Ouèrè',
+        'ifu': null, // MECEF-3 : l'IFU du client part avec la fiche (vide = particulier)
         'is_active': true,
       });
       expect(
