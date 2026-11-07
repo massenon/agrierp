@@ -14,4 +14,22 @@
  */
 return [
     'actif' => (bool) env('MECEF_ACTIF', false),
+
+    /*
+     * CONF-1 — VALEURS DE REPLI e-MECeF lues de `.env` (variables du paquet de référence). Elles ne servent QUE quand le
+     * réglage correspondant est vide en base : le réglage saisi à l'écran (Paramètres > Facturation normalisée) prime toujours.
+     * Le jeton `SGMEF_TOKEN` n'est jamais affiché, jamais servi au poste, jamais journalisé.
+     * Hors périmètre (volontairement non repris du paquet) : interface web, file d'attente, préfixe de route, polling.
+     * Lecture unique : `App\Services\Mecef\MecefReglage`.
+     */
+    'sgmef' => [
+        'api_url' => env('SGMEF_API_URL'),
+        'token' => env('SGMEF_TOKEN'),
+        'default_ifu' => env('SGMEF_DEFAULT_IFU'),
+        'default_operator_name' => env('SGMEF_DEFAULT_OPERATOR_NAME'),
+        'default_operator_id' => env('SGMEF_DEFAULT_OPERATOR_ID'),
+        'http_timeout' => (int) env('SGMEF_HTTP_TIMEOUT', 30),
+        'connect_timeout' => (int) env('SGMEF_CONNECT_TIMEOUT', 10),
+        'verify_ssl' => filter_var(env('SGMEF_VERIFY_SSL', true), FILTER_VALIDATE_BOOLEAN),
+    ],
 ];

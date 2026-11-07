@@ -25,10 +25,6 @@ use Throwable;
  */
 class MecefConfigurationTesteur
 {
-    public const DELAI = 8;
-
-    public const DELAI_CONNEXION = 5;
-
     /**
      * @param  array{mode?: ?string, ifu?: ?string, url?: ?string, jeton?: ?string}  $saisie  valeurs du formulaire ; un jeton vide = celui qui est enregistré
      * @return array{ok: bool, resume: string, lignes: array<int, array{ok: bool, libelle: string, detail: string}>}
@@ -37,7 +33,7 @@ class MecefConfigurationTesteur
     {
         $enregistre = app(MecefReglage::class)->emecef();
         $mode = (string) ($saisie['mode'] ?? '');
-        $ifu = trim((string) ($saisie['ifu'] ?? $enregistre['ifu']));
+        $ifu = trim((string) ($saisie['ifu'] ?? '')) ?: trim($enregistre['ifu']);
         $url = rtrim(trim((string) ($saisie['url'] ?? '')) ?: $enregistre['url'], '/');
         $jeton = trim((string) ($saisie['jeton'] ?? '')) ?: $enregistre['jeton'];
 
@@ -93,8 +89,10 @@ class MecefConfigurationTesteur
     private function lireLEtat(string $url, string $jeton, string $ifu): array
     {
         try {
+            $reseau = app(MecefReglage::class)->reseau();
             $reponse = Http::baseUrl($url)->withToken($jeton)->acceptJson()
-                ->connectTimeout(self::DELAI_CONNEXION)->timeout(self::DELAI)
+                ->connectTimeout($reseau['delai_connexion'])->timeout($reseau['delai'])
+                ->withOptions(['verify' => $reseau['verifier_ssl']])
                 ->get('/info/status');
         } catch (ConnectionException) {
             return [false, 'Hôte injoignable : vérifiez l\'adresse de l\'API et la connexion internet.'];

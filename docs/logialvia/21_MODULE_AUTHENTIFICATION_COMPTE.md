@@ -44,7 +44,7 @@ Comportement : ouvre réellement la base et applique les migrations ; sème rôl
 | Succès | toast « Connexion réussie — Bienvenue ! », attente 700 ms, `/dashboard` | — |
 
 **Règles** : chaque échec → `security_logs` (`typeEvenement = 'echec_connexion'`, jamais le mot de passe) ; succès/déconnexion → `audit_logs` (`action = 'connexion'`/`'deconnexion'`). « Se souvenir de moi » mémorise l'IDENTIFIANT (table `preferences_poste`, clé dédiée), jamais la session ; n'écrit qu'après connexion réussie ; décocher efface ; la case reflète l'état réel au retour. Placeholder identifiant = `admin` (écart délibéré : le prototype affichait `gerante@allmany.bj`, compte fictif).
-**Rôles** : quatre (`admin`, `comptable`, `caissier`, `animalier`) : TRANCHÉ (DV-07) ; le rôle `comptable` se crée depuis Paramètres, jamais `admin`.
+**Rôles** : quatre (`admin`, `comptable`, `caissier`, `animalier`) : TRANCHÉ (DV-07) ; le rôle `comptable` se crée depuis Paramètres, jamais `admin`. **Droits (DV-06, DV-08, DV-15)** : le caissier voit et enregistre ses retours dans « Retours et Avoirs » de `/ventes` (DV-08) mais n'a ni `/inventaire` ni `manage-facturation` ; `/inventaire` : administrateur seul par défaut (DV-15) ; comptable : périmètre par défaut calqué sur AgriERP (Q-DV-7 ouverte).
 **Compte initial** : `admin`, « Administratrice Principale », rôle `admin`, semis idempotent ; mot de passe initial `ALLMANY2026` (arbitré par la Gérante le 25/08/2026 ; `AdminSeeder.motDePasseInitialAdmin`) — **doit être changé de force à la première connexion** (dette `TODO` de F1 ; BR-038). Le seul rôle `admin` n'est jamais créable par l'écran ; le dernier admin ne s'archive pas.
 **Web** (nouveau) : verrouillage persisté côté serveur (le prototype et le poste ne persistent pas : fermer/rouvrir remet à zéro) ; limite `5/min` sur `POST /api/auth/login` ; jeton Sanctum NOMMÉ d'après le poste ; compte archivé refusé ; mot de passe temporaire → écran de changement obligatoire AVANT le PIN et l'accueil (middleware `ChangementMotDePasseObligatoire`).
 **Poste hors ligne** : première connexion d'un poste = réseau obligatoire ; ensuite ouverture par PIN local (4 à 6 chiffres, PBKDF2 ≥ 100 000 itérations) ; le poste ne conserve NI mot de passe NI hash.
@@ -75,6 +75,7 @@ Métadonnées : « Dernière connexion » = l'avant-dernière (lue dans `audit_l
 ## 8. Critères d'acceptation
 
 - [ ] Un compte `animalier` en URL directe `/comptabilite` : redirection `/dashboard`.
+- [ ] DV-08 : un compte `caissier` voit l'onglet « Retours et Avoirs » de `/ventes` ; DV-15 : un compte `comptable` en URL directe `/inventaire` est refusé.
 - [ ] Quatre rôles semés (`admin`, `comptable`, `caissier`, `animalier`) ; un compte `caissier` en URL directe `/inventaire` : redirection `/dashboard` ; sur `/factures-mecef` il voit et réimprime, `annuler`, `retransmettre` et `avoir` sont refusés par le serveur (TRANCHÉ DV-06, DV-07).
 - [ ] 5 échecs → bannière + bouton désactivé + aucun toast ; relancer l'application ne remet pas le verrou à zéro (web).
 - [ ] Mot de passe jamais présent dans `security_logs`, `audit_logs`, ni dans une table du poste (garde : aucune colonne `password`, `token`, `secret`).

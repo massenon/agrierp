@@ -8,6 +8,7 @@ use App\Services\Mecef\MecefReglage;
 use App\Services\Mecef\MecefReglageService;
 use App\Support\MecefMode;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 /**
@@ -43,13 +44,17 @@ class FacturationEmecef extends Component
 
     public function mount(): void
     {
+        // CONF-1 : jamais d'ouverture sans le droit (jeton configuré, IFU, adresse : réservés à `manage-parametres`).
+        abort_unless(Gate::allows('manage-parametres'), 403);
+
         $settings = CompanySetting::current();
         $reglage = app(MecefReglage::class);
 
         // Le mode effectif (le mode `simule` des environnements de développement s'affiche « Désactivé »).
         $this->mecefMode = in_array($reglage->mode(), MecefMode::REGLABLES, true) ? $reglage->mode() : MecefMode::DESACTIVE;
         $this->ifu = (string) $settings->ifu;
-        $this->mecefApiUrl = (string) ($settings->mecef_api_url ?: MecefMode::URL_PAR_DEFAUT);
+        // CONF-1 : l'adresse en service (saisie, sinon `SGMEF_API_URL`, sinon l'environnement d'essai) ; le jeton de `.env` n'est jamais lu ici.
+        $this->mecefApiUrl = $reglage->emecef()['url'];
         $this->mecefOperateurId = (string) $settings->mecef_operateur_id;
         $this->mecefOperateurNom = (string) $settings->mecef_operateur_nom;
     }
@@ -58,6 +63,20 @@ class FacturationEmecef extends Component
     public function getJetonConfigureProperty(): bool
     {
         return app(MecefReglage::class)->jetonConfigure();
+    }
+
+    /** CONF-1 — le jeton en service vient de la configuration du serveur (`.env`), pas de l'écran. */
+    public function getJetonDeConfigurationProperty(): bool
+    {
+        return app(MecefReglage::class)->jetonDepuisConfiguration();
+    }
+
+    /** CONF-1 — valeurs de repli (`SGMEF_DEFAULT_OPERATOR_*`) montrées en indice des champs opérateur. */
+    public function getRepliOperateurProperty(): array
+    {
+        $e = app(MecefReglage::class)->emecef();
+
+        return ['id' => $e['operateur_id'], 'nom' => $e['operateur_nom']];
     }
 
     /** Préréglage de l'adresse de l'API (production / essai). */

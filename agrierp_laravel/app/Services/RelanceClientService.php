@@ -31,6 +31,12 @@ use Illuminate\Validation\ValidationException;
  */
 class RelanceClientService
 {
+    /** CONF-1 — motif du refus d'une relance e-mail quand aucun envoi réel n'est possible (web et poste : le même). */
+    public const MOTIF_SANS_SMTP = "Aucun serveur SMTP n'est configuré : la relance n'a pas été envoyée. Configurez l'e-mail dans Paramètres > Email (SMTP).";
+
+    /** Mailers qui « réussissent » sans rien livrer. */
+    private const MAILERS_SANS_LIVRAISON = ['log', 'array'];
+
     public const CANAUX = ['whatsapp', 'email', 'appel', 'courrier'];
 
     /**
@@ -79,8 +85,26 @@ class RelanceClientService
             throw ValidationException::withMessages(['customer_id' => "Ce client n'a pas d'adresse email enregistrée."]);
         }
 
-        CompanySetting::current()->applyMailConfig();
+        $reglage = CompanySetting::current();
+
+        // CONF-1 — jamais « envoyée » sans envoi réel : sans hôte SMTP et avec un mailer qui n'écrit que dans un fichier ou en mémoire.
+        if (! $this->envoiReelPossible($reglage)) {
+            throw ValidationException::withMessages(['channel' => self::MOTIF_SANS_SMTP]);
+        }
+
+        $reglage->applyMailConfig();
         Mail::to($client->email)->send(new CustomerReminderMail($client->name, $message));
+    }
+
+    /**
+     * Un e-mail peut-il PARTIR pour de vrai ? Oui si un hôte SMTP est enregistré (Paramètres > Email (SMTP)) ou si le mailer
+     * du serveur (`MAIL_MAILER`) livre réellement ; non si c'est `log` ou `array` (le courrier y « réussit » sans partir).
+     */
+    public function envoiReelPossible(?CompanySetting $reglage = null): bool
+    {
+        $reglage ??= CompanySetting::current();
+
+        return (string) $reglage->smtp_host !== '' || ! in_array(config('mail.default'), self::MAILERS_SANS_LIVRAISON, true);
     }
 
     /** Adresse e-mail exigée : même message que le web. */

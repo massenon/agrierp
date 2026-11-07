@@ -27,19 +27,19 @@
 
 ## 3. Rôles et matrice RBAC (4 rôles — TRANCHÉ (DV-07), `16_DECISIONS_VALIDEES.md`)
 
-**Décision TRANCHÉE (DV-07, 08/11/2026)** : **4 rôles** — `admin` « Administrateur/Administratrice », `comptable` « Comptable », `caissier` « Agent de Vente », `animalier` « Agent d'Élevage » (modèle AgriERP : `RolesAndPermissionsSeeder.php`). Celui qui encaisse n'est pas celui qui comptabilise. LogiALVIA n'en avait que 3 (`role_utilisateur.dart`) : le poste et ses libellés sont à aligner (ancien Q-ROL-1 fermé). **Le code suit la matrice** (DV-06) : si le client veut d'autres accès, on corrige la matrice, pas l'inverse. Le périmètre du comptable ci-dessous est PROPOSÉ (calqué sur AgriERP) et reste à confirmer (Q-DV-7).
+**Décision TRANCHÉE (DV-07, 08/11/2026)** : **4 rôles** — `admin` « Administrateur/Administratrice », `comptable` « Comptable », `caissier` « Agent de Vente », `animalier` « Agent d'Élevage » (modèle AgriERP : `RolesAndPermissionsSeeder.php`). Celui qui encaisse n'est pas celui qui comptabilise. LogiALVIA n'en avait que 3 (`role_utilisateur.dart`) : le poste et ses libellés sont à aligner (ancien Q-ROL-1 fermé). **Le code suit la matrice** (DV-06) : si le client veut d'autres accès, on corrige la matrice, pas l'inverse. Le périmètre du comptable ci-dessous est PROPOSÉ (calqué sur AgriERP) et reste à confirmer (Q-DV-7 ouverte ; périmètre par défaut DV-15 : comptabilité et exercices en gestion, rapports, TVA, lecture des ventes/achats/stocks, ni caisse ni élevage).
 
 | Permission web | admin | comptable | caissier | animalier |
 |---|:--:|:--:|:--:|:--:|
-| `view/manage/archive/export-elevage` | oui | non | non | oui |
-| `view/manage/export-ventes` (caisse, clients) | oui | consultation (proposé) | oui | non |
+| `view/manage/archive/export-elevage` (dont les règles d'incubation de `/parametres/elevage`, DV-11) | oui | non | non | oui |
+| `view/manage/export-ventes` (caisse, clients ; onglet « Retours et Avoirs » : le caissier enregistre un retour, DV-08, sans avoir MeCeF/FA) | oui | consultation (proposé) | oui | non |
 | `view-facturation` : CONSULTER et RÉIMPRIMER les factures (`/factures-mecef`) | oui | oui | **oui** (DV-06) | non |
 | `manage-facturation` : annuler, retransmettre, créer un avoir | oui | oui (proposé) | **non** (DV-06) | non |
-| `view-stocks` : `/stocks`, `/catalogue` ET `/inventaire` | oui (et responsable stock s'il existe : Q-DV-5) | non | **non** (DV-06) | non |
+| `view-stocks` : `/stocks`, `/catalogue` ET `/inventaire` | oui, seul (DV-15 ; droit dédié plus tard si un responsable stock existe : Q-DV-5 ouverte) | non | **non** (DV-06) | non |
 | `manage-stocks` (stocks, catalogue) | oui | non | non | non |
 | `view/manage-achats` (achats, fournisseurs, dépenses) | oui | consultation (proposé) | non | non |
 | `view/manage-comptabilite` | oui | oui | non | non |
-| `close-fiscal-year` | oui | à confirmer (Q-DV-7) | non | non |
+| `close-fiscal-year` | oui | à confirmer (Q-DV-7 ouverte ; défaut DV-15 : admin seul) | non | non |
 | `view/export-rapports` | oui | oui | non | non |
 | `view/manage-parametres`, `manage-users`, `manage-modules` | oui | non | non | non |
 | `/parametres/elevage` : rations, prophylaxie, numérotation, seuils de provende | oui | non | non | oui (limité : pas d'activation de filière ; seuils de ferme : admin seul) |

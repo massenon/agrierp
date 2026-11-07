@@ -117,7 +117,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 
 ## 6. Questions ouvertes au client (à poser telles quelles)
 
-1. **Q-ROL-1** TRANCHÉ (DV-07) : rôle « comptable » distinct, 4 rôles. Reste le périmètre exact du comptable : Q-DV-7.
+1. **Q-ROL-1** TRANCHÉ (DV-07) : rôle « comptable » distinct, 4 rôles. Reste le périmètre exact du comptable : Q-DV-7 ouverte, valeur par défaut calquée sur AgriERP (DV-15).
 2. **Q-RH-1** La paie et le registre du personnel (employés, stagiaires, pointage) doivent-ils entrer dans LogiALVIA ? Si oui : combien d'employés, quel barème d'impôt sur salaires et quels taux CNSS/VPS pratiqués chez ALLMANY ?
 3. **Q-IMP-1** Quels modules importer par xlsx (stocks, produits, clients, fournisseurs, plan comptable, effectifs de départ des bandes) et dans quel ordre ?
 4. **Q-PWA-1** Besoin explicite de travailler sans réseau dans un navigateur (tablette, téléphone) ? Quels appareils, combien de temps hors ligne ?
@@ -129,7 +129,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 10. **Q-TVA-1** Entreprise assujettie à la TVA (taux 0 % et 18 % seulement) ? Une facture simple figure-t-elle dans la déclaration de TVA ?
 11. **Q-ADM-1** Politique de mot de passe (longueur, majuscule, chiffre) ? (logialvia : 8 caractères minimum.)
 12. **Q-VTE-1** Délai de paiement par défaut des ventes à crédit (jours) ?
-13. **Q-DV-1 … Q-DV-8** : nouvelles questions nées des décisions validées du 08/11/2026 (barème en % de biomasse, arrondi de l'estimation, mortalité des poussins de pintade, marge de sécurité, responsable stock, onglet Retours et Avoirs, périmètre du comptable, libellé du jeune pintade) : voir `16_DECISIONS_VALIDEES.md` §4.
+13. **Q-DV-1 … Q-DV-8** : nouvelles questions nées des décisions validées du 08/11/2026 (barème en % de biomasse, arrondi de l'estimation, mortalité des poussins de pintade, marge de sécurité, responsable stock, onglet Retours et Avoirs, périmètre du comptable, libellé du jeune pintade) : voir `16_DECISIONS_VALIDEES.md` §4. **Au 08/11/2026 : FERMÉES** Q-DV-6 (DV-08), Q-DV-8 (DV-09) ; **fermées en « recommandé, à confirmer avec le technicien »** Q-DV-2 (DV-12), Q-DV-3 (DV-13), Q-DV-4 (DV-14) ; **OUVERTES avec valeur par défaut** Q-DV-5 et Q-DV-7 (DV-15) ; Q-DV-1 ouverte.
 14. Questions FERMÉES le 08/11/2026 : Q-ROL-1, Q-ALR-1, Q-CPT-3, Q-PIS-5, Q-PIS-6, Q-PIN-4 (voir `16_`).
 
 ## 7. Critères d'acceptation du document

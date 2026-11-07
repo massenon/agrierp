@@ -33,10 +33,6 @@ use Throwable;
  */
 class EmecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
 {
-    public const DELAI = 12;
-
-    public const DELAI_CONNEXION = 5;
-
     public function __construct(private readonly MecefReglage $reglage, private readonly MecefFactureBuilder $constructeur) {}
 
     public function transmit(Sale $sale): array
@@ -151,12 +147,16 @@ class EmecefGateway implements MecefAvoirGatewayInterface, MecefGatewayInterface
 
     private function requete(array $emetteur): PendingRequest
     {
+        // CONF-1 : délais et vérification SSL viennent de `SGMEF_*` (défauts 30 s / 10 s / vérifiée).
+        $reseau = $this->reglage->reseau();
+
         return Http::baseUrl($emetteur['url'])
             ->withToken($emetteur['jeton'])
             ->acceptJson()
             ->asJson()
-            ->connectTimeout(self::DELAI_CONNEXION)
-            ->timeout(self::DELAI);
+            ->connectTimeout($reseau['delai_connexion'])
+            ->timeout($reseau['delai'])
+            ->withOptions(['verify' => $reseau['verifier_ssl']]);
     }
 
     private function erreurDansCorps(Response $r): bool

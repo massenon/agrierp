@@ -23,7 +23,7 @@ Deux stocks distincts (BR-011) : **produits vendables** (catalogue de la caisse)
 | `/achats` | Achats & Commandes | A | view/manage-achats | W+P |
 | `/fournisseurs` | Fournisseurs | A | view/manage-achats | W+P |
 | `/depenses` | Saisie des Dépenses | A | view/manage-achats | W+P |
-| `/inventaire` | Inventaire daté et valorisé | A (et responsable stock s'il existe : Q-DV-5) | **view-stocks** (TRANCHÉ DV-06 : plus `view-ventes`, caissier exclu) | W+P (lecture) |
+| `/inventaire` | Inventaire daté et valorisé | A seul (DV-15 : pas de cinquième rôle ; droit dédié plus tard si un responsable stock existe ; Q-DV-5 ouverte) | **view-stocks** (TRANCHÉ DV-06 : plus `view-ventes`, caissier exclu) | W+P (lecture) |
 
 ## 3. Gestion des Stocks (`/stocks`) — intrants
 
@@ -55,7 +55,7 @@ Formulaire (ordre du prototype, en tête de page) : LIBELLÉ DE LA DÉPENSE * (�
 
 ## 8. Inventaire (`/inventaire`, ajout hors prototype, demandé par la Gérante)
 
-Répond à « que détenait l'exploitation à une date, et d'où vient l'écart ? ». Périodes : « Journalier » (défaut), « Hebdomadaire » (depuis le lundi), « Mensuel » (depuis le 1er), « Plage personnalisée » (la dernière borne choisie fait foi). Recherche « Rechercher un article, un code… ». Colonnes : ARTICLE · CATÉGORIE · STOCK INITIAL · ENTRÉES · SORTIES · STOCK FINAL · PMP · VALEUR (intrants) ; PRODUIT · COÛT DE REVIENT · SORTIES (VENTES) · VALEUR (produits finis) ; FILIÈRE · EFFECTIF · DERNIÈRE SAISIE (animaux sur pied). KPI/totaux : TOTAL INTRANTS · TOTAL PRODUITS FINIS · TOTAL ANIMAUX SUR PIED · VALEUR TOTALE DU STOCK · « DONT INTRANTS » · « DONT PRODUITS FINIS ». **Règle** : stock à la date T = stock actuel − mouvements postérieurs à T (jamais le stock d'aujourd'hui sous une date passée) ; l'égalité stock initial + entrées − sorties = stock final doit tenir, sinon la ligne est signalée en tête (« un inventaire qui ne se justifie pas ne se signe pas ») ; intrants au PMP, produits finis au coût de revient, animaux et œufs en incubation COMPTÉS non valorisés ; un produit sans coût : « Non valorisé », hors totaux (« Hors N article(s)… ») ; export PDF paysage avec la base de valorisation. **Accès : TRANCHÉ (DV-06)** : administrateur seul (et responsable stock s'il existe, Q-DV-5) ; le caissier n'y accède NI par le menu NI par l'URL (redirection `/dashboard`) : il ne voit ni les coûts de revient ni la valorisation ; l'« arbitrage de la Gérante » consigné dans `permission_service.dart` est annulé, le code suit la matrice (`20_` §3). Au poste : hors ligne (lecture sur la base locale). AgriERP : l'inventaire au comptage (`InventaireAuComptageService`, écart calculé contre le grand livre à l'instant du comptage) est une règle distincte, PROPOSÉE (Q-STK-5).
+Répond à « que détenait l'exploitation à une date, et d'où vient l'écart ? ». Périodes : « Journalier » (défaut), « Hebdomadaire » (depuis le lundi), « Mensuel » (depuis le 1er), « Plage personnalisée » (la dernière borne choisie fait foi). Recherche « Rechercher un article, un code… ». Colonnes : ARTICLE · CATÉGORIE · STOCK INITIAL · ENTRÉES · SORTIES · STOCK FINAL · PMP · VALEUR (intrants) ; PRODUIT · COÛT DE REVIENT · SORTIES (VENTES) · VALEUR (produits finis) ; FILIÈRE · EFFECTIF · DERNIÈRE SAISIE (animaux sur pied). KPI/totaux : TOTAL INTRANTS · TOTAL PRODUITS FINIS · TOTAL ANIMAUX SUR PIED · VALEUR TOTALE DU STOCK · « DONT INTRANTS » · « DONT PRODUITS FINIS ». **Règle** : stock à la date T = stock actuel − mouvements postérieurs à T (jamais le stock d'aujourd'hui sous une date passée) ; l'égalité stock initial + entrées − sorties = stock final doit tenir, sinon la ligne est signalée en tête (« un inventaire qui ne se justifie pas ne se signe pas ») ; intrants au PMP, produits finis au coût de revient, animaux et œufs en incubation COMPTÉS non valorisés ; un produit sans coût : « Non valorisé », hors totaux (« Hors N article(s)… ») ; export PDF paysage avec la base de valorisation. **Accès : TRANCHÉ (DV-06)** : administrateur seul (valeur par défaut DV-15 ; un droit dédié sera créé plus tard si un responsable stock existe, jamais un cinquième rôle ; Q-DV-5 ouverte) ; le caissier n'y accède NI par le menu NI par l'URL (redirection `/dashboard`) : il ne voit ni les coûts de revient ni la valorisation ; l'« arbitrage de la Gérante » consigné dans `permission_service.dart` est annulé, le code suit la matrice (`20_` §3). Au poste : hors ligne (lecture sur la base locale). AgriERP : l'inventaire au comptage (`InventaireAuComptageService`, écart calculé contre le grand livre à l'instant du comptage) est une règle distincte, PROPOSÉE (Q-STK-5).
 
 ## 9. Hors ligne et synchronisation
 
@@ -70,7 +70,7 @@ Un inventaire (comptage) du poste porte `counted_quantity` + `counted_at` ; l'é
 
 ## 10. Notifications
 
-Stock sous seuil (06:05, rôle admin), stock négatif après synchronisation, autonomie de provende (alerte ≤ 7 j, critique ≤ 3 j : DV-04), achat en retard de réception (À DÉFINIR, Q-STK-6).
+Stock sous seuil (06:05, rôle admin), stock négatif après synchronisation, autonomie de provende (alerte ≤ 7 j, critique ≤ 3 j par défaut ; DV-14 recommandé : critique = délai fournisseur, alerte = délai + 4 j : DV-04), achat en retard de réception (À DÉFINIR, Q-STK-6).
 
 ## 11. Critères d'acceptation
 

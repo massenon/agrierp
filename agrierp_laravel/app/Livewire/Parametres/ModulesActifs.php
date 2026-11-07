@@ -37,6 +37,12 @@ use Livewire\Component;
  */
 class ModulesActifs extends Component
 {
+    public function mount(): void
+    {
+        // CONF-1 : jamais d'ouverture sans le droit de l'onglet (même garde que `EmailSmtp::mount`).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-modules'), 403);
+    }
+
     public function getSpeciesProperty()
     {
         return LivestockSpecies::orderBy('label')->get()->map(function ($species) {

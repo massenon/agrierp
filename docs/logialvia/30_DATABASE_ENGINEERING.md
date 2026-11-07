@@ -575,6 +575,29 @@ Reprend `2026_02_10_000001_create_livestock_lots_table.php` : `id`, `code` UK, `
 
 Le champ « Éclosion J+21 » est celui du dictionnaire logialvia ; **TRANCHÉ (DV-03)** : la durée n'est plus une constante, elle est portée par la ligne (`duree_incubation_jours`, défaut 28 pour la pintade, 21 pour le goliath) avec sa fenêtre ; éclosion prévue = `date_incubation` + durée ; mirages J7 et J14 et transfert J25 génèrent des rappels. Les repères d'incubateur (température, humidité) ne sont PAS stockés.
 
+### 5.8b `incubation_rules` (S) — règles d'incubation modifiables, une ligne par espèce (DV-11) — à créer
+
+Édité dans `/parametres/elevage` > « Incubation et règles » (`23_` §6b, `29_` §4b) ; serveur gagne au tirage, écriture au poste = envoi revalidé (modèle `elevage_numbering_settings`). Un cycle (5.8) copie ces valeurs à sa création : modifier une règle ne change jamais un cycle existant.
+
+| Colonne | Type | Nul | Défaut / contrainte | Rôle |
+|---|---|---|---|---|
+| `id` | uuid | non | PK | |
+| `species_code` | string(24) | non | UNIQUE, IN (`pintade`,`goliath`) | une ligne par espèce de couveuse |
+| `incubation_days` | unsigned tinyint | non | 28 / 21 ; CHECK 1..60 | durée |
+| `window_min_days`, `window_max_days` | unsigned tinyint | non | 26 et 28 / 19 et 23 ; CHECK min ≤ durée ≤ max ≤ 60 | fenêtre d'éclosion |
+| `default_mode` | string(24) | non | `couveuse` ; IN (`couveuse`,`couvaison_naturelle`) | mode proposé |
+| `mirage_days` | string(20) | non | `7,14` ; 1 à 3 entiers croissants, chacun < durée | jours de mirage |
+| `transfer_day` | unsigned tinyint | oui | 25 / NULL ; > dernier mirage et < durée | transfert à l'éclosoir (couveuse) |
+| `reminders_enabled` | boolean | non | vrai | rappels automatiques |
+| `egg_storage_advised_days`, `egg_storage_max_days` | unsigned tinyint | non | 7 et 10 ; CHECK conseillé ≤ max ≤ 30 | conservation avant incubation (avertissement) |
+| `incubator_temp_min_c`, `incubator_temp_max_c` | decimal(3,1) | non | 37,5 et 37,8 ; 30,0..42,0 ; min ≤ max | repère (avertissement) |
+| `humidity_min_pct`, `humidity_max_pct` | unsigned tinyint | non | 55 et 60 ; 30..90 | repère jusqu'au transfert |
+| `humidity_last3_min_pct`, `humidity_last3_max_pct` | unsigned tinyint | non | 65 et 75 ; 30..95 | repère des 3 derniers jours |
+| `turns_per_day` | unsigned tinyint | non | 4 (à confirmer) ; 1..12 | retournements par jour |
+| `device_id`, `sync_status`, `created_at`, `updated_at` | | | | métadonnées de synchronisation |
+
+Table Drift équivalente `IncubationRules` (`app_database.dart`, puis `dart run build_runner build`). Audit : `incubation_rules.updated`.
+
 ### 5.9 `soins` : `infirmerie`, `soins_calendrier`, `calendrier_prophylaxie`, `veterinary_records`
 
 - `calendrier_prophylaxie` (logialvia : `espece`, `jourCycle`, `traitement`, `produit`, `remanenceJours` défaut 0) → `prophylaxis_schedule_standards` (AgriERP, `cycle_day` ajouté par `2026_03_06_000001_...`). UK recommandée (`species_id`,`cycle_day`,`traitement`).
@@ -619,7 +642,7 @@ Le champ « Éclosion J+21 » est celui du dictionnaire logialvia ; **TRANCHÉ (
 
 ### 5.14 `company_settings` (singleton, S partiel)
 
-**Seuils de ferme (DV-04, DV-03)** : `autonomy_alert_days` unsigned tinyint défaut **7**, `autonomy_critical_days` unsigned tinyint défaut **3**, CHECK `autonomy_critical_days < autonomy_alert_days` (paramétrables par ferme, admin seul, journalisés) ; `autonomy_supplier_lead_days` et `autonomy_safety_margin_days` unsigned tinyint NULL (règle : seuil d'alerte = délai fournisseur + marge ; marge par défaut À DÉFINIR, Q-DV-4) ; `incubation_default_days_pintade` défaut 28, `incubation_window_min_pintade` 26, `incubation_window_max_pintade` 28. Colonnes d'AgriERP à reprendre : identité (`company_name`, `promoter_name`, `address`, `phone`, `email`, `ifu`, `rccm`), SMTP (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_user`, `smtp_password_encrypted` cast `encrypted`, `smtp_from_address`), `logo_path`, `favicon_path`, `mecef_*` (5.15), `onboarding_completed_at`, `demo_mode`, `data_reset_at`, `rappel_soins_jours`. **SMS : non repris** (AgriERP l'a supprimé, AUT-3 ; logialvia n'en a jamais eu). Une seule ligne : garde-fou « `company_settings` a exactement 1 ligne ». Réglages SMTP/logo/favicon : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
+**Seuils de ferme (DV-04, DV-03)** : `autonomy_alert_days` unsigned tinyint défaut **7**, `autonomy_critical_days` unsigned tinyint défaut **3**, CHECK `autonomy_critical_days < autonomy_alert_days` (paramétrables par ferme, admin seul, journalisés) ; `autonomy_supplier_lead_days` unsigned tinyint NULL et `autonomy_safety_margin_days` unsigned tinyint défaut **4** (DV-14, recommandé : seuil critique = délai fournisseur, seuil d'alerte = délai + marge) ; **les règles d'incubation ne sont plus dans `company_settings`** : elles vivent dans `incubation_rules` (5.8b, DV-11) ; paramètres recommandés, éditables (DV-12, DV-13) : `fish_estimate_gap_pct` défaut 20, `fish_avg_weight_range_min_pct` 50, `fish_avg_weight_range_max_pct` 150, `fish_min_sale_weight_g` 500, `fish_weight_stale_days` 30, `guinea_mort_day_warn_pct` 1, `guinea_mort_day_crit_pct` 2, `guinea_mort_cum_warn_pct` 10, `guinea_mort_cum_crit_pct` 20 (decimal(4,1), CHECK warn < crit). Colonnes d'AgriERP à reprendre : identité (`company_name`, `promoter_name`, `address`, `phone`, `email`, `ifu`, `rccm`), SMTP (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_user`, `smtp_password_encrypted` cast `encrypted`, `smtp_from_address`), `logo_path`, `favicon_path`, `mecef_*` (5.15), `onboarding_completed_at`, `demo_mode`, `data_reset_at`, `rappel_soins_jours`. **SMS : non repris** (AgriERP l'a supprimé, AUT-3 ; logialvia n'en a jamais eu). Une seule ligne : garde-fou « `company_settings` a exactement 1 ligne ». Réglages SMTP/logo/favicon : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
 
 ### 5.15 MeCeF : colonnes et tables
 

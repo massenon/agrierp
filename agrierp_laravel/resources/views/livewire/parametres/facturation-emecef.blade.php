@@ -54,7 +54,12 @@
 
                 <div class="sm:col-span-2">
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Jeton e-MECeF (JWT)</label>
-                    @if($this->jetonConfigure && ! $remplacerJeton)
+                    @if($this->jetonDeConfiguration && ! $remplacerJeton)
+                        <div class="flex items-center gap-sm">
+                            <span class="flex-1 h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center text-outline">Jeton défini dans la configuration du serveur</span>
+                            <button type="button" wire:click="$set('remplacerJeton', true)" class="px-md h-11 rounded-lg border border-outline-variant text-xs font-bold text-brand-forest hover:bg-surface-zebra">Remplacer</button>
+                        </div>
+                    @elseif($this->jetonConfigure && ! $remplacerJeton)
                         <div class="flex items-center gap-sm">
                             <span class="flex-1 h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center tracking-widest">••••••••••••</span>
                             <button type="button" wire:click="$set('remplacerJeton', true)" class="px-md h-11 rounded-lg border border-outline-variant text-xs font-bold text-brand-forest hover:bg-surface-zebra">Remplacer</button>
@@ -68,11 +73,11 @@
 
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Identifiant de l'opérateur</label>
-                    <input wire:model="mecefOperateurId" type="text" placeholder="1" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    <input wire:model="mecefOperateurId" type="text" placeholder="{{ $this->repliOperateur['id'] }}" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Nom de l'opérateur (caissier par défaut)</label>
-                    <input wire:model="mecefOperateurNom" type="text" placeholder="Caissier" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
+                    <input wire:model="mecefOperateurNom" type="text" placeholder="{{ $this->repliOperateur['nom'] }}" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                 </div>
             @endif
         </div>

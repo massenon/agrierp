@@ -67,6 +67,9 @@ class DonneesEntreprise extends Component
 
     public function mount(): void
     {
+        // CONF-1 : jamais d'ouverture sans le droit (même garde que `EmailSmtp::mount`).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-parametres'), 403);
+
         $settings = CompanySetting::current();
 
         $this->companyName = $settings->company_name;

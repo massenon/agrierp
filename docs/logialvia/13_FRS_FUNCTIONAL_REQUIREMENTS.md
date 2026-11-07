@@ -89,7 +89,7 @@
 | FR-ELV-31 | Pisciculture : fiche (Alevin, Juvénile, Mature) avec libellés « Achats » / « Nés » ; biomasse (effectif × poids moyen) suivie ; vente en kg ET sujets (FR-VTE-19) ; bassin, cycle, qualité de l'eau : **À DÉFINIR AVEC LE CLIENT**. | `15_` §7.1 ; `16_` DV-01, DV-02 | Q-PIS-1…4, 7…9 |
 | FR-ELV-32 | Pintades : mêmes mécanismes que Goliaths ; stade « Poussins » (DV-09) (jamais « Alevins ») ; durée du stade, rations par âge, seuil de maturité : repères à valider, **À DÉFINIR**. | `15_` §7.2 ; `16_` DV-03 | Q-PIN-1…3 |
 | FR-ELV-33 | Ration des poissons : effectif × poids moyen × taux (% de biomasse par jour) selon la classe de poids ; barème éditable ; pesée d'échantillon tous les 15 j (5–10 % des sujets, min. 30) recalculant le poids moyen. TRANCHÉ (DV-01). | RM-ELV-09b | `16_` DV-01 |
-| FR-ELV-34 | Incubation : durée (défaut 28 j), fenêtre (26–28 j), mode (couveuse / couvaison naturelle) paramétrables ; éclosion prévue = mise + durée avec plage ; rappels automatiques mirages J7, J14, transfert éclosoir J25 ; taux de fertilité et d'éclosion mesurés. TRANCHÉ (DV-03). | RM-COU-01, RM-COU-06 | `16_` DV-03 |
+| FR-ELV-34 | Incubation : durée (défaut 28 j), fenêtre (26–28 j), mode (couveuse / couvaison naturelle) paramétrables ; éclosion prévue = mise + durée avec plage ; rappels automatiques mirages J7, J14, transfert éclosoir J25 ; taux de fertilité et d'éclosion mesurés. TRANCHÉ (DV-03). **Modifiables dans le formulaire « Incubation et règles » de Paramètres Élevage (DV-11, `23_` §6b)** : jours de mirage, jour de transfert, rappels activés ou non, conservation des œufs (conseillée 7 j, maximale 10 j), repères d'incubateur en avertissement ; `manage-elevage`, validations françaises, audit, synchronisation ; un cycle existant n'est jamais modifié. | RM-COU-01, RM-COU-06 | `16_` DV-03, DV-11 |
 
 ## 5. Ventes, clients, facturation (module `24_`)
 
@@ -114,7 +114,7 @@
 | FR-VTE-17 | Avoir `FA-AAAA-NNN` désigne la facture d'origine (`origineRef`), ne la modifie jamais. | contre-passation | `facturation_mecef_tables.dart` |
 | FR-VTE-18 | Lettre de relance PDF ; sans échéance : « Rappel de Solde ». | contenu | F4, F7 |
 | FR-VTE-19 | Vente ou récolte de poisson : poids (kg) ET nombre de sujets saisis ; l'effectif baisse du nombre de sujets ; nombre inconnu = estimé (kg ÷ poids moyen de la dernière pesée) et ligne marquée « estimé » ; refus si estimation impossible (aucune pesée). TRANCHÉ (DV-02). | RM-ELV-12 | `16_` DV-02 |
-| FR-VTE-20 | `/factures-mecef` : le caissier consulte et réimprime ses factures ; annuler, retransmettre et créer un avoir lui sont refusés (serveur ET écran). TRANCHÉ (DV-06). | test par (rôle, action) | `16_` DV-06 |
+| FR-VTE-20 | `/factures-mecef` : le caissier consulte et réimprime ses factures ; annuler, retransmettre et créer un avoir lui sont refusés (serveur ET écran). TRANCHÉ (DV-06). L'onglet « Retours et Avoirs » de `/ventes` reste visible au caissier, qui y enregistre un retour client (validé par le serveur) sans créer d'avoir MeCeF/FA (TRANCHÉ DV-08). | test par (rôle, action) | `16_` DV-06, DV-08 |
 
 ## 6. Stocks et achats (module `25_`)
 
@@ -184,7 +184,7 @@
 | FR-ADM-11 | SMTP et e-MECeF : réglage avec « Tester la configuration » (un `GET /info/status`, jamais `POST /invoice`) ; jeton masqué « •••• », « Remplacer », « Effacer ». | jamais servi au poste | guide bloc 19 |
 | FR-ADM-12 | Toast en haut à droite, empilés (4 max), croix de fermeture. | rendu | F8 |
 | FR-ADM-13 | Quatre rôles (admin, comptable, caissier, animalier) ; matrice en lecture ; création d'utilisateur : rôle parmi comptable, caissier, animalier (`admin` jamais créable). TRANCHÉ (DV-07). | test de création de chaque rôle | `16_` DV-07 |
-| FR-ADM-14 | Paramètres de ferme : seuil d'alerte d'autonomie (défaut 7 j), seuil critique (défaut 3 j, < alerte), durée d'incubation et fenêtre ; modifiables par l'admin, journalisés. TRANCHÉ (DV-03, DV-04). | refus si critique ≥ alerte | `16_` DV-03, DV-04 |
+| FR-ADM-14 | Paramètres de ferme : seuil d'alerte d'autonomie (défaut 7 j), seuil critique (défaut 3 j, < alerte), durée d'incubation et fenêtre ; modifiables par l'admin, journalisés. TRANCHÉ (DV-03, DV-04, DV-11). Recommandés (DV-12 à DV-14, à confirmer avec le technicien) : marge de provende 4 j, mortalité des poussins de pintade 1 %/2 % et 10 %/20 %, estimation de vente de poisson (20 %, 50–150 %, 500 g). | refus si critique ≥ alerte | `16_` DV-03, DV-04 |
 
 ## 10. Synchronisation, MeCeF, PWA, alertes (transverses)
 
@@ -203,4 +203,4 @@
 
 ## 11. Questions ouvertes
 
-Reprises de `10_BRS_BUSINESS_REQUIREMENTS.md` §6 : Q-ELV-5/7, Q-PIS-1…4 et 7…9, Q-PIN-1…3, Q-CPT-4, Q-TVA-1, Q-VTE-1, Q-IMP-1. FERMÉES le 08/11/2026 (`16_DECISIONS_VALIDEES.md`) : Q-PIS-5, Q-PIS-6, Q-PIN-4, Q-ALR-1, Q-CPT-3, Q-ROL-1. Nouvelles : Q-DV-1 à Q-DV-7 (`16_` §4).
+Reprises de `10_BRS_BUSINESS_REQUIREMENTS.md` §6 : Q-ELV-5/7, Q-PIS-1…4 et 7…9, Q-PIN-1…3, Q-CPT-4, Q-TVA-1, Q-VTE-1, Q-IMP-1. FERMÉES le 08/11/2026 (`16_DECISIONS_VALIDEES.md`) : Q-PIS-5, Q-PIS-6, Q-PIN-4, Q-ALR-1, Q-CPT-3, Q-ROL-1. Nouvelles : Q-DV-1 à Q-DV-8 (`16_` §4) ; fermées ou par défaut au 08/11/2026 : DV-08 à DV-15.

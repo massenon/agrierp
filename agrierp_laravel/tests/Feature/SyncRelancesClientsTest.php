@@ -40,6 +40,9 @@ class SyncRelancesClientsTest extends TestCase
     {
         parent::setUp();
 
+        // CONF-1 : un e-mail n'est « envoyé » que si un envoi réel est possible ; ces tests (Mail::fake) supposent un SMTP configuré.
+        \App\Models\CompanySetting::current()->update(['smtp_host' => 'smtp.exemple.bj']);
+
         Permission::findOrCreate('manage-ventes', 'web');
         Permission::findOrCreate('view-ventes', 'web');
         Role::findOrCreate('vendeur', 'web')->givePermissionTo(['manage-ventes', 'view-ventes']);

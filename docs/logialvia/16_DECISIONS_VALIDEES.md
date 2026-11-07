@@ -64,7 +64,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 - **Reste À DÉFINIR.** Arrondi de l'estimation (proposé : à l'entier le plus proche, moitié vers le haut, au moins 1, plafonné à l'effectif) ; écart toléré entre nombre saisi et nombre estimé avant avertissement ; poids minimum de vente ; délai d'attente après traitement (3 j du bleu de méthylène confirmé en prophylaxie).
 - **Statut** : validé par le client le 08/11/2026.
 
-### DV-03 — Pintades : « pintadeaux », incubation 28 jours paramétrable
+### DV-03 — Pintades : libellé du stade voir DV-09, incubation 28 jours paramétrable
 - **Décision (texte normatif).**
   1. **Libellé du premier stade : voir DV-09** (« Poussin(s) », glossaire ; ce point remplace « pintadeaux » de la première rédaction). Le terme « Alevins » (poisson) reste interdit pour une pintade. Le barème semé de LogiALVIA est à corriger (`parametres_elevage_seeder.dart` : ligne `pintades / Alevins` → libellé exact du glossaire).
   2. **Incubation : 28 jours** (code `cycle_incubation.dart` et F3) ; `INDEX_MAITRE` qui dit 27 est à corriger. Mais la durée est un **PARAMÈTRE** (défaut 28 j) avec une **fenêtre d'éclosion 26–28 j** : 26–27 j ont été observés en climat chaud ou en couvaison naturelle.
@@ -72,7 +72,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
   4. **Date d'éclosion prévue = mise en incubation + 28 j**, avec plage affichée 26–28 j ; **mirages vers J7 et J14** ; **transfert à l'éclosoir vers J25** ; rappels automatiques pour ces trois échéances (mirages et transfert : en mode artificiel ; en couvaison naturelle, mirages possibles, pas de transfert).
   5. Suivi du **taux de fertilité** et du **taux d'éclosion** : à MESURER sur la ferme, aucune valeur imposée (RM-COU-03 existant).
   6. **Mortalité forte des premières semaines** du poussin de pintade (froid, humidité) : alerte prévue ; seuils : voir DV-13 (recommandé).
-  7. Élevage des pintadeaux en **poussinière chauffée**.
+  7. Élevage des poussins de pintade en **poussinière chauffée**.
 - **Repères terrain, à valider (ordres de grandeur)** : incubateur 37,5–37,8 °C ; humidité 55–60 %, puis 65–75 % les trois derniers jours ; retournements plusieurs fois par jour jusqu'à J25 ; œufs conservés ≤ 7–10 jours avant la mise en incubation ; poussinière ≈ 35 °C la première semaine puis réduction progressive ; ration **10–60 g/jour par pintadeau selon l'âge**, **90–120 g/jour adulte** (à confirmer avec la fiche de l'aliment) ; abattage : élevage amélioré vers 14–16 semaines, élevage traditionnel bien plus tard.
 - **Justification.** 28 j est la durée de référence (code et F3, corrigée par la Gérante) ; la fenêtre reconnaît les écarts de terrain sans les masquer ; les rappels évitent l'oubli des mirages (RM-COU-05).
 - **Impact par fichier** : `15_` RM-COU-01 (mise à jour), RM-COU-06 (nouvelle), §7.2, §9 (C-4, C-6) ; `23_` §4.4, §6 ; `30_` (`cycle_couveuse.duree_incubation_jours`, `fenetre_min_jours`, `fenetre_max_jours`, `mode_incubation`) ; `31_` cas T-DV03-* ; `12_` SR-055 ; `13_` FR-ELV-19, FR-ELV-32, FR-ELV-34 ; `10_` BR-045, E-INC.
@@ -130,7 +130,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 - **Statut** : validé par le client le 08/11/2026.
 
 ### DV-11 — Réglages d'incubation et règles modifiables dans « Paramètres Élevage »
-- **Décision (texte normatif).** Un **formulaire** (section « Incubation et règles » de `/parametres/elevage`) permet d'**éditer** les règles d'incubation par espèce (pintade, poule, autre volaille si présente) : durée, fenêtre d'éclosion, mode, jours de mirage, jour de transfert, rappels, délai de conservation des œufs, repères d'incubateur (avertissement). Droit `manage-elevage`, validations françaises, audit, synchronisation vers le poste. Spécification champ par champ : `29_` §5 et `23_` §6 ; construction et prompt : `23_` §6.
+- **Décision (texte normatif).** Un **formulaire** (section « Incubation et règles » de `/parametres/elevage`) permet d'**éditer** les règles d'incubation par espèce (pintade, poule, autre volaille si présente) : durée, fenêtre d'éclosion, mode, jours de mirage, jour de transfert, rappels, délai de conservation des œufs, repères d'incubateur (avertissement). Droit `manage-elevage`, validations françaises, audit, synchronisation vers le poste. Spécification champ par champ : `29_` §4b et `23_` §6b ; construction et prompt : `23_` §6b et §13.
 - **Constat AgriERP.** AgriERP **n'a pas de module d'incubation de pintades**. Ses durées de cycle de reproduction (lapins, porcs : palpation, sevrage) sont des dates attendues portées par chaque événement `livestock_reproduction_events`, calculées dans `SuiviReproduction.php` (valeurs fixes dans le code : palpation à +14 j, sevrage à +42 j), **non éditables dans un formulaire de réglage** ; seuls sont éditables dans `ParametresElevage` les barèmes, la prophylaxie, les provendes, les formats de numérotation (`elevage_numbering_settings`) et le délai de rappel des soins (`company_settings.rappel_soins_jours`, entier 0–30). Ces deux derniers servent de **modèle de construction**.
 - **Impact par fichier** : `23_` §6 et §8 ; `29_` ; `30_` ; `13_` FR-ELV-34, FR-ADM-14 ; `31_` T-DV11-*.
 - **Statut** : validé par le client le 08/11/2026 (valeurs numériques : repères à valider).
@@ -156,7 +156,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 
 ### DV-15 — Responsable stock et comptable : valeurs par défaut (aucune réponse du client)
 - **Responsable stock.** `/inventaire` **réservé à l'administrateur**. Si un « responsable stock » existe, on lui donnera **un droit dédié plus tard** ; **pas de 5ᵉ rôle**. **Q-DV-5 reste OUVERTE** avec cette valeur par défaut.
-- **Comptable.** Périmètre par défaut **calqué sur AgriERP** : comptabilité et exercices en gestion, rapports, TVA, **lecture** des ventes, achats et stocks ; **ni caisse ni élevage**. **Q-DV-7 reste OUVERTE** avec cette valeur par défaut. (Précision : « lecture des stocks » ne donne PAS l'accès à `/inventaire`, qui reste administrateur seul ; voir « Contradictions » ci-dessous.)
+- **Comptable.** Périmètre par défaut **calqué sur AgriERP** (les gestes de facturation de DV-07 sont conservés) : comptabilité et exercices en gestion, rapports, TVA, **lecture** des ventes, achats et stocks ; **ni caisse ni élevage**. **Q-DV-7 reste OUVERTE** avec cette valeur par défaut. (Précision : « lecture des stocks » ne donne PAS l'accès à `/inventaire`, qui reste administrateur seul ; voir « Contradictions » ci-dessous.)
 - **Statut** : décision par défaut, non validée par le client.
 
 ---
@@ -186,6 +186,7 @@ Aucune filière ruminants n'existe aujourd'hui. **Non adopté, pour plus tard** 
 - **DV-02 ↔ DV-12** : arrondi « moitié vers le haut » contre « entier le plus proche » : même résultat, sauf conventions de langage ; DV-12 précise DV-02 sans le contredire. Le poids moyen est en grammes dans DV-02 (× 1 000 ÷ g) et en kg dans DV-12 : formules équivalentes.
 - **DV-04 ↔ DV-14** : DV-04 fixe 7 j / 3 j par défaut ; DV-14 les dérive (délai + 4 j / délai). Compatibles seulement pour un délai de 3 j ; avec un autre délai les seuils recommandés changent, donc DV-04 reste la valeur initiale et DV-14 la méthode de réglage.
 - **DV-06/DV-08 ↔ DV-15** : le caissier voit « Retours et Avoirs » mais n'émet pas d'avoir FA ; et « lecture des stocks » du comptable (DV-15) ne contredit pas DV-06 car `/inventaire` exige `view-stocks` réservé à l'administrateur. À arbitrer si le client veut que le comptable lise l'inventaire.
+- **DV-07 ↔ DV-15** : DV-07 propose pour le comptable les gestes de facturation (annuler, retransmettre, avoir) ; DV-15 ne les cite pas (lecture des ventes). Par défaut on garde DV-07 (proposé) ; à confirmer avec Q-DV-7.
 - **DV-11 ↔ AgriERP** : la consigne présupposait des durées de cycle lapins/porcs déjà éditables ; vérification faite dans le code, elles ne le sont pas (voir DV-11).
 
 ## 5. Critères d'acceptation du registre

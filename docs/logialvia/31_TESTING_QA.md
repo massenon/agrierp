@@ -140,7 +140,7 @@ Source : `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` § 2 et § 6, « calculé à la 
 | TVA / groupes de taxe, e-MECeF | `41_MECEF_EMECEF.md` | voir ce fichier |
 | Clôture d'exercice, balance | `J1_Bascule_Cloture_Exercice.md` de logialvia | à calculer |
 
-### 4.3 Jeux calculés à la main des décisions validées du 08/11/2026 (DV-01 à DV-07)
+### 4.3 Jeux calculés à la main des décisions validées du 08/11/2026 (DV-01 à DV-15)
 
 Chaque valeur ci-dessous est calculée à la main (calculette), jamais en lançant le code ; les règles sont dans `15_REGLES_METIER.md` (RM-ELV-09b, RM-ELV-10, RM-ELV-12, RM-COU-01/06, RM-CPT-09) et `16_DECISIONS_VALIDEES.md`. **Les taux de ration utilisés sont des valeurs d'ESSAI au milieu des fourchettes de repère : ils ne constituent pas un barème et ne doivent jamais être amorcés comme « confirmés ».**
 
@@ -185,6 +185,32 @@ Chaque valeur ci-dessous est calculée à la main (calculette), jamais en lança
 | T-DV07-1 | Quatre rôles (DV-07) | semis des rôles | exactement `admin`, `comptable`, `caissier`, `animalier` |
 | T-DV07-2 | Comptable | `/comptabilite/*` et `/rapports` | accès ; `/ventes` en encaissement : refus |
 | T-DV07-3 | Séparation | le compte qui encaisse ne peut pas saisir d'écriture manuelle | refus du caissier sur `/comptabilite/journal` |
+| T-DV08-1 | Caissier et « Retours et Avoirs » (DV-08) | caissier ouvre `/ventes` | onglet « Retours et Avoirs » visible ; « Nouveau Retour » sur une vente non normalisée : accepté, validé par le serveur |
+| T-DV08-2 | Limite d'avoir (DV-08, DV-06) | caissier : retour sur une vente normalisée, puis POST d'un avoir `FA` | retour enregistré, « avoir à émettre » ; aucune facture `FA` créée ; POST refusé 403 |
+| T-DV08-3 | Avoir par le comptable | comptable ou admin sur la même vente | avoir `FA-AAAA-NNN` émis, numéro serveur |
+| T-DV09-1 | Libellé du premier stade (DV-09) | barème et fiche des pintades | libellé exact « Poussins » aux deux endroits, rapprochement réussi ; aucune occurrence de « Alevins » |
+| T-DV10-1 | Répartition de départ (DV-10) | bande de 200 sujets ; première ouverture de la fiche ; saisie 20 / 0 / 50 / 130 | somme 20 + 0 + 50 + 130 = **200** : acceptée |
+| T-DV10-2 | idem, somme fausse | 20 / 0 / 50 / 120 | somme **190** ≠ 200 : refusée, « La somme des catégories (190) doit être égale à l'effectif de la bande (200). » |
+| T-DV10-3 | Rien avant la répartition | saisie de la fiche du jour sans répartition enregistrée | refus ; la répartition n'est PAS demandée à la création de la bande |
+| T-DV11-1 | Enregistrement des règles (DV-11) | pintade : durée 28, fenêtre 26–28, mirages `7, 14`, transfert 25, rappels oui | enregistré, toast « Règles d'incubation enregistrées. », ligne d'audit `incubation_rules.updated`, ligne au poste après synchronisation |
+| T-DV11-2 | Bornes | durée 0, puis 61 | refus : « La durée d'incubation doit être un nombre entier de jours compris entre 1 et 60. » |
+| T-DV11-3 | Mirages invalides | `14, 7` ; `7, 14, 28` (durée 28) | refus : « Les jours de mirage doivent être des entiers croissants, tous inférieurs à la durée d'incubation. » |
+| T-DV11-4 | Fenêtre et transfert | durée 28, début de fenêtre 29 ; transfert 14 avec dernier mirage 14 ; transfert 25 | 29 refusé (> durée) ; 14 refusé (pas après le dernier mirage) ; 25 accepté |
+| T-DV11-5 | Droits | animalier ; caissier | l'animalier enregistre ; le caissier est refusé (serveur et écran) |
+| T-DV11-6 | Cycle existant intact | cycle créé le 01/08/2026 avec 28 j ; durée de l'espèce passée à 27 ; nouveau cycle le 01/08/2026 | ancien cycle : éclosion **29/08** inchangée ; nouveau : **28/08** (01/08 + 27) |
+| T-DV11-7 | Conservation des œufs | pondus le 01/08, mis le 09/08 (8 j) ; mis le 12/08 (11 j) ; conseillé 7, maximal 10 | 8 j : avertissement simple ; 11 j : avertissement renforcé ; jamais de blocage |
+| T-DV12-1 | Estimation du nombre (DV-12, recommandé) | 12,4 kg ÷ 0,62 kg ; 12,4 ÷ 0,58 ; 3,0 ÷ 0,62 | 20,0 → **20** ; 21,38 → **21** ; 4,84 → **5** |
+| T-DV12-2 | Plafond | 900 kg ÷ 0,62 = 1 451,6 ; effectif 1 200 | **1 200** (plafonné) |
+| T-DV12-3 | Écart avec le nombre saisi | estimation 20 ; saisi 25 ; saisi 23 | 25 % > 20 % : avertissement non bloquant ; 15 % : rien |
+| T-DV12-4 | Poids moyen vendu | 12,4 kg pour 10 sujets ; pour 25 sujets (lot 0,62 kg) | 1,24 kg = 200 % : avertissement ; 0,496 kg = 80 % : rien |
+| T-DV12-5 | Poids minimum de vente | 12,4 kg pour 30 sujets ; pour 20 sujets (min 500 g) | 413 g : avertissement ; 620 g : rien ; jamais de blocage |
+| T-DV12-6 | Pesée périmée | dernière pesée il y a 31 j ; il y a 30 j | 31 j : « poids moyen périmé », estimation « estimée » ; 30 j : rien |
+| T-DV13-1 | Mortalité du jour, lot de 200 (DV-13) | 2, 3, 4, 5 morts le même jour | 1,0 % rien ; 1,5 % avertissement ; 2,0 % avertissement ; 2,5 % critique |
+| T-DV13-2 | Mortalité cumulée à 4 semaines | 20, 21, 40, 41 morts | 10,0 % rien ; 10,5 % avertissement ; 20,0 % avertissement ; 20,5 % critique |
+| T-DV14-1 | Seuils d'autonomie calculés (DV-14) | délai 3 j ; délai 5 j ; marge 4 j | 3 j : critique 3, alerte **7** ; 5 j : critique 5, alerte **9** |
+| T-DV14-2 | Application avec ration 6 080 g/j, délai 5 j | stock 50 kg ; stock 30 kg | 50 000 ÷ 6 080 = 8,2 j : alerte (≤ 9) ; 30 000 ÷ 6 080 = 4,9 j : critique (≤ 5) |
+| T-DV15-1 | `/inventaire` par défaut (DV-15) | admin ; comptable ; caissier | admin accède ; comptable et caissier refusés |
+| T-DV15-2 | Comptable par défaut | `/comptabilite/*`, `/rapports` ; `/ventes` en caisse ; `/elevage` | accès aux deux premiers ; refus des deux autres |
 
 
 ## 5. Commandes
@@ -397,7 +423,7 @@ Capture web et capture poste côte à côte à la même largeur : différences d
 | Filière | Tests spécifiques | Ce qui est À DÉFINIR AVEC LE CLIENT |
 |---|---|---|
 | Pisciculture (poissons-chats) | libellés Alevin/Juvénile/Mature ; colonne « Nés » ; ration en % de biomasse (DV-01, jamais 30/60/110 ni 8/25/45) ; vente en kg ET sujets avec indicateur « estimé » (DV-02) ; note « repères à valider » visible ; l'achat d'alevins se saisit en « Achats » | bassins, qualité de l'eau, pesée/échantillonnage, récolte partielle (D-PIS-1 à 4 de `30`) : **aucun test inventé** ; écrire des tests `skip` portant la question |
-| Pintades | libellés Poussins/Pintadau/Mature (jeune : « Poussins » (DV-09), jamais « Alevins ») ; « Nés (Couveuse) » ; rations 30/60/110 en attendant les repères validés ; incubation 28 j paramétrable, fenêtre 26–28 j, deux modes, rappels J7/J14/J25 (DV-03) | seuil d'alerte de mortalité des poussins de pintade, repères d'incubateur et de poussinière, rations par âge (Q-DV-3) |
+| Pintades | libellés Poussins/Pintadau/Mature (jeune : « Poussins » (DV-09), jamais « Alevins ») ; « Nés (Couveuse) » ; rations 30/60/110 en attendant les repères validés ; incubation 28 j paramétrable, fenêtre 26–28 j, deux modes, rappels J7/J14/J25 (DV-03) | seuil d'alerte de mortalité des poussins de pintade, repères d'incubateur et de poussinière, rations par âge (Q-DV-3 fermée en « recommandé », DV-13) |
 | Goliaths | libellés Poussins/Goliathau/Mature ; rations 30/60/110 avec note « barème générique non confirmé » ; seuils de maturité 2 800 g / 120 jours présents dans le code | barème validé, définition de la maturité, combinaison des seuils (D-GOL-1/2) |
 | Toutes | ajouter une 6ᵉ filière = configuration, pas écran dupliqué : un garde-fou vérifie qu'il n'existe **qu'un** composant de fiche générique paramétré par la configuration | prophylaxie par filière (D-ALL-1) |
 
@@ -582,9 +608,9 @@ INTERDITS : déclarer « fonctionne » pour ce qui n'a été vu qu'en test serve
 ## 15. Questions ouvertes
 
 1. Les **quatre classes d'écran** : confirmer la classification de la section 9 avec `04_UI_UX_DESIGN_SYSTEM.md` (mes sources ne les nomment pas).
-2. **Rôles** de LogiALVIA : TRANCHÉ (DV-07) : `admin`, `comptable`, `caissier`, `animalier` ; un compte de recette par rôle ; périmètre du comptable : Q-DV-7.
+2. **Rôles** de LogiALVIA : TRANCHÉ (DV-07) : `admin`, `comptable`, `caissier`, `animalier` ; un compte de recette par rôle ; périmètre du comptable : Q-DV-7 ouverte, défaut DV-15.
 3. **Alerte de maturité des goliaths** : les deux seuils (2 800 g, 120 jours) se combinent-ils par ET ou par OU ?
-4. ~~Seuil d'autonomie alimentaire~~ TRANCHÉ (DV-04) : 7 j alerte, 3 j critique. Reste : marge de sécurité (Q-DV-4).
+4. ~~Seuil d'autonomie alimentaire~~ TRANCHÉ (DV-04) : 7 j alerte, 3 j critique. Marge de sécurité : 4 j recommandés (DV-14, Q-DV-4 fermée en « recommandé »).
 5. **Règle d'arrondi FCFA** (Q9 de `30`) : sans elle, le test de migration des montants échoue plutôt que d'arrondir.
 6. **Base réelle d'un poste logialvia** : le client peut-il en fournir une copie pour T4 ?
 7. **Poste Windows réel et matériel de la ferme** pour la recette finale : disponibles quand ?
