@@ -6,6 +6,7 @@ import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
 import '../erreurs/message_erreur.dart';
+import '../systeme/plateforme_poste.dart';
 import 'parametres_smtp.dart';
 
 /// Envoi réel d'un message par un serveur SMTP — `send` du paquet `mailer` hors des tests, injecté dans les tests
@@ -52,6 +53,9 @@ class EnvoiEmailTest {
       'Ceci est un e-mail de test envoyé depuis un poste LogiAgriERP (Paramètres > Email (SMTP)) — configuration '
       'SMTP validée avec succès.';
 
+  /// PWA-2 : un navigateur n'ouvre pas de socket SMTP ; l'essai se fait depuis le web de gestion.
+  static const motifNavigateur = "L'essai SMTP se fait depuis le web de gestion : un navigateur ne peut pas ouvrir de connexion SMTP.";
+
   static Future<void> envoyerReellement(Message message, SmtpServer serveur) =>
       send(message, serveur, timeout: delai);
 
@@ -78,6 +82,7 @@ class EnvoiEmailTest {
 
   /// Envoie l'e-mail de test à [destinataire] ; rend le message de succès du web. Lève [EchecEnvoiEmail].
   Future<String> envoyer(String destinataire) async {
+    if (PlateformePoste.navigateur) throw const EchecEnvoiEmail(motifNavigateur);
     final dest = destinataire.trim();
     if (dest.isEmpty) {
       throw const EchecEnvoiEmail('Le champ destinataire du test est obligatoire.');

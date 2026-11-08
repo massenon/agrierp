@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
+
+import '../systeme/fichiers_poste.dart';
+import '../systeme/plateforme_poste.dart';
 import '../temps/heure_benin.dart';
 
 /// Un PDF en octets : reçu du serveur (fiche sujet) ou fabriqué au poste (attestation, ATT-3 : l'émission est alors
@@ -39,23 +39,17 @@ class LivraisonPdf {
   /// même jour (une correction) sont un cas normal, et la seconde ne doit pas
   /// écraser la première sans rien demander.
   static Future<String> enregistrer(PdfRecu pdf, {DateTime? maintenant}) async {
-    final racine = await getApplicationDocumentsDirectory();
-    final dossier = Directory(p.join(racine.path, 'AgriERP'));
-    if (!dossier.existsSync()) dossier.createSync(recursive: true);
-
     final h = maintenant ?? HeureBenin.maintenant();
     String d(int n) => n.toString().padLeft(2, '0');
     final base = pdf.fichier.replaceAll(
       RegExp(r'\.pdf$', caseSensitive: false),
       '',
     );
-    final chemin = p.join(
-      dossier.path,
-      '$base-${h.year}${d(h.month)}${d(h.day)}-${d(h.hour)}${d(h.minute)}.pdf',
-    );
+    final nom = '$base-${h.year}${d(h.month)}${d(h.day)}-${d(h.hour)}${d(h.minute)}.pdf';
 
-    File(chemin).writeAsBytesSync(pdf.octets);
-    return chemin;
+    // PWA-2 : le navigateur n'a pas de dossier Documents : le PDF est TÉLÉCHARGÉ.
+    if (PlateformePoste.navigateur) return PlateformePoste.livreurNavigateur(nom, pdf.octets);
+    return livrerFichier(nom, pdf.octets);
   }
 
   static Future<void> imprimer(PdfRecu pdf) =>

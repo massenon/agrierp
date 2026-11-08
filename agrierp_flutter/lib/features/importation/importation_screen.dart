@@ -1,11 +1,10 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import '../../core/systeme/fichiers_poste.dart';
+import '../../core/systeme/plateforme_poste.dart';
 
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -19,19 +18,17 @@ typedef FichierChoisi = ({String nom, Uint8List octets});
 
 /// Sélecteur par défaut : un classeur .xlsx.
 Future<FichierChoisi?> choisirClasseurXlsx() async {
-  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx'], dialogTitle: 'Choisir le fichier à importer (.xlsx)');
-  if (r == null || r.files.isEmpty || r.files.first.path == null) return null;
-  return (nom: r.files.first.name, octets: Uint8List.fromList(await File(r.files.first.path!).readAsBytes()));
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx'], dialogTitle: 'Choisir le fichier à importer (.xlsx)', withData: selecteurAvecOctets);
+  if (r == null || r.files.isEmpty) return null;
+  final octets = await octetsDuFichierChoisi(r.files.first);
+  if (octets == null) return null;
+  return (nom: r.files.first.name, octets: Uint8List.fromList(octets));
 }
 
 /// Écrit un fichier dans « Documents\AgriERP » et rend son chemin (l'écran l'annonce : aucune boîte de dialogue, comme les exports).
 Future<String> enregistrerDansDocuments(String nom, List<int> octets) async {
-  final racine = await getApplicationDocumentsDirectory();
-  final dossier = Directory(p.join(racine.path, 'AgriERP'));
-  if (!dossier.existsSync()) dossier.createSync(recursive: true);
-  final chemin = p.join(dossier.path, nom);
-  File(chemin).writeAsBytesSync(octets);
-  return chemin;
+  if (PlateformePoste.navigateur) return PlateformePoste.livreurNavigateur(nom, octets);
+  return livrerFichier(nom, octets);
 }
 
 /// Ticket IMPORT-1 — ÉCRAN « IMPORTATION EN MASSE », portage de `livewire/stocks/importation-masse.blade.php`.

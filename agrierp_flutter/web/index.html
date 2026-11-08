@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <!-- PWA-2 : l'application est servie sous /poste/ (flutter build web --base-href /poste/). -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="LogiAgriERP — gestion de la Ferme École OLOUWACHEGOUN, utilisable hors ligne.">
+  <meta name="theme-color" content="#052E16">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="LogiAgriERP">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>LogiAgriERP</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Écran d'attente STATIQUE (aucune donnée) : visible avant que Flutter ne dessine la première image. */
+    html, body { margin: 0; height: 100%; background: #F8F9FA; }
+    #attente { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+               font-family: system-ui, sans-serif; color: #052E16; gap: 12px; }
+    #attente img { width: 96px; height: 96px; }
+  </style>
+</head>
+<body>
+  <div id="attente"><img src="icons/Icon-192.png" alt=""><div>LogiAgriERP — chargement…</div></div>
+  <!-- flutter_bootstrap.js est NOTRE gabarit (web/flutter_bootstrap.js) : il enregistre poste_sw.js et NON le service worker
+       de Flutter (qui se désinscrit). -->
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

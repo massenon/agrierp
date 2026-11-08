@@ -10,7 +10,19 @@
 <IfModule mod_mime.c>
     AddType application/manifest+json .webmanifest
     AddType font/woff2 .woff2
+    # PWA-2 : le poste Flutter web charge sqlite3.wasm et canvaskit.wasm. Sans `application/wasm`, la compilation en flux
+    # (WebAssembly.instantiateStreaming) est REFUSÉE par le navigateur : écran vide, sans message.
+    AddType application/wasm .wasm
+    AddType text/javascript .js .mjs
 </IfModule>
+
+<IfModule mod_deflate.c>
+    # PWA-2 : main.dart.js (≈ 8,5 Mo) et les .wasm se compressent d'un facteur 3 à 4.
+    AddOutputFilterByType DEFLATE application/wasm text/javascript application/javascript application/json
+</IfModule>
+
+# `/poste/` est un dossier statique (index.html) : on le sert tel quel, sans passer par Laravel.
+DirectoryIndex index.php index.html
 
 # Le service worker doit pouvoir piloter TOUTE l'application : son cache
 # ne doit jamais figer une version ancienne de sw.js lui-même.
@@ -37,8 +49,19 @@
     # elles ne portent PAS d'empreinte — un logo remplacé doit pouvoir
     # atteindre les postes sans attendre.
     <FilesMatch "\.(png|jpe?g|webp|svg|ico)$">
-        Header set Cache-Control "public, max-age=604800"
+        Header set Cache-Control "public, max-age=604800" "expr=%{REQUEST_URI} !~ m#^/poste/#"
     </FilesMatch>
+
+    # PWA-2 — poste Flutter web (public/poste/). Aucun nom ne porte d'empreinte (main.dart.js, canvaskit.wasm…) : tout se
+    # REVALIDE à chaque requête (ETag, 304), et c'est le service worker du poste (poste_sw.js, versionné) qui assure le
+    # hors ligne. Un cache HTTP long sur ces fichiers figerait une ancienne version du code face à une base plus récente.
+    # ⚠️ AUCUN en-tête Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy ici : avec eux, drift passe en OPFS et le
+    # tirage dure ≈ 150 s au lieu de 6 s (docs/logialvia/45, §7). Ne pas en poser.
+    Header set Cache-Control "no-cache" "expr=%{REQUEST_URI} =~ m#^/poste/#"
+    <Files "poste_sw.js">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Service-Worker-Allowed "/poste/"
+    </Files>
 </IfModule>
 
 <IfModule mod_rewrite.c>

@@ -1,12 +1,8 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
 
 import '../config/domaine_email.dart';
-import '../demarrage/dossier_donnees.dart';
 import 'identifiant_ligne_depense.dart';
+import 'ouverture_base.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -2451,7 +2447,7 @@ class SyncState extends Table {
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase() : super(ouvrirConnexionPoste());
 
   AppDatabase.forTesting(super.executor);
 
@@ -3790,18 +3786,4 @@ class AppDatabase extends _$AppDatabase {
     });
     return perdus;
   }
-}
-
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dossier = await DossierDonnees.courant();
-    await dossier.create(recursive: true);
-    final fichier = File(p.join(dossier.path, 'agrierp.sqlite'));
-
-    // ⚠️ `NativeDatabase.createInBackground` SEUL sur Windows Desktop. Ne
-    // JAMAIS réintroduire `open.overrideFor(OperatingSystem.windows, ...)` :
-    // ce motif a déjà cassé une compilation dans ce projet et n'apporte rien
-    // ici, `sqlite3_flutter_libs` fournissant déjà la bibliothèque.
-    return NativeDatabase.createInBackground(fichier);
-  });
 }

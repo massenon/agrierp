@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart' show ChartOfAccount;
 import '../rapports/rapports_exports_screen.dart' show Editeur;
+import '../../core/systeme/fichiers_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -18,9 +18,10 @@ typedef ReleveChoisi = ({String nom, String contenu, int octets});
 
 /// Sélecteur de fichier par défaut : un CSV ou un texte, lu en UTF-8 (injecté en test).
 Future<ReleveChoisi?> choisirReleveCsv() async {
-  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['csv', 'txt'], dialogTitle: 'Importer un relevé (CSV)');
-  if (r == null || r.files.isEmpty || r.files.first.path == null) return null;
-  final octets = await File(r.files.first.path!).readAsBytes();
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['csv', 'txt'], dialogTitle: 'Importer un relevé (CSV)', withData: selecteurAvecOctets);
+  if (r == null || r.files.isEmpty) return null;
+  final octets = await octetsDuFichierChoisi(r.files.first);
+  if (octets == null) return null;
   return (nom: r.files.first.name, contenu: utf8.decode(octets, allowMalformed: true), octets: octets.length);
 }
 

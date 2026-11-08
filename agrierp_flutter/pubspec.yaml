@@ -68,6 +68,8 @@ dependencies:
   desktop_drop: ^0.8.4
   # CONF-2 : décode l'ICO du favicon pour l'aperçu (déjà au verrou comme dépendance de `pdf`, version 4.3.0).
   image: ^4.3.0
+  drift_flutter: ^0.3.1
+  web: ^1.1.2
 
 dev_dependencies:
   flutter_test:

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -7,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/apercu_image.dart';
 import '../../core/config/fichiers_entreprise.dart';
 import '../../core/database/app_database.dart';
+import '../../core/systeme/fichiers_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -66,10 +66,11 @@ Widget _formulaire(Map<String, String> erreurs, String prefixe, List<Widget> cha
 
 /// Sélecteur de fichier image du poste (logo, favicon), injectable : les formats proposés sont ceux du genre (CONF-1).
 Future<FichierChoisi?> choisirImage(String genre) async {
-  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: FichiersEntreprise.extensionsParGenre[genre], dialogTitle: 'Choisir une image');
-  if (r == null || r.files.isEmpty || r.files.first.path == null) return null;
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: FichiersEntreprise.extensionsParGenre[genre], dialogTitle: 'Choisir une image', withData: selecteurAvecOctets);
+  if (r == null || r.files.isEmpty) return null;
   final f = r.files.first;
-  return (nom: f.name, octets: await File(f.path!).readAsBytes());
+  final octets = await octetsDuFichierChoisi(f);
+  return octets == null ? null : (nom: f.name, octets: octets);
 }
 
 Future<bool> ouvrirEntreprise({

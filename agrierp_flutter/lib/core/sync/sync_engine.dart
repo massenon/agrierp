@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visible
 import '../config/fichiers_entreprise.dart';
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import '../systeme/plateforme_poste.dart';
 import '../temps/heure_benin.dart';
 import 'fusion_referentiels.dart';
 import 'perimetre_tirage.dart';
@@ -6975,7 +6976,8 @@ class SyncEngine {
   /// `true` : fini (envoyé, ou impossible à jamais) ; `null` : à réessayer plus tard.
   Future<bool?> _envoyerUnJustificatif(String table, String id, String chemin, String quoi) async {
     final fichier = File(chemin);
-    if (!fichier.existsSync()) {
+    // PWA-2 : aucun justificatif n'est joint dans le navigateur (pas de chemin) ; si un chemin venu d'ailleurs arrive, il n'existe pas.
+    if (PlateformePoste.navigateur || !fichier.existsSync()) {
       _avertissements.add('Justificatif de $quoi introuvable sur ce poste (fichier déplacé ou supprimé) : il ne sera pas envoyé.');
       return true;
     }

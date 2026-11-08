@@ -127,3 +127,20 @@ Estimation globale révisée : **≈ 42 à 65 j-h** (étude 44 : 35 à 60). Le c
 - Les écrans, saisies et formulaires hors des trois pilotes (et hors fournisseur) n'ont pas été parcourus ; la vente de caisse hors ligne n'a pas été jouée (fournisseur choisi : formulaire plus court).
 - Les clics à coordonnées fixes sont fragiles ; une saisie rapide a perdu des caractères sous charge (mot de passe tronqué) dans un essai : artefact du pilotage, à ne pas confondre avec un défaut produit sans nouvel essai.
 - Aucun fichier du dépôt n'a été modifié, hors ce document et `docs/logialvia/img/phase0/` (4 captures, 150 à 220 Ko). Rien n'a été commité.
+
+
+## Suite : PWA-2 (phase 1, socle) — voir la section « PWA-2 » de `agrierp_flutter/CLAUDE.md`
+
+**Verdict : le bloquant n°1 est LEVÉ. Rechargement de la page HORS LIGNE : OUI** (`context.setOffline(true)` + `reload`, puis navigateur fermé et rouvert sans réseau) — l'application se recharge depuis le service worker `poste_sw.js` (portée `/poste/`) et affiche ses données locales. Script : `agrierp_flutter/outils/e2e_poste_web.mjs` (Chromium headless, `deviceScaleFactor` 1, serveur `php -S` + SQLite temporaire + `DemoDataSeeder`, build servi sous `/poste/` par le MÊME serveur).
+
+| Mesure (sandbox, rendu logiciel) | Résultat |
+|---|---|
+| Démarrage à froid (écran de connexion) | ≈ 5,0 s |
+| Connexion + PIN + tirage complet (7 pages) | ≈ 19,4 s (dont 8 s d'attentes du script) ; effectif 312 affiché |
+| Rechargement hors ligne (reload, verrou PIN compris) | ≈ 3,8 s |
+| Réouverture du navigateur, en ligne / SANS réseau | ≈ 4,2 s / ≈ 4,3 s, session, PIN et données conservés |
+| Service worker | portée `/poste/`, 42 fichiers précachés (28,3 Mo listés ; Chromium annonce 51,7 Mo de « caches », écart non élucidé), aucun `/api`, `/livewire`, `/login` dans le cache, un seul cache (purge des anciens) |
+| IndexedDB | 2,6 Mo après le tirage, 4,7 Mo après une synchronisation incrémentale et une saisie |
+| Saisie hors ligne puis reconnexion | fournisseur créé hors ligne (liste locale : 7), absent du serveur ; après « Synchroniser maintenant » : `POST /api/sync/push` 200, **une seule ligne** côté serveur, une synchro de plus ne la duplique pas |
+
+**Points ouverts mesurés** : (1) la synchronisation incrémentale après reconnexion a duré **134 s** (2 pages `pull?since=` : la page 1 a été appliquée en ≈ 90 s, contre 6 s pour le tirage initial complet) — cause non élucidée (application de pages existantes en IndexedDB, fil principal ?) : à instruire en priorité en phase 1 ; (2) la synchronisation automatique n'a pas envoyé le fournisseur en 30 s (elle est sur minuterie de 5 min) : l'essai a utilisé le bouton ; (3) le tableau de bord affiché pendant le tirage ne se rafraîchit pas seul ; (4) la vente de caisse du poste n'a PAS été jouée ; (5) Safari/iPhone, appareil réel, Apache (essai sous `php -S` seulement) : non vérifiés. Captures : `docs/logialvia/img/pwa2/`.

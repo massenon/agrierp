@@ -5,6 +5,8 @@ import 'package:excel/excel.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../systeme/fichiers_poste.dart';
+import '../systeme/plateforme_poste.dart';
 import 'document_officiel.dart';
 
 /// Édition tableur d'un [DocumentOfficiel].
@@ -83,13 +85,10 @@ class ExportTableur {
     DocumentOfficiel doc, {
     required DateTime maintenant,
   }) async {
-    final racine = await getApplicationDocumentsDirectory();
-    final dossier = Directory(p.join(racine.path, 'AgriERP'));
-    if (!dossier.existsSync()) dossier.createSync(recursive: true);
-
-    final chemin = p.join(dossier.path, nomFichier(doc.titre, maintenant));
-    File(chemin).writeAsBytesSync(construire(doc));
-    return chemin;
+    final nom = nomFichier(doc.titre, maintenant);
+    // PWA-2 : le navigateur n'a pas de dossier Documents : le classeur est TÉLÉCHARGÉ.
+    if (PlateformePoste.navigateur) return PlateformePoste.livreurNavigateur(nom, construire(doc));
+    return livrerFichier(nom, construire(doc));
   }
 
   /// Nom de fichier horodaté.
@@ -136,6 +135,10 @@ class ExportTableur {
     ClasseurRapport classeur, {
     required DateTime maintenant,
   }) async {
+    // PWA-2 : le navigateur renomme lui-même les doublons (« nom (1).xlsx ») : on lui livre le nom du web.
+    if (PlateformePoste.navigateur) {
+      return PlateformePoste.livreurNavigateur(nomClasseur(classeur, maintenant), construireTableau(classeur));
+    }
     final racine = await getApplicationDocumentsDirectory();
     final dossier = Directory(p.join(racine.path, 'AgriERP'));
     if (!dossier.existsSync()) dossier.createSync(recursive: true);

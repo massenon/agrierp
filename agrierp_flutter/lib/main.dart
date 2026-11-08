@@ -198,6 +198,9 @@ class _AgriErpAppState extends State<AgriErpApp> {
       baseUrl: widget.adresseServeur,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
+      // PWA-2 : le navigateur n'envoie PAS d'en-tête Accept de lui-même ; sans lui, Laravel traite un refus de validation en
+      // page web (302) au lieu de la réponse JSON 422 que le poste sait lire.
+      headers: const {'Accept': 'application/json'},
     ),
   );
 

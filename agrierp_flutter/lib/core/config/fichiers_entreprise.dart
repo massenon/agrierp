@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../demarrage/dossier_donnees.dart';
+import '../systeme/plateforme_poste.dart';
 
 /// Ticket AUT-2 — LOGO ET FAVICON DE L'ENTREPRISE, gardés sur le poste (hors base, hors réseau).
 ///
@@ -62,6 +63,10 @@ class FichiersEntreprise {
     return null;
   }
 
+  /// PWA-2 — navigateur : pas de dossier de données ; le logo et l'icône tirés du serveur restent EN MÉMOIRE pour la session
+  /// (retirés à chaque tirage, donc rechargés au démarrage suivant). Jamais écrits sur un disque.
+  static final Map<String, ({Uint8List octets, String nom, String? source})> _memoireNavigateur = {};
+
   static Future<Directory> _dossierParDefaut() async => Directory(p.join((await DossierDonnees.courant()).path, 'entreprise'));
 
   /// Refus AVANT d'écrire, mêmes règles et mêmes mots que le serveur (`EntrepriseService::jugerFichier`) : le nom (extension),
@@ -78,6 +83,7 @@ class FichiersEntreprise {
   }
 
   Future<File?> fichier(String genre) async {
+    if (PlateformePoste.navigateur) return null;
     final d = await _dossier();
     if (!await d.exists()) return null;
     await for (final f in d.list()) {
@@ -86,10 +92,16 @@ class FichiersEntreprise {
     return null;
   }
 
-  Future<Uint8List?> lire(String genre) async => (await fichier(genre))?.readAsBytes();
+  Future<Uint8List?> lire(String genre) async =>
+      PlateformePoste.navigateur ? _memoireNavigateur[genre]?.octets : (await fichier(genre))?.readAsBytes();
 
   /// Remplace le fichier du genre (l'ancien, d'une autre extension, est effacé) ; [sourceServeur] mémorise le chemin d'où il vient.
   Future<void> enregistrer(String genre, Uint8List octets, String nom, {String? sourceServeur}) async {
+    if (PlateformePoste.navigateur) {
+      _memoireNavigateur[genre] = (octets: octets, nom: nom, source: sourceServeur);
+      version.value++;
+      return;
+    }
     final d = await _dossier();
     await d.create(recursive: true);
     await effacer(genre);
@@ -100,6 +112,11 @@ class FichiersEntreprise {
   }
 
   Future<void> effacer(String genre) async {
+    if (PlateformePoste.navigateur) {
+      _memoireNavigateur.remove(genre);
+      version.value++;
+      return;
+    }
     final d = await _dossier();
     if (!await d.exists()) return;
     await for (final f in d.list()) {
@@ -109,6 +126,7 @@ class FichiersEntreprise {
   }
 
   Future<String?> sourceServeur(String genre) async {
+    if (PlateformePoste.navigateur) return _memoireNavigateur[genre]?.source;
     final d = await _dossier();
     final f = File(p.join(d.path, '$genre.source'));
     return await f.exists() ? f.readAsString() : null;
@@ -116,6 +134,10 @@ class FichiersEntreprise {
 
   /// Le logo de l'entreprise pour les PDF : PNG ou JPEG seulement (le moteur PDF n'en lit pas d'autres), sinon `null`.
   Future<Uint8List?> logoPourPdf() async {
+    if (PlateformePoste.navigateur) {
+      final m = _memoireNavigateur['logo'];
+      return m != null && const ['.png', '.jpg', '.jpeg'].contains(p.extension(m.nom).toLowerCase()) ? m.octets : null;
+    }
     final f = await fichier('logo');
     if (f == null || !const ['.png', '.jpg', '.jpeg'].contains(p.extension(f.path).toLowerCase())) return null;
     return f.readAsBytes();

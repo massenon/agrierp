@@ -4,6 +4,8 @@ import 'package:path/path.dart' as p;
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/systeme/justificatif_local.dart';
+import '../../core/systeme/plateforme_poste.dart';
+import '../../core/widgets/toast_agri.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -502,6 +504,10 @@ class _ModaleDepenseState extends State<ModaleDepense> {
 
   /// Ouvre le sélecteur de fichier et copie le fichier choisi dans le dossier local de l'application.
   Future<void> _choisirJustificatif() async {
+    if (PlateformePoste.navigateur) {
+      ToastAgri.afficher(context, motifJustificatifNavigateur, type: TypeToast.erreur);
+      return;
+    }
     final chemin = await choisirEtCopierJustificatif();
     if (chemin == null || !mounted) return;
     setState(() => _receiptLocalPath = chemin);

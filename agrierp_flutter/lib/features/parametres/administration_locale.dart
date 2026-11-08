@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
 import '../../core/demarrage/dossier_donnees.dart';
+import '../../core/systeme/plateforme_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -123,7 +124,13 @@ class AdministrationLocale {
     return f;
   }
 
+  /// PWA-2 — motif des gestes qui exigent le disque de Windows (sauvegarde complète, copie, restauration, ré-import).
+  static const motifNavigateur =
+      "Les sauvegardes de fichiers ne sont pas disponibles dans le navigateur : la base reste conservée par le navigateur. "
+      'Utilisez la sauvegarde du serveur (web de gestion) ou le poste Windows.';
+
   Future<List<FichierSauvegarde>> sauvegardes() async {
+    if (PlateformePoste.navigateur) return const [];
     final d = await _dossier();
     if (!await d.exists()) return const [];
     final limite = _maintenant().subtract(const Duration(days: retentionJours));
@@ -149,6 +156,7 @@ class AdministrationLocale {
 
   /// Sauvegarde COMPLÈTE (copie cohérente de la base, schéma compris) ou, avec [module], export JSON de ses tables.
   Future<String> generer({String? module}) async {
+    if (PlateformePoste.navigateur) return _exporterModuleNavigateur(module);
     final d = await _dossier();
     await d.create(recursive: true);
 
@@ -170,12 +178,29 @@ class AdministrationLocale {
     return 'Export du module « ${definition.libelle} » généré : ${p.basename(f.path)}';
   }
 
+  /// Navigateur : seul l'export JSON d'un module se fait, par TÉLÉCHARGEMENT ; la sauvegarde complète (`VACUUM INTO` écrit un
+  /// fichier) est refusée avec son motif.
+  Future<String> _exporterModuleNavigateur(String? module) async {
+    if (module == null) throw const RefusAdministration(motifNavigateur);
+    final definition = modules[module];
+    if (definition == null) throw const RefusAdministration('Module inconnu.');
+    final presentes = await _tablesPresentes();
+    final contenu = <String, Object?>{'module': module, 'genere_le': _maintenant().toIso8601String(), 'tables': <String, Object?>{}};
+    for (final t in definition.tables.where(presentes.contains)) {
+      (contenu['tables']! as Map<String, Object?>)[t] = [for (final r in await database.customSelect('SELECT * FROM $t').get()) _jsonable(r.data)];
+    }
+    final nom = 'agrierp_${_maintenant().millisecondsSinceEpoch}_$module.json';
+    await PlateformePoste.livreurNavigateur(nom, utf8.encode(jsonEncode(contenu)));
+    return 'Export du module « ${definition.libelle} » téléchargé : $nom';
+  }
+
   static Map<String, Object?> _jsonable(Map<String, Object?> ligne) => {
     for (final e in ligne.entries) e.key: e.value is List<int> ? base64Encode(e.value! as List<int>) : e.value,
   };
 
   /// Copie [fichier] dans le dossier Téléchargements (clé USB, disque externe : à copier ensuite) ; rend le chemin écrit.
   Future<String> copier(String fichier) async {
+    if (PlateformePoste.navigateur) throw const RefusAdministration(motifNavigateur);
     final source = File(p.join((await _dossier()).path, fichier));
     if (!await source.exists()) throw const RefusAdministration('Sauvegarde introuvable.');
     final cible = await _copie();
@@ -188,6 +213,7 @@ class AdministrationLocale {
   /// Restauration COMPLÈTE : la base actuelle est remplacée par [fichier] au PROCHAIN LANCEMENT (une base ouverte ne se remplace
   /// pas à chaud). L'ancienne base est gardée à côté.
   Future<String> programmerRestauration(String fichier) async {
+    if (PlateformePoste.navigateur) throw const RefusAdministration(motifNavigateur);
     final source = File(p.join((await _dossier()).path, fichier));
     if (!fichier.endsWith('_complete.sqlite') || !await source.exists()) {
       throw const RefusAdministration('Seule une sauvegarde complète peut être restaurée.');
@@ -198,6 +224,7 @@ class AdministrationLocale {
 
   /// À appeler AU LANCEMENT, avant d'ouvrir la base : installe la restauration programmée. Une panne laisse la base intacte.
   static Future<void> appliquerRestaurationEnAttente({Directory? dossierDonnees}) async {
+    if (dossierDonnees == null && !DossierDonnees.disponible) return; // PWA-2 : pas de dossier dans le navigateur
     try {
       final d = dossierDonnees ?? await DossierDonnees.courant();
       final restauration = File(p.join(d.path, fichierRestauration));
@@ -219,6 +246,7 @@ class AdministrationLocale {
   /// Remplace les données d'UN module par celles d'une sauvegarde complète. Les lignes reprises repartent `pending` (le serveur
   /// les rejouera). ⚠️ Mêmes réserves que le web : des enregistrements d'autres modules peuvent devenir orphelins.
   Future<String> importerModule({required String fichier, required String module}) async {
+    if (PlateformePoste.navigateur) throw const RefusAdministration(motifNavigateur);
     final definition = modules[module];
     if (definition == null) throw const RefusAdministration('Module inconnu.');
     final source = File(p.join((await _dossier()).path, fichier));

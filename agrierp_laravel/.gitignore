@@ -25,3 +25,6 @@ Thumbs.db
 .env.dusk.local
 /*.zip
 /public/assets/hors-ligne
+
+# PWA-2 : poste Flutter compilé pour le web (agrierp_flutter/outils/construire_poste_web.sh) — généré, jamais versionné.
+/public/poste
