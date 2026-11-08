@@ -105,6 +105,7 @@ class ProfileClient extends Component
     /** "Enregistrer un règlement" (solde global) — pas de créance précise ciblée. */
     public function openGlobalRegularisation(): void
     {
+        $this->authorize('manage-ventes');
         $this->regularisationTarget = '';
         $this->regularisationLabel = 'Solde global';
         $this->regularisationSolde = $this->soldeGlobal;
@@ -115,6 +116,7 @@ class ProfileClient extends Component
     /** "Régler" depuis l'onglet Créances — cible une facture précise. */
     public function openReceivableRegularisation(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
         $receivable = Receivable::findOrFail($receivableId);
         $this->regularisationTarget = $receivable->id;
         $this->regularisationLabel = strtoupper(substr($receivable->sale_id ?? $receivable->id, 0, 8));

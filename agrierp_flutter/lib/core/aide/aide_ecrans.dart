@@ -102,7 +102,8 @@ class AideEcrans {
         'L\'historique en bas liste les transformations passées avec leur statut.',
       ]),
     EcranPoste.parametresElevage: AideEcran(titre: 'Paramètres Élevage', puces: [
-        'Quatre référentiels de l\'élevage : fiche de rationnement, calendriers de prophylaxie, types de provende et numérotation des bandes et sujets.',
+        'Cinq onglets de l\'élevage : fiche de rationnement, calendriers de prophylaxie, types de provende, numérotation des bandes et sujets, et relevés de terrain.',
+        'Relevés de terrain : règles d\'incubation, délais du fournisseur de provende, barème du technicien. Les propositions sont « À valider » : le bouton « Valider » les confirme.',
         'La fiche de rationnement donne la ration en g par tête et par jour selon l\'espèce et le stade.',
         'Le calendrier de prophylaxie liste, par espèce, les traitements prévus à chaque échéance.',
         'Ces réglages alimentent les fiches journalières : une modification s\'applique à toute la ferme.',

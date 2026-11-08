@@ -159,25 +159,25 @@ void main() {
       // `rapports-exports.html` figure dans SA liste et dans aucune autre :
       // c'est le seul écran du poste que la carte lui réserve.
       //
-      // ⚠️ **« Comptabilité » RESTE HORS DE SA PORTÉE, ET CE N'EST PAS UN
-      // OUBLI DU PORTAGE.** L'écran porte `comptabilite-hub.html` ; la liste
-      // du comptable nomme `journal-comptable.html`, `rapport-bilan.html`,
-      // `cloture-exercice.html` et `comptabilite-analytique.html` — **jamais
-      // le hub**. Appliquée telle quelle, la carte lui ferme donc la porte de
-      // l'écran qui contient son propre journal. C'est une incohérence de
-      // `RBAC_PAGE_MAP`, relevée ici et **non corrigée** : compléter la carte
-      // est un arbitrage client, comme pour les six écrans qui n'y figurent
-      // pas du tout.
+      // ⚠️ **« Comptabilité » : ANCIENNE INCOHÉRENCE DE `RBAC_PAGE_MAP`, FERMÉE PAR CONF-5.** L'écran porte
+      // `comptabilite-hub.html` ; la liste du comptable nommait `journal-comptable.html`, `rapport-bilan.html`,
+      // `cloture-exercice.html` et `comptabilite-analytique.html`, jamais le hub : la carte lui fermait l'écran qui contient
+      // son propre journal. Le web (`view-comptabilite`) lui ouvre tout le hub : le poste aussi (extension voulue, dite).
       //
       // ⚠️ TICKET CONF-4 (DV-20, « le même périmètre dans LogiAgriERP ») : le comptable LIT les ventes (hub Ventes & Devis
-      // sans la caisse), consulte la facturation, lit les achats et les stocks. La caisse (`pos-interface.html`) et
-      // `creances-clients.html` n'entrent PAS dans sa liste (voir `permissions_poste.dart`).
+      // sans la caisse), consulte la facturation, lit les achats et les stocks. La caisse (`pos-interface.html`) n'entre PAS
+      // dans sa liste (voir `permissions_poste.dart`).
+      //
+      // ⚠️ TICKET CONF-5 : « Clients et Créances » (lecture : le web l'ouvre avec `view-ventes`) et le HUB Comptabilité
+      // (`comptabilite-hub.html`, incohérence ancienne de la carte : le comptable avait ses pages, jamais le hub) s'ajoutent.
       expect(PermissionsPoste.ecransDe('comptable'), [
         EcranPoste.tableauDeBord,
         EcranPoste.ventesEtDevis,
+        EcranPoste.clientsEtCreances,
         EcranPoste.achatsEtCommandes,
         EcranPoste.fournisseurs,
         EcranPoste.facturation,
+        EcranPoste.comptabilite, // CONF-5 : le hub (ordre de l'enum)
         EcranPoste.saisieDepenses,
         EcranPoste.gestionStocks,
         EcranPoste.catalogueProduits,
@@ -206,7 +206,6 @@ void main() {
         expect(PermissionsPoste.autorise('comptable', ecran), isTrue, reason: ecran.name);
       }
       expect(PermissionsPoste.autorise('comptable', EcranPoste.caisse), isFalse);
-      expect(PermissionsPoste.autorise('comptable', EcranPoste.clientsEtCreances), isFalse);
 
       // Ni élevage, ni utilisateurs / réglages, ni inventaire en masse, ni RH, ni administration.
       for (final ecran in [
@@ -254,8 +253,9 @@ void main() {
       expect(PermissionsPoste.peutRetransmettreFacture('animalier'), isFalse);
     });
 
-    test('caissier et animalier sont inchangés', () {
-      expect(PermissionsPoste.permissionsDuRole['caissier'], {'view-ventes', 'manage-ventes', 'export-ventes'});
+    test('caissier (hors CONF-5) et animalier sont inchangés', () {
+      // CONF-5 (DV-06) : le caissier gagne `view-facturation` (lecture seule), rien d'autre.
+      expect(PermissionsPoste.permissionsDuRole['caissier'], {'view-ventes', 'manage-ventes', 'export-ventes', 'view-facturation'});
       expect(PermissionsPoste.permissionsDuRole['animalier'], {'view-elevage', 'manage-elevage', 'archive-elevage', 'export-elevage'});
       expect(PermissionsPoste.peut('caissier', 'correct-invoices'), isFalse);
     });
@@ -271,6 +271,39 @@ void main() {
         const MaterialApp(home: GardeEcran(role: 'comptable', ecran: EcranPoste.ventesEtDevis, enfant: Text('hub'))),
       );
       expect(find.text('hub'), findsOneWidget);
+    });
+  });
+
+  group('CONF-5 : Clients et Créances en lecture, hub Comptabilité, caissier et facturation', () {
+    test('le comptable ouvre Clients et Créances (lecture) et tout le hub Comptabilité, jamais la caisse', () {
+      expect(PermissionsPoste.autorise('comptable', EcranPoste.clientsEtCreances), isTrue);
+      expect(PermissionsPoste.autorise('comptable', EcranPoste.comptabilite), isTrue);
+      expect(PermissionsPoste.autorise('comptable', EcranPoste.caisse), isFalse);
+      // Lecture seule : aucun droit d'écriture de Clients et Créances (`manage-ventes`).
+      expect(PermissionsPoste.peut('comptable', 'view-ventes'), isTrue);
+      expect(PermissionsPoste.peut('comptable', 'manage-ventes'), isFalse);
+      // L'animalier ne gagne rien.
+      expect(PermissionsPoste.autorise('animalier', EcranPoste.clientsEtCreances), isFalse);
+      expect(PermissionsPoste.autorise('animalier', EcranPoste.comptabilite), isFalse);
+      // Le caissier garde Clients et Créances, n'a toujours pas la comptabilité.
+      expect(PermissionsPoste.autorise('caissier', EcranPoste.clientsEtCreances), isTrue);
+      expect(PermissionsPoste.autorise('caissier', EcranPoste.comptabilite), isFalse);
+    });
+
+    test('le caissier consulte et réimprime la facturation, sans retransmettre ni corriger ni convertir', () {
+      expect(PermissionsPoste.autorise('caissier', EcranPoste.facturation), isTrue);
+      expect(PermissionsPoste.peut('caissier', 'view-facturation'), isTrue);
+      for (final d in ['manage-facturation', 'correct-invoices']) {
+        expect(PermissionsPoste.peut('caissier', d), isFalse, reason: d);
+      }
+      expect(PermissionsPoste.peutRetransmettreFacture('caissier'), isFalse);
+    });
+
+    testWidgets('la garde d\'écran laisse passer le comptable sur Clients et Créances et le hub Comptabilité', (tester) async {
+      for (final ecran in [EcranPoste.clientsEtCreances, EcranPoste.comptabilite]) {
+        await tester.pumpWidget(MaterialApp(home: GardeEcran(role: 'comptable', ecran: ecran, enfant: const Text('ouvert'))));
+        expect(find.text('ouvert'), findsOneWidget, reason: ecran.name);
+      }
     });
   });
 

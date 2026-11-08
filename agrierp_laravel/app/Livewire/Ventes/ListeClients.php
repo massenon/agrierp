@@ -104,12 +104,14 @@ class ListeClients extends Component
 
     public function newCustomer(): void
     {
+        $this->authorize('manage-ventes');
         $this->reset(['editingCustomerId', 'name', 'phone', 'email', 'city', 'ifu']);
         $this->dispatch('open-modal', name: 'modal-create-client');
     }
 
     public function editCustomer(string $id): void
     {
+        $this->authorize('manage-ventes');
         $customer = Customer::findOrFail($id);
         $this->editingCustomerId = $customer->id;
         $this->name = $customer->name;
@@ -166,6 +168,8 @@ class ListeClients extends Component
      */
     public function bulkArchiveCustomers(): void
     {
+        $this->authorize('manage-ventes');
+
         if (empty($this->selectedIds)) {
             return;
         }
@@ -179,6 +183,8 @@ class ListeClients extends Component
 
     public function openBulkArchiveModal(): void
     {
+        $this->authorize('manage-ventes');
+
         if (empty($this->selectedIds)) {
             return;
         }

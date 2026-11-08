@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import 'production_oeufs_service.dart';
+import 'releve_terrain_repository.dart';
 import 'soins_repository.dart';
 
 /// Une ligne du tableau « GMQ & Croissance » — `DashboardElevage::getGmqTableProperty` (Blade).
@@ -177,7 +178,11 @@ class DonneesDashboardElevage {
     required this.traitementLePlusFrequent,
     required this.lignesPrevision,
     required this.previsions,
+    required this.releves,
   });
+
+  /// Ticket RELEVES-1 — bloc « Relevés de terrain » (celui de `ReleveTerrainService::synthese` du web).
+  final SyntheseReleves releves;
 
   final int effectifTotal;
 
@@ -422,7 +427,10 @@ class DashboardElevageRepository {
       if (prevision != null) previsions.add(prevision);
     }
 
+    final releves = await ReleveTerrainRepository(database: database).synthese();
+
     return DonneesDashboardElevage(
+      releves: releves,
       effectifTotal: bandes.fold<int>(0, (t, b) => t + b.currentQuantity),
       gmqMoyen: avecGmq.isEmpty
           ? null

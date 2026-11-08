@@ -316,6 +316,32 @@ class FeedTypes extends Table with BaremeElevageSynchronisable {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket RELEVES-1 (schéma v86) — « RELEVÉS DE TERRAIN » de Paramètres Élevage, miroir de `field_survey_entries`.
+///
+/// Une ligne = un type (règle d'incubation, relevé de lot, règle du délai fournisseur, référentiel du technicien des
+/// poissons-chats) + un libellé + des valeurs (`data_json`) + un STATUT `a_valider` | `valide`. ⚠️ Table MIXTE de
+/// barème ([BaremeElevageSynchronisable]) : saisie au poste (`pending`, instant de saisie) ET tirée du serveur
+/// (`synced`) ; le tirage n'écrase JAMAIS une ligne `pending` / `conflict`. UN SEUL écrivain : `ReleveTerrainRepository`.
+/// ⚠️ Tout enregistrement humain pose `valide` ; seul le serveur sème des lignes `a_valider` (propositions).
+class FieldSurveyEntries extends Table with BaremeElevageSynchronisable {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get type => text()();
+  TextColumn get label => text()();
+  TextColumn get speciesCode => text().nullable()();
+
+  /// Valeurs du relevé, en JSON (objet) : mêmes clés que `data` du serveur.
+  TextColumn get dataJson => text().withDefault(const Constant('{}'))();
+
+  /// `a_valider` · `valide`.
+  TextColumn get status => text().withDefault(const Constant('a_valider'))();
+  TextColumn get validatedBy => text().nullable()();
+  TextColumn get validatedByName => text().nullable()();
+  DateTimeColumn get validatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Préfixes de numérotation des bandes et des sujets — table à UNE ligne.
 ///
 /// ⚠️⚠️ **CE SONT LES NOMS QUE LA FERME ÉCRIT SUR LES CAGES.** R1, T1,
@@ -2353,6 +2379,7 @@ class SyncState extends Table {
     CustomerReminders,
     FeedTypes,
     ElevageNumberingSettings,
+    FieldSurveyEntries,
     Suppliers,
     PurchaseOrders,
     PurchaseOrderLines,
@@ -2440,7 +2467,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 85;
+  int get schemaVersion => 86;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3122,6 +3149,10 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
       }
+      // v86 — ticket RELEVES-1 : relevés de terrain (mixte : saisis au poste ET tirés du serveur).
+      if (from < 86) {
+        if (!await _tableExiste(m, fieldSurveyEntries)) await m.createTable(fieldSurveyEntries);
+      }
       // v85 — ticket MECEF-3 : IFU du client, choix « facture simple / normalisée » de la vente, AIB, frais de livraison inclus.
       if (from < 85) {
         await _ajouterColonneSiAbsente(m, customers, customers.ifu);
@@ -3653,6 +3684,8 @@ class AppDatabase extends _$AppDatabase {
     'prophylaxis_schedule_standards',
     'feed_types',
     'elevage_numbering_settings',
+    // Ticket RELEVES-1 — relevés de terrain saisis, validés ou archivés au poste.
+    'field_survey_entries',
     'company_settings',
     // Ticket MOD1 — modules actifs basculés au poste (conservés par la purge, comme les autres réglages).
     'modules_config',
@@ -3724,7 +3757,7 @@ class AppDatabase extends _$AppDatabase {
   /// connexion hors ligne survive à une purge suivie d'un tirage interrompu).
   static const tablesConservees = [
     'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
-    'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
+    'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings', 'field_survey_entries', // RELEVES-1
     'chart_of_accounts', 'fixed_assets', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers', // CP-3 : fixed_assets
     'company_settings', 'modules_config', 'attestation_templates',
     // Ticket RH-4 — barème ITS (référentiel, préservé au serveur).

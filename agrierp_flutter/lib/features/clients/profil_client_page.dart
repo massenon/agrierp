@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/auth/refus_droit.dart';
 import '../../core/database/app_database.dart' show Customer;
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -13,9 +14,13 @@ import 'recouvrement_modale.dart';
 /// à droite : Ventes · Créances · Avances & Acomptes · Relances. Le poste écrit le FAIT (règlement, relance) ;
 /// les soldes affichés sont NETS de ce qu'il a saisi et que le serveur n'a pas encore appliqué.
 class ProfilClientPage extends StatefulWidget {
-  const ProfilClientPage({super.key, required this.depot, required this.clientId, required this.onRetour});
+  const ProfilClientPage({super.key, required this.depot, required this.clientId, required this.onRetour, this.peutGerer = true});
 
   final ClientsCreancesRepository depot;
+
+  /// Ticket CONF-5 — `manage-ventes` : sans lui (comptable), le profil se CONSULTE ; modifier, régler, relancer sont masqués
+  /// (le web les met sous `@can('manage-ventes')`) et refusés avant toute modale ou écriture.
+  final bool peutGerer;
   final String clientId;
 
   /// « Retour » vers la liste ; reçoit `true` si quelque chose a été écrit (la liste se recharge).
@@ -58,6 +63,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
   }
 
   Future<void> _modifierFiche(Customer c) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirFicheClient(context: context, depot: widget.depot, existant: c);
     if (!ecrit) return;
     _modifie = true;
@@ -66,6 +72,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
 
   /// `openGlobalRegularisation` : règlement du solde GLOBAL, imputé aux plus anciennes créances d'abord.
   Future<void> _reglementGlobal(ProfilClient p) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final donnees = await _donnees();
     if (!mounted) return;
     final ecrit = await ouvrirRecouvrement(
@@ -85,6 +92,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
 
   /// `openReceivableRegularisation` : règlement d'UNE créance.
   Future<void> _reglerCreance(LigneCreance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final donnees = await _donnees();
     if (!mounted) return;
     final ecrit = await ouvrirRecouvrement(
@@ -103,6 +111,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
 
   /// `sendQuickReminder` : relance WhatsApp pré-remplie, sans créance visée.
   Future<void> _relanceRapide(ProfilClient p) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     try {
       await widget.depot.relancer(
         clientId: p.client.id,
@@ -276,6 +285,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
               ),
             ),
           ],
+          if (widget.peutGerer) ...[
           const SizedBox(height: AgriSpacing.md),
           OutlinedButton(
             key: const Key('profil-modifier'),
@@ -296,6 +306,7 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
             style: OutlinedButton.styleFrom(foregroundColor: AgriColors.brandEmerald),
             child: const Text('Envoyer une relance rapide', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
           ),
+          ],
         ],
       ),
     );
@@ -424,14 +435,16 @@ class _ProfilClientPageState extends State<ProfilClientPage> {
             (
               Align(
                 alignment: Alignment.centerRight,
-                child: InkWell(
-                  key: Key('profil-regler-$i'),
-                  onTap: () => _reglerCreance(l),
-                  child: const Text(
-                    'Régler',
-                    style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold, color: AgriColors.brandEmerald),
-                  ),
-                ),
+                child: widget.peutGerer
+                    ? InkWell(
+                        key: Key('profil-regler-$i'),
+                        onTap: () => _reglerCreance(l),
+                        child: const Text(
+                          'Régler',
+                          style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold, color: AgriColors.brandEmerald),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
               2,
             ),

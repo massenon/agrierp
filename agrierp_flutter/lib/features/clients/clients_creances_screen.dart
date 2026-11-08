@@ -2,6 +2,7 @@ import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 
+import '../../core/auth/refus_droit.dart';
 import '../../core/database/app_database.dart' show Customer, CustomerReminder;
 import '../../core/systeme/ouvreur_url.dart';
 import '../../core/temps/heure_benin.dart';
@@ -39,12 +40,19 @@ class ClientsCreancesScreen extends StatefulWidget {
   const ClientsCreancesScreen({
     super.key,
     required this.depot,
+    this.peutGerer = true,
     this.imprimer,
     this.maintenant = HeureBenin.maintenant,
     this.ouvrirUrl = ouvrirUrlSysteme,
   });
 
   final ClientsCreancesRepository depot;
+
+  /// Ticket CONF-5 (DV-06 / DV-20) — `manage-ventes` du web : SANS lui (le COMPTABLE lit « Clients et Créances » avec
+  /// `view-ventes`), les boutons d'écriture ne sont pas montrés (le web les masque par `@can('manage-ventes')`) et chaque
+  /// geste est refusé AVANT d'ouvrir une modale ou d'écrire (`RefusDroit`, « Votre rôle ne permet pas cette action. »).
+  /// Consulter (soldes, profil, historique) reste ouvert.
+  final bool peutGerer;
 
   /// Éditeur injecté — `EditeursRapports.imprimer` en production, un espion en test.
   /// Absent, ni le reçu d'acompte ni « Exporter » n'impriment : l'avance est tout de
@@ -141,6 +149,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                         ProfilClientPage(
                           key: ValueKey('profil-$_profilId'),
                           depot: widget.depot,
+                          peutGerer: widget.peutGerer,
                           clientId: _profilId!,
                           onRetour: (modifie) {
                             setState(() => _profilId = null);
@@ -260,6 +269,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           large,
         ),
         const SizedBox(height: AgriSpacing.md),
+        if (widget.peutGerer)
         Align(
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
@@ -309,7 +319,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ),
         ]),
         const SizedBox(height: AgriSpacing.md),
-        if (_selection.isNotEmpty) ...[
+        if (widget.peutGerer && _selection.isNotEmpty) ...[
           _barreSelection(d),
           const SizedBox(height: AgriSpacing.md),
         ],
@@ -338,7 +348,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         const SizedBox(height: AgriSpacing.md),
         _tableau(
           largeur: 1040,
-          teteSelection: Checkbox(
+          teteSelection: !widget.peutGerer ? null : Checkbox(
             key: const Key('clients-tout-selectionner'),
             value: toutChoisi,
             onChanged: (v) => setState(() {
@@ -395,7 +405,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   (_statutClient(lignes[i]), 3),
                   (_actionsClient(lignes[i].client), 3),
                 ],
-                teteSelection: Checkbox(
+                teteSelection: !widget.peutGerer ? null : Checkbox(
                   key: Key('client-case-${lignes[i].client.id}'),
                   value: _selection.contains(lignes[i].client.id),
                   onChanged: (v) => setState(() {
@@ -420,6 +430,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _ouvrirFiche(Customer? existant) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirFicheClient(
       context: context,
       depot: widget.depot,
@@ -429,6 +440,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _archiver(List<Customer> clients) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ok = await confirmerArchivageClients(
       context: context,
       depot: widget.depot,
@@ -557,6 +569,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         constraints: const BoxConstraints(),
         color: AgriColors.brandEmerald,
       ),
+      if (widget.peutGerer)
       IconButton(
         key: Key('modifier-client-${c.id}'),
         tooltip: 'Modifier',
@@ -566,6 +579,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         constraints: const BoxConstraints(),
         color: AgriColors.infoBlue,
       ),
+      if (widget.peutGerer)
       IconButton(
         key: Key('archiver-client-${c.id}'),
         tooltip: 'Archiver',
@@ -600,6 +614,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         ),
         const SizedBox(height: AgriSpacing.md),
         // Ticket VC-1 — « Ajouter un Recouvrement » (en-tête du Blade) : l'encaissement d'une créance, écrit en local.
+        if (widget.peutGerer)
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(
@@ -701,6 +716,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (widget.peutGerer)
                         IconButton(
                           key: Key('creance-encaisser-$i'),
                           tooltip: 'Enregistrer un règlement',
@@ -711,6 +727,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                           color: AgriColors.brandEmerald,
                         ),
                         // Ticket VC-2 — « Relancer » (`SuiviDettes::sendReminder`) : trace WhatsApp du solde dû.
+                        if (widget.peutGerer)
                         IconButton(
                           key: Key('creance-relancer-$i'),
                           tooltip: 'Relancer',
@@ -735,6 +752,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   /// Ticket VC-2 — « Relancer » de la ligne (`SuiviDettes::sendReminder`) : le web TIENT LA TRACE d'une relance WhatsApp au
   /// message « Relance — solde dû N FCFA. », sans ouvrir WhatsApp ; le poste fait de même.
   Future<void> _relancerRapide(LigneCreance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     try {
       await widget.depot.relancer(
         creanceId: l.creance.id,
@@ -751,6 +769,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
 
   /// Ticket VC-1 — « Enregistrer un Recouvrement » : écrit le FAIT en local, le serveur solde et passe l'écriture.
   Future<void> _encaisser(DonneesClients d, LigneCreance? depart) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirRecouvrement(context: context, depot: widget.depot, donnees: d, depart: depart);
     if (!ecrit) return;
     await _charger();
@@ -1003,10 +1022,12 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                 spacing: AgriSpacing.xs,
                 runSpacing: AgriSpacing.xs,
                 children: [
+                  if (widget.peutGerer) ...[
                   _boutonRelance('relancer-whatsapp', l, 'whatsapp', 'Relancer WhatsApp', SymbolesAgri.chat, rempli: AgriColors.brandEmerald),
                   _boutonRelance('relancer-email', l, 'email', 'Relancer par Mail', SymbolesAgri.mail, rempli: AgriColors.infoBlue),
                   _boutonRelance('exporter-courrier', l, 'courrier', 'Exporter Courrier', SymbolesAgri.picture_as_pdf),
                   _boutonRelance('relancer-appel', l, 'appel', 'Appeler', SymbolesAgri.call),
+                  ],
                 ],
               ),
             ],
@@ -1039,6 +1060,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   /// Ticket VC-2 — écrit la relance en local, PUIS fait ce que l'appareil peut faire : ouvrir WhatsApp, éditer la lettre.
   /// L'e-mail part du SMTP du poste (sans SMTP, c'est une DEMANDE : le serveur l'envoie à la synchronisation) ; l'appel est composé par `tel:`.
   Future<void> _relancer(LigneCreance l, String canal, {String? message}) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final texte = message ?? ClientsCreancesRepository.rendreModele(_texteModele.text, l);
     final CustomerReminder relance;
     try {
@@ -1220,6 +1242,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                 shape: const StadiumBorder(),
               ),
             ),
+            if (widget.peutGerer)
             ElevatedButton.icon(
               key: const Key('nouvelle-avance'),
               onPressed: () => _nouvelAcompte(d),
@@ -1411,6 +1434,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         opacity: 0.4,
         child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
       ),
+      if (widget.peutGerer)
       IconButton(
         key: Key('modifier-avance-${l.avance.id}'),
         tooltip: 'Modifier',
@@ -1420,7 +1444,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         constraints: const BoxConstraints(),
         color: AgriColors.brandEmerald,
       ),
-      if (!l.soldee && !l.refusee)
+      if (widget.peutGerer && !l.soldee && !l.refusee)
         IconButton(
           key: Key('imputer-avance-${l.avance.id}'),
           tooltip: 'Imputer',
@@ -1430,6 +1454,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           constraints: const BoxConstraints(),
           color: AgriColors.brandForest,
         ),
+      if (widget.peutGerer)
       IconButton(
         key: Key('archiver-avance-${l.avance.id}'),
         tooltip: 'Archiver',
@@ -1444,6 +1469,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
 
   /// `editAdvance` + `saveAdvance` : la modale « Modifier l'Avance » ; succès = « Avance modifiée avec succès. ».
   Future<void> _modifierAvance(DonneesClients d, LigneAvance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirModificationAvance(context: context, depot: widget.depot, donnees: d, ligne: l);
     if (!ecrit) return;
     await _charger();
@@ -1453,6 +1479,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
 
   /// `archiveAdvance` : confirmation, puis l'archivage ; un refus (reste à imputer) est un toast d'erreur, comme au web.
   Future<void> _archiverAvance(LigneAvance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     if (!await confirmerArchivageAvance(context: context, ligne: l)) return;
     try {
       await widget.depot.archiverAvance(l.avance.id);
@@ -1467,6 +1494,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _nouvelAcompte(DonneesClients d) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final saisi = await ouvrirNouvelAcompte(
       context: context,
       depot: widget.depot,
@@ -1509,6 +1537,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _imputer(DonneesClients d, LigneAvance depart) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirImputation(
       context: context,
       depot: widget.depot,

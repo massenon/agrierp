@@ -8339,6 +8339,752 @@ class ElevageNumberingSettingsCompanion
   }
 }
 
+class $FieldSurveyEntriesTable extends FieldSurveyEntries
+    with TableInfo<$FieldSurveyEntriesTable, FieldSurveyEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldSurveyEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<SyncStatus, String> syncStatus =
+      GeneratedColumn<String>(
+        'sync_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('synced'),
+      ).withConverter<SyncStatus>(
+        $FieldSurveyEntriesTable.$convertersyncStatus,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _speciesCodeMeta = const VerificationMeta(
+    'speciesCode',
+  );
+  @override
+  late final GeneratedColumn<String> speciesCode = GeneratedColumn<String>(
+    'species_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dataJsonMeta = const VerificationMeta(
+    'dataJson',
+  );
+  @override
+  late final GeneratedColumn<String> dataJson = GeneratedColumn<String>(
+    'data_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('a_valider'),
+  );
+  static const VerificationMeta _validatedByMeta = const VerificationMeta(
+    'validatedBy',
+  );
+  @override
+  late final GeneratedColumn<String> validatedBy = GeneratedColumn<String>(
+    'validated_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _validatedByNameMeta = const VerificationMeta(
+    'validatedByName',
+  );
+  @override
+  late final GeneratedColumn<String> validatedByName = GeneratedColumn<String>(
+    'validated_by_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _validatedAtMeta = const VerificationMeta(
+    'validatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> validatedAt = GeneratedColumn<DateTime>(
+    'validated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    isActive,
+    syncStatus,
+    updatedAt,
+    id,
+    type,
+    label,
+    speciesCode,
+    dataJson,
+    status,
+    validatedBy,
+    validatedByName,
+    validatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_survey_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldSurveyEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('species_code')) {
+      context.handle(
+        _speciesCodeMeta,
+        speciesCode.isAcceptableOrUnknown(
+          data['species_code']!,
+          _speciesCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('data_json')) {
+      context.handle(
+        _dataJsonMeta,
+        dataJson.isAcceptableOrUnknown(data['data_json']!, _dataJsonMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('validated_by')) {
+      context.handle(
+        _validatedByMeta,
+        validatedBy.isAcceptableOrUnknown(
+          data['validated_by']!,
+          _validatedByMeta,
+        ),
+      );
+    }
+    if (data.containsKey('validated_by_name')) {
+      context.handle(
+        _validatedByNameMeta,
+        validatedByName.isAcceptableOrUnknown(
+          data['validated_by_name']!,
+          _validatedByNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('validated_at')) {
+      context.handle(
+        _validatedAtMeta,
+        validatedAt.isAcceptableOrUnknown(
+          data['validated_at']!,
+          _validatedAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FieldSurveyEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldSurveyEntry(
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      syncStatus: $FieldSurveyEntriesTable.$convertersyncStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}sync_status'],
+        )!,
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      speciesCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}species_code'],
+      ),
+      dataJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}data_json'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      validatedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}validated_by'],
+      ),
+      validatedByName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}validated_by_name'],
+      ),
+      validatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}validated_at'],
+      ),
+    );
+  }
+
+  @override
+  $FieldSurveyEntriesTable createAlias(String alias) {
+    return $FieldSurveyEntriesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<SyncStatus, String, String> $convertersyncStatus =
+      const EnumNameConverter<SyncStatus>(SyncStatus.values);
+}
+
+class FieldSurveyEntry extends DataClass
+    implements Insertable<FieldSurveyEntry> {
+  final bool isActive;
+
+  /// `pending` : saisi ou archivé au poste, pas encore acquitté — le tirage ne l'écrase JAMAIS.
+  /// `conflict` : refusé par le serveur, motif mot pour mot dans `sync_conflicts`.
+  final SyncStatus syncStatus;
+
+  /// Instant de la SAISIE au poste (jamais de l'envoi) ; nul pour une ligne tirée du serveur. Il sert à
+  /// n'acquitter que la version partie : une ligne modifiée pendant l'envoi reste `pending`.
+  final DateTime? updatedAt;
+  final String id;
+  final String type;
+  final String label;
+  final String? speciesCode;
+
+  /// Valeurs du relevé, en JSON (objet) : mêmes clés que `data` du serveur.
+  final String dataJson;
+
+  /// `a_valider` · `valide`.
+  final String status;
+  final String? validatedBy;
+  final String? validatedByName;
+  final DateTime? validatedAt;
+  const FieldSurveyEntry({
+    required this.isActive,
+    required this.syncStatus,
+    this.updatedAt,
+    required this.id,
+    required this.type,
+    required this.label,
+    this.speciesCode,
+    required this.dataJson,
+    required this.status,
+    this.validatedBy,
+    this.validatedByName,
+    this.validatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['is_active'] = Variable<bool>(isActive);
+    {
+      map['sync_status'] = Variable<String>(
+        $FieldSurveyEntriesTable.$convertersyncStatus.toSql(syncStatus),
+      );
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    map['id'] = Variable<String>(id);
+    map['type'] = Variable<String>(type);
+    map['label'] = Variable<String>(label);
+    if (!nullToAbsent || speciesCode != null) {
+      map['species_code'] = Variable<String>(speciesCode);
+    }
+    map['data_json'] = Variable<String>(dataJson);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || validatedBy != null) {
+      map['validated_by'] = Variable<String>(validatedBy);
+    }
+    if (!nullToAbsent || validatedByName != null) {
+      map['validated_by_name'] = Variable<String>(validatedByName);
+    }
+    if (!nullToAbsent || validatedAt != null) {
+      map['validated_at'] = Variable<DateTime>(validatedAt);
+    }
+    return map;
+  }
+
+  FieldSurveyEntriesCompanion toCompanion(bool nullToAbsent) {
+    return FieldSurveyEntriesCompanion(
+      isActive: Value(isActive),
+      syncStatus: Value(syncStatus),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      id: Value(id),
+      type: Value(type),
+      label: Value(label),
+      speciesCode: speciesCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(speciesCode),
+      dataJson: Value(dataJson),
+      status: Value(status),
+      validatedBy: validatedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validatedBy),
+      validatedByName: validatedByName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validatedByName),
+      validatedAt: validatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validatedAt),
+    );
+  }
+
+  factory FieldSurveyEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldSurveyEntry(
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      syncStatus: $FieldSurveyEntriesTable.$convertersyncStatus.fromJson(
+        serializer.fromJson<String>(json['syncStatus']),
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      label: serializer.fromJson<String>(json['label']),
+      speciesCode: serializer.fromJson<String?>(json['speciesCode']),
+      dataJson: serializer.fromJson<String>(json['dataJson']),
+      status: serializer.fromJson<String>(json['status']),
+      validatedBy: serializer.fromJson<String?>(json['validatedBy']),
+      validatedByName: serializer.fromJson<String?>(json['validatedByName']),
+      validatedAt: serializer.fromJson<DateTime?>(json['validatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'isActive': serializer.toJson<bool>(isActive),
+      'syncStatus': serializer.toJson<String>(
+        $FieldSurveyEntriesTable.$convertersyncStatus.toJson(syncStatus),
+      ),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'type': serializer.toJson<String>(type),
+      'label': serializer.toJson<String>(label),
+      'speciesCode': serializer.toJson<String?>(speciesCode),
+      'dataJson': serializer.toJson<String>(dataJson),
+      'status': serializer.toJson<String>(status),
+      'validatedBy': serializer.toJson<String?>(validatedBy),
+      'validatedByName': serializer.toJson<String?>(validatedByName),
+      'validatedAt': serializer.toJson<DateTime?>(validatedAt),
+    };
+  }
+
+  FieldSurveyEntry copyWith({
+    bool? isActive,
+    SyncStatus? syncStatus,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    String? id,
+    String? type,
+    String? label,
+    Value<String?> speciesCode = const Value.absent(),
+    String? dataJson,
+    String? status,
+    Value<String?> validatedBy = const Value.absent(),
+    Value<String?> validatedByName = const Value.absent(),
+    Value<DateTime?> validatedAt = const Value.absent(),
+  }) => FieldSurveyEntry(
+    isActive: isActive ?? this.isActive,
+    syncStatus: syncStatus ?? this.syncStatus,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    id: id ?? this.id,
+    type: type ?? this.type,
+    label: label ?? this.label,
+    speciesCode: speciesCode.present ? speciesCode.value : this.speciesCode,
+    dataJson: dataJson ?? this.dataJson,
+    status: status ?? this.status,
+    validatedBy: validatedBy.present ? validatedBy.value : this.validatedBy,
+    validatedByName: validatedByName.present
+        ? validatedByName.value
+        : this.validatedByName,
+    validatedAt: validatedAt.present ? validatedAt.value : this.validatedAt,
+  );
+  FieldSurveyEntry copyWithCompanion(FieldSurveyEntriesCompanion data) {
+    return FieldSurveyEntry(
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      label: data.label.present ? data.label.value : this.label,
+      speciesCode: data.speciesCode.present
+          ? data.speciesCode.value
+          : this.speciesCode,
+      dataJson: data.dataJson.present ? data.dataJson.value : this.dataJson,
+      status: data.status.present ? data.status.value : this.status,
+      validatedBy: data.validatedBy.present
+          ? data.validatedBy.value
+          : this.validatedBy,
+      validatedByName: data.validatedByName.present
+          ? data.validatedByName.value
+          : this.validatedByName,
+      validatedAt: data.validatedAt.present
+          ? data.validatedAt.value
+          : this.validatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldSurveyEntry(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('label: $label, ')
+          ..write('speciesCode: $speciesCode, ')
+          ..write('dataJson: $dataJson, ')
+          ..write('status: $status, ')
+          ..write('validatedBy: $validatedBy, ')
+          ..write('validatedByName: $validatedByName, ')
+          ..write('validatedAt: $validatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    isActive,
+    syncStatus,
+    updatedAt,
+    id,
+    type,
+    label,
+    speciesCode,
+    dataJson,
+    status,
+    validatedBy,
+    validatedByName,
+    validatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldSurveyEntry &&
+          other.isActive == this.isActive &&
+          other.syncStatus == this.syncStatus &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.label == this.label &&
+          other.speciesCode == this.speciesCode &&
+          other.dataJson == this.dataJson &&
+          other.status == this.status &&
+          other.validatedBy == this.validatedBy &&
+          other.validatedByName == this.validatedByName &&
+          other.validatedAt == this.validatedAt);
+}
+
+class FieldSurveyEntriesCompanion extends UpdateCompanion<FieldSurveyEntry> {
+  final Value<bool> isActive;
+  final Value<SyncStatus> syncStatus;
+  final Value<DateTime?> updatedAt;
+  final Value<String> id;
+  final Value<String> type;
+  final Value<String> label;
+  final Value<String?> speciesCode;
+  final Value<String> dataJson;
+  final Value<String> status;
+  final Value<String?> validatedBy;
+  final Value<String?> validatedByName;
+  final Value<DateTime?> validatedAt;
+  final Value<int> rowid;
+  const FieldSurveyEntriesCompanion({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.label = const Value.absent(),
+    this.speciesCode = const Value.absent(),
+    this.dataJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.validatedBy = const Value.absent(),
+    this.validatedByName = const Value.absent(),
+    this.validatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldSurveyEntriesCompanion.insert({
+    this.isActive = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    required String id,
+    required String type,
+    required String label,
+    this.speciesCode = const Value.absent(),
+    this.dataJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.validatedBy = const Value.absent(),
+    this.validatedByName = const Value.absent(),
+    this.validatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       type = Value(type),
+       label = Value(label);
+  static Insertable<FieldSurveyEntry> custom({
+    Expression<bool>? isActive,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? type,
+    Expression<String>? label,
+    Expression<String>? speciesCode,
+    Expression<String>? dataJson,
+    Expression<String>? status,
+    Expression<String>? validatedBy,
+    Expression<String>? validatedByName,
+    Expression<DateTime>? validatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (isActive != null) 'is_active': isActive,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (label != null) 'label': label,
+      if (speciesCode != null) 'species_code': speciesCode,
+      if (dataJson != null) 'data_json': dataJson,
+      if (status != null) 'status': status,
+      if (validatedBy != null) 'validated_by': validatedBy,
+      if (validatedByName != null) 'validated_by_name': validatedByName,
+      if (validatedAt != null) 'validated_at': validatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldSurveyEntriesCompanion copyWith({
+    Value<bool>? isActive,
+    Value<SyncStatus>? syncStatus,
+    Value<DateTime?>? updatedAt,
+    Value<String>? id,
+    Value<String>? type,
+    Value<String>? label,
+    Value<String?>? speciesCode,
+    Value<String>? dataJson,
+    Value<String>? status,
+    Value<String?>? validatedBy,
+    Value<String?>? validatedByName,
+    Value<DateTime?>? validatedAt,
+    Value<int>? rowid,
+  }) {
+    return FieldSurveyEntriesCompanion(
+      isActive: isActive ?? this.isActive,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      type: type ?? this.type,
+      label: label ?? this.label,
+      speciesCode: speciesCode ?? this.speciesCode,
+      dataJson: dataJson ?? this.dataJson,
+      status: status ?? this.status,
+      validatedBy: validatedBy ?? this.validatedBy,
+      validatedByName: validatedByName ?? this.validatedByName,
+      validatedAt: validatedAt ?? this.validatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(
+        $FieldSurveyEntriesTable.$convertersyncStatus.toSql(syncStatus.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (speciesCode.present) {
+      map['species_code'] = Variable<String>(speciesCode.value);
+    }
+    if (dataJson.present) {
+      map['data_json'] = Variable<String>(dataJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (validatedBy.present) {
+      map['validated_by'] = Variable<String>(validatedBy.value);
+    }
+    if (validatedByName.present) {
+      map['validated_by_name'] = Variable<String>(validatedByName.value);
+    }
+    if (validatedAt.present) {
+      map['validated_at'] = Variable<DateTime>(validatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldSurveyEntriesCompanion(')
+          ..write('isActive: $isActive, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('label: $label, ')
+          ..write('speciesCode: $speciesCode, ')
+          ..write('dataJson: $dataJson, ')
+          ..write('status: $status, ')
+          ..write('validatedBy: $validatedBy, ')
+          ..write('validatedByName: $validatedByName, ')
+          ..write('validatedAt: $validatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SuppliersTable extends Suppliers
     with TableInfo<$SuppliersTable, Supplier> {
   @override
@@ -52143,6 +52889,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $FeedTypesTable feedTypes = $FeedTypesTable(this);
   late final $ElevageNumberingSettingsTable elevageNumberingSettings =
       $ElevageNumberingSettingsTable(this);
+  late final $FieldSurveyEntriesTable fieldSurveyEntries =
+      $FieldSurveyEntriesTable(this);
   late final $SuppliersTable suppliers = $SuppliersTable(this);
   late final $PurchaseOrdersTable purchaseOrders = $PurchaseOrdersTable(this);
   late final $PurchaseOrderLinesTable purchaseOrderLines =
@@ -52284,6 +53032,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     customerReminders,
     feedTypes,
     elevageNumberingSettings,
+    fieldSurveyEntries,
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
@@ -56377,6 +57126,364 @@ typedef $$ElevageNumberingSettingsTableProcessedTableManager =
         >,
       ),
       ElevageNumberingSetting,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldSurveyEntriesTableCreateCompanionBuilder =
+    FieldSurveyEntriesCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
+      required String id,
+      required String type,
+      required String label,
+      Value<String?> speciesCode,
+      Value<String> dataJson,
+      Value<String> status,
+      Value<String?> validatedBy,
+      Value<String?> validatedByName,
+      Value<DateTime?> validatedAt,
+      Value<int> rowid,
+    });
+typedef $$FieldSurveyEntriesTableUpdateCompanionBuilder =
+    FieldSurveyEntriesCompanion Function({
+      Value<bool> isActive,
+      Value<SyncStatus> syncStatus,
+      Value<DateTime?> updatedAt,
+      Value<String> id,
+      Value<String> type,
+      Value<String> label,
+      Value<String?> speciesCode,
+      Value<String> dataJson,
+      Value<String> status,
+      Value<String?> validatedBy,
+      Value<String?> validatedByName,
+      Value<DateTime?> validatedAt,
+      Value<int> rowid,
+    });
+
+class $$FieldSurveyEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldSurveyEntriesTable> {
+  $$FieldSurveyEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<SyncStatus, SyncStatus, String>
+  get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get speciesCode => $composableBuilder(
+    column: $table.speciesCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dataJson => $composableBuilder(
+    column: $table.dataJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validatedBy => $composableBuilder(
+    column: $table.validatedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validatedByName => $composableBuilder(
+    column: $table.validatedByName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get validatedAt => $composableBuilder(
+    column: $table.validatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldSurveyEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldSurveyEntriesTable> {
+  $$FieldSurveyEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get speciesCode => $composableBuilder(
+    column: $table.speciesCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dataJson => $composableBuilder(
+    column: $table.dataJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validatedBy => $composableBuilder(
+    column: $table.validatedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validatedByName => $composableBuilder(
+    column: $table.validatedByName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get validatedAt => $composableBuilder(
+    column: $table.validatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldSurveyEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldSurveyEntriesTable> {
+  $$FieldSurveyEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SyncStatus, String> get syncStatus =>
+      $composableBuilder(
+        column: $table.syncStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get speciesCode => $composableBuilder(
+    column: $table.speciesCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dataJson =>
+      $composableBuilder(column: $table.dataJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get validatedBy => $composableBuilder(
+    column: $table.validatedBy,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get validatedByName => $composableBuilder(
+    column: $table.validatedByName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get validatedAt => $composableBuilder(
+    column: $table.validatedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$FieldSurveyEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldSurveyEntriesTable,
+          FieldSurveyEntry,
+          $$FieldSurveyEntriesTableFilterComposer,
+          $$FieldSurveyEntriesTableOrderingComposer,
+          $$FieldSurveyEntriesTableAnnotationComposer,
+          $$FieldSurveyEntriesTableCreateCompanionBuilder,
+          $$FieldSurveyEntriesTableUpdateCompanionBuilder,
+          (
+            FieldSurveyEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $FieldSurveyEntriesTable,
+              FieldSurveyEntry
+            >,
+          ),
+          FieldSurveyEntry,
+          PrefetchHooks Function()
+        > {
+  $$FieldSurveyEntriesTableTableManager(
+    _$AppDatabase db,
+    $FieldSurveyEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldSurveyEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldSurveyEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldSurveyEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String?> speciesCode = const Value.absent(),
+                Value<String> dataJson = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> validatedBy = const Value.absent(),
+                Value<String?> validatedByName = const Value.absent(),
+                Value<DateTime?> validatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldSurveyEntriesCompanion(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                id: id,
+                type: type,
+                label: label,
+                speciesCode: speciesCode,
+                dataJson: dataJson,
+                status: status,
+                validatedBy: validatedBy,
+                validatedByName: validatedByName,
+                validatedAt: validatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<bool> isActive = const Value.absent(),
+                Value<SyncStatus> syncStatus = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                required String id,
+                required String type,
+                required String label,
+                Value<String?> speciesCode = const Value.absent(),
+                Value<String> dataJson = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> validatedBy = const Value.absent(),
+                Value<String?> validatedByName = const Value.absent(),
+                Value<DateTime?> validatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldSurveyEntriesCompanion.insert(
+                isActive: isActive,
+                syncStatus: syncStatus,
+                updatedAt: updatedAt,
+                id: id,
+                type: type,
+                label: label,
+                speciesCode: speciesCode,
+                dataJson: dataJson,
+                status: status,
+                validatedBy: validatedBy,
+                validatedByName: validatedByName,
+                validatedAt: validatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldSurveyEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldSurveyEntriesTable,
+      FieldSurveyEntry,
+      $$FieldSurveyEntriesTableFilterComposer,
+      $$FieldSurveyEntriesTableOrderingComposer,
+      $$FieldSurveyEntriesTableAnnotationComposer,
+      $$FieldSurveyEntriesTableCreateCompanionBuilder,
+      $$FieldSurveyEntriesTableUpdateCompanionBuilder,
+      (
+        FieldSurveyEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $FieldSurveyEntriesTable,
+          FieldSurveyEntry
+        >,
+      ),
+      FieldSurveyEntry,
       PrefetchHooks Function()
     >;
 typedef $$SuppliersTableCreateCompanionBuilder =
@@ -77550,6 +78657,8 @@ class $AppDatabaseManager {
         _db,
         _db.elevageNumberingSettings,
       );
+  $$FieldSurveyEntriesTableTableManager get fieldSurveyEntries =>
+      $$FieldSurveyEntriesTableTableManager(_db, _db.fieldSurveyEntries);
   $$SuppliersTableTableManager get suppliers =>
       $$SuppliersTableTableManager(_db, _db.suppliers);
   $$PurchaseOrdersTableTableManager get purchaseOrders =>

@@ -69,7 +69,7 @@ class SauvegardeService
                 'animals', 'transformations', 'veterinary_records',
                 'veterinary_withdrawal_periods', 'veterinary_calendar_events',
                 'infirmary_records', 'livestock_lots', 'feed_ration_standards',
-                'prophylaxis_schedule_standards', 'feed_types', 'livestock_species',
+                'prophylaxis_schedule_standards', 'feed_types', 'livestock_species', 'field_survey_entries',
             ]],
             'comptabilite' => ['libelle' => 'Comptabilité', 'tables' => [
                 // Ticket 15.20b : le compteur de numéros voyage AVEC les écritures (exporté, vidé, restauré).

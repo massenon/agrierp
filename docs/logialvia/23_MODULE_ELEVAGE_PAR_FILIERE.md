@@ -104,6 +104,8 @@ Catégories **ALEVIN · JUVÉNILE (IMMATURES) · MATURE (ÉLIGIBLES VENTE)** ; v
 
 ## 6b. Règles d'incubation modifiables : formulaire « Incubation et règles » (TRANCHÉ DV-11)
 
+> **Mise à jour du 08/11/2026 (DV-23, DV-24)** : dans LogiAgriERP (ticket RELEVES-1), ces règles vivent dans l'onglet « Relevés de terrain » de Paramètres Élevage, famille « Incubation » (table unique `field_survey_entries`, type `incubation_regle`, au lieu de `incubation_rules`), avec les relevés de lots ; chaque règle semée naît « À valider » et se valide par la modale « Valider » ou en enregistrant. Les champs 1 à 6, 8 et 9 ci-dessous sont portés ; les repères d'incubateur (10 à 13) et les rappels (7) ne le sont pas encore.
+
 Le client veut **éditer** ces règles, plus les lire dans le code. Emplacement : `/parametres/elevage`, **5ᵉ onglet « Incubation et règles »** (§8 passe de 4 à 5 onglets). Un formulaire par espèce de couveuse.
 
 Les pastilles d'espèce sont celles de la couveuse **d'après le code de LogiALVIA** (`cycle_incubation.dart`, enum `EspeceCouvable`) : **Pintade** (28 j) et **Goliath** (21 j). Aucune « poule » n'est une espèce de couveuse dans LogiALVIA ; la poule n'apparaît que comme **mère porteuse** du mode « couvaison naturelle » (champ 4). Une autre volaille se rajoutera comme nouvelle ligne d'espèce, sans changer le formulaire. Chaque espèce a son propre formulaire (une ligne `incubation_rules` par espèce).

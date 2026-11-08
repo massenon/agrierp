@@ -71,7 +71,7 @@ class AdministrationLocale {
     'ventes': (libelle: 'Ventes & Clients', tables: ['sale_lines', 'credit_notes', 'quotes', 'advance_imputations', 'receivables', 'customer_advances', 'customer_reminders', 'sales', 'customers']),
     'achats': (libelle: 'Achats & Fournisseurs', tables: ['purchase_lines', 'purchase_order_lines', 'purchase_returns', 'supplier_payments', 'supplier_refunds', 'payables', 'purchases', 'purchase_orders', 'expense_lines', 'expenses', 'suppliers']),
     'stocks': (libelle: 'Stocks', tables: ['stock_movements', 'products', 'product_categories']),
-    'elevage': (libelle: 'Élevage', tables: ['livestock_daily_entries', 'livestock_reproduction_events', 'animals', 'transformations', 'veterinary_records', 'veterinary_withdrawal_periods', 'veterinary_calendar_events', 'infirmary_records', 'livestock_lots', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'livestock_species']),
+    'elevage': (libelle: 'Élevage', tables: ['livestock_daily_entries', 'livestock_reproduction_events', 'animals', 'transformations', 'veterinary_records', 'veterinary_withdrawal_periods', 'veterinary_calendar_events', 'infirmary_records', 'livestock_lots', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'livestock_species', 'field_survey_entries']),
     'comptabilite': (libelle: 'Comptabilité', tables: ['accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures', 'bank_statement_lines', 'fixed_assets', 'cost_centers', 'treasury_accounts', 'fiscal_years', 'chart_of_accounts']),
     'rh': (libelle: 'Ressources Humaines', tables: ['payslips', 'attendance_records', 'internship_absences', 'internships', 'employees', 'income_tax_brackets']),
   };

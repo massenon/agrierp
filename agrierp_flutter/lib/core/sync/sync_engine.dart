@@ -861,6 +861,8 @@ class SyncEngine {
     recus += await _absorberRelances(corps['customer_reminders']);
     recus += await _absorberProvendes(corps['feed_types']);
     recus += await _absorberNumerotation(corps['elevage_numbering']);
+    // Ticket RELEVES-1 — relevés de terrain (table mixte de barème : une saisie en attente n'est jamais écrasée).
+    recus += await _absorberReleves(corps['field_survey_entries']);
     recus += await _absorberFournisseurs(corps['suppliers']);
     recus += await _absorberBonsCommande(corps['purchase_orders']);
     recus += await _absorberAchats(corps['purchases']);
@@ -1996,6 +1998,71 @@ class SyncEngine {
         t.id.isNotIn(servis),
       ]),
       archivage: const FeedRationStandardsCompanion(isActive: Value(false)),
+    );
+
+    return recues.length;
+  }
+
+  /// Ticket RELEVES-1 — RELEVÉS DE TERRAIN du serveur (Paramètres Élevage), FUSIONNÉS par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT** : un identifiant servi deux fois, un type inconnu, un libellé absent, un statut hors de
+  /// `a_valider` | `valide`, des valeurs qui ne sont pas un objet ou un `is_active` illisible refusent TOUT le tirage
+  /// (rien n'est écrit, le curseur n'avance pas). Une ligne `pending` / `conflict` (saisie ou validée ici, pas encore
+  /// acquittée) n'est JAMAIS écrasée : une validation faite hors ligne ne revient pas à « À valider » au tirage.
+  Future<int> _absorberReleves(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignesStrictes(brut, 'Relevé de terrain');
+    final vus = <String>{};
+    final recues = <FieldSurveyEntriesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Relevé de terrain');
+      final type = l['type'];
+      final libelle = l['label'];
+      final statut = l['status'];
+      final donnees = l['data'];
+      if (type is! String || !_typesReleves.contains(type)) {
+        throw FormatException('Relevé de terrain $id refusé : type inconnu ($type).');
+      }
+      if (libelle is! String || libelle.isEmpty) {
+        throw FormatException('Relevé de terrain $id refusé : libellé absent.');
+      }
+      if (statut != 'a_valider' && statut != 'valide') {
+        throw FormatException('Relevé de terrain $id refusé : statut illisible ($statut).');
+      }
+      if (donnees is! Map && !(donnees is List && donnees.isEmpty)) {
+        throw FormatException('Relevé de terrain $id refusé : valeurs illisibles.');
+      }
+      recues.add(
+        FieldSurveyEntriesCompanion.insert(
+          id: id,
+          type: type,
+          label: libelle,
+          speciesCode: Value(_texteStrict(l['species_code'], 'Relevé $id : espèce')),
+          dataJson: Value(jsonEncode(donnees is Map ? donnees : <String, dynamic>{})),
+          status: Value(statut as String),
+          validatedBy: Value(_texteStrict(l['validated_by'], 'Relevé $id : validé par')),
+          validatedByName: Value(_texteStrict(l['validated_by_name'], 'Relevé $id : nom du validateur')),
+          validatedAt: Value(_instantTechnique(l['validated_at'])),
+          isActive: Value(_actifStrict(l, 'Relevé $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
+
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.fieldSurveyEntries,
+      recues: recues,
+      idsServis: servis,
+      idDe: (FieldSurveyEntry r) => r.id,
+      statutDe: (FieldSurveyEntry r) => r.syncStatus,
+      synceeHorsServis: ($FieldSurveyEntriesTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const FieldSurveyEntriesCompanion(isActive: Value(false)),
     );
 
     return recues.length;
@@ -5592,6 +5659,13 @@ class SyncEngine {
       _db.elevageNumberingSettings,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket RELEVES-1 — relevés de terrain saisis, validés ou archivés au poste (règles d'incubation AVANT les lots).
+    final relevesTerrain = await (_db.select(_db.fieldSurveyEntries)
+          ..where((t) => t.syncStatus.equalsValue(SyncStatus.pending)))
+        .get()
+      // ⚠️ Une règle d'incubation part AVANT les relevés de lots qui la visent (le serveur exige la règle de l'espèce).
+      ..sort((a, b) => (a.type == 'incubation_regle' ? 0 : 1).compareTo(b.type == 'incubation_regle' ? 0 : 1));
+
     final entreprise = await (_db.select(
       _db.companySettings,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -5618,6 +5692,7 @@ class SyncEngine {
         echeances.isEmpty &&
         provendes.isEmpty &&
         numerotations.isEmpty &&
+        relevesTerrain.isEmpty &&
         entreprise.isEmpty &&
         modules.isEmpty &&
         courriers.isEmpty &&
@@ -5766,6 +5841,9 @@ class SyncEngine {
           'feed_types': provendes.map(_provendeEnJson).toList(),
         if (numerotations.isNotEmpty)
           'elevage_numbering': numerotations.map(_numerotationEnJson).toList(),
+        // Ticket RELEVES-1 — `pushFieldSurveyEntries` (manage-elevage) : le statut n'est pas envoyé, le serveur le pose.
+        if (relevesTerrain.isNotEmpty)
+          'field_survey_entries': relevesTerrain.map(_releveEnJson).toList(),
         if (entreprise.isNotEmpty)
           'company_settings': entreprise.map(_rappelSoinsEnJson).toList(),
         // Ticket MOD1 — UNE LIGNE PAR ESPÈCE, valeur explicite (jamais une bascule) ; acquittée sous le code de l'espèce.
@@ -6074,6 +6152,27 @@ class SyncEngine {
                   ]),
                 ))
                 .write(FeedTypesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket RELEVES-1 — n'acquitte que la VERSION partie (instant de saisie inchangé).
+    accepte += await _acquitter(
+      'field_survey_entries',
+      corps['field_survey_entries'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final r in relevesTerrain) (r.id, r.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.fieldSurveyEntries)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null ? t.updatedAt.isNull() : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(FieldSurveyEntriesCompanion(syncStatus: Value(statut))),
       ),
       motifs,
       (n) => rejete += n,
@@ -6712,6 +6811,8 @@ class SyncEngine {
     'livestock_transfers',
     // Ticket EL-1 — après les fiches et les transferts, comme au serveur.
     'transformations',
+    // Ticket RELEVES-1 — relevés de terrain, juste après les transformations, comme au serveur.
+    'field_survey_entries',
     // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
     'chart_of_accounts',
     // Ticket CP-2 — après le plan comptable, comme au serveur.
@@ -7587,6 +7688,16 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket RELEVES-1 — relevé refusé : « Relancer » le remet en file.
+      'field_survey_entries' =>
+        () =>
+            (_db.update(
+              _db.fieldSurveyEntries,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FieldSurveyEntriesCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
       'feed_types' =>
         () =>
             (_db.update(
@@ -8317,6 +8428,33 @@ class SyncEngine {
     'stage_label': r.stageLabel,
     'ration_g_per_day': r.rationGPerDay.round(),
     'is_active': r.isActive,
+  };
+
+  /// Types de relevés connus du serveur (`ReleveTerrainService::FAMILLES`) : un autre type refuse le tirage.
+  static const _typesReleves = {
+    'incubation_regle', 'incubation_lot', 'delai_regle', 'poisson_marque', 'poisson_bareme', 'poisson_temperature', 'poisson_densite',
+  };
+
+  static Object _donneesReleve(FieldSurveyEntry r) {
+    try {
+      final d = jsonDecode(r.dataJson);
+      return d is Map ? d : <String, dynamic>{};
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  /// Ticket RELEVES-1 — relevé tel que `SyncController::pushFieldSurveyEntries` le valide : type, libellé, espèce,
+  /// valeurs et `is_active`. ⚠️ Le STATUT n'est pas envoyé : un envoi du poste est un enregistrement humain, le serveur
+  /// pose « Validé » (validé par = le jeton, validé le = son instant).
+  Map<String, dynamic> _releveEnJson(FieldSurveyEntry r) => {
+    'id': r.id,
+    'type': r.type,
+    'label': r.label,
+    'species_code': r.speciesCode,
+    'data': _donneesReleve(r),
+    'is_active': r.isActive,
+    'device_id': _deviceId,
   };
 
   /// Ticket H9b — échéance de prophylaxie (`prophylaxie()` de l'Action). Les bornes de cycle ne partent pas :

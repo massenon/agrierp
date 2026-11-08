@@ -226,6 +226,10 @@ class AuditLog extends Model
         'feed_type.archived' => "Type d'aliment archivé",
         'prophylaxis_schedule.archived' => 'Calendrier de prophylaxie archivé',
         'rappel_soins.updated' => 'Délai de rappel des soins modifié',
+        // Ticket RELEVES-1 — relevés de terrain (Paramètres Élevage).
+        'releve.saved' => 'Relevé de terrain enregistré',
+        'releve.valide' => 'Relevé de terrain validé',
+        'releve.archived' => 'Relevé de terrain archivé',
         'employee.created' => 'Employé créé',
         'employee.updated' => 'Employé modifié',
         'employee.archived' => 'Employé archivé',

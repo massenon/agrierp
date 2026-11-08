@@ -90,6 +90,8 @@ void main() {
     'livestock_transfers',
     // Ticket EL-1 — transformations (table mixte : saisie ET tirée).
     'transformations',
+    // Ticket RELEVES-1 — relevés de terrain (table mixte de barème : saisie ET tirée).
+    'field_survey_entries',
     'feed_ration_standards',
     // Ticket U2 (D-U2) — objectifs de GMQ.
     'growth_standards',

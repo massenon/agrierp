@@ -153,6 +153,8 @@ class SyncController extends Controller
         'fixed_assets', 'depreciation_requests',
         // Ticket EL-1 — transformations (« Bon d'Abattage & Transformation ») saisies au poste.
         'transformations',
+        // Ticket RELEVES-1 — « Relevés de terrain » (Paramètres Élevage) : table mixte, point de passage `ReleveTerrainService`.
+        'field_survey_entries',
         // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles).
         'settings_requests',
         // Ticket CP-5 — relevés bancaires (CSV) importés au poste, par UUID d'import (rejeu sans doublon).
@@ -214,6 +216,7 @@ class SyncController extends Controller
         'livestock_daily_entries' => null,
         'livestock_transfers' => ['view-elevage'],
         'transformations' => ['view-elevage'],
+        'field_survey_entries' => ['view-elevage'],
         'feed_ration_standards' => ['view-elevage', 'view-ventes'],
         'growth_standards' => ['view-elevage'],
         'veterinary_withdrawal_periods' => ['view-elevage', 'view-ventes'],
@@ -915,6 +918,15 @@ class SyncController extends Controller
             // Ces prefixes nomment les animaux sur le terrain (R1, T1, LOT-VOL-1) :
             // un poste qui les ignore proposerait sa propre convention, et deux
             // registres de la meme ferme ne se liraient plus ensemble.
+            // Ticket RELEVES-1 — relevés de terrain : toute la table (archivées comprises : `is_active`), validateur nommé.
+            'field_survey_entries' => fn () => \App\Models\FieldSurveyEntry::with('validateur:id,name')->orderBy('id')->get()
+                ->map(fn (\App\Models\FieldSurveyEntry $l) => [
+                    'id' => $l->id, 'type' => $l->type, 'label' => $l->label, 'species_code' => $l->species_code,
+                    'data' => $l->data ?? new \stdClass, 'status' => $l->status, 'validated_by' => $l->validated_by,
+                    'validated_by_name' => $l->validateur?->name, 'validated_at' => $l->validated_at?->toIso8601String(),
+                    'is_active' => $l->is_active, 'updated_at' => $l->updated_at?->toIso8601String(),
+                ])->values(),
+
             'elevage_numbering' => fn () => ElevageNumberingSetting::current()->only([
                 'bande_format', 'lapine_prefix', 'male_prefix', 'truie_prefix',
                 'verrat_prefix', 'portee_prefix', 'volaille_prefix', 'parc_prefix',
@@ -2259,6 +2271,8 @@ class SyncController extends Controller
             // Ticket CP-2 — demandes d'écriture manuelle (créer, modifier, archiver) saisies au poste.
             'manual_entry_requests' => ['accepted' => [], 'rejected' => []],
             'transformations' => ['accepted' => [], 'rejected' => []],
+            // Ticket RELEVES-1 — relevés de terrain du poste, rejoués par `ReleveTerrainService` (le point de passage du web).
+            'field_survey_entries' => ['accepted' => [], 'rejected' => []],
             'fixed_assets' => ['accepted' => [], 'rejected' => []],
             'depreciation_requests' => ['accepted' => [], 'rejected' => []],
             'fiscal_closure_requests' => ['accepted' => [], 'rejected' => []],
@@ -2484,6 +2498,15 @@ class SyncController extends Controller
             $result['transformations'] = $this->pushTransformations(
                 $request->input('transformations'),
                 $request->user(),
+            );
+        }
+
+        // Ticket RELEVES-1 — relevés de terrain (règles d'incubation avant les relevés de lots qui les visent).
+        if ($request->has('field_survey_entries')) {
+            $result['field_survey_entries'] = $this->pushFieldSurveyEntries(
+                $request->input('field_survey_entries'),
+                $request->user(),
+                $this->nomDuPoste($request),
             );
         }
 
@@ -2766,6 +2789,8 @@ class SyncController extends Controller
         'livestock_transfers' => 'manage-elevage',
         // Ticket EL-1 — le droit de `TransformationForm::validateTransformation()` du web.
         'transformations' => 'manage-elevage',
+        // Ticket RELEVES-1 — le droit des méthodes d'écriture de `ParametresElevage` du web.
+        'field_survey_entries' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
         'infirmary_records' => 'manage-elevage',
         'veterinary_calendar_events' => 'manage-elevage',
@@ -6531,6 +6556,76 @@ class SyncController extends Controller
                 $action->enregistrer(Arr::except($valides, ['id']), $utilisateur->id, $valides['id']);
 
                 $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket RELEVES-1 — RELEVÉS DE TERRAIN DU POSTE, rejoués par `ReleveTerrainService` (le point de passage de
+     * `ParametresElevage`). Absorbeur STRICT : type connu, valeurs revalidées par les règles du web ; le statut envoyé
+     * est IGNORÉ — un envoi du poste est un enregistrement humain, donc « Validé » (validé par = le jeton, validé le =
+     * l'instant du serveur). Idempotent par l'UUID ; une ligne archivée n'est jamais rouverte ni modifiée.
+     */
+    private function pushFieldSurveyEntries(array $lignes, $utilisateur, ?string $poste): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\Elevage\ReleveTerrainService::class);
+
+        foreach ($lignes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-elevage')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'enregistrer un relevé de terrain.'];
+
+                continue;
+            }
+            if (! is_string($id) || ! Str::isUuid($id)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Identifiant de relevé invalide.'];
+
+                continue;
+            }
+
+            try {
+                $saisie = ['label' => $data['label'] ?? null, 'species_code' => $data['species_code'] ?? null, 'data' => $data['data'] ?? []];
+                $type = (string) ($data['type'] ?? '');
+                $archive = array_key_exists('is_active', $data) && ! filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                DB::transaction(function () use ($service, $id, $type, $saisie, $archive, $utilisateur, $poste) {
+                    $existante = \App\Models\FieldSurveyEntry::find($id);
+                    if ($existante === null) {
+                        $ligne = $service->creer($type, $saisie, $utilisateur->id, $id, $poste);
+                        if ($archive) {
+                            $service->archiver($ligne, $utilisateur->id);
+                        }
+
+                        return;
+                    }
+                    if (! $existante->is_active || $existante->type !== $type) {
+                        return;   // archivée : jamais rouverte ni modifiée
+                    }
+                    if ($archive) {
+                        $service->archiver($existante, $utilisateur->id);
+
+                        return;
+                    }
+                    $identique = $existante->status === \App\Services\Elevage\ReleveTerrainService::VALIDE
+                        && $existante->label === trim((string) ($saisie['label'] ?? ''))
+                        && $service->normaliser($type, $saisie, $existante)['data'] == $existante->data;
+                    if ($identique) {
+                        return;   // rejeu : acquitté sans écriture ni nouvelle trace
+                    }
+                    $existante->estAValider()
+                        ? $service->valider($existante, $saisie, $utilisateur->id, $poste)
+                        : $service->modifier($existante, $saisie, $utilisateur->id, $poste);
+                });
+
+                $accepted[] = $id;
             } catch (ValidationException $e) {
                 $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
             }

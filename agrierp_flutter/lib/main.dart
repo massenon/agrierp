@@ -1375,6 +1375,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.clientsEtCreances => ClientsCreancesScreen(
           depot: widget.clients,
+          // Ticket CONF-5 — `manage-ventes` : le comptable CONSULTE (view-ventes) sans relancer, encaisser, imputer ni modifier.
+          peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
           imprimer: EditeursRapports.imprimer,
         ),
         // Ticket U10 — « Exporter », « Ajouter Stock » (`manage-stocks`), « Configurer les Seuils d'Alerte » et

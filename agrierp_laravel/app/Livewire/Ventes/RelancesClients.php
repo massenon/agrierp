@@ -154,6 +154,8 @@ class RelancesClients extends Component
 
     public function sendMailReminder(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
 
         try {
@@ -169,6 +171,8 @@ class RelancesClients extends Component
 
     public function sendWhatsappReminder(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
         $phone = preg_replace('/[^0-9]/', '', (string) $receivable->customer?->phone);
 
@@ -192,6 +196,8 @@ class RelancesClients extends Component
      */
     public function callReminder(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
 
         try {

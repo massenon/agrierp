@@ -50,7 +50,8 @@ class RaiseFeedAutonomyAlertAction
 
         $autonomie = round($aliment->stockEnKg() / $consommationKgParJour, 1);
 
-        if ($autonomie > self::SEUIL_JOURS) {
+        // RELEVES-1 : le seuil CRITIQUE est lu de la règle « délai fournisseur » (3 j tant que rien n'est validé).
+        if ($autonomie > \App\Services\Elevage\ReleveTerrainService::seuilCritiqueJours()) {
             $this->resorber($aliment);
 
             return null;

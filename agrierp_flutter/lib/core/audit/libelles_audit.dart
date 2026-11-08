@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 156 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 159 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -130,6 +130,9 @@ class LibellesAudit {
     'feed_type.archived': 'Type d\'aliment archivé',
     'prophylaxis_schedule.archived': 'Calendrier de prophylaxie archivé',
     'rappel_soins.updated': 'Délai de rappel des soins modifié',
+    'releve.saved': 'Relevé de terrain enregistré',
+    'releve.valide': 'Relevé de terrain validé',
+    'releve.archived': 'Relevé de terrain archivé',
     'employee.created': 'Employé créé',
     'employee.updated': 'Employé modifié',
     'employee.archived': 'Employé archivé',

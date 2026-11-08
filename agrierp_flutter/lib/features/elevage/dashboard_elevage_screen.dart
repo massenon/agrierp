@@ -7,6 +7,7 @@ import '../../core/widgets/carte_kpi.dart';
 import 'bilan_technico_economique_repository.dart';
 import 'bilan_technico_economique_vue.dart';
 import 'dashboard_elevage_repository.dart';
+import 'releve_terrain.dart';
 import 'suffixe_doublon.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -300,11 +301,65 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           ],
         ),
         const SizedBox(height: AgriSpacing.lg),
+        _cartesReleves(large),
+        const SizedBox(height: AgriSpacing.lg),
         _cartesEspeces(large),
         const SizedBox(height: AgriSpacing.lg),
         _resumeEtRappels(large),
         const SizedBox(height: AgriSpacing.lg),
         _courbeEspeces(),
+      ],
+    );
+  }
+
+  /// Ticket RELEVES-1 — bloc « Relevés de terrain » (cartes du web, mêmes libellés, « — » sans donnée, jamais 0).
+  Widget _cartesReleves(bool large) {
+    final r = _donnees!.releves;
+    String nb(num? v, String suffixe) => v == null ? '—' : '${ReleveTerrain.nb(v)}$suffixe';
+
+    return GrilleKpi(
+      key: const Key('cartes-releves'),
+      colonnes: large ? 4 : 2,
+      children: [
+        _carteKpi(
+          libelle: 'Référentiels à valider',
+          valeur: '${r.aValider}',
+          legende: 'Propositions en attente de validation',
+          icone: SymbolesAgri.fact_check,
+          barre: AgriColors.accentYellow,
+          couleurIcone: AgriColors.brandForest,
+        ),
+        _carteKpi(
+          libelle: 'Fertilité moyenne',
+          valeur: nb(r.fertiliteMoyenne, ' %'),
+          legende: r.nbLots == 0 ? 'Aucun lot relevé' : 'Moyenne de ${r.nbLots} lot(s) relevé(s)',
+          icone: SymbolesAgri.egg,
+          barre: AgriColors.brandEmerald,
+        ),
+        _carteKpi(
+          libelle: 'Éclosion moyenne',
+          valeur: nb(r.eclosionMoyenne, ' %'),
+          legende: r.nbLots == 0 ? 'Aucun lot relevé' : 'Éclos ÷ fertiles',
+          icone: SymbolesAgri.child_care,
+          barre: AgriColors.infoBlue,
+          couleurIcone: AgriColors.infoBlue,
+        ),
+        _carteKpi(
+          libelle: 'Incubation observée',
+          valeur: nb(r.dureeObserveeMoyenne, ' j'),
+          legende: 'Règle : ${nb(r.dureeRegleMoyenne, ' j')}',
+          icone: SymbolesAgri.schedule,
+          barre: AgriColors.brandForest,
+          couleurIcone: AgriColors.brandForest,
+        ),
+        _carteKpi(
+          libelle: 'Délai fournisseur',
+          valeur: '${r.delai.critique} j / ${r.delai.alerte} j',
+          legende: 'Critique / alerte retenus — constaté : ${nb(r.delaiConstateMax, ' j')}',
+          icone: SymbolesAgri.local_shipping,
+          barre: AgriColors.errorRed,
+          couleurIcone: AgriColors.errorRed,
+        ),
       ],
     );
   }

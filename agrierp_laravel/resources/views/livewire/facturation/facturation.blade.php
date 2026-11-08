@@ -87,9 +87,11 @@
                                 @if($this->mecefActif && $sale->mecef_status === 'transmise' && $sale->mecef_qr_ref)
                                     <button type="button" wire:click="showMecef('{{ $sale->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Facture normalisée MeCeF"><span class="material-symbols-outlined text-[18px]">qr_code_2</span></button>
                                 @endif
+                                @can('retransmettre-facture')
                                 @if($this->mecefActif && $sale->estADeclarer() && $sale->mecef_status !== 'transmise')
                                     <button type="button" wire:click="retryMecef('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retransmettre au MeCeF"><span class="material-symbols-outlined text-[18px]">refresh</span></button>
                                 @endif
+                                @endcan
                             </td>
                         </tr>
                     @empty

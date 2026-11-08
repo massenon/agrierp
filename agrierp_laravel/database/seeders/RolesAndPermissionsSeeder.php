@@ -61,6 +61,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
         Role::findByName('caissier')->givePermissionTo([
             'view-ventes', 'manage-ventes', 'export-ventes',
+            // CONF-5 (DV-06) — le caissier CONSULTE et RÉIMPRIME ses factures : `view-facturation` seul. Jamais
+            // `manage-facturation` (conversion de devis), `correct-invoices` (avoir fiscal) ni la retransmission.
+            'view-facturation',
         ]);
 
         Role::findByName('animalier')->givePermissionTo([

@@ -124,7 +124,8 @@ class ComptablePerimetreTest extends TestCase
             Permission::pluck('name')->sort()->values()->all(),
             $this->droits('admin'),
         );
-        $this->assertSame(['export-ventes', 'manage-ventes', 'view-ventes'], $this->droits('caissier'));
+        // CONF-5 (DV-06) : le caissier lit et réimprime ses factures (`view-facturation`), sans aucun droit d'écriture de facturation.
+        $this->assertSame(['export-ventes', 'manage-ventes', 'view-facturation', 'view-ventes'], $this->droits('caissier'));
         $this->assertFalse($this->caissier->can('correct-invoices'));
         $this->assertSame(['archive-elevage', 'export-elevage', 'manage-elevage', 'view-elevage'], $this->droits('animalier'));
         $this->assertFalse($this->animalier->can('correct-invoices'));

@@ -42,6 +42,8 @@ void main() {
     'livestock_transfers': 'livestock_transfers',
     // Ticket EL-1 — transformations (table mixte : saisie ET tirée), lues par l'écran « Transformation ».
     'transformations': 'transformations',
+    // Ticket RELEVES-1 — relevés de terrain (table mixte de barème), lus par Paramètres Élevage et le Dashboard Élevage.
+    'field_survey_entries': 'field_survey_entries',
     'feed_ration_standards': 'feed_ration_standards',
     'growth_standards': 'growth_standards',
     'veterinary_withdrawal_periods': 'veterinary_withdrawal_periods',
@@ -204,6 +206,12 @@ void main() {
     },
     // Ticket IMPORT-1 — l'écran n'offre (et ne lit) que les modules du compte : le catalogue et les filières pour
     // `manage-stocks`, les fournisseurs pour `manage-achats` (le caissier n'a que `manage-ventes` : clients).
+    // Ticket RELEVES-1 — le bloc « Relevés de terrain » du Dashboard Élevage calcule le délai constaté du fournisseur de
+    // provende sur les bons de commande reçus : le poste les lit SEULEMENT s'il les a (`view-achats`) ; sans eux (poste de
+    // l'animalier) il n'y a aucun délai constaté et la règle garde ses valeurs de départ (écart assumé, voir CLAUDE.md).
+    EcranPoste.dashboardElevage: {
+      'view-achats': {'purchase_orders'},
+    },
     EcranPoste.importationMasse: {
       'manage-stocks': {'livestock_species'},
       'manage-achats': {'suppliers', 'purchase_orders'},

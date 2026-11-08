@@ -320,10 +320,24 @@ class PermissionsPoste {
     'comptable': [
       'dashboard.html',
       // Ticket CONF-4 (DV-20, décision du client du 08/11/2026 : « le même périmètre dans LogiAgriERP ») — EXTENSION DE LA
-      // CARTE DU PROTOTYPE, voulue et dite : le comptable LIT les ventes (hub Ventes & Devis SANS la caisse : devis,
-      // historique, retours et avoirs), CONSULTE la facturation, LIT les achats et les stocks. `pos-interface.html` (la
-      // caisse) n'y figure PAS. `creances-clients.html` non plus : l'écran Clients et Créances n'a pas de garde par droit au
-      // poste (relances, encaissements) ; le web, lui, l'ouvre en lecture (`view-ventes`) — écart assumé, voir CONF-4.
+      // CARTE DU PROTOTYPE (`RBAC_PAGE_MAP`), voulue et dite : le comptable LIT les ventes (hub Ventes & Devis SANS la caisse :
+      // devis, historique, retours et avoirs), CONSULTE la facturation, LIT les achats et les stocks. `pos-interface.html`
+      // (la caisse) n'y figure PAS.
+      //
+      // Ticket CONF-5 — DEUX EXTENSIONS DE PLUS de `RBAC_PAGE_MAP`, voulues et dites (décision du client, « lance le reste ») :
+      //  - `creances-clients.html` (+ `liste-clients`, `suivi-dettes`, `relances-clients`, `historique-avances`, `profile-client`) :
+      //    « Clients et Créances » s'ouvre en LECTURE (le web : `view-ventes`). Sans `manage-ventes`, chaque geste d'écriture
+      //    (relancer, encaisser, imputer une avance, créer / modifier / archiver un client) est masqué ET refusé (`RefusDroit`) ;
+      //  - `comptabilite-hub.html` : le comptable atteint tout le hub Comptabilité, comme au web (`view-comptabilite`) : plan
+      //    comptable, journal, grand livre, balance, états, clôture, analytique, TVA, rapprochement, bilan, immobilisations,
+      //    balance âgée. Ancienne incohérence de la carte (le hub manquait, ses pages non).
+      'comptabilite-hub.html',
+      'creances-clients.html',
+      'liste-clients.html',
+      'suivi-dettes.html',
+      'relances-clients.html',
+      'historique-avances.html',
+      'profile-client.html',
       'ventes-devis.html',
       'historique-ventes.html',
       'devis.html',
@@ -423,7 +437,9 @@ class PermissionsPoste {
       'view-facturation',
       'correct-invoices',
     },
-    'caissier': {'view-ventes', 'manage-ventes', 'export-ventes'},
+    // Ticket CONF-5 (DV-06) : le caissier CONSULTE et RÉIMPRIME ses factures (`view-facturation`, LECTURE seule) ; jamais
+    // `manage-facturation`, `correct-invoices` ni la retransmission.
+    'caissier': {'view-ventes', 'manage-ventes', 'export-ventes', 'view-facturation'},
     'animalier': {
       'view-elevage',
       'manage-elevage',

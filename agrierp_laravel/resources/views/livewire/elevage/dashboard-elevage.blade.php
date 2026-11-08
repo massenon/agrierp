@@ -21,6 +21,22 @@
                     <x-kpi-card label="Mortalité Cumulée (7j)" icon="health_and_safety" color="red" :value="number_format($this->syntheseKpis['taux_mortalite_7j'], 1, ',', ' ').' %'" caption="Alerte si > 10%/semaine" />
                 </x-kpi-accordion>
 
+                {{-- Ticket RELEVES-1 — bloc « Relevés de terrain » (lié à l'onglet de Paramètres Élevage) : « — » sans donnée, jamais 0. --}}
+                @php
+                    $rt = $this->syntheseReleves;
+                    $nbRt = fn ($v, $suffixe = '') => $v === null ? '—' : \App\Services\Elevage\ReleveTerrainService::nb($v).$suffixe;
+                @endphp
+                <x-kpi-accordion title="Relevés de terrain">
+                    <x-kpi-card label="Référentiels à valider" icon="fact_check" color="maize" :value="(string) $rt['a_valider']" caption="Propositions en attente de validation" />
+                    <x-kpi-card label="Fertilité moyenne" icon="egg" color="emerald" :value="$nbRt($rt['fertilite_moyenne'], ' %')" :caption="$rt['nb_lots'] === 0 ? 'Aucun lot relevé' : 'Moyenne de '.$rt['nb_lots'].' lot(s) relevé(s)'" />
+                    <x-kpi-card label="Éclosion moyenne" icon="child_care" color="blue" :value="$nbRt($rt['eclosion_moyenne'], ' %')" :caption="$rt['nb_lots'] === 0 ? 'Aucun lot relevé' : 'Éclos ÷ fertiles'" />
+                    <x-kpi-card label="Incubation observée" icon="schedule" color="forest" :value="$nbRt($rt['duree_observee_moyenne'], ' j')" :caption="'Règle : '.$nbRt($rt['duree_regle_moyenne'], ' j')" />
+                    <x-kpi-card label="Délai fournisseur" icon="local_shipping" color="red" :value="$rt['delai']['critique'].' j / '.$rt['delai']['alerte'].' j'" :caption="'Critique / alerte retenus — constaté : '.$nbRt($rt['delai_constate_max'], ' j')" />
+                </x-kpi-accordion>
+                @can('manage-elevage')
+                    <a wire:navigate href="{{ route('elevage.parametres', ['tab' => 'releves']) }}" class="inline-flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline"><span class="material-symbols-outlined text-[16px]">fact_check</span>Ouvrir les relevés de terrain ({{ $rt['a_valider'] }} à valider) →</a>
+                @endcan
+
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-md">
                     @foreach($this->speciesSummary as $row)
                         <div class="bg-white border border-outline-variant rounded-lg p-md">

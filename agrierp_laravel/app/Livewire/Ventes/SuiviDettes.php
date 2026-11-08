@@ -98,6 +98,8 @@ class SuiviDettes extends Component
 
     public function openPaymentModal(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
         $this->paymentTargetId = $receivable->id;
         $this->paymentTargetLabel = $receivable->customer?->name.' — '.strtoupper(substr($receivable->sale_id ?? $receivable->id, 0, 8));

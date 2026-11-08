@@ -186,7 +186,7 @@ class ReinitialisationDonneesService
             'role_has_permissions', 'company_settings', 'modules_config',
             'chart_of_accounts', 'fiscal_years', 'treasury_accounts',
             'products', 'product_categories', 'livestock_species',
-            'feed_types', 'feed_ration_standards', 'prophylaxis_schedule_standards',
+            'feed_types', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'field_survey_entries',
             'cost_centers', 'income_tax_brackets',
             // Immobilisations semées en reprise d'antériorité (`FixedAssetsSeeder`) : paramètres de base. Celles
             // ACHETÉES dans l'application sont retirées par `remettreLesImmobilisations()` (ticket 15.50).

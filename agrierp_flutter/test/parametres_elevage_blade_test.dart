@@ -263,9 +263,10 @@ void main() {
   }
 
   group('H9 — structure du Blade', () {
-    testWidgets('les quatre onglets du Blade, dans son ordre', (tester) async {
+    testWidgets('les cinq onglets du Blade, dans son ordre (RELEVES-1 : « Relevés de terrain » est le cinquième)', (tester) async {
       final onglets = _tous(_blade!, r"'label' => '([^']+)'");
-      expect(onglets, hasLength(4));
+      expect(onglets, hasLength(5));
+      expect(onglets.last, 'Relevés de terrain');
       await afficher(tester);
 
       final abscisses = [
@@ -821,10 +822,11 @@ void main() {
     }, skip: _sautWeb);
 
     test('le composant web et le point d envoi exigent manage-elevage', () {
-      // Les huit écritures du composant : rappel, ration ×2, échéance ×2, provende ×2, numérotation.
+      // Les douze écritures du composant : rappel, ration ×2, échéance ×2, provende ×2, numérotation, plus (RELEVES-1)
+      // relevé de terrain : nouveau, enregistrer, valider (modale), archiver.
       expect(
         RegExp(r"authorize\('manage-elevage'\)").allMatches(_livewire!).length,
-        8,
+        12,
       );
       final controleur = _lireLaravel(
         'app/Http/Controllers/Api/SyncController.php',
