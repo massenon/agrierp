@@ -168,8 +168,19 @@ void main() {
       // `RBAC_PAGE_MAP`, relevée ici et **non corrigée** : compléter la carte
       // est un arbitrage client, comme pour les six écrans qui n'y figurent
       // pas du tout.
+      //
+      // ⚠️ TICKET CONF-4 (DV-20, « le même périmètre dans LogiAgriERP ») : le comptable LIT les ventes (hub Ventes & Devis
+      // sans la caisse), consulte la facturation, lit les achats et les stocks. La caisse (`pos-interface.html`) et
+      // `creances-clients.html` n'entrent PAS dans sa liste (voir `permissions_poste.dart`).
       expect(PermissionsPoste.ecransDe('comptable'), [
         EcranPoste.tableauDeBord,
+        EcranPoste.ventesEtDevis,
+        EcranPoste.achatsEtCommandes,
+        EcranPoste.fournisseurs,
+        EcranPoste.facturation,
+        EcranPoste.saisieDepenses,
+        EcranPoste.gestionStocks,
+        EcranPoste.catalogueProduits,
         EcranPoste.rapportsEtExports,
         EcranPoste.monProfil,
         EcranPoste.notifications,
@@ -177,6 +188,89 @@ void main() {
         EcranPoste.contactEditeur,
         EcranPoste.synchronisation,
       ]);
+    });
+  });
+
+  group('CONF-4 : périmètre du comptable (DV-20)', () {
+    test('il lit les ventes, la facturation, les achats et les stocks, JAMAIS la caisse', () {
+      for (final ecran in [
+        EcranPoste.ventesEtDevis,
+        EcranPoste.facturation,
+        EcranPoste.achatsEtCommandes,
+        EcranPoste.fournisseurs,
+        EcranPoste.saisieDepenses,
+        EcranPoste.gestionStocks,
+        EcranPoste.catalogueProduits,
+        EcranPoste.rapportsEtExports,
+      ]) {
+        expect(PermissionsPoste.autorise('comptable', ecran), isTrue, reason: ecran.name);
+      }
+      expect(PermissionsPoste.autorise('comptable', EcranPoste.caisse), isFalse);
+      expect(PermissionsPoste.autorise('comptable', EcranPoste.clientsEtCreances), isFalse);
+
+      // Ni élevage, ni utilisateurs / réglages, ni inventaire en masse, ni RH, ni administration.
+      for (final ecran in [
+        EcranPoste.gestionElevage,
+        EcranPoste.parametresElevage,
+        EcranPoste.transfertsBandes,
+        EcranPoste.parametresGeneraux,
+        EcranPoste.parametres,
+        EcranPoste.importationMasse,
+        EcranPoste.personnelEtStages,
+        EcranPoste.administrationEtDocument,
+      ]) {
+        expect(PermissionsPoste.autorise('comptable', ecran), isFalse, reason: ecran.name);
+      }
+    });
+
+    test('droits : lecture + correction, aucun droit d\'écriture de la caisse, des achats, des stocks ni de l\'élevage', () {
+      for (final d in ['view-ventes', 'view-achats', 'view-stocks', 'view-facturation', 'correct-invoices', 'manage-comptabilite']) {
+        expect(PermissionsPoste.peut('comptable', d), isTrue, reason: d);
+      }
+      for (final d in [
+        'manage-ventes',
+        'manage-achats',
+        'manage-stocks',
+        'manage-elevage',
+        'manage-users',
+        'manage-parametres',
+        'manage-facturation',
+        'export-ventes',
+      ]) {
+        expect(PermissionsPoste.peut('comptable', d), isFalse, reason: d);
+      }
+    });
+
+    test('les deux portes de correction du web (Gates avoir-client et retransmettre-facture)', () {
+      // Avoir : manage-ventes OU correct-invoices.
+      expect(PermissionsPoste.peutCorrigerParAvoir('admin'), isTrue);
+      expect(PermissionsPoste.peutCorrigerParAvoir('caissier'), isTrue);
+      expect(PermissionsPoste.peutCorrigerParAvoir('comptable'), isTrue);
+      expect(PermissionsPoste.peutCorrigerParAvoir('animalier'), isFalse);
+      // Retransmettre une facture : manage-facturation OU correct-invoices ; le caissier ne la gagne pas.
+      expect(PermissionsPoste.peutRetransmettreFacture('admin'), isTrue);
+      expect(PermissionsPoste.peutRetransmettreFacture('comptable'), isTrue);
+      expect(PermissionsPoste.peutRetransmettreFacture('caissier'), isFalse);
+      expect(PermissionsPoste.peutRetransmettreFacture('animalier'), isFalse);
+    });
+
+    test('caissier et animalier sont inchangés', () {
+      expect(PermissionsPoste.permissionsDuRole['caissier'], {'view-ventes', 'manage-ventes', 'export-ventes'});
+      expect(PermissionsPoste.permissionsDuRole['animalier'], {'view-elevage', 'manage-elevage', 'archive-elevage', 'export-elevage'});
+      expect(PermissionsPoste.peut('caissier', 'correct-invoices'), isFalse);
+    });
+
+    testWidgets('la garde d\'écran refuse la caisse au comptable et laisse passer le hub des ventes', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: GardeEcran(role: 'comptable', ecran: EcranPoste.caisse, enfant: Text('caisse'))),
+      );
+      expect(find.byKey(const Key('acces-refuse')), findsOneWidget);
+      expect(find.text('caisse'), findsNothing);
+
+      await tester.pumpWidget(
+        const MaterialApp(home: GardeEcran(role: 'comptable', ecran: EcranPoste.ventesEtDevis, enfant: Text('hub'))),
+      );
+      expect(find.text('hub'), findsOneWidget);
     });
   });
 

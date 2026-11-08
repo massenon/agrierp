@@ -2,6 +2,7 @@ import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 
+import '../../core/auth/refus_droit.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
 import '../../core/temps/heure_benin.dart';
@@ -63,7 +64,13 @@ class AchatsCommandesScreen extends StatefulWidget {
     this.choisirJustificatif = choisirEtCopierJustificatif,
     this.imprimer,
     this.maintenant,
+    this.peutGerer = true,
   });
+
+  /// Ticket CONF-4 (DV-20) — `manage-achats` du rôle de la session : sans lui (comptable : LECTURE des achats, `view-achats`),
+  /// chaque geste d'écriture (achat, retour, remboursement, bon de commande, réception, fournisseur ou produit à la volée)
+  /// est refusé par « Votre rôle ne permet pas cette action. », comme le 403 du web.
+  final bool peutGerer;
 
   final AchatsRepository depot;
 
@@ -194,6 +201,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
   /// `openAddSupplierModal` / `saveNewSupplier` du web : « Nouveau Fournisseur », puis le fournisseur est sélectionné.
   Future<void> _nouveauFournisseur() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final fiche = await ouvrirNouveauFournisseurRapide(context: context, depot: widget.depotFournisseurs!);
     if (fiche == null) return;
     await _charger();
@@ -204,6 +212,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
   /// `openAddProductModal` / `saveNewProduct` du web : « Nouveau Produit », puis le produit est sélectionné (P.U. à 0).
   Future<void> _nouveauProduit() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final fiche = await ouvrirNouveauProduitRapide(context: context, depot: widget.depotProduits!);
     if (fiche == null) return;
     await _charger();
@@ -266,6 +275,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   }
 
   Future<void> _enregistrer() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     if (_fournisseurId == null) {
       setState(() {
         _message = 'Choisissez le fournisseur de cet achat.';
@@ -507,6 +517,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// « Retour Fournisseur » : la modale écrit la DEMANDE (`pending`) ; rien d'autre ne
   /// bouge au poste.
   Future<void> _demanderRetour(LigneAchat ligne) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirRetourFournisseur(
       context: context,
       depot: widget.depot,
@@ -521,6 +532,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   }
 
   Future<void> _demanderRemboursement(DonneesAchats d) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirRemboursement(
       context: context,
       depot: widget.depot,
@@ -652,6 +664,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     if (_profilFournisseur != null && depotFournisseurs != null) {
       return ProfilFournisseurScreen(
         depot: depotFournisseurs,
+        peutGerer: widget.peutGerer,
         fournisseurId: _profilFournisseur!,
         onRetour: () {
           setState(() => _profilFournisseur = null);
@@ -1514,6 +1527,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   }
 
   Future<void> _genererBon() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     try {
       await widget.depot.creerBon(
         fournisseurId: _bonFournisseurId ?? '',
@@ -1552,6 +1566,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
   /// `openReceiveModal` / `confirmReceiveOrder` : la modale « Valider la réception ».
   Future<void> _recevoirBon(LigneBon l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ok = await afficherModale<bool>(
       context: context,
       confirmation: true,

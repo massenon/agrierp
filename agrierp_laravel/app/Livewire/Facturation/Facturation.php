@@ -155,7 +155,8 @@ class Facturation extends Component
 
     public function retryMecef(string $id): void
     {
-        $this->authorize('manage-facturation');
+        // CONF-4 : `manage-facturation` OU `correct-invoices` (le comptable retransmet sans pouvoir convertir un devis).
+        $this->authorize('retransmettre-facture');
 
         if (! $this->mecefActif) {
             $this->dispatch('toast', message: "Le module MeCeF n'est pas activé : aucune transmission possible.", type: 'warning');

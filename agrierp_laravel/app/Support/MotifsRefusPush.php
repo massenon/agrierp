@@ -319,6 +319,15 @@ class MotifsRefusPush
             .'reconnectez-vous depuis ce poste. Les saisies en attente restent sur le poste.';
     }
 
+    /**
+     * CONF-4 (DV-20) — une vente envoyée au statut `annulee` par un compte qui n'a pas `manage-ventes` (le comptable : il
+     * lit les ventes et corrige par l'avoir, il n'encaisse ni n'annule). L'annulation reste à la caisse.
+     */
+    public static function annulationVenteRefusee(): string
+    {
+        return "Refusé : votre rôle ne permet pas d'annuler une vente (réservé aux comptes autorisés à encaisser). Pour corriger une vente, enregistrez un avoir depuis « Retours et Avoirs ».";
+    }
+
     /** Ticket S1 : l'utilisateur connecté au poste n'a pas le droit d'écrire cette table. */
     public static function roleInsuffisant(string $table): string
     {

@@ -178,6 +178,10 @@ class PosInterface extends Component
 
     public function mount(): void
     {
+        // CONF-4 (DV-20) — la CAISSE est à `manage-ventes` SEUL : le comptable lit les ventes (`view-ventes`) sans l'ouvrir.
+        // Le hub ne monte plus cet onglet pour lui ; ce refus tient aussi si le composant est monté autrement.
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-ventes'), 403);
+
         $this->dateVente = now()->format('Y-m-d');
     }
 

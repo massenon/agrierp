@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:agrierp/core/comptabilite/exercice_choisi.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
@@ -758,19 +760,24 @@ void main() {
       expect((await (db.select(db.sales)..where((s) => s.id.equals(uuid('a')))).getSingle()).status, 'validee');
     });
 
-    testWidgets('sans manage-ventes : « Votre rôle ne permet pas cette action. », rien n\'est écrit', (tester) async {
+    testWidgets('⚠️ CONF-4 (DV-20) sans manage-ventes (comptable) : pas de bouton « Annuler » (le web le masque, @can), « Voir » reste ouvert, rien n\'est écrit', (tester) async {
       await vente('a', total: 9000);
-      await monter(tester, exercice: await exercice(), peutGerer: false);
-      await tester.tap(find.byKey(Key('vente-annuler-${uuid('a')}')));
-      await tester.pumpAndSettle();
+      final ex = await exercice();
+      await monter(tester, exercice: ex, peutGerer: false);
 
-      await tester.tap(find.byKey(const Key('annulation-confirmer')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Votre rôle ne permet pas cette action.'), findsOneWidget);
+      expect(find.byKey(Key('vente-annuler-${uuid('a')}')), findsNothing);
+      expect(find.byKey(Key('vente-voir-${uuid('a')}')), findsOneWidget);
+      // Le caissier (manage-ventes) garde le bouton.
+      await monter(tester, exercice: ex);
+      expect(find.byKey(Key('vente-annuler-${uuid('a')}')), findsOneWidget);
       expect((await (db.select(db.sales)..where((s) => s.id.equals(uuid('a')))).getSingle()).status, 'validee');
-      ToastAgri.toutRetirer();
-      await tester.pumpAndSettle(const Duration(seconds: 5));
+    });
+
+    test('⚠️ CONF-4 la garde de l\'annulation demeure dans le code (défense en profondeur) et dit le motif du web', () {
+      final source = File('lib/features/ventes/historique_ventes_onglet.dart').readAsStringSync();
+      final garde = source.substring(source.indexOf('Future<void> _confirmerAnnulation'));
+      expect(garde.substring(0, garde.indexOf('widget.depot.annuler(id)')), contains('if (!widget.peutGerer)'));
+      expect(HistoriqueVentesOnglet.refusDroit, 'Votre rôle ne permet pas cette action.');
     });
 
     testWidgets('⚠️⚠️ @lectureSeule : exercice clos, « Annuler » est grisé (et « Voir » reste ouvert)', (tester) async {

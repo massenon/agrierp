@@ -2803,7 +2803,10 @@ class SyncController extends Controller
         // Ticket DEV — le droit du composant `Ventes\Devis` du web.
         'quotes' => 'manage-ventes',
         // Ticket AV1 — le droit de `RetoursAvoirs::saveReturn()` / `markAsTreated()` du web.
-        'credit_notes' => 'manage-ventes',
+        // CONF-4 (DV-20) — `avoir-client` (Gate de `AppServiceProvider`) = `manage-ventes` OU `correct-invoices` : le comptable
+        // envoie ses avoirs SANS pouvoir encaisser (`sales` reste à `manage-ventes` seul : une annulation de vente venant de
+        // lui est refusée, avec son motif).
+        'credit_notes' => 'avoir-client',
         // Ticket ARC2 — le droit de l'écran Corbeille du web (administrateur).
         'corbeille_demandes' => 'manage-parametres',
         'stock_adjustments' => 'manage-stocks',
@@ -2874,7 +2877,11 @@ class SyncController extends Controller
                 $cle = $table === 'stock_adjustments' ? 'client_ref' : 'id';
                 $refus[$table][] = [
                     $cle => is_array($envoi) ? ($envoi[$cle] ?? null) : null,
-                    'reason' => MotifsRefusPush::roleInsuffisant($table),
+                    // CONF-4 — une vente renvoyée `annulee` par un compte sans `manage-ventes` (le comptable) : motif PROPRE à
+                    // l'annulation, qui dit où va la correction (l'avoir).
+                    'reason' => $table === 'sales' && is_array($envoi) && ($envoi['status'] ?? null) === 'annulee'
+                        ? MotifsRefusPush::annulationVenteRefusee()
+                        : MotifsRefusPush::roleInsuffisant($table),
                 ];
             }
 
@@ -5502,7 +5509,7 @@ class SyncController extends Controller
      * ABSORBEUR STRICT (refus MOTIVÉ de CET avoir seul ; la transaction annulée ne laisse ni stock ni écriture) :
      * vente inconnue ou annulée, produit absent de la vente, quantité au-delà de « vendu − déjà retourné », montant
      * au-delà de « ligne − déjà crédité », date future ou antérieure à la vente, exercice absent ou clos, plan
-     * comptable incomplet, droit `manage-ventes`.
+     * comptable incomplet, droit `avoir-client` (`manage-ventes` OU `correct-invoices`, CONF-4).
      *
      * ⚠️ IDEMPOTENCE : `id` = UUID de l'avoir né sur le poste ; un `id` déjà reçu est acquitté sans rien rejouer. Un
      * avoir connu renvoyé au statut `traite` est marqué traité (« Marquer comme traité » du web), une seule fois.
@@ -5516,7 +5523,8 @@ class SyncController extends Controller
         foreach ($avoirs as $data) {
             $id = is_array($data) ? ($data['id'] ?? null) : null;
 
-            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+            // CONF-4 : `avoir-client` = `manage-ventes` OU `correct-invoices` (le comptable envoie ses avoirs, sans caisse).
+            if (! $utilisateur || ! $utilisateur->can('avoir-client')) {
                 $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::roleInsuffisant('credit_notes')];
 
                 continue;

@@ -35,6 +35,13 @@ class AppServiceProvider extends ServiceProvider
         // (`manage-stocks`, `manage-ventes`, `manage-achats`) reste vérifié à chaque lecture et écriture (`ImportMasseService`).
         \Illuminate\Support\Facades\Gate::define('importation-masse', fn ($user) => $user->canAny(['manage-stocks', 'manage-ventes', 'manage-achats']));
 
+        // Ticket CONF-4 (DV-20) — LA CORRECTION COMPTABLE N'OUVRE PAS LA CAISSE. Un AVOIR (créer, marquer traité, retransmettre sa
+        // facture `FA`) s'ouvre à `manage-ventes` (caissier : inchangé) OU `correct-invoices` (comptable). Retransmettre une FACTURE
+        // depuis « Facturation » s'ouvre à `manage-facturation` (administrateur : inchangé) OU `correct-invoices`. L'annulation
+        // d'une vente, la caisse et tout le reste de `manage-ventes` restent à `manage-ventes` SEUL (jamais ces portes-ci).
+        \Illuminate\Support\Facades\Gate::define('avoir-client', fn ($user) => $user->canAny(['manage-ventes', 'correct-invoices']));
+        \Illuminate\Support\Facades\Gate::define('retransmettre-facture', fn ($user) => $user->canAny(['manage-facturation', 'correct-invoices']));
+
         // ⚠️⚠️ TICKET 14.65 — POLITIQUE DE MOT DE PASSE CENTRALISEE. Les deux
         // seuls endroits qui posent un mot de passe (`ResetPassword` et
         // `GestionUtilisateurs`) exigeaient `min:8` et rien d'autre :

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/auth/refus_droit.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'fiche_fournisseur_modales.dart';
 import 'fournisseurs_repository.dart';
@@ -33,7 +34,11 @@ class ProfilFournisseurScreen extends StatefulWidget {
     required this.depot,
     required this.fournisseurId,
     required this.onRetour,
+    this.peutGerer = true,
   });
+
+  /// Ticket CONF-4 (DV-20) — `manage-achats` : « Modifier la fiche » et « Régler » refusés sans lui (comptable).
+  final bool peutGerer;
 
   final FournisseursRepository depot;
   final String fournisseurId;
@@ -95,6 +100,7 @@ class _ProfilFournisseurScreenState extends State<ProfilFournisseurScreen> {
       .join();
 
   Future<void> _modifierFiche(ProfilFournisseur p) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirFicheFournisseur(
       context: context,
       depot: widget.depot,
@@ -104,6 +110,7 @@ class _ProfilFournisseurScreenState extends State<ProfilFournisseurScreen> {
   }
 
   Future<void> _ouvrirReglement(ProfilFournisseur p) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final enregistre = await afficherModale<bool>(
       context: context,
       constructeur: (_) =>

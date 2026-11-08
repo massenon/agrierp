@@ -9,6 +9,7 @@ import '../../core/systeme/ouvreur_url.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/auth/refus_droit.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -44,9 +45,13 @@ import 'modale_depense.dart';
 ///
 /// ⚠️ « Charges Fixes / Variables » : arbitrage client en attente (aucun champ Fixe/Variable, ni au web ni ici).
 class SaisieDepensesScreen extends StatefulWidget {
-  const SaisieDepensesScreen({super.key, required this.depot, this.ouvrirFichier = ouvrirUrlSysteme});
+  const SaisieDepensesScreen({super.key, required this.depot, this.ouvrirFichier = ouvrirUrlSysteme, this.peutGerer = true});
 
   final DepensesRepository depot;
+
+  /// Ticket CONF-4 (DV-20) — `manage-achats` : sans lui (comptable : lecture des achats), « Nouvelle Dépense », modifier et
+  /// archiver sont refusés par « Votre rôle ne permet pas cette action. » (le web : 403 de `submitExpense()`).
+  final bool peutGerer;
 
   /// Ticket AC-3 — ouvre le justificatif local dans la visionneuse du système ; un espion en test.
   final OuvreurUrl ouvrirFichier;
@@ -738,6 +743,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
 
   /// `nouvelleDepense()` du web : la modale « Nouvelle Dépense » s'ouvre sur une ligne vide.
   Future<void> _nouvelle() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final enregistree = await ModaleDepense.ouvrir(context, depot: widget.depot);
     await _apresModale(enregistree);
   }
@@ -746,6 +752,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   /// d'ouvrir, comme le web : exercice clos (motif R4 de sa date), dépense comptabilisée (immuable : on l'archive puis on
   /// la saisit à nouveau), dépense archivée.
   Future<void> _modifier(LigneDepense l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final refus = await widget.depot.refusAvantModification(l.depense);
     if (!mounted) return;
     if (refus != null) {
@@ -766,6 +773,7 @@ class _SaisieDepensesScreenState extends State<SaisieDepensesScreen> {
   /// `archiveExpense($id)` derrière `x-modal-confirm-delete` : icône `archive` `text-error-deep`, « Confirmer
   /// l'archivage », le libellé de la dépense, « Annuler » puis « Archiver » (`bg-error-red`).
   Future<void> _archiver(Expense d) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final confirme = await afficherModale<bool>(
       context: context,
       confirmation: true,

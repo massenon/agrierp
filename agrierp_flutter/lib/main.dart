@@ -1391,7 +1391,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.catalogueProduits => CatalogueProduitsScreen(
           key: ValueKey('catalogue-$_versionCatalogue'),
           depot: widget.stocks,
-          produits: widget.produits,
+          // Ticket CONF-4 (DV-20) — `manage-stocks` : sans lui (comptable : lecture des stocks), `produits: null` rend le
+          // catalogue CONSULTABLE SEULEMENT (créer, modifier, archiver, configurer un seuil : boutons inertes).
+          produits: PermissionsPoste.peut(_role, 'manage-stocks') ? widget.produits : null,
           ongletInitial: _catalogueOnglet,
           produitAModifier: _catalogueProduit,
         ),
@@ -1402,8 +1404,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
           imprimer: EditeursRapports.imprimer,
           avoirs: widget.avoirs,
           historique: widget.historiqueVentes,
-          // Tickets AV1 / AV2 — `manage-ventes` (retour, avoir traité, annulation) et `export-ventes` (ticket PDF).
+          // Tickets AV1 / AV2 — `manage-ventes` (caisse, annulation, devis) et `export-ventes` (ticket PDF).
           peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
+          // Ticket CONF-4 — retour et avoir traité : `manage-ventes` OU `correct-invoices` (Gate `avoir-client` du web).
+          peutCorriger: PermissionsPoste.peutCorrigerParAvoir(_role),
           peutExporter: PermissionsPoste.peut(_role, 'export-ventes'),
           // Ticket DEV3 — « Convertir en Facture » : `manage-facturation` EN PLUS de `manage-ventes` (admin seul aujourd'hui) ;
           // « Voir la facture » : `view-facturation`, vers l'écran Facturation & MeCeF.
@@ -1467,19 +1471,26 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.facturation => FacturationScreen(
           depot: widget.facturation,
           imprimer: EditeursRapports.imprimer,
-          onOuvrirCaisse: () => setState(() => _ecran = EcranPoste.caisse),
+          // Ticket CONF-4 : sans le droit de la caisse (comptable), « Nouvelle Facture » ouvre le hub Ventes & Devis, comme le web.
+          onOuvrirCaisse: () => setState(
+            () => _ecran = PermissionsPoste.autorise(_role, EcranPoste.caisse) ? EcranPoste.caisse : EcranPoste.ventesEtDevis,
+          ),
         ),
+        // Ticket CONF-4 (DV-20) — `manage-achats` : le comptable LIT les achats, sans rien y écrire.
         EcranPoste.fournisseurs => FournisseursScreen(
           depot: widget.fournisseurs,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-achats'),
         ),
         EcranPoste.achatsEtCommandes => AchatsCommandesScreen(
           depot: widget.achats,
           depotFournisseurs: widget.fournisseurs,
           depotProduits: widget.produits,
           imprimer: EditeursRapports.imprimer,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-achats'),
         ),
         EcranPoste.saisieDepenses => SaisieDepensesScreen(
           depot: widget.depenses,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-achats'),
         ),
         // Ticket U12a — « Exporter PDF », liens du Blade (transferts, retour à Gestion Élevage, commande de stock).
         EcranPoste.ficheEscargots => FicheEscargotsScreen(

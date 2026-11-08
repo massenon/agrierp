@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/auth/refus_droit.dart';
 import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -33,9 +34,13 @@ import '../../core/comptabilite/exercice_de_saisie.dart';
 /// attendant les règlements non encore acquittés, pour ne pas inviter à payer deux
 /// fois.
 class FournisseursScreen extends StatefulWidget {
-  const FournisseursScreen({super.key, required this.depot});
+  const FournisseursScreen({super.key, required this.depot, this.peutGerer = true});
 
   final FournisseursRepository depot;
+
+  /// Ticket CONF-4 (DV-20) — `manage-achats` : sans lui (comptable), créer, modifier, archiver un fournisseur et régler une
+  /// dette sont refusés par « Votre rôle ne permet pas cette action. » (le web : 403).
+  final bool peutGerer;
 
   @override
   State<FournisseursScreen> createState() => _FournisseursScreenState();
@@ -74,6 +79,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     if (_profil != null) {
       return ProfilFournisseurScreen(
         depot: widget.depot,
+        peutGerer: widget.peutGerer,
         fournisseurId: _profil!,
         onRetour: () {
           setState(() => _profil = null);
@@ -509,6 +515,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   }
 
   Future<void> _ouvrirReglement(DonneesFournisseurs d, {String? fournisseurId}) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final enregistre = await afficherModale<bool>(
       context: context,
       constructeur: (_) => _ModaleReglement(depot: widget.depot, donnees: d, fournisseurDepart: fournisseurId),
@@ -580,6 +587,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   );
 
   Future<void> _ouvrirFiche(Supplier? existant) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirFicheFournisseur(
       context: context,
       depot: widget.depot,
@@ -589,6 +597,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   }
 
   Future<void> _archiver(Supplier fiche) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ok = await confirmerArchivageFournisseur(
       context: context,
       depot: widget.depot,

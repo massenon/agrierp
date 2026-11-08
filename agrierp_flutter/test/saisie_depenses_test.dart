@@ -1247,13 +1247,18 @@ void main() {
     // `saisie-depenses.html` n'apparaît dans AUCUNE des quatre listes ; seul `admin`, dont la liste vaut `null`,
     // n'est pas restreint.
     expect(PermissionsPoste.autorise('admin', EcranPoste.saisieDepenses), isTrue);
-    for (final role in ['caissier', 'animalier', 'comptable']) {
+    for (final role in ['caissier', 'animalier']) {
       expect(
         PermissionsPoste.autorise(role, EcranPoste.saisieDepenses),
         isFalse,
         reason: '$role ne doit pas decaisser depuis un poste de terrain',
       );
     }
+    // Ticket CONF-4 (DV-20) : le COMPTABLE LIT les achats et les dépenses (l'écran lui est ouvert), sans les écrire :
+    // pas de `manage-achats`, donc « Nouvelle Dépense », modifier et archiver y sont refusés (voir le test d'écran).
+    expect(PermissionsPoste.autorise('comptable', EcranPoste.saisieDepenses), isTrue);
+    expect(PermissionsPoste.peut('comptable', 'view-achats'), isTrue);
+    expect(PermissionsPoste.peut('comptable', 'manage-achats'), isFalse, reason: 'le comptable ne decaisse pas depuis un poste');
   });
 }
 

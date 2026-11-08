@@ -579,7 +579,10 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
                 child: Icon(SymbolesAgri.lock, size: 18, color: AgriColors.outlineVariant),
               ),
             )
-          else if (!l.annulee)
+          // Ticket CONF-4 (DV-20) — comme le web (`@can('manage-ventes')` autour de « Annuler ») : l'annulation d'une vente reste à
+          // `manage-ventes` SEUL ; le comptable, qui lit l'historique, corrige par l'avoir. La garde de `_confirmerAnnulation`
+          // demeure (défense en profondeur).
+          else if (!l.annulee && widget.peutGerer)
             LectureSeule.infobulle(
               motifLecture,
               boutonIconeTableau(

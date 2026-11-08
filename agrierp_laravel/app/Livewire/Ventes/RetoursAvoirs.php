@@ -137,7 +137,8 @@ class RetoursAvoirs extends Component
     {
         // ⚠️ Garde posée sur la méthode qui ÉCRIT : la route du hub ne porte
         // que `can:view-ventes`, et rien d'autre ne protégeait cette action.
-        $this->authorize('manage-ventes');
+        // CONF-4 : `manage-ventes` OU `correct-invoices` (le comptable corrige par l'avoir sans ouvrir la caisse).
+        $this->authorize('avoir-client');
 
         $this->validate([
             'saleId' => ['required', 'exists:sales,id'],
@@ -189,7 +190,7 @@ class RetoursAvoirs extends Component
     /** MECEF-1 — retransmet une facture d'avoir (`FA`) en attente, refusée ou expirée ; une avoir déjà normalisé ne repart jamais. */
     public function retryMecef(string $id): void
     {
-        $this->authorize('manage-ventes');
+        $this->authorize('avoir-client');
 
         $r = app(\App\Services\Mecef\FacturationMecefService::class)->facturerAvoir($id);
 
@@ -198,7 +199,7 @@ class RetoursAvoirs extends Component
 
     public function markAsTreated(string $id): void
     {
-        $this->authorize('manage-ventes');
+        $this->authorize('avoir-client');
 
         app(AvoirClientService::class)->marquerTraite(CreditNote::findOrFail($id));
         $this->dispatch('toast', message: 'Avoir marqué comme traité.', type: 'success');

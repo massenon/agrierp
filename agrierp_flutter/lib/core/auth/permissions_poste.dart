@@ -319,6 +319,21 @@ class PermissionsPoste {
     ],
     'comptable': [
       'dashboard.html',
+      // Ticket CONF-4 (DV-20, décision du client du 08/11/2026 : « le même périmètre dans LogiAgriERP ») — EXTENSION DE LA
+      // CARTE DU PROTOTYPE, voulue et dite : le comptable LIT les ventes (hub Ventes & Devis SANS la caisse : devis,
+      // historique, retours et avoirs), CONSULTE la facturation, LIT les achats et les stocks. `pos-interface.html` (la
+      // caisse) n'y figure PAS. `creances-clients.html` non plus : l'écran Clients et Créances n'a pas de garde par droit au
+      // poste (relances, encaissements) ; le web, lui, l'ouvre en lecture (`view-ventes`) — écart assumé, voir CONF-4.
+      'ventes-devis.html',
+      'historique-ventes.html',
+      'devis.html',
+      'retours-avoirs.html',
+      'facturation.html',
+      'achats-commandes.html',
+      'fournisseurs.html',
+      'saisie-depenses.html',
+      'gestion-stocks.html',
+      'catalogue-produits.html',
       'journal-comptable.html',
       'rapport-bilan.html',
       'cloture-exercice.html',
@@ -400,6 +415,13 @@ class PermissionsPoste {
       'close-fiscal-year',
       'view-rapports',
       'export-rapports',
+      // Ticket CONF-4 (DV-20) : lecture des ventes, achats, stocks ; facturation ; droit fin de correction (avoir,
+      // retransmission) SANS la caisse (`manage-ventes`).
+      'view-ventes',
+      'view-achats',
+      'view-stocks',
+      'view-facturation',
+      'correct-invoices',
     },
     'caissier': {'view-ventes', 'manage-ventes', 'export-ventes'},
     'animalier': {
@@ -409,6 +431,15 @@ class PermissionsPoste {
       'export-elevage',
     },
   };
+
+  /// Ticket CONF-4 — Gate `avoir-client` du web : créer un avoir, le marquer traité, retransmettre sa facture `FA`.
+  /// `manage-ventes` (caissier) OU `correct-invoices` (comptable) ; l'annulation et la caisse restent à `manage-ventes` seul.
+  static bool peutCorrigerParAvoir(String role) =>
+      peut(role, 'manage-ventes') || peut(role, 'correct-invoices');
+
+  /// Ticket CONF-4 — Gate `retransmettre-facture` du web : `manage-facturation` (administrateur) OU `correct-invoices`.
+  static bool peutRetransmettreFacture(String role) =>
+      peut(role, 'manage-facturation') || peut(role, 'correct-invoices');
 
   /// `$user->can($permission)` du web, pour le rôle de la session du poste. Rôle inconnu : aucun droit
   /// d'écriture (le serveur refuserait de toute façon).

@@ -477,6 +477,26 @@ void main() {
       );
       expect(caissier, isNot(contains('accounting_entries')));
       expect(animalier, isNot(contains('accounting_entries')));
+      // Ticket CONF-4 (DV-20) — le comptable LIT les ventes, les achats et les stocks : il reçoit devis, avoirs, relances,
+      // bons de commande, crédits fournisseurs et mouvements de stock. Ni le personnel, ni les soins, ni la corbeille.
+      expect(
+        comptable,
+        containsAll([
+          'quotes',
+          'credit_notes',
+          'customer_advances',
+          'customer_reminders',
+          'purchase_orders',
+          'supplier_credits',
+          'expense_categories',
+          'stock_movements',
+        ]),
+      );
+      expect(comptable, isNot(contains('veterinary_records')));
+      expect(comptable, isNot(contains('corbeille_elements')));
+      expect(comptable, isNot(contains('permissions_applicatives')));
+      // Le caissier ne reçoit pas les achats détaillés (inchangé).
+      expect(caissier, isNot(contains('purchase_orders')));
       for (final role in [caissier, animalier, comptable]) {
         expect(role, isNot(contains('employees')));
         expect(role, isNot(contains('mails')));

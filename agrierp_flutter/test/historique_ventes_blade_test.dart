@@ -232,7 +232,9 @@ void main() {
       expect(vue, contains(icone));
       expect(ecran, contains('SymbolesAgri.$icone'), reason: icone);
     }
-    expect(ecran, contains('if (!l.annulee)'));
+    // CONF-4 (DV-20) : « Annuler » est derrière `@can('manage-ventes')` au web, derrière `widget.peutGerer` au poste.
+    expect(vue, contains("@can('manage-ventes')"));
+    expect(ecran, contains('if (!l.annulee && widget.peutGerer)'));
     expect(ecran, contains('LectureSeule.motif(context)'));
     expect(ecran, contains('LectureSeule.infobulle('));
     expect(chaines, contains('Voir'));

@@ -84,7 +84,8 @@
             </div>
             @endhasanyrole
 
-            @hasanyrole(['admin', 'caissier'])
+            {{-- CONF-4 (DV-20) : le comptable LIT les ventes (historique, devis, retours et avoirs) ; la caisse reste à `manage-ventes`. --}}
+            @hasanyrole(['admin', 'caissier', 'comptable'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">VENTES FERME</p>
             <div class="space-y-xs mb-sm">
                 <x-sidebar-link href="/ventes-devis" icon="point_of_sale" label="Ventes & Devis" />
@@ -92,7 +93,8 @@
             </div>
             @endhasanyrole
 
-            @hasanyrole(['admin'])
+            {{-- CONF-4 (DV-20) : le comptable LIT les achats et les stocks (`view-achats`, `view-stocks`), sans rien y écrire. --}}
+            @hasanyrole(['admin', 'comptable'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">ACHATS & CHARGES</p>
             <div class="space-y-xs mb-sm">
                 <x-sidebar-link href="/achats-commandes" icon="local_shipping" label="Achats & Commandes" />
@@ -108,7 +110,7 @@
             @endhasanyrole
 
             {{-- Ticket VC-5 : la facturation existe avec ou sans MeCeF ; seul le libellé suit le module (`config/mecef.php`). --}}
-            @hasanyrole(['admin', 'caissier'])
+            @hasanyrole(['admin', 'caissier', 'comptable'])
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">FACTURATION</p>
             <div class="space-y-xs mb-sm">
                 <x-sidebar-link href="/facturation" icon="receipt_long" :label="app(\App\Services\Mecef\MecefReglage::class)->actif() ? 'Facturation & MeCeF' : 'Facturation'" />

@@ -382,9 +382,16 @@ class PosChampDateVenteTest extends TestCase
     {
         $lecteur = User::create(['name' => 'Lecteur', 'email' => 'lecteur@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
         $lecteur->givePermissionTo('view-ventes');
-        $this->actingAs($lecteur);
 
-        $this->panier('especes', '2026-10-11')->call('validateSale')->assertForbidden();
+        // CONF-4 : la caisse ne se monte plus sans `manage-ventes` (le comptable lit les ventes sans l'ouvrir) ...
+        $this->actingAs($lecteur);
+        Livewire::test(PosInterface::class)->assertForbidden();
+
+        // ... et la méthode qui vend garde SA garde : un panier monté par un compte autorisé, appelé par un lecteur, est refusé.
+        $this->actingAs(User::first());
+        $caisse = $this->panier('especes', '2026-10-11');
+        $this->actingAs($lecteur);
+        $caisse->call('validateSale')->assertForbidden();
 
         $this->assertSame(0, Sale::count());
     }
