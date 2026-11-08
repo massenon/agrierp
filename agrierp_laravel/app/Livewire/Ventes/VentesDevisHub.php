@@ -37,6 +37,6 @@ class VentesDevisHub extends Component
             $this->tab = 'historique';
         }
 
-        return view('livewire.ventes.ventes-devis-hub', ['title' => 'Ventes & Devis', 'peutEncaisser' => $peutEncaisser]);
+        return view('livewire.ventes.ventes-devis-hub', ['peutEncaisser' => $peutEncaisser, 'title' => 'Ventes & Devis']);
     }
 }
