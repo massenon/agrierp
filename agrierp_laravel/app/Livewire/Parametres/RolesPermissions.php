@@ -51,6 +51,12 @@ use Livewire\Component;
  */
 class RolesPermissions extends Component
 {
+    public function mount(): void
+    {
+        // CONF-3 : jamais d'ouverture sans le droit de l'onglet (mêmes droits que l'export PDF des rôles ; les écritures restent réservées au rôle admin).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-users'), 403);
+    }
+
     public ?string $editingRoleName = null;
 
     public string $roleName = '';

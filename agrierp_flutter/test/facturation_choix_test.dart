@@ -136,6 +136,9 @@ void main() {
       expect(sousTitre(s), isNot(contains('IFU')));
       expect(sousTitre(s), isNot(contains('AIB')));
       expect(s.codeQr, isNull);
+      // CONF-3 (DV-22) : le mode de règlement est un LIBELLÉ, jamais la clé stockée.
+      expect(sousTitre(s), contains('Mode de règlement : '));
+      expect(sousTitre(s), isNot(contains('especes')));
     });
 
     test('un client sans IFU : pas de ligne IFU ; AIB « Aucun (N/A) » dit tel quel', () async {

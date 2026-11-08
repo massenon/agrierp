@@ -6,7 +6,8 @@ import { activer, deverrouiller, etatAppareil, desactiver, purgerLocal, prerequi
 import { ouvrirBase } from '../../resources/js/hors-ligne/base-locale.js';
 import { ajouterVente } from '../../resources/js/hors-ligne/file-envoi.js';
 import { ErreurPin, dechiffrer } from '../../resources/js/hors-ligne/coffre.js';
-import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, normaliser } from '../../resources/js/hors-ligne/catalogue.js';
+import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, normaliser, SEUIL_AVERTISSEMENT_PRIX_JOURS, SEUIL_CONFIRMATION_PRIX_JOURS, niveauPrixPerimes, messageBandeauPrix, messageConfirmationVente, NIVEAUX_PRIX } from '../../resources/js/hors-ligne/catalogue.js';
+import { ageDuTirageEnJours } from '../../resources/js/hors-ligne/etat.js';
 
 const ITER = 1000;
 const reponseLogin = (corps = {}, statut = 200) => async () => new Response(JSON.stringify({ token: '7|JETON-EN-CLAIR-SECRET', user: { id: 'u', name: 'Caissière', username: 'caisse', role: 'caissier' }, must_change_password: false, ...corps }), { status: statut });
@@ -125,7 +126,8 @@ test('catalogue : filtre sans accents, catégorie, tuiles non vendables, âge du
     assert.equal(fourchetteDePrix(produits[0]), '2 000 – 2 500 FCFA');
     assert.equal(fourchetteDePrix(produits[3]), '2 500 FCFA');
     assert.equal(normaliser('  Œufs É '), 'œufs e');
-    assert.match(messageAgeTirage(5), /il y a 5 jour\(s\) — vérifiez les prix/);
+    assert.equal(messageAgeTirage(5), 'Dernier tirage du catalogue : il y a 5 jours.');
+    assert.equal(messageAgeTirage(1), 'Dernier tirage du catalogue : il y a 1 jour.');
     assert.match(messageAgeTirage(0), /aujourd'hui/);
     assert.match(messageAgeTirage(null), /jamais tiré/);
 });
@@ -137,4 +139,43 @@ test('un jeton déchiffré n\'est pas lisible sans le bon PIN', async () => {
     const { cle } = await deverrouiller(base, '4821');
     assert.equal(await dechiffrer(cle, await base.meta('jeton')), '7|JETON-EN-CLAIR-SECRET');
     await assert.rejects(deverrouiller(base, '4822', { idb }), ErreurPin);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// CONF-3 (DV-21) — prix périmés : 3 jours = avertissement, 7 jours = confirmation avant chaque vente, jamais un refus.
+
+test('CONF-3 : les seuils sont des constantes nommées (3 et 7 jours)', () => {
+    assert.equal(SEUIL_AVERTISSEMENT_PRIX_JOURS, 3);
+    assert.equal(SEUIL_CONFIRMATION_PRIX_JOURS, 7);
+});
+
+test('CONF-3 : niveau selon l\'âge, aux bornes exactes', () => {
+    for (const [jours, niveau] of [[null, 'aucun'], [undefined, 'aucun'], [0, 'aucun'], [1, 'aucun'], [2, 'aucun'], [3, 'avertissement'], [6, 'avertissement'], [7, 'confirmation'], [8, 'confirmation'], [90, 'confirmation']]) {
+        assert.equal(niveauPrixPerimes(jours), niveau, `${jours} jour(s)`);
+    }
+    assert.equal(NIVEAUX_PRIX.confirmation, 'confirmation');
+});
+
+test('CONF-3 : libellés français, état vide sans « 0 », jamais de refus dans le texte', () => {
+    assert.equal(messageBandeauPrix(0), '');
+    assert.equal(messageBandeauPrix(2), '');
+    assert.equal(messageBandeauPrix(null), '');
+    assert.equal(messageBandeauPrix(3), 'Prix tirés il y a 3 jours : reconnectez-vous pour les actualiser.');
+    assert.match(messageBandeauPrix(8), /^Attention : les prix datent de 8 jours et peuvent être périmés\./);
+    assert.equal(messageConfirmationVente(8), 'Les prix datent de 8 jours et peuvent être périmés. Confirmer la vente ?');
+    assert.equal(messageAgeTirage(0), "Catalogue tiré aujourd'hui.");
+});
+
+test('CONF-3 : l\'âge se calcule sur le dernier tirage RÉUSSI, horloge corrigée du décalage serveur', () => {
+    const J = 86_400_000;
+    const tirage = '2026-11-01T10:00:00.000Z';
+    const t = Date.parse(tirage);
+    assert.equal(ageDuTirageEnJours(null, t), null, 'aucun tirage : pas d\'âge');
+    assert.equal(ageDuTirageEnJours(tirage, t + 3 * J - 1), 2);
+    assert.equal(ageDuTirageEnJours(tirage, t + 3 * J), 3);
+    assert.equal(ageDuTirageEnJours(tirage, t + 8 * J), 8);
+    // Appareil en AVANCE de 5 jours : sans correction il croirait 8 jours ; le décalage mesuré (-5 j) ramène à 3.
+    assert.equal(ageDuTirageEnJours(tirage, t + 8 * J, -5 * J), 3);
+    // Appareil en retard : jamais d'âge négatif.
+    assert.equal(ageDuTirageEnJours(tirage, t - 2 * J), 0);
 });

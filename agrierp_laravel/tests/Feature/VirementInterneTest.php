@@ -198,12 +198,8 @@ class VirementInterneTest extends TestCase
 
         $this->actingAs($lecteur);
 
-        Livewire::test(ModesPaiement::class)
-            ->set('transferFromId', $this->caisse->id)
-            ->set('transferToId', $this->banque->id)
-            ->set('transferAmount', 100_000)
-            ->call('submitTransfer')
-            ->assertForbidden();
+        // CONF-3 : l'onglet refuse désormais l'ouverture sans `manage-comptabilite` (avant, seul le virement était refusé).
+        Livewire::test(ModesPaiement::class)->assertForbidden();
 
         $this->assertEquals(1_000_000, (float) $this->caisse->fresh()->balance);
     }

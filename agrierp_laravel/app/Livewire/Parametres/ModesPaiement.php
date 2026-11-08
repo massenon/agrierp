@@ -74,6 +74,12 @@ class ModesPaiement extends Component
 
     public string $transferReason = '';
 
+    public function mount(): void
+    {
+        // CONF-3 : jamais d'ouverture sans le droit de l'onglet (droit de toutes les écritures de l'onglet).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-comptabilite'), 403);
+    }
+
     public function getKpisProperty(): array
     {
         return [

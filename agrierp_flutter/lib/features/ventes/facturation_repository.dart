@@ -4,6 +4,7 @@ import '../../core/export/document_officiel.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import 'choix_facture.dart';
+import 'mode_paiement.dart';
 
 /// Statut de normalisation fiscale d'une facture, tel que le web le nomme (`App\Support\MecefEtat`).
 ///
@@ -209,7 +210,7 @@ class DocumentsFacturation {
           ];
     return DocumentOfficiel(
       titre: 'Facture ${f.numero}',
-      sousTitre: 'Du ${_jour(v.soldAt)} — Client : $client$identite',
+      sousTitre: 'Du ${_jour(v.soldAt)} — Client : $client$identite — Mode de règlement : ${ModePaiement.libelle(v.paymentMode)}',
       fichier: 'facture-${f.numero}.pdf',
       entetes: const ['Désignation', 'Quantité', 'Prix unitaire', 'Montant'],
       lignes: [

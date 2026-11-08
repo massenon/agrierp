@@ -23,7 +23,7 @@ Deux stocks distincts (BR-011) : **produits vendables** (catalogue de la caisse)
 | `/achats` | Achats & Commandes | A | view/manage-achats | W+P |
 | `/fournisseurs` | Fournisseurs | A | view/manage-achats | W+P |
 | `/depenses` | Saisie des Dépenses | A | view/manage-achats | W+P |
-| `/inventaire` | Inventaire daté et valorisé | A seul (DV-15 : pas de cinquième rôle ; droit dédié plus tard si un responsable stock existe ; Q-DV-5 ouverte) | **view-stocks** (TRANCHÉ DV-06 : plus `view-ventes`, caissier exclu) | W+P (lecture) |
+| `/inventaire` | Inventaire daté et valorisé | A seul (DV-20 : pas de cinquième rôle ; droit délégué plus tard si une personne tient le stock ; Q-DV-5 tranchée par défaut recommandé) | **view-stocks** (TRANCHÉ DV-06 : plus `view-ventes`, caissier exclu) | W+P (lecture) |
 
 ## 3. Gestion des Stocks (`/stocks`) — intrants
 

@@ -49,6 +49,12 @@ use Livewire\Component;
  */
 class AuditLogs extends Component
 {
+    public function mount(): void
+    {
+        // CONF-3 : jamais d'ouverture sans le droit de l'onglet (lecture seule : droit de la route du hub).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('view-parametres'), 403);
+    }
+
     #[Url]
     public string $search = '';
 

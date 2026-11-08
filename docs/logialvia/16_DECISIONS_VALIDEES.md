@@ -1,10 +1,10 @@
-# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-15)
+# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-22)
 
 ## USAGE
 
 - **Quand l'utiliser** : avant de toucher à une ration, une vente de poisson, l'incubation des pintades, une alerte d'autonomie, la corbeille, les droits ou les rôles. Ce registre est la SOURCE de ce qui est TRANCHÉ ; les autres fichiers de `docs/logialvia/` portent le texte normatif et renvoient ici par « TRANCHÉ (DV-xx) ».
 - **Ordre** : `10_BRS` → … → `15_REGLES_METIER` → **`16_DECISIONS_VALIDEES`** → modules `20_` à `29_`. En cas de conflit entre ce registre et un autre fichier, ce registre prévaut et l'autre fichier est corrigé.
-- **Date de validation** : 08/11/2026. DV-01 à DV-11 : décisions **validées par le client** (DV-08 à DV-11 : réponses du client du 08/11/2026). DV-12 à DV-14 : **recommandations de l'assistant, adoptées comme valeurs par défaut paramétrables**, statut « **recommandé, à confirmer avec le technicien** ». DV-15 : **décision par défaut** faute de réponse du client (Q-DV-5 et Q-DV-7 restent ouvertes).
+- **Date de validation** : 08/11/2026. DV-01 à DV-11 : décisions **validées par le client** (DV-08 à DV-11 : réponses du client du 08/11/2026). DV-12 à DV-14 : **recommandations de l'assistant, adoptées comme valeurs par défaut paramétrables**, statut « **recommandé, à confirmer avec le technicien** ». DV-15 : **décision par défaut** faute de réponse du client, **remplacée par DV-20** (Q-DV-5 et Q-DV-7 tranchées par défaut recommandé). **DV-16 à DV-22 : recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain.**
 - **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` (lecture seule) ; sans préfixe = monorepo `/home/user/agrierp`.
 
 > **Avertissement général.** Les repères zootechniques de ce registre (taux de ration, températures, humidités, durées, poids, rations par âge, indices de conversion, âges d'abattage) sont des **ORDRES DE GRANDEUR donnés par l'assistant, à confirmer par le technicien/vétérinaire et les fiches techniques des aliments ; seule la décision d'adopter la règle est validée.** Aucune valeur de ce registre ne s'écrit en dur dans le code comme « vérité ferme » : barèmes, seuils et durées sont des PARAMÈTRES éditables, marqués « repère terrain, à valider » tant que le technicien ne les a pas confirmés.
@@ -31,7 +31,14 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 | DV-12 | 08/11/2026 | Estimation du nombre de sujets d'une vente de poisson : arrondi, écarts, poids minimum, poids moyen initial | recommandé, à confirmer avec le technicien | Q-DV-2 (en « recommandé ») | validation technicien |
 | DV-13 | 08/11/2026 | Pintadeaux : alertes de mortalité 1 %/2 % du jour, 10 %/20 % cumulés ; repères de poussinière | recommandé, à confirmer avec le technicien | Q-DV-3 (en « recommandé ») | validation technicien |
 | DV-14 | 08/11/2026 | Autonomie de provende : critique = délai fournisseur ; alerte = délai + marge de 4 j | recommandé, à confirmer avec le technicien | Q-DV-4 (en « recommandé ») | délai réel du fournisseur |
-| DV-15 | 08/11/2026 | `/inventaire` réservé à l'administrateur ; comptable calqué sur AgriERP | décision par défaut (aucune réponse du client) | — | Q-DV-5 et Q-DV-7 OUVERTES |
+| DV-15 | 08/11/2026 | `/inventaire` réservé à l'administrateur ; comptable calqué sur AgriERP | décision par défaut (aucune réponse du client) ; **remplacée par DV-20** | — | — |
+| DV-16 | 08/11/2026 | PWA tous modules : PHASE 0 (3 jours, preuve dans Chrome) AVANT tout engagement ; caisse hors ligne JS conservée | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | — | résultat de la phase 0 (critères d'arrêt de `44_`) |
+| DV-17 | 08/11/2026 | Incubation : pintade 28 j (fenêtre 26–28), goliath 21 j, couveuse artificielle par défaut ; protocole d'observation sur 3 lots | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | — | durées ajustées après 3 lots |
+| DV-18 | 08/11/2026 | Délai fournisseur de provende mesuré sur les 5 derniers bons de commande : critique = le plus long, alerte = critique + 4 j | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | précise DV-14 | mesure sur la ferme ; indicateur « délai constaté » (non construit) |
+| DV-19 | 08/11/2026 | Barème poissons-chats : le tableau % de biomasse de DV-01 adopté comme PROVISOIRE ; validation technicien en 3 questions puis 2 pesées | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | Q-DV-1 (en « recommandé ») | réponses du technicien, 2 cycles de pesée |
+| DV-20 | 08/11/2026 | Responsable stock : aucun rôle de plus ; comptable : périmètre arrêté (retransmet, avoirs, pas d'annulation de vente) | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | Q-DV-5, Q-DV-7 ; écart DV-07 / DV-15 | droit délégué « stock » si une personne tient le stock |
+| DV-21 | 08/11/2026 | Prix périmés de la caisse hors ligne : 3 j avertissement, 7 j confirmation, jamais de refus | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain ; **implémenté par CONF-3** | — | — |
+| DV-22 | 08/11/2026 | Libellés lisibles du mode de règlement sur tous les documents | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain ; **implémenté par CONF-3** | — | — |
 
 ---
 
@@ -157,7 +164,51 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 ### DV-15 — Responsable stock et comptable : valeurs par défaut (aucune réponse du client)
 - **Responsable stock.** `/inventaire` **réservé à l'administrateur**. Si un « responsable stock » existe, on lui donnera **un droit dédié plus tard** ; **pas de 5ᵉ rôle**. **Q-DV-5 reste OUVERTE** avec cette valeur par défaut.
 - **Comptable.** Périmètre par défaut **calqué sur AgriERP** (les gestes de facturation de DV-07 sont conservés) : comptabilité et exercices en gestion, rapports, TVA, **lecture** des ventes, achats et stocks ; **ni caisse ni élevage**. **Q-DV-7 reste OUVERTE** avec cette valeur par défaut. (Précision : « lecture des stocks » ne donne PAS l'accès à `/inventaire`, qui reste administrateur seul ; voir « Contradictions » ci-dessous.)
-- **Statut** : décision par défaut, non validée par le client.
+- **Statut** : décision par défaut, non validée par le client. **Remplacée par DV-20 (08/11/2026)** : le responsable stock reste « pas de 5ᵉ rôle » ; le périmètre du comptable est arrêté (voir DV-20, qui résout l'écart avec DV-07).
+
+### DV-16 — PWA tous modules : phase 0 de preuve avant tout engagement [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain]
+- **Décision.** Lancer la **PHASE 0 (3 jours)** de `44_ETUDE_FAISABILITE_PWA_FLUTTER_WEB.md` AVANT tout engagement sur une PWA couvrant tous les modules. **Preuve attendue, dans Chrome** : migration du schéma local à la version 85, **tirage complet** du catalogue et des tables, **temps de démarrage**, **volume OPFS** occupé. **Critères d'arrêt** : ceux de `44_` (si l'un est franchi, on s'arrête et on garde l'existant).
+- **Périmètre cible** : tablette et ordinateur, **Chrome et Edge**. **PAS de promesse iPhone** (Safari n'a pas été essayé ; voir les limites de PWA-1).
+- **La caisse hors ligne JavaScript (PWA-1) est CONSERVÉE** en attendant le résultat de la phase 0 : rien n'est démonté.
+- **Modules pilotes** (si la phase 0 réussit) : **Gestion Stocks, Fournisseurs, Ventes & Devis**.
+- **Impact** : `44_` (critères) ; `agrierp_laravel/CLAUDE.md` § PWA-1 ; `docs/PLAN_FINALISATION.md`.
+
+### DV-17 — Incubation : valeurs par défaut et protocole d'observation [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain]
+- **Valeurs par défaut** (modifiables dans « Incubation et règles », DV-11) : **pintade 28 jours** (fenêtre d'éclosion **26–28**), **goliath 21 jours**, mode par défaut **couveuse artificielle**.
+- **PROTOCOLE d'observation** : pour les **3 premiers lots**, noter la **date de mise en incubation**, la **date du premier et du dernier éclos**, et les **œufs mis / fertiles / éclos**. **Taux de fertilité = fertiles ÷ mis ; taux d'éclosion = éclos ÷ fertiles.** Exemple : 100 œufs mis, 80 fertiles, 64 éclos → fertilité 80 %, éclosion 80 %.
+- **Ajustement** : la durée et la fenêtre ne se changent **qu'après ces 3 lots**, dans « Incubation et règles ».
+- **Repères de terrain à ne PAS imposer** (températures, humidités, retournements de DV-03) : ils restent des repères éditables, jamais des contrôles bloquants.
+- **Précise DV-03 et DV-11** (valeur du goliath et protocole ; rien d'autre ne change).
+
+### DV-18 — Délai fournisseur de provende : le mesurer, ne pas le deviner [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain]
+- **Mesure** : sur les **5 derniers bons de commande** du fournisseur, **délai = date du bon → date de réception**.
+- **Règle** : **critique = le PLUS LONG des 5** (pas la moyenne) ; **alerte = critique + 4 jours** (marge de DV-14). Exemple : délais 3, 4, 3, 6, 4 jours → critique **6 j**, alerte **10 j**.
+- **En attendant la mesure** : garder **7 j / 3 j** (DV-04).
+- **Proposé, NON construit** : un indicateur **« délai de livraison constaté »** par fournisseur (le plus long et la médiane des 5 derniers bons de commande), affiché dans la fiche fournisseur et proposé comme valeur des seuils d'autonomie (jamais appliqué sans l'accord de l'administrateur).
+- **Précise DV-14** (qui donnait la méthode) ; ferme la question « par fournisseur ou par ferme » dans le sens **mesure par fournisseur, seuils par ferme** (les deux seuils restent `autonomy_*_days` de la ferme).
+
+### DV-19 — Barème des poissons-chats : PROVISOIRE, à valider par le technicien [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain]
+- **Décision.** Le tableau « % de biomasse par classe de poids » de **DV-01** est adopté comme barème **PROVISOIRE**, modifiable (CRUD de « Rationnement »).
+- **Validation par le technicien — 3 questions** : (1) **marque et tableau du fabricant de granulés** : % de biomasse par température de l'eau et par taille de granulé ; (2) **plage de température de l'eau du site** ; (3) **densité d'empoissonnement**.
+- **Puis 2 cycles de pesée d'échantillon** : calculer l'**indice de conversion réel** (aliment distribué ÷ gain de poids) et le comparer à **1,0–1,8** (DV-01).
+- **Règle d'arrêt** : si l'indice réel **dépasse 2,0 sur 2 pesées**, **revoir le taux et la qualité de l'aliment** avant de continuer.
+- **Ferme Q-DV-1 en « recommandé »** (reste : les réponses du technicien).
+
+### DV-20 — Responsable stock et comptable : périmètre arrêté [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain]
+- **Responsable stock : AUCUN nouveau rôle.** `/inventaire` = **administrateur**. Si une personne tient le stock, on lui donnera **plus tard un droit délégué** (jamais un 5ᵉ rôle).
+- **Comptable** : **gestion** de la comptabilité, des exercices, de la TVA et des rapports ; **lecture** des ventes, des achats et des stocks ; il peut **consulter et RETRANSMETTRE** les factures et **créer des AVOIRS** (la correction comptable passe par l'avoir). Il ne peut **PAS** annuler une vente, **ni** encaisser en caisse, **ni** gérer l'élevage, les utilisateurs ou les réglages.
+- **Résout l'écart DV-07 / DV-15** : DV-07 listait « annuler » parmi les gestes du comptable ; DV-20 le retire (l'annulation d'une vente reste à l'administrateur et à qui a `manage-ventes`) et garde retransmission et avoir. **Ferme Q-DV-5 et Q-DV-7 : « tranchées par défaut recommandé ».**
+- **Précision (arbitrage de rédaction, à confirmer)** : `/inventaire` et `/stocks` exigent le MÊME droit `view-stocks` ; tant que `/inventaire` n'a pas son propre contrôle, la « lecture des stocks » du comptable passe par les rapports (`view-rapports`, stocks synthèse) et non par ces deux écrans.
+- **Écart code (non traité par CONF-3)** : `RolesAndPermissionsSeeder` ne donne aujourd'hui au comptable que comptabilité, `close-fiscal-year` et rapports : lecture des ventes/achats, `view-facturation` et `manage-facturation` (retransmettre, avoir) sont **à construire** (ticket à ouvrir), avec la séparation « annuler une vente » ≠ « retransmettre / avoir ».
+
+### DV-21 — Prix périmés dans la caisse hors ligne : avertir, jamais refuser [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain ; implémenté par CONF-3]
+- **Règle.** L'âge se compte depuis le **dernier tirage réussi du catalogue** gardé dans la base locale du navigateur (heure du serveur, horloge de l'appareil corrigée du décalage mesuré). **Dès 3 jours** : bandeau d'AVERTISSEMENT sur la page de caisse (« Prix tirés il y a N jours : reconnectez-vous pour les actualiser »). **Dès 7 jours** : avertissement FORT et CONFIRMATION explicite avant CHAQUE vente (« Les prix datent de N jours et peuvent être périmés. Confirmer la vente ? » ; « Confirmer quand même » / « Annuler »).
+- **Jamais de refus automatique** : une vente hors ligne n'est jamais bloquée par l'âge des prix ; le serveur reste l'autorité (prix, stock, refus réels).
+- **Seuils** : constantes nommées (`SEUIL_AVERTISSEMENT_PRIX_JOURS` = 3, `SEUIL_CONFIRMATION_PRIX_JOURS` = 7 dans `resources/js/hors-ligne/catalogue.js`), testées. Périmètre : la caisse hors ligne du navigateur (PWA-1) seulement ; le poste Windows n'est pas touché.
+
+### DV-22 — Mode de règlement lisible sur tous les documents [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain ; implémenté par CONF-3]
+- **Règle.** La facture et l'historique des ventes affichent un **libellé français** et jamais la clé stockée : `especes` → **Espèces**, `mobile_money` → **Mobile Money**, `virement` → **Virement bancaire**, `cheque` → **Chèque**, `credit` → **Crédit client**, `avance` → **Avance**. Clé inconnue : la clé telle quelle, capitalisée (« carte_bancaire » → « Carte bancaire ») ; vide : « — ».
+- **Point de passage unique** : `App\Support\ModePaiement::libelle` (web) et `ModePaiement.libelle` (poste, parité exécutée contre le PHP). **Aucune clé stockée, aucun envoi, aucune écriture comptable ne change.**
 
 ---
 
@@ -169,16 +220,16 @@ Aucune filière ruminants n'existe aujourd'hui. **Non adopté, pour plus tard** 
 
 | Id | Question | Décision liée |
 |---|---|---|
-| Q-DV-1 | Quel technicien/vétérinaire valide le barème en % de biomasse (taux par classe) et le poids moyen initial d'un lot avant la première pesée ? | DV-01 |
+| Q-DV-1 | ~~Quel technicien valide le barème~~ **FERMÉE « recommandé » (DV-19)** : barème PROVISOIRE, validé par le technicien (3 questions) puis 2 cycles de pesée ; règle d'arrêt : indice réel > 2,0 sur 2 pesées. Reste : les réponses du technicien et le poids moyen initial d'un lot. | DV-01, DV-19 |
 | Q-DV-2 | ~~Arrondi, écart toléré, poids minimum de vente~~ **FERMÉE « recommandé, à confirmer avec le technicien » (DV-12)** : entier le plus proche, 1 à l'effectif, écart 20 %, 500 g. | DV-02, DV-12 |
 | Q-DV-3 | ~~Seuil et fenêtre de l'alerte de mortalité~~ **FERMÉE « recommandé » (DV-13)** : 1 %/2 % du jour, 10 %/20 % cumulés à 4 semaines. Reste : repères validés par le technicien. | DV-03, DV-13 |
 | Q-DV-4 | ~~Marge de sécurité par défaut~~ **FERMÉE « recommandé » (DV-14)** : 4 jours. Reste à demander au client : le délai réel du fournisseur (par fournisseur ou par ferme). | DV-04, DV-14 |
-| Q-DV-5 | **OUVERTE** (valeur par défaut DV-15 : `/inventaire` administrateur seul, pas de 5ᵉ rôle ; droit dédié plus tard) : un « responsable stock » existe-t-il ? | DV-06, DV-15 |
+| Q-DV-5 | ~~Un « responsable stock » existe-t-il ?~~ **TRANCHÉE par défaut recommandé (DV-20)** : aucun nouveau rôle, `/inventaire` administrateur ; droit délégué plus tard si une personne tient le stock. | DV-06, DV-15, DV-20 |
 | Q-DV-6 | ~~Le caissier garde-t-il l'onglet « Retours et Avoirs » ?~~ **FERMÉE (DV-08)** : oui, retour client ; aucun avoir MeCeF/FA. | DV-06, DV-08 |
-| Q-DV-7 | **OUVERTE** (valeur par défaut DV-15 : calqué sur AgriERP) : périmètre exact du comptable (RH, achats, `close-fiscal-year`) ? | DV-07, DV-15 |
+| Q-DV-7 | ~~Périmètre exact du comptable~~ **TRANCHÉE par défaut recommandé (DV-20)** : comptabilité, exercices (dont `close-fiscal-year`), TVA, rapports en gestion ; lecture ventes/achats/stocks ; retransmet les factures et crée des avoirs ; n'annule pas une vente. Reste hors périmètre : RH et paie (Q-RH-1/Q-PAI-1). | DV-07, DV-15, DV-20 |
 | Q-DV-8 | ~~Libellé exact du premier stade des pintades~~ **FERMÉE (DV-09)** : « Poussin(s) » (glossaire) ; catégorie 2 « Pintadau » inchangée. | DV-03, DV-09 |
 
-**Questions restées ouvertes** : Q-DV-1 (technicien du barème en % de biomasse), Q-DV-5 et Q-DV-7 (valeurs par défaut DV-15) ; reste à demander au client le délai réel du fournisseur de provende (DV-14).
+**Questions restées ouvertes** : aucune Q-DV n'est plus ouverte au sens strict. Restent à confirmer sur le terrain : les réponses du technicien sur le barème des poissons (DV-19), la mesure du délai réel du fournisseur de provende sur ses 5 derniers bons de commande (DV-18), les durées d'incubation après les 3 premiers lots (DV-17) et le résultat de la phase 0 de la PWA (DV-16).
 
 ## 4b. Contradictions apparentes entre décisions (relevées le 08/11/2026)
 
@@ -186,7 +237,7 @@ Aucune filière ruminants n'existe aujourd'hui. **Non adopté, pour plus tard** 
 - **DV-02 ↔ DV-12** : arrondi « moitié vers le haut » contre « entier le plus proche » : même résultat, sauf conventions de langage ; DV-12 précise DV-02 sans le contredire. Le poids moyen est en grammes dans DV-02 (× 1 000 ÷ g) et en kg dans DV-12 : formules équivalentes.
 - **DV-04 ↔ DV-14** : DV-04 fixe 7 j / 3 j par défaut ; DV-14 les dérive (délai + 4 j / délai). Compatibles seulement pour un délai de 3 j ; avec un autre délai les seuils recommandés changent, donc DV-04 reste la valeur initiale et DV-14 la méthode de réglage.
 - **DV-06/DV-08 ↔ DV-15** : le caissier voit « Retours et Avoirs » mais n'émet pas d'avoir FA ; et « lecture des stocks » du comptable (DV-15) ne contredit pas DV-06 car `/inventaire` exige `view-stocks` réservé à l'administrateur. À arbitrer si le client veut que le comptable lise l'inventaire.
-- **DV-07 ↔ DV-15** : DV-07 propose pour le comptable les gestes de facturation (annuler, retransmettre, avoir) ; DV-15 ne les cite pas (lecture des ventes). Par défaut on garde DV-07 (proposé) ; à confirmer avec Q-DV-7.
+- **DV-07 ↔ DV-15** : DV-07 proposait pour le comptable les gestes de facturation (annuler, retransmettre, avoir) ; DV-15 ne les citait pas. **Résolue par DV-20** : retransmettre et créer des avoirs, oui ; annuler une vente, non.
 - **DV-11 ↔ AgriERP** : la consigne présupposait des durées de cycle lapins/porcs déjà éditables ; vérification faite dans le code, elles ne le sont pas (voir DV-11).
 
 ## 5. Critères d'acceptation du registre

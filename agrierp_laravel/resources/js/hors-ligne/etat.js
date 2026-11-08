@@ -56,8 +56,16 @@ export function heureDuServeur(serverTime) {
     return m ? `${m[1]}:${m[2]}` : null;
 }
 
-/** Durée depuis le dernier tirage, pour refuser/avertir d'un prix périmé. */
-export function ageDuTirageEnJours(serverTime, maintenantMs) {
+/**
+ * Âge du dernier tirage RÉUSSI du catalogue, en jours entiers.
+ *
+ * `serverTime` = curseur gardé en base locale (heure du SERVEUR à la fin du dernier tirage). L'horloge de l'appareil est
+ * CORRIGÉE du décalage mesuré à ce tirage (`decalage_horloge_ms`, en-tête `Date`) : un téléphone en avance ou en retard ne
+ * fabrique pas de faux âge. Jamais négatif ; `null` si aucun tirage.
+ */
+export function ageDuTirageEnJours(serverTime, maintenantMs, decalageMs = 0) {
     const t = Date.parse(serverTime ?? '');
-    return Number.isFinite(t) ? Math.floor((maintenantMs - t) / 86_400_000) : null;
+    if (!Number.isFinite(t)) return null;
+    const ecoule = maintenantMs + (Number.isFinite(decalageMs) ? decalageMs : 0) - t;
+    return Math.max(0, Math.floor(ecoule / 86_400_000));
 }

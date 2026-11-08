@@ -140,7 +140,7 @@ Source : `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` § 2 et § 6, « calculé à la 
 | TVA / groupes de taxe, e-MECeF | `41_MECEF_EMECEF.md` | voir ce fichier |
 | Clôture d'exercice, balance | `J1_Bascule_Cloture_Exercice.md` de logialvia | à calculer |
 
-### 4.3 Jeux calculés à la main des décisions validées du 08/11/2026 (DV-01 à DV-15)
+### 4.3 Jeux calculés à la main des décisions validées du 08/11/2026 (DV-01 à DV-22)
 
 Chaque valeur ci-dessous est calculée à la main (calculette), jamais en lançant le code ; les règles sont dans `15_REGLES_METIER.md` (RM-ELV-09b, RM-ELV-10, RM-ELV-12, RM-COU-01/06, RM-CPT-09) et `16_DECISIONS_VALIDEES.md`. **Les taux de ration utilisés sont des valeurs d'ESSAI au milieu des fourchettes de repère : ils ne constituent pas un barème et ne doivent jamais être amorcés comme « confirmés ».**
 
@@ -209,7 +209,12 @@ Chaque valeur ci-dessous est calculée à la main (calculette), jamais en lança
 | T-DV13-2 | Mortalité cumulée à 4 semaines | 20, 21, 40, 41 morts | 10,0 % rien ; 10,5 % avertissement ; 20,0 % avertissement ; 20,5 % critique |
 | T-DV14-1 | Seuils d'autonomie calculés (DV-14) | délai 3 j ; délai 5 j ; marge 4 j | 3 j : critique 3, alerte **7** ; 5 j : critique 5, alerte **9** |
 | T-DV14-2 | Application avec ration 6 080 g/j, délai 5 j | stock 50 kg ; stock 30 kg | 50 000 ÷ 6 080 = 8,2 j : alerte (≤ 9) ; 30 000 ÷ 6 080 = 4,9 j : critique (≤ 5) |
-| T-DV15-1 | `/inventaire` par défaut (DV-15) | admin ; comptable ; caissier | admin accède ; comptable et caissier refusés |
+| T-DV15-1 | `/inventaire` (DV-15, repris par DV-20) | admin ; comptable ; caissier | admin accède ; comptable et caissier refusés |
+| T-DV18-1 | Seuils d'autonomie mesurés (DV-18) | délais des 5 derniers bons : 3, 4, 3, 6, 4 j ; marge 4 j | critique = 6 j (le plus long, pas la moyenne 4) ; alerte = 10 j |
+| T-DV17-1 | Taux d'incubation (DV-17) | 100 œufs mis, 80 fertiles, 64 éclos | fertilité 80 % ; éclosion 80 % |
+| T-DV20-1 | Comptable (DV-20) | retransmettre une facture ; créer un avoir ; annuler une vente | les deux premiers acceptés, l'annulation refusée (à construire : écart code) |
+| T-DV21-1 | Prix périmés (DV-21, CONF-3) | catalogue vieux de 2, 3, 6, 7, 8 jours | rien, avertissement, avertissement, confirmation, confirmation ; aucune vente refusée |
+| T-DV22-1 | Libellé du mode de règlement (DV-22, CONF-3) | `especes`, `virement`, `mobile_money`, `carte_bancaire`, vide | Espèces, Virement bancaire, Mobile Money, Carte bancaire, « — » |
 | T-DV15-2 | Comptable par défaut | `/comptabilite/*`, `/rapports` ; `/ventes` en caisse ; `/elevage` | accès aux deux premiers ; refus des deux autres |
 
 
@@ -608,7 +613,7 @@ INTERDITS : déclarer « fonctionne » pour ce qui n'a été vu qu'en test serve
 ## 15. Questions ouvertes
 
 1. Les **quatre classes d'écran** : confirmer la classification de la section 9 avec `04_UI_UX_DESIGN_SYSTEM.md` (mes sources ne les nomment pas).
-2. **Rôles** de LogiALVIA : TRANCHÉ (DV-07) : `admin`, `comptable`, `caissier`, `animalier` ; un compte de recette par rôle ; périmètre du comptable : Q-DV-7 ouverte, défaut DV-15.
+2. **Rôles** de LogiALVIA : TRANCHÉ (DV-07) : `admin`, `comptable`, `caissier`, `animalier` ; un compte de recette par rôle ; périmètre du comptable : Q-DV-7 tranchée par défaut recommandé (DV-20).
 3. **Alerte de maturité des goliaths** : les deux seuils (2 800 g, 120 jours) se combinent-ils par ET ou par OU ?
 4. ~~Seuil d'autonomie alimentaire~~ TRANCHÉ (DV-04) : 7 j alerte, 3 j critique. Marge de sécurité : 4 j recommandés (DV-14, Q-DV-4 fermée en « recommandé »).
 5. **Règle d'arrondi FCFA** (Q9 de `30`) : sans elle, le test de migration des montants échoue plutôt que d'arrondir.

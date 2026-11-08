@@ -2,19 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Parametres\AuditLogs;
+use App\Livewire\Parametres\Corbeille;
 use App\Livewire\Parametres\DonneesEntreprise;
 use App\Livewire\Parametres\EmailSmtp;
 use App\Livewire\Parametres\FacturationEmecef;
 use App\Livewire\Parametres\GestionUtilisateurs;
+use App\Livewire\Parametres\ModesPaiement;
 use App\Livewire\Parametres\ModulesActifs;
 use App\Livewire\Parametres\PostesAppairage;
 use App\Livewire\Parametres\ReinitialisationDonnees;
+use App\Livewire\Parametres\RolesPermissions;
 use App\Livewire\Parametres\Sauvegardes;
+use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Models\Role;
+use App\Models\TreasuryAccount;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -24,6 +31,9 @@ use Tests\TestCase;
  * Le hub n'exige que `view-parametres`. Avant, `FacturationEmecef::mount` et `DonneesEntreprise::mount` n'avaient pas le
  * `abort_unless` d'`EmailSmtp::mount` : qui n'avait que `view-parametres` voyait mode, IFU, adresse, opérateur et « jeton configuré ».
  * Chaque composant monté dans le hub a maintenant la garde de ses actions.
+ *
+ * Ticket CONF-3 — les quatre derniers (rôles, modes de paiement, journal d'audit, corbeille) ont aussi leur garde d'ouverture ;
+ * `view-parametres` (droit du hub) suffit pour le journal d'audit, en lecture seule, comme sa route.
  */
 class ParametresDroitsOuvertureTest extends TestCase
 {
@@ -33,7 +43,15 @@ class ParametresDroitsOuvertureTest extends TestCase
 
     private const MOT_DE_PASSE_SMTP = 'mdp-smtp-secret-7a6b5c4d';
 
+    private const RIB = 'RIB-SECRET-0123456789';
+
+    private const IBAN = 'BJ66IBAN-SECRET-987654';
+
+    private const SAUVEGARDE = 'sauvegarde-secrete-2026.sql';
+
     private User $lecteur;
+
+    private User $sansDroit;
 
     protected function setUp(): void
     {
@@ -46,7 +64,15 @@ class ParametresDroitsOuvertureTest extends TestCase
         ]);
 
         // Un compte qui peut OUVRIR le hub (`view-parametres`) sans rien gérer.
+        TreasuryAccount::create(['type' => 'banque', 'label' => 'Banque secrète', 'account_code' => '521101', 'bank_name' => 'BANQUE-TEST', 'rib' => self::RIB, 'iban' => self::IBAN, 'balance' => 1, 'is_active' => true]);
+        Storage::disk('local')->makeDirectory('backups');
+        Storage::disk('local')->put('backups/'.self::SAUVEGARDE, '-- sauvegarde');
+
         Role::findOrCreate('observateur', 'web')->givePermissionTo('view-parametres');
+        // Le journal d'audit ne demande que `view-parametres` : le refus se prouve avec un compte qui ne l'a pas.
+        Role::findOrCreate('sans-droit', 'web');
+        $this->sansDroit = User::create(['name' => 'Nul', 'username' => 'nul', 'email' => 'nul@x.bj', 'password' => bcrypt('x'), 'is_active' => true]);
+        $this->sansDroit->assignRole('sans-droit');
         $this->lecteur = User::create(['name' => 'Obs', 'username' => 'obs', 'email' => 'obs@x.bj', 'password' => bcrypt('x'), 'is_active' => true]);
         $this->lecteur->assignRole('observateur');
     }
@@ -63,6 +89,9 @@ class ParametresDroitsOuvertureTest extends TestCase
             'postes' => [PostesAppairage::class, 'postes'],
             'reinitialisation' => [ReinitialisationDonnees::class, 'reinitialisation'],
             'sauvegardes' => [Sauvegardes::class, 'sauvegardes'],
+            'roles' => [RolesPermissions::class, 'roles'],
+            'paiement' => [ModesPaiement::class, 'paiement'],
+            'corbeille' => [Corbeille::class, 'corbeille'],
         ];
     }
 
@@ -76,7 +105,7 @@ class ParametresDroitsOuvertureTest extends TestCase
         $reponse = $this->get('/parametres-hub?tab='.$onglet)->assertForbidden();
         $corps = $reponse->getContent();
 
-        foreach ([self::JETON, self::MOT_DE_PASSE_SMTP, '3202601234567', 'smtp.exemple.bj'] as $secret) {
+        foreach ([self::JETON, self::MOT_DE_PASSE_SMTP, '3202601234567', 'smtp.exemple.bj', self::RIB, self::IBAN, self::SAUVEGARDE] as $secret) {
             $this->assertStringNotContainsString($secret, $corps, "« {$secret} » ne doit pas figurer dans la réponse de l'onglet {$onglet}");
         }
     }
@@ -108,8 +137,8 @@ class ParametresDroitsOuvertureTest extends TestCase
         $hub = (string) file_get_contents(resource_path('views/livewire/parametres/parametres-hub.blade.php'));
         preg_match_all('/<livewire:parametres\.([a-z-]+)/', $hub, $m);
 
-        // Lecture seule ou garde propre (admin, `authorize` au rendu) : RolesPermissions, ModesPaiement, AuditLogs, Corbeille, BaremeIts.
-        $exceptions = ['roles-permissions', 'modes-paiement', 'audit-logs', 'corbeille'];
+        // CONF-3 : plus aucune exception, tous les composants du hub portent leur garde d'ouverture.
+        $exceptions = [];
 
         foreach (array_unique($m[1]) as $nom) {
             if (in_array($nom, $exceptions, true)) {
@@ -119,6 +148,34 @@ class ParametresDroitsOuvertureTest extends TestCase
             $classe = \Illuminate\Support\Str::studly($nom);
             $source = (string) file_get_contents(app_path('Livewire/Parametres/'.$classe.'.php'));
             $this->assertMatchesRegularExpression('/function mount\(\)[^{]*\{[^}]*abort_unless\(\s*(\\\\Illuminate\\\\Support\\\\Facades\\\\)?Gate::allows\(/s', $source, "{$classe}::mount doit refuser l'ouverture sans droit");
+        }
+    }
+
+    public function test_le_journal_d_audit_refuse_l_ouverture_sans_view_parametres_et_ne_montre_aucune_ligne(): void
+    {
+        AuditLog::record('login.failed', 'auth');
+        $this->actingAs($this->sansDroit);
+
+        Livewire::test(AuditLogs::class)->assertForbidden();
+    }
+
+    public function test_le_journal_d_audit_s_ouvre_avec_view_parametres_en_lecture_seule(): void
+    {
+        $this->actingAs($this->lecteur);
+
+        Livewire::test(AuditLogs::class)->assertOk();
+    }
+
+    public function test_les_roles_et_les_modes_de_paiement_s_ouvrent_avec_leur_droit(): void
+    {
+        $role = Role::findOrCreate('gestionnaire', 'web');
+        $role->givePermissionTo(['manage-users', 'manage-comptabilite', 'manage-parametres', 'view-parametres']);
+        $u = User::create(['name' => 'G', 'username' => 'g', 'email' => 'g@x.bj', 'password' => bcrypt('x'), 'is_active' => true]);
+        $u->assignRole('gestionnaire');
+        $this->actingAs($u);
+
+        foreach ([RolesPermissions::class, ModesPaiement::class, Corbeille::class, AuditLogs::class] as $composant) {
+            Livewire::test($composant)->assertOk();
         }
     }
 }

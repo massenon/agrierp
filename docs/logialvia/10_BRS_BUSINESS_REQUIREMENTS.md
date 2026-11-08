@@ -89,7 +89,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 | BR-046 | L'autonomie de provende a deux seuils paramétrables par ferme : alerte à 7 jours (défaut = délai d'approvisionnement + marge de sécurité), critique à 3 jours. TRANCHÉ (DV-04). | `16_` DV-04 ; `15_` RM-ELV-10 | C | M |
 | BR-047 | Une écriture comptable ne se supprime pas et ne se restaure pas : elle se contre-passe ; elle n'entre jamais dans la corbeille (intangibilité OHADA). TRANCHÉ (DV-05). | `16_` DV-05 ; `15_` RM-CPT-09 | C | M |
 | BR-048 | Le caissier n'accède pas à `/inventaire` (administrateur, et responsable stock s'il existe) ; sur `/factures-mecef` il consulte et réimprime, sans annuler, retransmettre ni créer d'avoir. La matrice fait foi, le code la suit. TRANCHÉ (DV-06). | `16_` DV-06 ; `20_` §3 | C | M |
-| BR-049 | Séparation des fonctions : le périmètre du comptable (comptabilité, rapports, gestes de facturation interdits au caissier) est distinct de celui du caissier ; périmètre exact à confirmer (Q-DV-7). | `16_` DV-07 | P | M |
+| BR-049 | Séparation des fonctions : le périmètre du comptable (comptabilité, rapports, gestes de facturation interdits au caissier) est distinct de celui du caissier ; périmètre tranché par défaut recommandé (DV-20, Q-DV-7) : retransmission et avoirs oui, annulation d'une vente non. | `16_` DV-07, DV-20 | P | M |
 
 ## 4. Objectifs mesurables (reprise de B1/B2)
 
@@ -117,7 +117,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 
 ## 6. Questions ouvertes au client (à poser telles quelles)
 
-1. **Q-ROL-1** TRANCHÉ (DV-07) : rôle « comptable » distinct, 4 rôles. Reste le périmètre exact du comptable : Q-DV-7 ouverte, valeur par défaut calquée sur AgriERP (DV-15).
+1. **Q-ROL-1** TRANCHÉ (DV-07) : rôle « comptable » distinct, 4 rôles. Périmètre du comptable : Q-DV-7 tranchée par défaut recommandé (DV-20).
 2. **Q-RH-1** La paie et le registre du personnel (employés, stagiaires, pointage) doivent-ils entrer dans LogiALVIA ? Si oui : combien d'employés, quel barème d'impôt sur salaires et quels taux CNSS/VPS pratiqués chez ALLMANY ?
 3. **Q-IMP-1** Quels modules importer par xlsx (stocks, produits, clients, fournisseurs, plan comptable, effectifs de départ des bandes) et dans quel ordre ?
 4. **Q-PWA-1** Besoin explicite de travailler sans réseau dans un navigateur (tablette, téléphone) ? Quels appareils, combien de temps hors ligne ?

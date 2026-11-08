@@ -53,7 +53,7 @@
             <option value="">Mode : Tous</option>
             <option value="especes">Espèces</option>
             <option value="mobile_money">Mobile Money</option>
-            <option value="virement">Virement</option>
+            <option value="virement">Virement bancaire</option>
             <option value="credit">Crédit client</option>
             <option value="avance">Avance</option>
         </select>
@@ -87,7 +87,6 @@
                 <tbody>
                     @forelse($this->sales as $i => $sale)
                         @php
-                            $modeLabels = ['especes' => 'Espèces', 'mobile_money' => 'Mobile Money', 'virement' => 'Virement', 'credit' => 'Crédit client', 'avance' => 'Avance'];
                             $reste = $sale->status === 'annulee' ? 0 : ($sale->receivable?->balance ?? 0);
                             $paye = $sale->status === 'annulee' ? 0 : $sale->total - $reste;
                         @endphp
@@ -100,7 +99,7 @@
                             <td data-label="Total TTC" class="px-md py-sm text-xs text-right font-bold">{{ number_format($sale->total, 0, ',', ' ') }} FCFA</td>
                             <td data-label="Payé" class="px-md py-sm text-xs text-right text-brand-emerald">{{ number_format($paye, 0, ',', ' ') }}</td>
                             <td data-label="Reste" class="px-md py-sm text-xs text-right {{ $reste > 0 ? 'text-error-deep font-bold' : '' }}">{{ number_format($reste, 0, ',', ' ') }}</td>
-                            <td data-label="Mode" class="px-md py-sm text-xs">{{ $modeLabels[$sale->payment_mode] ?? $sale->payment_mode }}</td>
+                            <td data-label="Mode" class="px-md py-sm text-xs">{{ \App\Support\ModePaiement::libelle($sale->payment_mode) }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($sale->status === 'annulee')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">Annulée</span>

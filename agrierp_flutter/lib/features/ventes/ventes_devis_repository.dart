@@ -58,7 +58,7 @@ class VentesDevisRepository {
   final AppDatabase database;
 
   /// Modes de règlement du filtre de la maquette, dans son ordre.
-  static const modes = ['Espèces', 'Mobile Money', 'Virement', 'Crédit client'];
+  static const modes = ['Espèces', 'Mobile Money', 'Virement bancaire', 'Crédit client'];
 
   /// Statuts du filtre de la maquette, dans son ordre.
   static const statuts = ['Payée', 'En attente', 'Annulée'];

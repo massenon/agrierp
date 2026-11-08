@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/features/ventes/avoirs_repository.dart';
 import 'package:agrierp/features/ventes/historique_ventes_onglet.dart';
 import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
+import 'package:agrierp/features/ventes/mode_paiement.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'blade_ventes_lecture.dart';
@@ -117,7 +118,7 @@ void main() {
       'Mode : Tous',
       'Espèces',
       'Mobile Money',
-      'Virement',
+      'Virement bancaire',
       'Crédit client',
       'Avance',
       'Client : Tous',
@@ -128,12 +129,13 @@ void main() {
     }
     expect(vue, contains('wire:model.live.debounce.300ms="search"'));
     expect(HistoriqueVentesOnglet.delaiRecherche, const Duration(milliseconds: 300));
-    // Les valeurs et libellés des options de « Mode » : ceux de `$modeLabels` du Blade.
+    // Les valeurs et libellés des options de « Mode » : celles du filtre du Blade (CONF-3 : libellés = `ModePaiement::libelle`).
+    final filtreMode = RegExp(r'wire:model\.live="modeFilter".*?</select>', dotAll: true).firstMatch(vue)!.group(0)!;
     final modes = <String, String>{
-      for (final m in RegExp(r"'(\w+)' => '([^']+)'").allMatches(RegExp(r'\$modeLabels = \[[^\]]*\]').firstMatch(vue)!.group(0)!))
-        m.group(1)!: m.group(2)!,
+      for (final m in RegExp(r'<option value="(\w+)">([^<]+)</option>').allMatches(filtreMode)) m.group(1)!: m.group(2)!,
     };
-    expect(modes, {'especes': 'Espèces', 'mobile_money': 'Mobile Money', 'virement': 'Virement', 'credit': 'Crédit client', 'avance': 'Avance'});
+    expect(modes, {'especes': 'Espèces', 'mobile_money': 'Mobile Money', 'virement': 'Virement bancaire', 'credit': 'Crédit client', 'avance': 'Avance'});
+    modes.forEach((cle, libelle) => expect(ModePaiement.libelle(cle), libelle));
     expect(HistoriqueVentesRepository.libellesModes, modes);
     expect(HistoriqueVentesRepository.statuts, [('payee', 'Payée'), ('attente', 'En attente'), ('annulee', 'Annulée')]);
     for (final valeur in ['payee', 'attente', 'annulee']) {

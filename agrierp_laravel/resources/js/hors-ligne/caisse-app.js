@@ -12,7 +12,7 @@ import { ErreurPin, dechiffrer } from './coffre.js';
 import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
-import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, LIBELLES_STATUT } from './catalogue.js';
+import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, messageBandeauPrix, messageConfirmationVente, niveauPrixPerimes, NIVEAUX_PRIX, LIBELLES_STATUT } from './catalogue.js';
 import { construireVente, validerLigne, validerChoixFacture, sousTotal, totalVente, monnaieARendre, tvaIncluse, formaterFcfa, lireEntier, LIBELLES_PAIEMENT } from './calculs-caisse.js';
 import { decider, DUREE_PAR_DEFAUT } from '../verrou-logique.js';
 
@@ -32,7 +32,7 @@ const app = {
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
     lectureSeule: false, derniereActivite: Date.now(), minutesVerrou: DUREE_PAR_DEFAUT, requetes: 0,
-    minuterieReessai: null, derniereSynchro: null, serverTime: null,
+    minuterieReessai: null, derniereSynchro: null, serverTime: null, decalage: 0,
 };
 
 // ------------------------------------------------------------------------------------------------ messages
@@ -136,6 +136,7 @@ async function chargerReferentiels() {
     app.clients = (await lire('customers')).filter((c) => c.is_active !== false);
     app.entreprise = (await lire('company_settings'))[0] ?? null;
     app.serverTime = (await app.base.meta('curseur')) ?? null;
+    app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
     app.derniereSynchro = heureDuServeur(await app.base.meta('derniere_synchro'));
 }
 
@@ -158,6 +159,24 @@ async function dessinerEtat() {
     $('btn-synchroniser').disabled = app.enCours;
 }
 
+/** Âge du dernier tirage RÉUSSI (curseur gardé en base locale), horloge corrigée du décalage serveur. */
+function agePrix() {
+    return ageDuTirageEnJours(app.serverTime, Date.now(), app.decalage);
+}
+
+/** Demande la confirmation « prix périmés » ; rend true si l'opérateur confirme quand même. */
+function confirmerPrixPerimes(jours) {
+    return new Promise((resolu) => {
+        const dlg = $('dlg-prix-perimes');
+        $('prix-perimes-texte').textContent = messageConfirmationVente(jours);
+        const fin = (valeur) => { $('prix-perimes-confirmer').onclick = null; $('prix-perimes-annuler').onclick = null; dlg.onclose = null; if (dlg.open) dlg.close(); resolu(valeur); };
+        $('prix-perimes-confirmer').onclick = () => fin(true);
+        $('prix-perimes-annuler').onclick = () => fin(false);
+        dlg.onclose = () => fin(false); // Échap = Annuler
+        dlg.showModal();
+    });
+}
+
 function dessinerCatalogue() {
     const select = $('categorie');
     const courante = select.value;
@@ -170,8 +189,15 @@ function dessinerCatalogue() {
             h('b', {}, p.name), h('small', {}, [fourchetteDePrix(p), p.stock_qty !== undefined ? `Stock : ${Number(p.stock_qty)} ${p.unit ?? ''}` : ''].filter(Boolean).join(' · ')), t.note ? h('small', {}, t.note) : null);
     }));
     $('produits-vide').hidden = liste.length > 0;
-    const jours = ageDuTirageEnJours(app.serverTime, Date.now());
+    const jours = agePrix();
     $('age-tirage').textContent = messageAgeTirage(jours);
+    // CONF-3 (DV-21) : prix périmés = avertissement (3 j) puis avertissement fort (7 j) ; jamais un refus de vente.
+    const texte = messageBandeauPrix(jours);
+    const bandeau = $('bandeau-prix');
+    bandeau.textContent = texte;
+    bandeau.hidden = texte === '';
+    bandeau.className = `bandeau ${niveauPrixPerimes(jours) === NIVEAUX_PRIX.confirmation ? 'erreur' : 'avert'}`;
+    bandeau.dataset.niveau = niveauPrixPerimes(jours);
     // client
     const cc = $('client').value;
     $('client').replaceChildren(h('option', { value: '' }, 'Client Anonyme'), ...app.clients.map((c) => h('option', { value: c.id }, c.name)));
@@ -285,6 +311,10 @@ $('btn-valider').addEventListener('click', async () => {
         if (['client_nom_facture', 'client_ifu', 'aib_taux'].includes(r.champ)) ouvrirFacture();
         return;
     }
+    // CONF-3 (DV-21) : à partir de 7 jours sans tirage, confirmation explicite avant CHAQUE vente (jamais un refus : le serveur reste l'autorité).
+    app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
+    const joursPrix = agePrix();
+    if (niveauPrixPerimes(joursPrix) === NIVEAUX_PRIX.confirmation && !(await confirmerPrixPerimes(joursPrix))) return; // annulé : le panier est gardé
     try {
         await ajouterVente(app.ctx, r.vente); // ne rend qu'une fois l'écriture DURABLE
     } catch (e) {

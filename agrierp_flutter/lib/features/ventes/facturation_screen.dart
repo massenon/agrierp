@@ -12,6 +12,7 @@ import '../../core/temps/heure_benin.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'choix_facture.dart';
 import 'facturation_repository.dart';
+import 'mode_paiement.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/facturation.html` → Facturation & MeCeF.
@@ -590,7 +591,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
           children: [
             _ligneDetail('Date', _date(v.soldAt)),
             _ligneDetail('Montant TTC', '${_montant(v.total)} FCFA'),
-            _ligneDetail('Mode de paiement', v.paymentMode),
+            _ligneDetail('Mode de paiement', ModePaiement.libelle(v.paymentMode)),
             _ligneDetail('Statut MeCeF', f.statut.libelle),
             if (f.normalisee && (v.mecefCode ?? '').isNotEmpty) _ligneDetail('Code MeCeF/DGI', v.mecefCode!),
             if (f.normalisee && (v.mecefNim ?? '').isNotEmpty) _ligneDetail('NIM', v.mecefNim!),

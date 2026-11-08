@@ -16,7 +16,7 @@
         @if($sale->customer?->phone) — {{ $sale->customer->phone }} @endif
         <br>
     @endif
-    Mode de règlement : {{ $sale->payment_mode ?? '—' }}
+    Mode de règlement : {{ \App\Support\ModePaiement::libelle($sale->payment_mode) }}
 </p>
 
 <table class="data-table">

@@ -576,7 +576,7 @@ void main() {
       await tester.tap(find.byKey(const Key('filtre-mode')));
       await tester.pumpAndSettle();
 
-      for (final mode in ['Mode : Tous', 'Espèces', 'Mobile Money', 'Virement', 'Crédit client', 'Avance']) {
+      for (final mode in ['Mode : Tous', 'Espèces', 'Mobile Money', 'Virement bancaire', 'Crédit client', 'Avance']) {
         expect(find.text(mode), findsWidgets, reason: mode);
       }
     });

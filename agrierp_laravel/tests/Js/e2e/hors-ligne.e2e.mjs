@@ -15,7 +15,8 @@
  * `setOffline(true)` → rechargement de la page depuis le service worker → 2 ventes (dont une facture normalisée) +
  * 1 refus de saisie → `setOffline(false)` → synchronisation AUTOMATIQUE → la base contient chaque vente UNE fois ;
  * réponse perdue après traitement serveur → renvoi → toujours UNE fois ; jeton révoqué → 401 → suspension ; aucun HTML
- * authentifié ni jeton dans les caches / stockages ; déconnexion = purge.
+ * authentifié ni jeton dans les caches / stockages ; CONF-3 : catalogue vieilli à 1, 4 puis 8 jours (rien / bandeau /
+ * confirmation avant chaque vente, jamais un refus) ; déconnexion = purge.
  */
 import { createRequire } from 'node:module';
 import { spawn, execFileSync } from 'node:child_process';
@@ -279,6 +280,71 @@ try {
     assert.ok(jetonClair, 'jeton observé dans une requête');
     for (const [nom, contenu] of [['localStorage', inspection.ls], ['sessionStorage', inspection.ss], ['IndexedDB', brut]]) assert.ok(!contenu.includes(jetonClair), `le jeton n'est pas en clair dans ${nom}`);
     ok('caches : seulement les 2 pages HTML statiques ; jeton jamais en clair (localStorage, sessionStorage, IndexedDB, caches)');
+
+    // --- 8b. CONF-3 (DV-21) : prix périmés — 4 jours = bandeau d'avertissement ; 8 jours = confirmation avant CHAQUE vente ---
+    // L'âge se lit sur le curseur du dernier tirage RÉUSSI gardé en IndexedDB : on le vieillit à la main, réseau coupé (sinon la
+    // synchro de l'ouverture re-tirerait le catalogue et remettrait l'âge à zéro).
+    const vieillirLeTirage = async (jours) => {
+        await page.evaluate(async (j) => {
+            const db = await new Promise((ok2, ko) => { const r = indexedDB.open('agrierp_hors_ligne'); r.onsuccess = () => ok2(r.result); r.onerror = () => ko(r.error); });
+            const tx = db.transaction('meta', 'readwrite');
+            tx.objectStore('meta').put({ cle: 'curseur', valeur: new Date(Date.now() - j * 86_400_000).toISOString() });
+            tx.objectStore('meta').put({ cle: 'decalage_horloge_ms', valeur: 0 });
+            await new Promise((ok2) => { tx.oncomplete = ok2; });
+            db.close();
+        }, jours);
+        await contexte.setOffline(true);
+        await page.reload();
+        await page.fill('#champ-pin', '4821');
+        await page.click('#form-pin button');
+        await page.waitForSelector('#contenu:not([hidden])');
+        await page.waitForFunction(() => document.querySelectorAll('#produits .produit').length > 0);
+    };
+    const ventesServeurAvant = sql('select count(*) from sales');
+    const ventesAffichees = () => page.evaluate(() => document.querySelectorAll('#corps-ventes tr').length);
+    await page.goto(`${base}/caisse-hors-ligne.html`);
+    await page.fill('#champ-pin', '4821');
+    await page.click('#form-pin button');
+    await page.waitForSelector('#contenu:not([hidden])');
+
+    await vieillirLeTirage(1);
+    assert.equal(await page.isHidden('#bandeau-prix'), true, 'catalogue d\'hier : aucun bandeau, aucun « 0 jour »');
+
+    await vieillirLeTirage(4);
+    await page.waitForSelector('#bandeau-prix:not([hidden])');
+    assert.equal((await page.textContent('#bandeau-prix')).trim(), 'Prix tirés il y a 4 jours : reconnectez-vous pour les actualiser.');
+    assert.equal(await page.getAttribute('#bandeau-prix', 'data-niveau'), 'avertissement');
+    const avant4 = await ventesAffichees();
+    await vendre(produits[0][0], 1, 3000);
+    await page.click('#btn-valider');
+    await page.waitForFunction((n) => document.querySelectorAll('#corps-ventes tr').length === n + 1, avant4);
+    assert.equal(await page.evaluate(() => document.querySelector('#dlg-prix-perimes').open), false, 'à 4 jours, aucune confirmation : l\'avertissement ne bloque jamais');
+
+    await vieillirLeTirage(8);
+    await page.waitForSelector('#bandeau-prix:not([hidden])');
+    assert.match(await page.textContent('#bandeau-prix'), /^Attention : les prix datent de 8 jours et peuvent être périmés\./);
+    assert.equal(await page.getAttribute('#bandeau-prix', 'data-niveau'), 'confirmation');
+    const avant8 = await ventesAffichees();
+    await vendre(produits[0][0], 1, 3000);
+    await page.click('#btn-valider');
+    await page.waitForSelector('#dlg-prix-perimes[open]');
+    assert.equal((await page.textContent('#prix-perimes-texte')).trim(), 'Les prix datent de 8 jours et peuvent être périmés. Confirmer la vente ?');
+    await page.click('#prix-perimes-annuler');
+    await page.waitForFunction(() => !document.querySelector('#dlg-prix-perimes').open);
+    assert.equal(await ventesAffichees(), avant8, 'Annuler : aucune vente enregistrée');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#corps-panier tr').length), 1, 'Annuler : le panier est gardé');
+    await page.click('#btn-valider');
+    await page.waitForSelector('#dlg-prix-perimes[open]');
+    await page.click('#prix-perimes-confirmer');
+    await page.waitForFunction((n) => document.querySelectorAll('#corps-ventes tr').length === n + 1, avant8);
+    await vendre(produits[0][0], 1, 3000);
+    await page.click('#btn-valider');
+    await page.waitForSelector('#dlg-prix-perimes[open]');
+    await page.click('#prix-perimes-confirmer');
+    await page.waitForFunction((n) => document.querySelectorAll('#corps-ventes tr').length === n + 2, avant8);
+    assert.equal(sql('select count(*) from sales'), ventesServeurAvant, 'le serveur n\'a rien reçu : réseau coupé, la confirmation ne remplace pas la synchronisation');
+    await contexte.setOffline(false);
+    ok('prix périmés (CONF-3) : 1 jour = rien ; 4 jours = bandeau sans blocage ; 8 jours = confirmation avant CHAQUE vente (Annuler garde le panier, Confirmer enregistre), jamais un refus');
 
     // --- 9. Déconnexion = purge ---
     await page.goto(`${base}/caisse-hors-ligne.html`);

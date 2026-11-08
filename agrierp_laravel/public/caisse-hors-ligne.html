@@ -54,6 +54,7 @@
 
 <div id="avis" class="bandeau neutre" role="status" hidden></div>
 <div id="avis-onglet" class="bandeau avert" role="alert" hidden>Cet appareil est déjà ouvert dans un autre onglet : celui-ci est en lecture seule.</div>
+<div id="bandeau-prix" class="bandeau avert" role="status" hidden></div>
 <div id="avis-maj" class="bandeau avert" role="status" hidden>Mise à jour disponible — terminez la saisie en cours puis rechargez la page.</div>
 
 <main id="contenu" hidden>
@@ -173,6 +174,15 @@
         <button type="button" class="btn" data-fermer="dlg-deconnexion">Annuler</button>
         <button type="button" class="btn" id="deco-envoyer" hidden>Envoyer d'abord</button>
         <button type="button" class="btn danger" id="deco-confirmer">Déconnecter</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-prix-perimes">
+    <h3>Prix peut-être périmés</h3>
+    <p id="prix-perimes-texte"></p>
+    <div class="pied-dialog">
+        <button type="button" class="btn" id="prix-perimes-annuler">Annuler</button>
+        <button type="button" class="btn danger" id="prix-perimes-confirmer">Confirmer quand même</button>
     </div>
 </dialog>
 

@@ -30,12 +30,42 @@ export function fourchetteDePrix(p) {
     return '';
 }
 
-/** Âge du tirage : avertit au-delà de `seuil` jours (prix peut-être périmés). */
-export function messageAgeTirage(joursEcoules, seuil = 3) {
+/** CONF-3 (DV-21) : dès ce nombre de jours sans tirage du catalogue, bandeau d'AVERTISSEMENT sur la caisse. */
+export const SEUIL_AVERTISSEMENT_PRIX_JOURS = 3;
+
+/** CONF-3 (DV-21) : dès ce nombre de jours, avertissement FORT et CONFIRMATION explicite avant chaque vente. Jamais un refus. */
+export const SEUIL_CONFIRMATION_PRIX_JOURS = 7;
+
+export const NIVEAUX_PRIX = { aucun: 'aucun', avertissement: 'avertissement', confirmation: 'confirmation' };
+
+/** Niveau d'alerte « prix périmés » selon l'âge du tirage. Aucun tirage connu (null) : aucun niveau (la caisse est alors vide). */
+export function niveauPrixPerimes(jours) {
+    if (jours === null || jours === undefined || !Number.isFinite(jours)) return NIVEAUX_PRIX.aucun;
+    if (jours >= SEUIL_CONFIRMATION_PRIX_JOURS) return NIVEAUX_PRIX.confirmation;
+    if (jours >= SEUIL_AVERTISSEMENT_PRIX_JOURS) return NIVEAUX_PRIX.avertissement;
+    return NIVEAUX_PRIX.aucun;
+}
+
+const duree = (n) => `${n} jour${n > 1 ? 's' : ''}`;
+
+/** Texte du bandeau de la page de caisse ; chaîne vide sous le premier seuil (jamais de « 0 jour »). */
+export function messageBandeauPrix(jours) {
+    const niveau = niveauPrixPerimes(jours);
+    if (niveau === NIVEAUX_PRIX.avertissement) return `Prix tirés il y a ${duree(jours)} : reconnectez-vous pour les actualiser.`;
+    if (niveau === NIVEAUX_PRIX.confirmation) return `Attention : les prix datent de ${duree(jours)} et peuvent être périmés. Reconnectez-vous pour les actualiser ; chaque vente demandera une confirmation.`;
+    return '';
+}
+
+/** Question posée avant CHAQUE vente à partir du second seuil. */
+export function messageConfirmationVente(jours) {
+    return `Les prix datent de ${duree(jours)} et peuvent être périmés. Confirmer la vente ?`;
+}
+
+/** Ligne d'information sur le dernier tirage (l'alerte « prix périmés » est portée par le bandeau, pas par cette ligne). */
+export function messageAgeTirage(joursEcoules) {
     if (joursEcoules === null || joursEcoules === undefined) return 'Catalogue jamais tiré : connectez-vous une fois pour le recevoir.';
-    if (joursEcoules >= seuil) return `Dernier tirage du catalogue : il y a ${joursEcoules} jour(s) — vérifiez les prix avant de vendre.`;
     if (joursEcoules <= 0) return "Catalogue tiré aujourd'hui.";
-    return `Dernier tirage du catalogue : il y a ${joursEcoules} jour(s).`;
+    return `Dernier tirage du catalogue : il y a ${duree(joursEcoules)}.`;
 }
 
 /** Libellés de statut d'une vente locale (mots de la modale « Synchronisation » du poste). */
