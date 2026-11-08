@@ -56,7 +56,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     ('Calendriers de Prophylaxie', SymbolesAgri.event_repeat),
     ('Types de Provende', SymbolesAgri.inventory_2),
     ('Numérotation Bandes & Sujets', SymbolesAgri.tag),
-    ('Relevés de terrain', SymbolesAgri.fact_check),
+    ('Relevés de terrain', SymbolesAgri.check_circle),
   ];
 
   /// Messages des toasts du composant (`dispatch('toast', message: …)`).
@@ -1329,7 +1329,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
                   Row(
                     children: [
                       _pastilleStatut(ReleveTerrain.aValider, 'avant'),
-                      const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(Icons.arrow_forward, size: 16)),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(SymbolesAgri.arrow_forward, size: 16)),
                       _pastilleStatut(ReleveTerrain.valide, 'apres'),
                     ],
                   ),

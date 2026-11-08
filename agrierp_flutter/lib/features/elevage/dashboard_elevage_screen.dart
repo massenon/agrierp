@@ -325,7 +325,7 @@ class _DashboardElevageScreenState extends State<DashboardElevageScreen> {
           libelle: 'Référentiels à valider',
           valeur: '${r.aValider}',
           legende: 'Propositions en attente de validation',
-          icone: SymbolesAgri.fact_check,
+          icone: SymbolesAgri.check_circle,
           barre: AgriColors.accentYellow,
           couleurIcone: AgriColors.brandForest,
         ),

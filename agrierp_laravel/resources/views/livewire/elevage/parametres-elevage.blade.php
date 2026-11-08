@@ -5,7 +5,7 @@
             ['key' => 'prophylaxie', 'label' => 'Calendriers de Prophylaxie', 'icon' => 'event_repeat'],
             ['key' => 'provende', 'label' => 'Types de Provende', 'icon' => 'inventory_2'],
             ['key' => 'numerotation', 'label' => 'Numérotation Bandes & Sujets', 'icon' => 'tag'],
-            ['key' => 'releves', 'label' => 'Relevés de terrain', 'icon' => 'fact_check'],
+            ['key' => 'releves', 'label' => 'Relevés de terrain', 'icon' => 'check_circle'],
         ]"
         :active="$tab">
 
@@ -356,7 +356,7 @@
             <div class="space-y-md">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
                     <div>
-                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">fact_check</span>Relevés de terrain</h2>
+                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">check_circle</span>Relevés de terrain</h2>
                         <p class="text-xs text-outline mt-xs">Valeurs par défaut = <strong>propositions « À valider »</strong>. Le bouton « Valider » les confirme ; enregistrer une ligne la passe aussi à « Validé ».</p>
                     </div>
                     <a href="{{ route('elevage.dashboard') }}" class="flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline"><span class="material-symbols-outlined text-[18px]">monitoring</span>{{ $this->relevesAValider }} référentiel(s) à valider — Dashboard Élevage</a>

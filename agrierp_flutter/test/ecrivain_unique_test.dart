@@ -40,6 +40,7 @@ void main() {
     // Ticket CP-1 — « Plan Comptable » : « Nouveau Compte », « Modifier » et « Archiver » s'écrivent par ce dépôt.
     // Ticket EL-1 — « Bon d'Abattage & Transformation » : la transformation (le fait seul) s'écrit par ce dépôt.
     'transformations': 'lib/features/elevage/transformation_repository.dart',
+    'field_survey_entries': 'lib/features/elevage/releve_terrain_repository.dart', // RELEVES-1
     'chart_of_accounts': 'lib/features/comptabilite/comptabilite_repository.dart',
     // Ticket CP-2 — « Journal Comptable » : « Saisie d'Écriture », « Modifier » et « Archiver » s'écrivent (en demandes) par ce dépôt.
     'manual_entry_requests': 'lib/features/comptabilite/comptabilite_repository.dart',

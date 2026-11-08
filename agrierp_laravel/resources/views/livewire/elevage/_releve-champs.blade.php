@@ -37,7 +37,7 @@
     @endif
 
     @if($releveType === 'incubation_lot')
-        <div><label class="{{ $etiquette }}">Date de mise en incubation *</label><input wire:model="releveForm.data.mise_date" type="date" class="{{ $champ }}">@error('releveForm.data.mise_date') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
+        <div><label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de mise en incubation *</label><input wire:model="releveForm.data.mise_date" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">@error('releveForm.data.mise_date') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
         <div>
             <label class="{{ $etiquette }}">Mode *</label>
             <select wire:model="releveForm.data.mode" class="{{ $champ }}">
@@ -48,8 +48,8 @@
         <div><label class="{{ $etiquette }}">Œufs mis</label><input wire:model="releveForm.data.oeufs_mis" type="text" inputmode="numeric" class="{{ $champ }}">@error('releveForm.data.oeufs_mis') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
         <div><label class="{{ $etiquette }}">Œufs fertiles</label><input wire:model="releveForm.data.oeufs_fertiles" type="text" inputmode="numeric" class="{{ $champ }}">@error('releveForm.data.oeufs_fertiles') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
         <div><label class="{{ $etiquette }}">Œufs éclos</label><input wire:model="releveForm.data.oeufs_eclos" type="text" inputmode="numeric" class="{{ $champ }}">@error('releveForm.data.oeufs_eclos') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
-        <div><label class="{{ $etiquette }}">Date du premier éclos</label><input wire:model="releveForm.data.premier_eclos_date" type="date" class="{{ $champ }}">@error('releveForm.data.premier_eclos_date') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
-        <div><label class="{{ $etiquette }}">Date du dernier éclos</label><input wire:model="releveForm.data.dernier_eclos_date" type="date" class="{{ $champ }}">@error('releveForm.data.dernier_eclos_date') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
+        <div><label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date du premier éclos</label><input wire:model="releveForm.data.premier_eclos_date" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">@error('releveForm.data.premier_eclos_date') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
+        <div><label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date du dernier éclos</label><input wire:model="releveForm.data.dernier_eclos_date" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">@error('releveForm.data.dernier_eclos_date') <p class="invalid-feedback">{{ $message }}</p> @enderror</div>
     @endif
 
     @if($releveType === 'delai_regle')
