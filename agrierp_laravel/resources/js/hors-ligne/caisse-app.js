@@ -6,14 +6,15 @@
  * libellés copiés de la caisse du web. Le DOM est construit avec `textContent` (jamais `innerHTML` avec des données).
  */
 
-import { ouvrirBase, ErreurBase } from './base-locale.js';
+import { ouvrirBase, ErreurBase, totalEnAttente, listeEnAttente } from './base-locale.js';
 import { etatAppareil, deverrouiller, desactiver, purgerLocal, lireMarqueur, noterEnAttente, MARQUEUR_ACTIVE, MARQUEUR_EN_ATTENTE } from './appairage.js';
 import { ErreurPin, dechiffrer } from './coffre.js';
 import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.js';
 import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
 import { jourBenin, lotsVendables, bandeSousRemanence, refusDuPanier, elevageApresVentes } from './elevage-hors-ligne.js';
 import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
-import { produitProvende, evaluerAutonomie } from './fiche-lapins-calculs.js';
+import { soinsEnAttente, garderSoins, remettreSoinEnFile, abandonnerSoin, soinsAvecLocaux, remanencesAvecLocales, protocoleDuJour, validerTraitements } from './fiche-lapins-prophylaxie.js';
+import { produitProvende, evaluerAutonomie, delaisFournisseurs } from './fiche-lapins-calculs.js';
 import { appliquerSaisies, chargerJour, enregistrerJour, garderSaisie, saisiesEnAttente, remettreFicheEnFile, abandonnerFiche, rendreFormulaire, refusExerciceClos, ROLES_ECRITURE, MOTIFS as MOTIFS_SAISIE } from './fiche-lapins-saisie.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
@@ -35,7 +36,7 @@ const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
-    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], feedTypes: [], releves: [], saisie: null, saisieCle: null, retour: null },
+    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], feedTypes: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
     role: null,
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
@@ -149,18 +150,25 @@ async function chargerReferentiels() {
     app.entreprise = (await lire('company_settings'))[0] ?? null;
     // PWA-1b — bandes, fiches du jour et rémanences tirées ; les ventes en attente sont rejouées au-dessus (jamais écrites dans la copie tirée).
     app.elevageTire = { lots: await lire('livestock_lots'), fiches: await lire('livestock_daily_entries') };
-    app.remanences = await lire('veterinary_withdrawal_periods');
+    app.fiche.soinsEnAttente = await soinsEnAttente(app.ctx);
+    app.remanences = remanencesAvecLocales(await lire('veterinary_withdrawal_periods'), app.fiche.soinsEnAttente);
     // PWA-3 (É3) : saisies de fiche en attente d'envoi, exercices et barème, rejoués AVANT les ventes en attente.
     app.fiche.saisies = await saisiesEnAttente(app.ctx);
     app.fiche.exercices = await lire('fiscal_years');
     app.fiche.feedTypes = await lire('feed_types');
+    app.fiche.standards = await lire('prophylaxis_schedule_standards');
+    app.fiche.evenements = await lire('livestock_reproduction_events');
     app.fiche.releves = await lire('field_survey_entries');
+    // Délai fournisseur constaté : seulement si le compte lit les bons de commande (`view-achats`) ; sinon le seuil est dit « à confirmer en ligne ».
+    app.fiche.delais = (await app.base.lire('referentiels', 'purchase_orders'))
+        ? delaisFournisseurs({ bons: await lire('purchase_orders'), achats: await lire('purchases'), produits: app.produits, categories: app.categories })
+        : null;
     app.fiche.rations = (await lire('feed_ration_standards')).filter((r) => r.species_code === 'cuniculture');
     await recalculerElevage();
     // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
     app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries'));
     app.fiche.donnees = app.fiche.servie ? {
-        lots: app.elevage.lots, fiches: app.elevage.fiches, soins: await lire('veterinary_records'), produits: app.produits, exercices: await lire('fiscal_years'),
+        lots: app.elevage.lots, fiches: app.elevage.fiches, soins: soinsAvecLocaux(await lire('veterinary_records'), app.fiche.soinsEnAttente), produits: app.produits, exercices: await lire('fiscal_years'),
     } : null;
     $('btn-vue-fiche').hidden = !app.fiche.servie;
     if (!app.fiche.servie && app.fiche.vue) basculerVue(false);
@@ -214,8 +222,22 @@ function formulaireDuJour(m) {
     return rendreFormulaire(h, {
         s,
         retourInitial: app.fiche.retour,
-        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations, autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === 'cuniculture').map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves), lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'), conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null }),
+        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations, autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === 'cuniculture').map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves, app.fiche.delais), conflitsSoins: app.fiche.soinsEnAttente.filter((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict'), protocole: protocoleDuJour({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour }), lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'), conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null }),
         actions: {
+            validerTraitements: async (idsCoches, observations) => {
+                const r = validerTraitements({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, aujourdhui: jourDuComptoir(), idsCoches, observations, role: app.role });
+                if (r.refus || r.avertissement || r.soins.length === 0) return { refus: r.refus ?? null, avertissement: r.avertissement ?? null };
+                try {
+                    await garderSoins(app.ctx, r.soins);
+                } catch (e) {
+                    return { refus: `Le soin n'est PAS enregistré : ${e?.message ?? 'écriture locale impossible'}.` };
+                }
+                app.fiche.retour = r.message;
+                await chargerReferentiels();
+                return { refus: null, message: r.message };
+            },
+            renvoyerSoin: async (id) => { await remettreSoinEnFile(app.ctx, id); await chargerReferentiels(); $('btn-synchroniser').click(); },
+            abandonnerSoin: async (id) => { await abandonnerSoin(app.ctx, id); await chargerReferentiels(); },
             renvoyer: async () => {
                 const it = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict');
                 if (!it) return;
@@ -597,31 +619,31 @@ function enregistrerServiceWorker() {
 // -------------------------------------------------------------------------------------------- déconnexion
 
 $('btn-deconnecter').addEventListener('click', async () => {
-    const c = await app.base.compter();
-    const n = c.pending + c.conflict;
+    const c = await app.base.compterTout();
+    const n = totalEnAttente(c);
     $('deco-erreur').textContent = '';
     $('deco-n').value = '';
     $('deco-abandon').hidden = n === 0;
     $('deco-envoyer').hidden = n === 0;
     $('deco-texte').textContent = n === 0
-        ? 'Les données de cet appareil (catalogue, clients, jeton) seront effacées. Aucune vente n\'est en attente.'
-        : `${n} vente(s) ne sont pas encore envoyées au serveur. Envoyez-les d'abord, ou abandonnez-les explicitement : elles seraient perdues.`;
-    $('deco-confirmer').textContent = n === 0 ? 'Déconnecter' : 'Abandonner ces ventes et déconnecter';
+        ? 'Les données de cet appareil (catalogue, clients, jeton) seront effacées. Rien n\'est en attente d\'envoi.'
+        : `${listeEnAttente(c)} ne sont pas encore envoyé(e)s au serveur. Envoyez-les d'abord, ou abandonnez-les explicitement : ils seraient perdus.`;
+    $('deco-confirmer').textContent = n === 0 ? 'Déconnecter' : 'Abandonner ces éléments et déconnecter';
     $('deco-confirmer').dataset.n = String(n);
     $('dlg-deconnexion').showModal();
 });
 $('deco-envoyer').addEventListener('click', async () => {
     $('deco-erreur').textContent = 'Envoi en cours…';
     await lancerSynchro({ manuel: true });
-    const c = await app.base.compter();
-    if (c.pending + c.conflict === 0) { $('deco-erreur').textContent = ''; $('deco-confirmer').click(); }
-    else $('deco-erreur').textContent = `Il reste ${c.pending + c.conflict} vente(s) non envoyée(s) (hors ligne ou refusées). Rien n'a été effacé.`;
+    const c = await app.base.compterTout();
+    if (totalEnAttente(c) === 0) { $('deco-erreur').textContent = ''; $('deco-confirmer').click(); }
+    else $('deco-erreur').textContent = `Il reste ${listeEnAttente(c)} non envoyé(e)s (hors ligne ou refusé(e)s). Rien n'a été effacé.`;
 });
 $('deco-confirmer').addEventListener('click', async () => {
     const n = Number($('deco-confirmer').dataset.n ?? 0);
-    const c = await app.base.compter();
-    const reel = c.pending + c.conflict;
-    if (reel > 0 && Number($('deco-n').value) !== reel) { $('deco-erreur').textContent = `Saisissez le nombre exact de ventes à abandonner (${reel}).`; return; }
+    const c = await app.base.compterTout();
+    const reel = totalEnAttente(c);
+    if (reel > 0 && Number($('deco-n').value) !== reel) { $('deco-erreur').textContent = `Saisissez le nombre exact d'éléments à abandonner (${reel}).`; return; }
     void n;
     await desactiver({ base: app.base, jeton: app.jeton });
     $('dlg-deconnexion').close();

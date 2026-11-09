@@ -18,6 +18,7 @@ import { lotAEnvoyer, marquerSynced, marquerConflit, compterTentative, nettoyerS
 import { clientsEnAttente, aEnvoyer, retirerClients, refuserClient, clientEnJson } from './clients-hors-ligne.js';
 import { chiffrer, dechiffrer } from './coffre.js';
 import { aEnvoyerFiches, ficheEnJson, marquerFicheConflit, marquerFichesSynced, retirerFichesSynced, saisiesEnAttente } from './fiche-lapins-saisie.js';
+import { aEnvoyerSoins, soinEnJson, marquerSoinsSynced, marquerSoinConflit, retirerSoinsSynced, soinsEnAttente } from './fiche-lapins-prophylaxie.js';
 import { classerReponse, delaiDeReessai, heureDuServeur } from './etat.js';
 
 /** Tables gardées par la caisse hors ligne (le reste du tirage est ignoré, jamais stocké). */
@@ -29,11 +30,15 @@ export const TABLES_GARDEES = [
     'feed_ration_standards', 'prophylaxis_schedule_standards', 'veterinary_records', 'livestock_transfers', 'feed_types', 'fiscal_years',
     // PWA-3 (É5) — règle de terrain (seuil critique d'autonomie), lue seule.
     'field_survey_entries',
+    // PWA-3 (délai fournisseur constaté) — bons de commande reçus et achats qui les ont reçus (`view-achats`), réduits à ce que le calcul lit.
+    'purchase_orders', 'purchases',
+    // PWA-3 (prophylaxie du jour) — saillies : le jour de cycle d'une bande en reproduction se compte depuis la dernière.
+    'livestock_reproduction_events',
 ];
 /** Familles PAGINÉES par le serveur : leurs lignes arrivent sur TOUTES les pages (les autres tables, sur la première seulement). */
-export const TABLES_PAGINEES = ['livestock_daily_entries', 'veterinary_records', 'livestock_transfers'];
+export const TABLES_PAGINEES = ['livestock_daily_entries', 'veterinary_records', 'livestock_transfers', 'purchases', 'livestock_reproduction_events'];
 /** Tables servies EN ENTIER à chaque tirage (jamais incrémentales) : leur copie est remplacée, une rémanence levée disparaît. */
-export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years', 'field_survey_entries'];
+export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years', 'field_survey_entries', 'purchase_orders'];
 const COLONNES_ENTREPRISE = ['company_name', 'tva_enabled', 'tva_default_rate', 'mecef_actif'];
 export const TAILLE_LOT = 20;
 const TIMEOUT_MS = 30_000;
@@ -65,6 +70,9 @@ export function ligneValide(table, ligne) {
 
 function garder(table, ligne) {
     if (table === 'company_settings') return ligne; // objet unique, traité à part
+    // Réduits aux colonnes lues par `delaisFournisseurs` (le reste d'un achat ou d'un bon n'a rien à faire dans cette copie).
+    if (table === 'purchases') return { id: ligne.id, purchase_order_id: ligne.purchase_order_id, purchase_date: ligne.purchase_date };
+    if (table === 'purchase_orders') return { id: ligne.id, supplier_id: ligne.supplier_id, status: ligne.status, created_at: ligne.created_at, lines: (ligne.lines ?? []).map((x) => ({ product_id: x.product_id })) };
     return ligne;
 }
 
@@ -175,6 +183,7 @@ export function creerSynchro({
             }
             const bonnes = [];
             for (const l of Array.isArray(brut) ? brut : []) {
+                if (table === 'purchases' && !l?.purchase_order_id) continue; // seuls les achats qui ont reçu un bon servent
                 if (ligneValide(table, l)) bonnes.push(garder(table, l));
                 else refusees.push({ table, id: l?.id ?? null });
             }
@@ -295,6 +304,41 @@ export function creerSynchro({
         return { statut: 'ok', acceptees: acceptees.size, refusees: (c.rejected ?? []).length };
     }
 
+    /**
+     * PWA-3 (prophylaxie du jour) — les soins validés hors ligne partent après les fiches et AVANT les ventes (clé `veterinary_records` de
+     * `pushVeterinaryRecords`, comme le poste) : le serveur crée lui-même la période de rémanence. Mêmes états que les fiches.
+     */
+    async function envoyerSoins() {
+        const liste = aEnvoyerSoins(await soinsEnAttente(ctx));
+        if (liste.length === 0) return { statut: 'ok', acceptes: 0, refuses: 0 };
+        const corps = { device_id: deviceName, veterinary_records: liste.map((i) => soinEnJson(i, deviceName)) };
+        const reset = await base.meta('data_reset_at');
+        if (reset) corps.data_reset_at = reset;
+        let r;
+        try {
+            r = await appel('POST', '/api/sync/push', corps);
+        } catch {
+            return { statut: 'hors_ligne', message: MESSAGES.injoignable };
+        }
+        const classe = classerReponse(r.statut);
+        if (classe === 'suspendre') return suspendre();
+        if (classe === 'refuser' || classe === 'reinitialisation') {
+            const motif = r.json?.message ?? `Envoi refusé par le serveur (${r.statut}).`;
+            for (const i of liste) { await marquerSoinConflit(ctx, i.id, motif, maintenant); await journaliser(ctx, { vente_id: i.id, motif: `Soin refusé : ${motif}` }, maintenant); }
+            return { statut: 'ok', acceptes: 0, refuses: liste.length };
+        }
+        if (classe !== 'ok') return { statut: 'erreur', message: r.json?.message ?? `Le serveur n'a pas pu recevoir les soins (${r.statut}).` };
+        const c = r.json?.veterinary_records ?? { accepted: [], rejected: [] };
+        const acceptes = new Set(c.accepted ?? []);
+        await marquerSoinsSynced(ctx, [...acceptes], maintenant);
+        for (const x of c.rejected ?? []) {
+            const motif = x.reason || 'Soin refusé par le serveur.';
+            await marquerSoinConflit(ctx, x.id, motif, maintenant);
+            await journaliser(ctx, { vente_id: x.id, motif: `Soin refusé : ${motif}` }, maintenant);
+        }
+        return { statut: 'ok', acceptes: acceptes.size, refuses: (c.rejected ?? []).length };
+    }
+
     async function envoyer() {
         let taille = tailleLot;
         let envoyes = 0;
@@ -368,6 +412,7 @@ export function creerSynchro({
             recus = a.recus;
             // PWA-3 (É4) : un tirage commencé plus de 5 s après l'accusé contient la fiche du serveur : la copie locale devient inutile.
             await retirerFichesSynced(ctx, debutTirage - 5000, maintenant);
+            await retirerSoinsSynced(ctx, debutTirage - 5000, maintenant);
         } catch (e) {
             if (e?.name === 'ErreurBase') throw e;
             etat.essai++;
@@ -385,6 +430,12 @@ export function creerSynchro({
             etat.essai++;
             return { ...fi, recus, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
         }
+        const so = await envoyerSoins();
+        if (so.statut === 'suspendu') return so;
+        if (so.statut !== 'ok') {
+            etat.essai++;
+            return { ...so, recus, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
+        }
         const e = await envoyer();
         if (e.statut === 'suspendu') return e;
         if (e.statut !== 'ok') {
@@ -394,7 +445,7 @@ export function creerSynchro({
         etat.essai = 0;
         // PWA-1b — des ventes viennent d'être acceptées : leur effet sur les bandes et les fiches n'est dans la copie tirée qu'au tirage
         // SUIVANT. On le tire tout de suite (au mieux) : sans lui, l'effectif d'une bande « remonterait » entre l'accusé et le prochain tirage.
-        if (e.envoyes > 0 || fi.acceptees > 0) {
+        if (e.envoyes > 0 || fi.acceptees > 0 || so.acceptes > 0) {
             try {
                 const t2 = await tirer();
                 if (t2.statut === 'ok') recus += (await absorber(t2)).recus;
@@ -406,7 +457,7 @@ export function creerSynchro({
         await nettoyerSynced(ctx, undefined, maintenant);
         const serveur = await base.meta('curseur');
         await base.poserMeta('derniere_synchro', serveur);
-        return { statut: 'ok', recus, envoyes: e.envoyes, refuses: e.refuses, message: MESSAGES.termine(recus, e.envoyes) + (fi.refusees > 0 ? ` ${fi.refusees} fiche(s) d'élevage refusée(s) par le serveur : voir la fiche concernée.` : ''), heureServeur: heureDuServeur(serveur) };
+        return { statut: 'ok', recus, envoyes: e.envoyes, refuses: e.refuses, message: MESSAGES.termine(recus, e.envoyes) + (fi.refusees > 0 ? ` ${fi.refusees} fiche(s) d'élevage refusée(s) par le serveur : voir la fiche concernée.` : '') + (so.refuses > 0 ? ` ${so.refuses} soin(s) refusé(s) par le serveur : voir la fiche concernée.` : ''), heureServeur: heureDuServeur(serveur) };
     }
 
     async function synchroniser({ manuel = false } = {}) {

@@ -18,6 +18,14 @@ import { LAPINS, calculerJour, departDepuisStade, verifierDepart } from './effec
 import { provendeDuJour, LIBELLES as LIBELLES_RATION } from './fiche-lapins-calculs.js';
 import { arrondiPhp } from './calculs-caisse.js';
 import { chiffrer, dechiffrer } from './coffre.js';
+import { rendreProphylaxie, LIBELLES as LIBELLES_PROPHY } from './fiche-lapins-prophylaxie.js';
+import { META_AUTRES_EN_ATTENTE } from './base-locale.js';
+
+/** Le NOMBRE d'éléments non envoyés, en clair (meta) : l'avertissement de déconnexion le lit sans le PIN. */
+export async function noterAutres(base, genre, n) {
+    const actuel = (await base.meta(META_AUTRES_EN_ATTENTE)) ?? {};
+    await base.poserMeta(META_AUTRES_EN_ATTENTE, { ...actuel, [genre]: n });
+}
 
 export const TABLE_FICHES_A_ENVOYER = 'fiches_a_envoyer';
 /** Rôles qui ont `manage-elevage` (seeder) : les autres lisent la fiche sans pouvoir l'écrire. */
@@ -243,6 +251,7 @@ export async function garderSaisie({ base, cle }, item, maintenant = () => new D
     const liste = await saisiesEnAttente({ base, cle });
     const suivante = [...liste.filter((x) => !(x.lot_id === item.lot_id && x.jour === item.jour)), { ...item, sync_status: 'pending' }];
     await base.ecrire('referentiels', { table: TABLE_FICHES_A_ENVOYER, tire_le: maintenant().toISOString(), ...(await chiffrer(cle, suivante)) });
+    await noterAutres(base, 'fiches', suivante.filter((x) => x.sync_status !== 'synced').length);
     return suivante;
 }
 
@@ -265,8 +274,9 @@ export function appliquerSaisies(tire, saisies, ctx = {}) {
 // ------------------------------------------------------------------------------------------------------ file d'envoi (É4)
 
 const ecrireSaisies = async ({ base, cle }, liste, maintenant = () => new Date()) => {
-    if (liste.length === 0) { await base.supprimer('referentiels', TABLE_FICHES_A_ENVOYER); return; }
-    await base.ecrire('referentiels', { table: TABLE_FICHES_A_ENVOYER, tire_le: maintenant().toISOString(), ...(await chiffrer(cle, liste)) });
+    if (liste.length === 0) await base.supprimer('referentiels', TABLE_FICHES_A_ENVOYER);
+    else await base.ecrire('referentiels', { table: TABLE_FICHES_A_ENVOYER, tire_le: maintenant().toISOString(), ...(await chiffrer(cle, liste)) });
+    await noterAutres(base, 'fiches', liste.filter((x) => x.sync_status !== 'synced').length);
 };
 
 /** Les saisies à envoyer : `pending` seulement (une saisie refusée reste `conflict` jusqu'à la reprise manuelle, jamais renvoyée en boucle). */
@@ -341,6 +351,7 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
     const venteChamp = h('b', { id: 'saisie-vente' });
     const etatEnvoi = h('p', { id: 'saisie-etat', class: 'muted', role: 'status' });
     const provende = h('div', { id: 'saisie-provende' });
+    const prophyZone = h('div', { id: 'saisie-prophy-zone' });
     const autonomieZone = h('div', { id: 'saisie-autonomie' });
 
     function rafraichir() {
@@ -391,6 +402,13 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
             h('button', { type: 'button', class: 'btn', id: 'saisie-renvoyer', onclick: () => actions.renvoyer() }, 'Renvoyer'),
             h('button', { type: 'button', class: 'btn danger', id: 'saisie-abandonner', onclick: () => actions.abandonner() }, 'Abandonner cette saisie'))
         : null;
+    const coches = new Set();
+    const observations = h('input', { type: 'text', id: 'saisie-observations', class: 'fiche-select', style: 'width:100%', placeholder: LIBELLES_PROPHY.observationsExemple, disabled: Boolean(ctx0.lectureSeule) });
+    const conflitsSoins = (ctx0.conflitsSoins ?? []).map((x) => h('div', { class: 'bandeau refus', role: 'alert', style: 'margin:6px 0 0', 'data-conflit-soin': x.id }, `Soin « ${x.soin.action_type} » refusé par le serveur : ${x.motif} `,
+        h('button', { type: 'button', class: 'btn', onclick: () => actions.renvoyerSoin(x.id) }, 'Renvoyer'), h('button', { type: 'button', class: 'btn danger', onclick: () => actions.abandonnerSoin(x.id) }, 'Abandonner ce soin')));
+    const message = (r) => { retour.textContent = r.refus ?? r.avertissement ?? r.message ?? ''; retour.className = r.refus ? 'alerte' : 'muted'; };
+    prophyZone.append(rendreProphylaxie(h, { protocole: ctx0.protocole, coches, lectureSeule: ctx0.lectureSeule, actions: { valider: async () => message(await actions.validerTraitements([...coches], observations.value)) } }), ...conflitsSoins,
+        h('label', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES_PROPHY.observations), observations));
     const bouton = h('button', { type: 'button', class: 'btn plein', id: 'saisie-enregistrer', disabled: Boolean(ctx0.lectureSeule) }, h('span', { class: 'material-symbols-outlined' }, 'save'), LIBELLES.enregistrer);
     const retour = h('p', { id: 'saisie-retour', role: 'alert', class: 'muted' }, retourInitial);
     bouton.addEventListener('click', async () => {
@@ -416,7 +434,7 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
         h('div', { class: 'saisie-trois' }, entier('peseeTotal', LIBELLES.pesee),
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${LIBELLES.echantillon} ${LIBELLES.echantillonAuto}`), echantillon),
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.poidsMoyen), poidsMoyen)),
-        gmq, retour, etatEnvoi, h('div', { class: 'groupe', style: 'justify-content:flex-end' }, bouton));
+        gmq, prophyZone, retour, etatEnvoi, h('div', { class: 'groupe', style: 'justify-content:flex-end' }, bouton));
     if (ctx0.lectureSeule) for (const el of racine.querySelectorAll('input')) el.disabled = true;
     rafraichir();
     return racine;

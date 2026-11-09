@@ -16,6 +16,21 @@
 
 export const NOM_BASE = 'agrierp_hors_ligne';
 export const DB_VERSION = 2;
+/** Nombre (en clair, jamais le contenu) de fiches d'élevage et de clients en attente d'envoi : l'avertissement de déconnexion les compte. */
+export const META_AUTRES_EN_ATTENTE = 'autres_en_attente';
+
+/** Tout ce qui serait PERDU à la déconnexion : ventes `pending` / `conflict`, fiches d'élevage et clients non envoyés. */
+export const totalEnAttente = (c) => c.pending + c.conflict + (c.fiches ?? 0) + (c.clients ?? 0) + (c.soins ?? 0);
+
+/** « 3 vente(s), 2 fiche(s) d'élevage et 1 client(s) créé(s) hors ligne » (seulement ce qui est non nul). */
+export function listeEnAttente(c) {
+    const parts = [];
+    if (c.pending + c.conflict > 0) parts.push(`${c.pending + c.conflict} vente(s)`);
+    if ((c.fiches ?? 0) > 0) parts.push(`${c.fiches} fiche(s) d'élevage`);
+    if ((c.soins ?? 0) > 0) parts.push(`${c.soins} soin(s) vétérinaire(s)`);
+    if ((c.clients ?? 0) > 0) parts.push(`${c.clients} client(s) créé(s) hors ligne`);
+    return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} et ${parts.at(-1)}` : (parts[0] ?? '');
+}
 
 export class ErreurBase extends Error {
     constructor(message, code = 'base') {
@@ -182,6 +197,13 @@ export class BaseLocale {
             c[l.sync_status] = (c[l.sync_status] ?? 0) + 1;
         }
         return c;
+    }
+
+    /** `compter()` + fiches d'élevage et clients créés hors ligne (listes chiffrées : seul leur NOMBRE est gardé en clair, en meta). */
+    async compterTout() {
+        const c = await this.compter();
+        const autres = (await this.meta(META_AUTRES_EN_ATTENTE)) ?? {};
+        return { ...c, fiches: Number(autres.fiches) || 0, clients: Number(autres.clients) || 0, soins: Number(autres.soins) || 0 };
     }
 
     fermer() {

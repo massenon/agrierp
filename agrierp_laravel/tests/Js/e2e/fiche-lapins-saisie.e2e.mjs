@@ -46,6 +46,8 @@ php(['artisan', 'tinker', '--execute', `
     $lot = \\App\\Models\\LivestockLot::forceCreate(['code' => 'LAP-SAISIE', 'species_id' => $lap->id, 'stage' => 'engraissement', 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
     $cat = \\App\\Models\\ProductCategory::first() ?? \\App\\Models\\ProductCategory::create(['label' => 'Aliments', 'is_active' => true]);
     \\App\\Models\\Product::forceCreate(['sku' => 'PROV-LAP', 'name' => 'Provende lapin', 'category_id' => $cat->id, 'species_id' => $lap->id, 'unit' => 'kg', 'pricing_mode' => 'fourchette', 'price_min' => 400, 'price_max' => 500, 'stock_qty' => 10, 'tva_rate' => 0, 'is_active' => true]);
+    \\DB::table('prophylaxis_schedule_standards')->update(['is_active' => false]);
+    \\DB::table('prophylaxis_schedule_standards')->insert(['id' => '00000000-0000-4000-8000-0000000000aa', 'species_code' => 'cuniculture', 'period_label' => 'E2E', 'treatment' => 'Vermifuge E2E', 'product_recommended' => 'Ivermectine', 'dosage' => '1 ml', 'withdrawal_days' => 5, 'is_active' => true, 'cycle_day_start' => 1, 'cycle_day_end' => 9999, 'created_at' => now(), 'updated_at' => now()]);
     foreach ([2, 1, 0] as $k) {
         $f = new \\App\\Models\\LivestockDailyEntry();
         $f->forceFill(['lot_id' => $lot->id, 'entry_date' => now()->setTimezone('Africa/Porto-Novo')->subDays($k)->toDateString(), 'achat' => 0, 'ne' => 0, 'mort' => 0, 'vente' => 0, 'don' => 0, 'effectif_final' => 40]);
@@ -79,6 +81,8 @@ try {
     await Promise.all([page.waitForURL('**/dashboard', { timeout: 30000 }), page.click('[dusk=login-submit]')]);
     await page.goto(`${base}/mode-hors-ligne`);
     await page.waitForSelector('#hl-mdp');
+    // La fenêtre « Rappels du jour » du web s'ouvre (un traitement est dû) : « Plus tard » la ferme.
+    await page.locator('[dusk=rappels-du-jour] button:has-text("Plus tard")').click({ timeout: 4000 }).catch(() => {});
     await page.fill('#hl-mdp', 'LogiAgriERP@2026');
     await page.fill('#hl-pin', '4821');
     await page.fill('#hl-pin2', '4821');
@@ -150,6 +154,22 @@ try {
     assert.equal(effectifsServeur(), avant);
     ok('page rechargée hors ligne : la saisie (3 morts) est toujours là, toujours en attente d\'envoi, effectifs recalculés');
 
+    // --- PROPHYLAXIE DU JOUR : validée hors ligne, soin et rémanence jouées localement ---
+    await page.fill('#fiche-date', aujourdhui);
+    await page.dispatchEvent('#fiche-date', 'change');
+    await page.waitForSelector(`#fiche-mensuel tbody tr.choisi[data-jour="${aujourdhui}"]`);
+    assert.match(await page.textContent('#prophy-cycle'), /^Jour \d+ du cycle de la bande$/);
+    assert.equal(await page.textContent('#prophy-etat'), '1 Prévu(s)');
+    assert.match(await page.textContent('#prophy-lignes'), /Vermifuge E2E \(Ivermectine — 1 ml\)Rémanence 5j/);
+    await page.check('[data-prophy="00000000-0000-4000-8000-0000000000aa"]');
+    await page.fill('#saisie-observations', 'RAS');
+    await page.click('#prophy-valider');
+    await page.waitForFunction(() => /1 traitement\(s\) enregistré\(s\) au registre vétérinaire\./.test(document.querySelector('#saisie-retour')?.textContent ?? ''));
+    await page.waitForFunction(() => document.querySelector('#prophy-etat')?.textContent === 'Validé / Effectué');
+    assert.equal(await page.isDisabled('[data-prophy="00000000-0000-4000-8000-0000000000aa"]'), true, 'déjà administré : plus cochable');
+    assert.equal(sql('select count(*) from veterinary_records'), '0', 'le serveur n\'a rien reçu');
+    ok('prophylaxie du jour validée hors ligne : protocole du jour, soin enregistré sur l\'appareil, serveur intact');
+
     // --- ÉTAPE É4 : retour du réseau, la fiche part au serveur ---
     assert.ok(Number(sql("select count(*) from fiscal_years where status='ouvert'")) >= 1, 'un exercice ouvert couvre les jours saisis');
     await contexte.setOffline(false);
@@ -159,6 +179,8 @@ try {
     assert.equal(sql(`select mort_jeune||'|'||cat_depart_jeune from livestock_daily_entries where entry_date='${hier}'`), '3|40');
     assert.equal(sql("select current_quantity from livestock_lots where code='LAP-SAISIE'"), '37', 'effectif de la bande au serveur = celui du navigateur');
     assert.equal(sql('select count(*) from livestock_daily_entries'), '3', 'aucune fiche en double');
+    assert.equal(sql("select action_type||'|'||product_used||'|'||dose||'|'||symptomes||'|'||is_active from veterinary_records"), 'Vermifuge E2E|Ivermectine|1 ml|RAS|1', 'le soin validé hors ligne est au registre du serveur');
+    assert.equal(sql("select product_used||'|'||withdrawal_days from veterinary_withdrawal_periods"), 'Ivermectine|5', 'la rémanence est créée par le serveur');
     assert.deepEqual(await colonne(), ['40', '37', '37'], 'l\'effectif affiché ne « remonte » pas');
     assert.equal(await page.textContent('#saisie-etat'), '', 'plus « en attente d\'envoi »');
     ok('retour du réseau : fiche au serveur, effectif du serveur = effectif du navigateur (37), rien en double, aucune remontée à l\'écran');
@@ -166,6 +188,8 @@ try {
     await page.click('#btn-synchroniser');
     await page.waitForTimeout(1500);
     assert.equal(sql('select count(*) from livestock_daily_entries'), '3');
+    assert.equal(sql('select count(*) from veterinary_records'), '1', 'jamais un second soin');
+    assert.equal(sql('select count(*) from veterinary_withdrawal_periods'), '1');
     assert.equal(effectifsServeur(), '40,37,37');
     ok('second envoi : rien d\'écrit ni de dupliqué');
 

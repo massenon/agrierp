@@ -50,7 +50,7 @@ test('autonomie = vrai AutonomieAlimentaireService', (t) => {
     scenarios.forEach((s, i) => {
         const produits = s.produits.map((p) => ({ id: p.id, name: p.name, unit: p.unit, stock_qty: p.stock_qty, species_id: p.espece === null ? null : p.espece === 'cuniculture' ? CUNI : 'ESP-PORC' }));
         const releves = s.releve === null ? [] : [{ id: s.releve.id, type: 'delai_regle', status: s.releve.status, is_active: true, data: s.releve.data }];
-        const a = evaluerAutonomie(produitProvende(produits, [CUNI]), s.consommation, s.feed_types, releves);
+        const a = evaluerAutonomie(produitProvende(produits, [CUNI]), s.consommation, s.feed_types, releves, []);
         const p = retour[i];
         const ctx = `scénario ${i}`;
         assert.equal(a.available, p.available, `${ctx} disponible`);
@@ -68,8 +68,8 @@ test('autonomie = vrai AutonomieAlimentaireService', (t) => {
 
 test('seuil critique : 3 jours par défaut ; règle validée en mode « constaté » = seuil incertain (jamais inventé)', () => {
     assert.equal(SEUIL_CRITIQUE_DEPART_JOURS, 3);
-    assert.deepEqual(seuilCritique([]), { critique: 3, incertain: false });
-    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'a_valider', data: { critique_jours: 5 } }]), { critique: 5, incertain: false });
-    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'valide', data: { mode: 'manuel', critique_jours: 6 } }]), { critique: 6, incertain: false });
+    assert.deepEqual(seuilCritique([]), { critique: 3, incertain: false, source: 'depart' });
+    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'a_valider', data: { critique_jours: 5 } }]), { critique: 5, incertain: false, source: 'depart' });
+    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'valide', data: { mode: 'manuel', critique_jours: 6 } }]), { critique: 6, incertain: false, source: 'manuel' });
     assert.equal(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'valide', data: { mode: 'constate', critique_jours: 4 } }]).incertain, true);
 });

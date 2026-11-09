@@ -355,7 +355,7 @@ try {
     await page.waitForSelector('#dlg-deconnexion[open]');
     await page.click('#deco-confirmer');
     await page.waitForFunction(() => document.querySelector('#deco-erreur').textContent !== '');
-    assert.match(await page.textContent('#deco-erreur'), /Saisissez le nombre exact de ventes à abandonner/);
+    assert.match(await page.textContent('#deco-erreur'), /Saisissez le nombre exact d'éléments à abandonner/);
     const n = await page.evaluate(() => [...document.querySelectorAll('#corps-ventes tr')].filter((t) => t.dataset.statut !== 'synced').length);
     await page.fill('#deco-n', String(n));
     await page.click('#deco-confirmer');

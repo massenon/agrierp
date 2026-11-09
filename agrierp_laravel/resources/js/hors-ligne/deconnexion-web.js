@@ -1,4 +1,4 @@
-import { ouvrirBase } from './base-locale.js';
+import { ouvrirBase, totalEnAttente, listeEnAttente } from './base-locale.js';
 import { lireMarqueur, purgerLocal, MARQUEUR_ACTIVE } from './appairage.js';
 
 /**
@@ -6,7 +6,7 @@ import { lireMarqueur, purgerLocal, MARQUEUR_ACTIVE } from './appairage.js';
  *
  * Intercepte le formulaire de déconnexion du menu de profil :
  *  - ce navigateur n'est pas appairé : la déconnexion part telle quelle (aucune surcoût) ;
- *  - des ventes `pending` / `conflict` attendent sur l'appareil : la déconnexion est REFUSÉE (toast) tant qu'elles ne sont
+ *  - des ventes `pending` / `conflict`, des fiches d'élevage ou des clients créés hors ligne attendent sur l'appareil : la déconnexion est REFUSÉE (toast) tant qu'elles ne sont
  *    pas envoyées ou explicitement abandonnées dans la caisse hors ligne ;
  *  - sinon : base IndexedDB, caches du service worker, marqueurs sont effacés, PUIS la déconnexion part.
  * Le jeton de l'appareil est chiffré par le PIN : il ne peut pas être révoqué ici ; il reste révocable dans Paramètres,
@@ -24,12 +24,12 @@ document.addEventListener('submit', async (ev) => {
     let base = null;
     try {
         base = await ouvrirBase();
-        const c = await base.compter();
-        const n = c.pending + c.conflict;
+        const c = await base.compterTout();
+        const n = totalEnAttente(c);
         if (n > 0) {
             base.fermer();
             window.dispatchEvent(new CustomEvent('toast', { detail: {
-                message: `${n} vente(s) de la caisse hors ligne ne sont pas encore envoyées : ouvrez la caisse hors ligne pour les envoyer (ou les abandonner) avant de vous déconnecter.`,
+                message: `${listeEnAttente(c)} de la caisse hors ligne ne sont pas encore envoyé(e)s : ouvrez la caisse hors ligne pour les envoyer (ou les abandonner) avant de vous déconnecter.`,
                 type: 'warning',
             } }));
             return;

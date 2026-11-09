@@ -1706,6 +1706,9 @@ class SyncController extends Controller
                     return [
                         'id' => $achat->id,
                         'supplier_id' => $achat->supplier_id,
+                        // PWA-3 (délai fournisseur constaté) — le bon de commande que cet achat a reçu : sans lui, le poste ne peut pas
+                        // relier un bon « reçu » au jour de sa réception (`ReleveTerrainService::delaisFournisseurs`).
+                        'purchase_order_id' => $achat->purchase_order_id,
                         'supplier_name' => $achat->supplier?->name,
                         'supplier_category' => $achat->supplier?->category,
                         'payment_mode' => $achat->payment_mode,

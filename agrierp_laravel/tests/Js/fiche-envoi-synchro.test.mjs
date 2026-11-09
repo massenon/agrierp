@@ -21,7 +21,7 @@ const contexte = async () => {
 const LOT = { id: '00000000-0000-4000-8000-000000000001', code: 'LAP-1', species_code: 'cuniculture', stage: 'engraissement', initial_quantity: 40, current_quantity: 40, status: 'actif', is_active: true };
 const FICHE = (id, jour) => ({ id, lot_id: LOT.id, entry_date: jour, achat: 0, ne: 0, mort: 3, vente: 0, don: 0, effectif_final: 37, mort_repro: 0, mort_sevre: 0, mort_jeune: 3, don_repro: 0, don_sevre: 0, don_jeune: 0, passage_sevre_jeune: 0, cat_depart_repro: 0, cat_depart_sevre: 0, cat_depart_jeune: 40, sync_status: 'pending' });
 const saisie = (ctx, id, jour = '2026-11-08') => garderSaisie(ctx, { id_fiche: id, lot_id: LOT.id, jour, saisie: {}, fiche: FICHE(id, jour), cree_le: '2026-11-09T08:00:00.000Z' });
-const serveurFiches = ({ refuse = {} } = {}) => {
+const serveurFiches = ({ refuse = {}, refuseSoin = {} } = {}) => {
     const s = { appels: [], fiches: [] };
     s.fetch = async (url, opts) => {
         const u = new URL(url, 'http://x');
@@ -38,6 +38,9 @@ const serveurFiches = ({ refuse = {} } = {}) => {
                 else { accepted.push(f.id); s.fiches.push({ ...f, effectif_final: 37 }); }
             }
             sortie.livestock_daily_entries = { accepted, rejected, merged: [] };
+        }
+        if (corps.veterinary_records) {
+            sortie.veterinary_records = { accepted: corps.veterinary_records.filter((x) => !refuseSoin[x.id]).map((x) => x.id), rejected: corps.veterinary_records.filter((x) => refuseSoin[x.id]).map((x) => ({ id: x.id, reason: refuseSoin[x.id] })) };
         }
         if (corps.sales) sortie.sales = { accepted: corps.sales.map((v) => v.id), rejected: [] };
         return new Response(JSON.stringify(sortie), { status: 200 });
@@ -102,4 +105,58 @@ test('refus : conflict + motif français du serveur, journalisé, jamais renvoy�
     assert.equal(serveur.appels.filter((a) => a.corps?.livestock_daily_entries).length, 2, 'renvoyée une fois après la reprise');
     await abandonnerFiche(ctx, A);
     assert.equal((await saisiesEnAttente(ctx)).length, 0);
+});
+
+test('déconnexion : les fiches en attente et les clients créés hors ligne sont comptés (en clair, sans PIN)', async () => {
+    const { totalEnAttente, listeEnAttente } = await import('../../resources/js/hors-ligne/base-locale.js');
+    const { ajouterClient, retirerClients } = await import('../../resources/js/hors-ligne/clients-hors-ligne.js');
+    const ctx = await contexte();
+    assert.deepEqual(await ctx.base.compterTout(), { pending: 0, conflict: 0, synced: 0, fiches: 0, clients: 0, soins: 0 });
+    await saisie(ctx, A);
+    await saisie(ctx, 'b2222222-2222-4222-8222-222222222222', '2026-11-07');
+    await ajouterClient(ctx, { id: 'c1111111-1111-4111-8111-111111111111', valeurs: { name: 'Awa', phone: null, ifu: null }, instant: '2026-11-09T08:00:00.000Z', deviceId: 'pwa-test' });
+    await ajouterVente(ctx, { id: 'v1111111-1111-4111-8111-111111111111', sold_at: '2026-11-09T08:00:00Z', total: 100, payment_mode: 'especes', lines: [] });
+    let c = await ctx.base.compterTout();
+    assert.equal(c.fiches, 2); assert.equal(c.clients, 1); assert.equal(c.pending, 1);
+    assert.equal(totalEnAttente(c), 4);
+    assert.equal(listeEnAttente(c), "1 vente(s), 2 fiche(s) d'élevage et 1 client(s) créé(s) hors ligne");
+    assert.equal(listeEnAttente({ pending: 0, conflict: 0, fiches: 0, clients: 3 }), '3 client(s) créé(s) hors ligne');
+    const brut = JSON.stringify(await ctx.base.tout('meta'));
+    assert.ok(!brut.includes('Awa') && !brut.includes('LAP-1'), 'seul un nombre est en clair');
+    await abandonnerFiche(ctx, A);
+    await retirerClients(ctx, ['c1111111-1111-4111-8111-111111111111']);
+    c = await ctx.base.compterTout();
+    assert.equal(c.fiches, 1); assert.equal(c.clients, 0);
+    // acquittée (synced) : plus à perdre
+    const serveur = serveurFiches();
+    await synchroDe(ctx, serveur).synchroniser({ manuel: true });
+    assert.equal((await ctx.base.compterTout()).fiches, 0, 'une fiche acquittée par le serveur n\'est plus comptée');
+});
+
+test('soins (prophylaxie) : envoyés après les fiches et AVANT les ventes avec la rémanence ; refus = conflict + motif ; comptés à la déconnexion', async () => {
+    const { garderSoins, soinsEnAttente, remettreSoinEnFile, aEnvoyerSoins } = await import('../../resources/js/hors-ligne/fiche-lapins-prophylaxie.js');
+    const ctx = await contexte();
+    const S1 = 's1111111-1111-4111-8111-111111111111'; const S2 = 's2222222-2222-4222-8222-222222222222';
+    const soin = (id) => ({ id, lot_id: LOT.id, action_type: 'Vermifuge', product_used: 'Ivermectine', dose: '1 ml', vet_name: null, symptomes: null, cost: null, record_date: '2026-11-09', withdrawal_days: 5, is_active: true });
+    await garderSoins(ctx, [soin(S1), soin(S2)]);
+    await saisie(ctx, A);
+    await ajouterVente(ctx, { id: 'v1111111-1111-4111-8111-111111111111', sold_at: '2026-11-09T08:00:00Z', total: 100, payment_mode: 'especes', lines: [] });
+    assert.equal((await ctx.base.compterTout()).soins, 2);
+    const serveur = serveurFiches({ refuseSoin: { [S2]: 'Le champ action_type est obligatoire.' } });
+    const r = await synchroDe(ctx, serveur).synchroniser({ manuel: true });
+    assert.match(r.message, /1 soin\(s\) refusé\(s\)/);
+    const pushs = serveur.appels.filter((a) => a.chemin === '/api/sync/push');
+    assert.deepEqual(pushs.map((p) => p.cles.find((c) => ['livestock_daily_entries', 'veterinary_records', 'sales'].includes(c))), ['livestock_daily_entries', 'veterinary_records', 'sales']);
+    const envoye = pushs[1].corps.veterinary_records[0];
+    assert.equal(envoye.withdrawal_days, 5, 'la rémanence part avec le soin : le serveur crée la période');
+    assert.equal(envoye.device_id, 'pwa-test');
+    const liste = await soinsEnAttente(ctx);
+    assert.equal(liste.find((x) => x.id === S1).sync_status, 'synced');
+    assert.equal(liste.find((x) => x.id === S2).sync_status, 'conflict');
+    assert.equal(liste.find((x) => x.id === S2).motif, 'Le champ action_type est obligatoire.');
+    assert.equal((await ctx.base.compterTout()).soins, 1, 'seul le soin refusé reste à perdre');
+    await synchroDe(ctx, serveur).synchroniser({ manuel: true });
+    assert.equal(serveur.appels.filter((a) => a.corps?.veterinary_records).length, 1, 'jamais renvoyé en boucle');
+    await remettreSoinEnFile(ctx, S2);
+    assert.deepEqual(aEnvoyerSoins(await soinsEnAttente(ctx)).map((x) => x.id), [S2], 'reprise manuelle');
 });
