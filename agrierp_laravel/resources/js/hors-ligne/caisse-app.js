@@ -16,6 +16,7 @@ import { FAMILLES } from './fiche-familles.js';
 import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
 import { soinsEnAttente, garderSoins, remettreSoinEnFile, abandonnerSoin, soinsAvecLocaux, remanencesAvecLocales, protocoleDuJour, validerTraitements } from './fiche-lapins-prophylaxie.js';
 import { produitProvende, evaluerAutonomie, delaisFournisseurs } from './fiche-lapins-calculs.js';
+import { contenuRecu, rendreRecu, imprimerRecu, recuProvisoireDisponible, BOUTON_RECU } from './recu-provisoire.js';
 import { droitsDeLEcran } from './droits-ecran.js';
 import { appliquerSaisies, chargerJour, enregistrerJour, garderSaisie, saisiesEnAttente, remettreFicheEnFile, abandonnerFiche, rendreFormulaire, refusExerciceClos, ROLES_ECRITURE, MOTIFS as MOTIFS_SAISIE } from './fiche-lapins-saisie.js';
 import { creerSynchro } from './synchro.js';
@@ -39,7 +40,7 @@ const app = {
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
     fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], famille: 'lapins', feedTypes: [], modules: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
-    role: null, droits: droitsDeLEcran(null),
+    typeAppareil: 'entreprise', role: null, droits: droitsDeLEcran(null),
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
@@ -113,8 +114,8 @@ $('form-pin').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     $('erreur-pin').textContent = '';
     try {
-        const { cle, jeton } = await deverrouiller(app.base, $('champ-pin').value);
-        app.ctx = { base: app.base, cle }; app.jeton = jeton;
+        const { cle, jeton, typeAppareil } = await deverrouiller(app.base, $('champ-pin').value);
+        app.ctx = { base: app.base, cle }; app.jeton = jeton; app.typeAppareil = typeAppareil; // CAISSE-1 : type d'appareil lu chiffré
         app.minutesVerrou = (await app.base.meta('verrou_minutes')) ?? DUREE_PAR_DEFAUT;
         app.derniereActivite = Date.now();
         montrer(null);
@@ -424,10 +425,18 @@ async function dessinerVentes() {
         h('td', { 'data-label': 'Heure' }, heureLocale(l.vente.sold_at)),
         h('td', { class: 'num', 'data-label': 'Total' }, formaterFcfa(l.vente.total)),
         h('td', { 'data-label': 'Statut' }, h('span', { class: `statut ${l.sync_status}` }, LIBELLES_STATUT[l.sync_status] ?? l.sync_status)),
-        h('td', { 'data-label': 'Motif' }, l.motif ?? ''),
-        h('td', { 'data-label': '' }, l.sync_status === 'conflict' ? h('span', { class: 'groupe' },
+        h('td', { 'data-label': 'Motif' }, l.motif ?? (l.sync_status === 'synced' ? 'Facture numérotée par le serveur (écran Facturation).' : '')),
+        h('td', { 'data-label': '' }, recuProvisoireDisponible(l) ? h('button', { type: 'button', class: 'btn', 'data-recu': l.id, onclick: () => ouvrirRecu(l) }, BOUTON_RECU) : null, l.sync_status === 'conflict' ? h('span', { class: 'groupe' },
             h('button', { type: 'button', class: 'btn', onclick: async () => { await remettreEnFile(app.ctx, l.id); await dessiner(); lancerSynchro({ manuel: true }); } }, 'Remettre en file'),
             h('button', { type: 'button', class: 'btn danger', onclick: () => demanderAbandon(l) }, 'Abandonner')) : null))));
+}
+
+/** CAISSE-2 : le reçu provisoire d'une vente pas encore numérotée par le serveur (aperçu, puis impression par le navigateur). */
+function ouvrirRecu(l) {
+    const c = contenuRecu(l.vente, { entreprise: app.entreprise, produits: app.produits, clients: app.clients });
+    $('recu-contenu').replaceChildren(rendreRecu(h, c));
+    $('recu-imprimer').onclick = () => imprimerRecu(c);
+    $('dlg-recu').showModal();
 }
 
 function demanderAbandon(l) {
@@ -670,9 +679,10 @@ $('btn-deconnecter').addEventListener('click', async () => {
     $('deco-n').value = '';
     $('deco-abandon').hidden = n === 0;
     $('deco-envoyer').hidden = n === 0;
-    $('deco-texte').textContent = n === 0
+    const perso = app.typeAppareil === 'personnel' ? ' Appareil personnel : TOUTES les données hors ligne (copie chiffrée, clé, jeton, caches) sont effacées à la déconnexion.' : '';
+    $('deco-texte').textContent = (n === 0
         ? 'Les données de cet appareil (catalogue, clients, jeton) seront effacées. Rien n\'est en attente d\'envoi.'
-        : `${listeEnAttente(c)} ne sont pas encore envoyé(e)s au serveur. Envoyez-les d'abord, ou abandonnez-les explicitement : ils seraient perdus.`;
+        : `${listeEnAttente(c)} ne sont pas encore envoyé(e)s au serveur. Envoyez-les d'abord, ou abandonnez-les explicitement : ils seraient perdus.`) + perso;
     $('deco-confirmer').textContent = n === 0 ? 'Déconnecter' : 'Abandonner ces éléments et déconnecter';
     $('deco-confirmer').dataset.n = String(n);
     $('dlg-deconnexion').showModal();

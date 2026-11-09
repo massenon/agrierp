@@ -1,6 +1,6 @@
 import { activer, etatAppareil, prerequis, purgerLocal } from './appairage.js';
 import { ouvrirBase } from './base-locale.js';
-import { pinValide, MOTIF_PIN } from './coffre.js';
+import { pinValidePour, motifPinPour, TYPE_APPAREIL_PAR_DEFAUT } from './coffre.js';
 
 /**
  * PWA-1 — composant Alpine de la page « Mode hors ligne » (`livewire/profil/mode-hors-ligne.blade.php`). Enregistré à
@@ -20,6 +20,8 @@ document.addEventListener('alpine:init', () => {
         enAttente: 0,
         motDePasse: '',
         pin: '',
+        typeAppareil: TYPE_APPAREIL_PAR_DEFAUT,
+        typeActif: TYPE_APPAREIL_PAR_DEFAUT,
         pin2: '',
         erreur: '',
         message: '',
@@ -39,6 +41,7 @@ document.addEventListener('alpine:init', () => {
                 this.nomAppareil = etat.deviceName ?? '';
                 this.activeLe = etat.activeLe ? new Date(etat.activeLe).toLocaleString('fr-FR') : '';
                 this.persistant = etat.persistant;
+                this.typeActif = etat.typeAppareil;
                 const c = await base.compter();
                 this.enAttente = c.pending + c.conflict;
             } catch (e) {
@@ -49,13 +52,15 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        get libellePin() { return this.typeAppareil === 'personnel' ? 'PIN (6 chiffres)' : 'PIN (4 à 6 chiffres)'; },
+
         async activer() {
             this.erreur = ''; this.message = '';
-            if (!pinValide(this.pin)) { this.erreur = MOTIF_PIN; return; }
+            if (!pinValidePour(this.pin, this.typeAppareil)) { this.erreur = motifPinPour(this.typeAppareil); return; }
             if (this.pin !== this.pin2) { this.erreur = 'Les deux PIN ne sont pas identiques.'; return; }
             this.envoi = true;
             try {
-                await activer({ identifiant: this.identifiant, motDePasse: this.motDePasse, pin: this.pin });
+                await activer({ identifiant: this.identifiant, motDePasse: this.motDePasse, pin: this.pin, typeAppareil: this.typeAppareil });
                 this.motDePasse = ''; this.pin = ''; this.pin2 = '';
                 this.message = 'Mode hors ligne activé sur cet appareil. Ouvrez la caisse hors ligne : le catalogue y sera copié à la première synchronisation.';
                 await this.rafraichir();

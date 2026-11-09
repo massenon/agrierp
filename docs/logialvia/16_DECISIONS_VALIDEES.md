@@ -1,4 +1,4 @@
-# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-31)
+# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-33)
 
 ## USAGE
 
@@ -48,6 +48,8 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 | DV-29 | 09/11/2026 | Poste Windows : l'ancien dossier `Documents\AgriERP` est REPRIS dans `Documents\LogiAgriERP`, jamais d'écrasement ; l'installateur le sauvegarde puis le retire | décision de conception appliquée au renommage ; implémentée | — | essai sur un vrai Windows |
 | DV-30 | 09/11/2026 | Captures du manuel, du README et de l'aperçu social SANS donnée personnelle : nom et e-mail de l'administrateur floutés ; copie non floutée gardée dans le dépôt privé (`manuel/originaux_non_floutes`, jamais publiée) | appliquée (commits du 09/11/2026) | — | — |
 | DV-31 | 09/11/2026 | **CAISSE-1, volet animalier** : un animalier seul PEUT activer le mode hors ligne du navigateur et saisir ses fiches (droit d'activer = `manage-ventes` OU `manage-elevage`, un seul Gate `utiliser-mode-hors-ligne` ; comptable toujours refusé) ; l'écran de la PWA suit les droits du compte (caisse = `manage-ventes`, fiches = `view-elevage`, écriture = `manage-elevage`) ; le serveur reste le juge | décision du client (« un animalier seul DOIT pouvoir activer le mode hors ligne et saisir ses fiches ») ; les autres volets de CAISSE-1 (PIN, devis, reçu provisoire, export-ventes) restent en attente |
+| DV-32 | 09/11/2026 | **CAISSE-1, type d'appareil** : à l'activation du mode hors ligne, « Appareil de l'entreprise » (défaut recommandé : PIN de 4 à 6 chiffres, données conservées jusqu'à l'envoi) ou « Appareil personnel » (PIN de 6 chiffres OBLIGATOIRE, TOUTES les données hors ligne effacées à la déconnexion, après confirmation du nombre d'éléments perdus) ; le type est mémorisé chiffré avec l'appairage et ne change qu'en réactivant | décision du client (« OUI à tout ») |
+| DV-33 | 09/11/2026 | **CAISSE-2, reçu provisoire** : après une vente hors ligne et tant que le serveur ne l'a pas numérotée, « Imprimer le reçu provisoire » (sans numéro de facture légal, identifiant court de la vente, mention « Facture n° attribué à la synchronisation. ») ; après la synchronisation le numéro de facture est celui du serveur (écran Facturation) | décision du client (« OUI à tout ») |
 
 ---
 

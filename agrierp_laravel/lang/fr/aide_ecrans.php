@@ -91,7 +91,8 @@ return [
             'titre' => 'Mode hors ligne',
             'puces' => [
                 "Permet de travailler sans réseau depuis ce navigateur : la caisse (droit des ventes) et les fiches d'élevage (droit d'élevage) restent sur l'appareil, puis partent seules au retour de la liaison ; l'écran suit les droits du compte.",
-                "« Activer » demande votre mot de passe (non conservé) et un PIN de 4 à 6 chiffres qui protège les données de l'appareil.",
+                "« Activer » demande votre mot de passe (non conservé), le type d'appareil et un PIN qui protège les données : appareil de l'entreprise (recommandé) = PIN de 4 à 6 chiffres ; appareil personnel = PIN de 6 chiffres obligatoire, et tout est effacé à la déconnexion.",
+                "Après une vente hors ligne, « Imprimer le reçu provisoire » donne un reçu sans numéro de facture : le numéro est attribué à la synchronisation.",
                 "Sont couverts : la caisse (produits dont sujets vivants sur bande source, panier, livraison, nouveau client, facture, paiement) pour qui a le droit des ventes, et les fiches d'élevage pour qui a le droit d'élevage ; la comptabilité exige le réseau.",
                 "« Désactiver cet appareil » efface les données locales ; un administrateur peut aussi le révoquer dans Postes & Appairage.",
             ],
