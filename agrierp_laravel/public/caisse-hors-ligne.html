@@ -46,6 +46,10 @@
     <h1><span class="material-symbols-outlined">point_of_sale</span> Caisse hors ligne <span id="nom-utilisateur" class="muted" style="font-weight:500"></span></h1>
     <div class="groupe">
         <button id="btn-vue-fiche" type="button" class="btn" hidden><span class="material-symbols-outlined">cruelty_free</span>Fiches Lapins</button>
+        <button id="btn-vue-porcs" type="button" class="btn" hidden><span class="material-symbols-outlined">pets</span>Fiches Porcs</button>
+        <button id="btn-vue-escargots" type="button" class="btn" hidden><span class="material-symbols-outlined">bug_report</span>Fiches Escargots</button>
+        <button id="btn-vue-reproducteurs" type="button" class="btn" hidden><span class="material-symbols-outlined">grid_view</span>Fiches Reproducteurs</button>
+        <button id="btn-vue-pondeuses" type="button" class="btn" hidden><span class="material-symbols-outlined">egg</span>Fiches Pondeuses</button>
         <span id="etat-synchro" class="pastille neutre" role="status" aria-live="polite">Hors ligne</span>
         <button id="btn-synchroniser" type="button" class="btn"><span class="material-symbols-outlined">sync</span>Synchroniser maintenant</button>
         <button id="btn-verrouiller" type="button" class="btn"><span class="material-symbols-outlined">lock</span>Verrouiller</button>
@@ -225,7 +229,7 @@
     <h3>Déconnecter cet appareil</h3>
     <p id="deco-texte"></p>
     <div id="deco-abandon" hidden>
-        <label class="champ" for="deco-n">Pour abandonner ces ventes, saisissez leur nombre</label>
+        <label class="champ" for="deco-n">Pour abandonner ces éléments, saisissez leur nombre</label>
         <input id="deco-n" type="number" min="0" step="1" inputmode="numeric">
     </div>
     <div id="deco-erreur" class="erreur-champ" role="alert"></div>

@@ -15,6 +15,7 @@
  */
 
 import { chiffrer, dechiffrer } from './coffre.js';
+import { META_AUTRES_EN_ATTENTE } from './base-locale.js';
 import { MOTIFS } from './calculs-caisse.js';
 
 export const TABLE_CLIENTS_A_ENVOYER = 'clients_a_envoyer';
@@ -54,11 +55,11 @@ export async function clientsEnAttente({ base, cle }) {
 }
 
 async function ecrireClients({ base, cle }, liste, maintenant = () => new Date()) {
-    if (liste.length === 0) {
-        await base.supprimer('referentiels', TABLE_CLIENTS_A_ENVOYER);
-        return;
-    }
-    await base.ecrire('referentiels', { table: TABLE_CLIENTS_A_ENVOYER, tire_le: maintenant().toISOString(), ...(await chiffrer(cle, liste)) });
+    if (liste.length === 0) await base.supprimer('referentiels', TABLE_CLIENTS_A_ENVOYER);
+    else await base.ecrire('referentiels', { table: TABLE_CLIENTS_A_ENVOYER, tire_le: maintenant().toISOString(), ...(await chiffrer(cle, liste)) });
+    // Le NOMBRE de clients non acquittés, en clair : l'avertissement de déconnexion le compte sans le PIN.
+    const actuel = (await base.meta(META_AUTRES_EN_ATTENTE)) ?? {};
+    await base.poserMeta(META_AUTRES_EN_ATTENTE, { ...actuel, clients: liste.length });
 }
 
 /** Enregistre un client `pending` ; ne rend qu'une fois l'écriture DURABLE (sinon lève : le client n'est PAS créé). */

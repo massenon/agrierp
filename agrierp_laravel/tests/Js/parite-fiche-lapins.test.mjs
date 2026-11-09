@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { cleRation, rationDe, provendeDuJour, RATIONS_DE_SECOURS, LIBELLES } from '../../resources/js/hors-ligne/fiche-lapins-calculs.js';
+import { cleRation, rationDe, provendeDuJour, RATIONS_DE_SECOURS, LIBELLES, cleRationPorc, provendeDuJourPorcs, RATIONS_PORCS_DE_SECOURS, LIBELLES_PORCS } from '../../resources/js/hors-ligne/fiche-lapins-calculs.js';
 
 /**
  * PWA-3 (fiche lapins) — PARITÉ EXÉCUTÉE de la clé de rationnement et de la provende du jour contre le vrai `CategorieRationLapin` et le
@@ -15,7 +15,7 @@ const alea = (n) => { graine = (graine * 1103515245 + 12345) % 2147483648; retur
 
 const LIBELLES_BAREME = [
     'Reproducteur', 'reproducteurs (lapine)', 'Sous-mères', 'Sous mères', 'SOUS-MÈRES', 'Lapin Sevré', 'Sevrés', 'Jeune', ' jeune ', 'JEUNE', 'Jeunes', 'Jeune porc',
-    'Lapin de Chair', 'Jeune (engraissement)', 'Engraissement', 'Porcelet', 'Truie', '', 'Poussin ponte (0 à 2 mois)', 'Œufs', 'Lapereau',
+    'Lapin de Chair', 'Jeune (engraissement)', 'Engraissement', 'Porcelet', 'Truie', 'Porc Marchand', 'PORCS MARCHANDS', 'marchand', '', 'Poussin ponte (0 à 2 mois)', 'Œufs', 'Lapereau',
 ];
 const libelles = [...LIBELLES_BAREME, ...Array.from({ length: 80 }, () => LIBELLES_BAREME[alea(LIBELLES_BAREME.length)] + (alea(3) === 0 ? ' x' : ''))];
 const provendes = Array.from({ length: 400 }, () => ({
@@ -58,4 +58,22 @@ test('valeurs de secours et libellés du glossaire du 17/10/2026', () => {
     assert.deepEqual(RATIONS_DE_SECOURS, { reproducteur: 120, sous_meres: 30, chair: 60 });
     assert.deepEqual(LIBELLES, { reproducteur: 'Reproducteur', sous_meres: 'Sous-mères', chair: 'Jeune' });
     assert.equal(rationDe([], 'chair'), 60);
+});
+
+// ------------------------------------------------------------------------------------------------ porcs (PWA-3, fiche porcs)
+
+test('porcs : clé de rationnement = CategorieRationPorc::cle, provende = FichePorcs::getProvendeCalculationProperty', (t) => {
+    if (!retour) return t.skip(raison);
+    libelles.forEach((l, i) => assert.equal(cleRationPorc(l), retour.clesPorcs[i], `« ${l} »`));
+    assert.ok(new Set(retour.clesPorcs).size === 4, 'les trois catégories ET « aucune » sont couvertes');
+    let inconnus = 0; let secours = 0;
+    provendes.forEach((c, i) => {
+        const p = retour.provendesPorcs[i];
+        assert.deepEqual(provendeDuJourPorcs(c.cat, c.rations), p, `cas ${i} ${JSON.stringify(c)}`);
+        if (p.total_g === null) inconnus++;
+        if (['reproducteur', 'porcelet', 'marchand'].some((k) => !c.rations.some((r) => cleRationPorc(r.stage_label) === k))) secours++;
+    });
+    assert.ok(inconnus > 40 && secours > 100, `inconnus ${inconnus}, valeurs de secours ${secours}`);
+    assert.deepEqual(RATIONS_PORCS_DE_SECOURS, { reproducteur: 2000, porcelet: 300, marchand: 600 });
+    assert.deepEqual(LIBELLES_PORCS, { reproducteur: 'Reproducteur', porcelet: 'Porcelet', marchand: 'Porc Marchand' });
 });

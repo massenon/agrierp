@@ -23,7 +23,7 @@ for (let i = 0; i < 600; i++) {
     const feed_types = Array.from({ length: alea(3) }, () => ({ id: uuid(++compteur), standard_bag_weight_kg: [0, 25, 20, 50, 12.5][alea(5)] }));
     const releve = alea(3) === 0 ? null : { id: uuid(++compteur), status: alea(2) === 0 ? 'valide' : 'a_valider', data: { ...(alea(3) === 0 ? {} : { mode: alea(2) === 0 ? 'manuel' : 'constate' }), ...(alea(4) === 0 ? {} : { critique_jours: 1 + alea(10) }) } };
     const consommation = alea(5) === 0 ? null : (alea(6) === 0 ? 0 : (1 + alea(alea(2) === 0 ? 400 : 12000)) / 100);
-    scenarios.push({ produits, feed_types, releve, consommation });
+    scenarios.push({ espece: i % 2 === 0 ? 'cuniculture' : 'porciculture', produits, feed_types, releve, consommation });
 }
 // Cas limites : l'autonomie vaut EXACTEMENT le seuil (3 j par défaut, ou la valeur de la règle) → critique.
 for (let k = 1; k <= 20; k++) {
@@ -50,7 +50,7 @@ test('autonomie = vrai AutonomieAlimentaireService', (t) => {
     scenarios.forEach((s, i) => {
         const produits = s.produits.map((p) => ({ id: p.id, name: p.name, unit: p.unit, stock_qty: p.stock_qty, species_id: p.espece === null ? null : p.espece === 'cuniculture' ? CUNI : 'ESP-PORC' }));
         const releves = s.releve === null ? [] : [{ id: s.releve.id, type: 'delai_regle', status: s.releve.status, is_active: true, data: s.releve.data }];
-        const a = evaluerAutonomie(produitProvende(produits, [CUNI]), s.consommation, s.feed_types, releves);
+        const a = evaluerAutonomie(produitProvende(produits, [s.espece === 'porciculture' ? 'ESP-PORC' : CUNI]), s.consommation, s.feed_types, releves, []);
         const p = retour[i];
         const ctx = `scénario ${i}`;
         assert.equal(a.available, p.available, `${ctx} disponible`);
@@ -68,8 +68,8 @@ test('autonomie = vrai AutonomieAlimentaireService', (t) => {
 
 test('seuil critique : 3 jours par défaut ; règle validée en mode « constaté » = seuil incertain (jamais inventé)', () => {
     assert.equal(SEUIL_CRITIQUE_DEPART_JOURS, 3);
-    assert.deepEqual(seuilCritique([]), { critique: 3, incertain: false });
-    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'a_valider', data: { critique_jours: 5 } }]), { critique: 5, incertain: false });
-    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'valide', data: { mode: 'manuel', critique_jours: 6 } }]), { critique: 6, incertain: false });
+    assert.deepEqual(seuilCritique([]), { critique: 3, incertain: false, source: 'depart' });
+    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'a_valider', data: { critique_jours: 5 } }]), { critique: 5, incertain: false, source: 'depart' });
+    assert.deepEqual(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'valide', data: { mode: 'manuel', critique_jours: 6 } }]), { critique: 6, incertain: false, source: 'manuel' });
     assert.equal(seuilCritique([{ id: 'a', type: 'delai_regle', status: 'valide', data: { mode: 'constate', critique_jours: 4 } }]).incertain, true);
 });

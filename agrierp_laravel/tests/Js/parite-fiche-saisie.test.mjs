@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { evaluerAutonomie, produitProvende } from '../../resources/js/hors-ligne/fiche-lapins-calculs.js';
+import { FAMILLES } from '../../resources/js/hors-ligne/fiche-familles.js';
 import { calculsSaisie, chargerJour, enregistrerJour, MOTIFS } from '../../resources/js/hors-ligne/fiche-lapins-saisie.js';
 import { computeEffectifFinal, jourDe } from '../../resources/js/hors-ligne/chaine-effectif.js';
 
@@ -22,10 +23,12 @@ const jourDuMois = (d) => `2026-${d > 31 ? '11' : '10'}-${deux(d > 31 ? d - 31 :
 let compteur = 0;
 const scenarios = [];
 const STADES = ['reproduction', 'croissance', 'engraissement', 'autre'];
-const NB = Number(process.env.SCENARIOS_LIMITE ?? 420); // une valeur réduite sert aux contrôles par mutation seulement
+const NB = Number(process.env.SCENARIOS_LIMITE ?? 600); // une valeur réduite sert aux contrôles par mutation seulement
 for (let i = 0; i < NB; i++) {
+    const famille = i % 2 === 0 ? 'lapins' : 'porcs'; // une moitié des scénarios par fiche
+    const F = FAMILLES[famille];
     const initial = 20 + alea(200);
-    const lot = { id: uuid(++compteur), code: `LAP-${i}`, species_code: 'cuniculture', stage: STADES[alea(4)], initial_quantity: initial, current_quantity: initial, status: 'actif', is_active: true };
+    const lot = { id: uuid(++compteur), code: `LAP-${i}`, species_code: F.espece, stage: STADES[alea(4)], initial_quantity: initial, current_quantity: initial, status: 'actif', is_active: true };
     const chaine = alea(2) === 0;
     const nb = alea(7);
     const jours = [...new Set(Array.from({ length: nb }, () => 25 + alea(16)))].sort((a, b) => a - b);
@@ -63,7 +66,7 @@ for (let i = 0; i < NB; i++) {
     mettre('donRepro', alea(3)); mettre('donChair', alea(3)); mettre('donLapereau', alea(3));
     mettre('passage', alea(6) === 0 ? 40 + alea(40) : alea(5));
     mettre('effectifM', alea(10)); mettre('effectifF', alea(30)); mettre('effectifSevres', alea(40)); mettre('effectifSmeres', alea(40));
-    if (alea(3) === 0) mettre('peseeTotal', alea(3) === 0 ? null : 500 + alea(9000));
+    if (alea(3) === 0) mettre('peseeTotal', alea(3) === 0 ? null : (F.kg ? (20 + alea(3000)) / 10 : 500 + alea(9000)));
     if (alea(3) === 0) { mettre('departRepro', alea(4) === 0 ? null : alea(80)); mettre('departSevre', alea(4) === 0 ? null : alea(80)); mettre('departJeune', alea(4) === 0 ? null : alea(80)); }
     const provende = {
         produit: alea(4) === 0 ? null : { id: uuid(++compteur), name: ['Provende lapin', 'Aliment lapin', 'Sac de provende'][alea(3)], unit: alea(2) === 0 ? 'sac' : 'kg', stock_qty: alea(5) === 0 ? 0 : alea(400) },
@@ -71,8 +74,8 @@ for (let i = 0; i < NB; i++) {
         releve: alea(3) === 0 ? null : { id: uuid(++compteur), status: alea(2) === 0 ? 'valide' : 'a_valider', data: { mode: alea(2) === 0 ? 'manuel' : 'constate', critique_jours: 1 + alea(8) } },
     };
     scenarios.push({
-        aujourdhui: '2026-11-09', lot, provende, fiches, exercices, jour, saisie: surcharges,
-        rations: Array.from({ length: alea(4) }, () => ({ stage_label: ['Reproducteur', 'Jeune', 'Sous-mères', 'Lapin de Chair'][alea(4)], ration_g_per_day: 20 + alea(200) })),
+        famille, aujourdhui: '2026-11-09', lot, provende, fiches, exercices, jour, saisie: surcharges,
+        rations: Array.from({ length: alea(4) }, () => ({ stage_label: (F.kg ? ['Reproducteur', 'Porcelet', 'Jeune porc', 'Porc Marchand'] : ['Reproducteur', 'Jeune', 'Sous-mères', 'Lapin de Chair'])[alea(4)], ration_g_per_day: 20 + alea(200) })),
     });
 }
 
@@ -100,12 +103,12 @@ test('saisie = vrai saveDay : saisie rechargée, refus, fiches écrites, chaîne
     scenarios.forEach((s, i) => {
         const p = retour[i];
         const ctx = `scénario ${i}`;
-        const charge = chargerJour(s.lot, s.fiches, s.jour);
+        const charge = chargerJour(s.lot, s.fiches, s.jour, FAMILLES[s.famille]);
         for (const k of PROPS) assert.equal(charge[k] ?? null, p.charge[k] ?? null, `${ctx} saisie rechargée ${k}`);
         const saisie = { ...charge, ...s.saisie };
         const produits = s.provende.produit ? [{ ...s.provende.produit, species_id: 'ESP' }] : [];
         const releves = s.provende.releve ? [{ id: s.provende.releve.id, type: 'delai_regle', status: s.provende.releve.status, is_active: true, data: s.provende.releve.data }] : [];
-        const c = calculsSaisie(s.lot, s.fiches, s.jour, saisie, s.rations, (kg) => evaluerAutonomie(produitProvende(produits, ['ESP']), kg, s.provende.feed_types, releves));
+        const c = calculsSaisie(s.lot, s.fiches, s.jour, saisie, s.rations, (kg) => evaluerAutonomie(produitProvende(produits, ['ESP']), kg, s.provende.feed_types, releves), FAMILLES[s.famille]);
         const a = p.apercu;
         assert.equal(c.veille, a.veille, `${ctx} effectif de la veille`);
         assert.equal(c.effectifFinal, a.effectifFinal, `${ctx} effectif final calculé`);
@@ -139,5 +142,5 @@ test('saisie = vrai saveDay : saisie rechargée, refus, fiches écrites, chaîne
         stats.ok++;
         if (normaliser(r.fiches).some((f, k) => f.effectif_final !== normaliser(s.fiches.concat([r.fiche]).filter((x, idx, arr) => arr.findIndex((y) => jourDe(y) === jourDe(x)) === idx))[k]?.effectif_final)) stats.cascade++;
     });
-    if (NB === 420) assert.ok(stats.ok > 120 && stats.clos > 5 && stats.passage > 5 && stats.depart > 5 && stats.ancienne > 3 && stats.morts > 5 && stats.somme > 5 && stats.gmq > 20 && stats.autonomie > 150 && stats.alerte > 20, `couverture insuffisante : ${JSON.stringify(stats)}`);
+    if (NB === 600) assert.ok(stats.ok > 120 && stats.clos > 5 && stats.passage > 5 && stats.depart > 5 && stats.ancienne > 3 && stats.morts > 5 && stats.somme > 5 && stats.gmq > 20 && stats.autonomie > 150 && stats.alerte > 20, `couverture insuffisante : ${JSON.stringify(stats)}`);
 });

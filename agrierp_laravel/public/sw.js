@@ -44,7 +44,7 @@
 // nouveau numéro, un poste déjà venu lirait l'ancienne fonte en cache et afficherait ces noms en toutes lettres.
 // v6 (PWA-1) — caisse hors ligne : nouvelle enveloppe statique précachée, nouveau cache `…-hors-ligne`.
 // v7 (CONF-3) — la page de caisse gagne le bandeau et la confirmation « prix périmés » (3 j / 7 j).
-const VERSION = 'agrierp-v13';
+const VERSION = 'agrierp-v18';
 const CACHE_STATIQUE = `${VERSION}-statique`;
 
 /** Le strict minimum pour afficher une page d'attente présentable ET ouvrir la caisse hors ligne. */

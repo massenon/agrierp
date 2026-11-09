@@ -15,14 +15,41 @@ $app = require $racine.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Livewire\Elevage\FicheLapins;
+use App\Livewire\Elevage\FichePorcs;
 use App\Models\FeedRationStandard;
+use App\Support\CategorieRationPorc;
 use App\Support\CategorieRationLapin;
 
 $entree = json_decode(stream_get_contents(STDIN), true);
-$sortie = ['cles' => [], 'provendes' => []];
+$sortie = ['cles' => [], 'provendes' => [], 'clesPorcs' => [], 'provendesPorcs' => []];
 
 foreach ($entree['libelles'] as $i => $libelle) {
     $sortie['cles'][$i] = CategorieRationLapin::cle($libelle);
+}
+
+foreach ($entree['libelles'] as $i => $libelle) {
+    $sortie['clesPorcs'][$i] = CategorieRationPorc::cle($libelle);
+}
+
+// PWA-3 (fiche porcs) : même jeux, jouées sur le vrai `FichePorcs::getProvendeCalculationProperty`.
+foreach ($entree['provendes'] as $i => $cas) {
+    $rations = collect(array_map(fn ($r) => new FeedRationStandard(['species_code' => 'porciculture', 'stage_label' => $r['stage_label'], 'ration_g_per_day' => $r['ration_g_per_day']]), $cas['rations']));
+    $composant = new class($rations, $cas['cat']) extends FichePorcs {
+        public function __construct(private $rationsFixes, private array $catFixes)
+        {
+        }
+
+        public function getRationStandardsProperty()
+        {
+            return $this->rationsFixes;
+        }
+
+        public function getCategoriesJourProperty(): array
+        {
+            return $this->catFixes;
+        }
+    };
+    $sortie['provendesPorcs'][$i] = $composant->getProvendeCalculationProperty();
 }
 
 foreach ($entree['provendes'] as $i => $cas) {

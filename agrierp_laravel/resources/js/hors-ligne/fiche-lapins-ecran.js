@@ -13,31 +13,15 @@
 
 import { arrondiPhp } from './calculs-caisse.js';
 import { effectifVeille, jourDe } from './chaine-effectif.js';
+import { ECRAN_COMMUN, LAPINS_F, FAMILLE_PAR_DEFAUT } from './fiche-familles.js';
+import { produitOeufs } from './fiche-pondeuses.js';
 
 export const ESPECE = 'cuniculture';
 
 /** Libellés et ordre du Blade (garde : `fiche-lapins-ecran.test.mjs`). */
-export const ECRAN = {
-    titre: 'Fiches Lapins - Cuniculture',
-    sousTitre: 'Fiche de suivi mensuel du cheptel — transcription fidèle du registre de la ferme.',
-    exportPdf: 'Exporter PDF',
-    exportPdfHorsLigne: 'Export PDF disponible en ligne seulement.',
-    kpis: ['Effectif Total Vivant', 'Géniteurs (M/F)', 'Naissances du Mois', 'Taux de Mortalité'],
-    aucuneBande: 'Aucune bande active en cuniculture pour le moment.',
-    saisieTitre: 'Saisie Journalière du Cheptel',
-    bande: 'Bande :',
-    date: 'Date :',
-    mois: 'Mois :',
-    moisPrecedent: 'Mois précédent',
-    moisSuivant: 'Mois suivant',
-    transferts: 'Transferts entre bandes ce jour :',
-    transfertsSuite: "— compris dans l'effectif final. Ils se modifient depuis l'écran",
-    transfertsEcran: 'Transferts entre Bandes',
-    // En-têtes du tableau mensuel : groupes (libellé, colspan/rowspan) puis sous-colonnes.
-    groupes: [['Date', 'rowspan'], ['Entrées', 2], ['Sorties', 3], ['Effectif Final du Jour', 5], ['Taux Mort %', 'rowspan'], ['Poids Général (g)', 'rowspan'], ['Traitements & Prophylaxie', 'rowspan']],
-    sousColonnes: ['Achat', 'Né', 'Mort', 'Vente', 'Don', 'M', 'F', 'Jeunes', 'S/Mères', 'Total'],
-    vide: '—',
-};
+/** Libellés de l'écran des lapins (communs + propres aux lapins), lus dans le Blade par la garde de sources. */
+export const MODULE_DESACTIVE = { titre: 'Module Héliciculture non activé', texte: "Ce module est disponible mais désactivé par défaut. Un administrateur peut l'activer depuis Paramètres > Modules Actifs." };
+export const ECRAN = { ...ECRAN_COMMUN, ...LAPINS_F.ecran };
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const FORMAT_JOUR = /^\d{4}-\d{2}-\d{2}$/;
@@ -123,8 +107,10 @@ export function tauxMortaliteFiche(fiche, veille) {
  * @param {{lots:object[], fiches:object[], soins:object[], produits:object[], exercices:object[]}} donnees  données tirées
  * @param {{bandeId:?string, date:string, aujourdhui:string}} etat  `aujourdhui` : le jour du Bénin (AAAA-MM-JJ)
  */
-export function modeleFiche(donnees, { bandeId = null, date, aujourdhui }) {
-    const lots = donnees.lots.filter((l) => l.species_code === ESPECE && l.status === 'actif' && l.is_active !== false);
+export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille = FAMILLE_PAR_DEFAUT }) {
+    // Escargots : sans le module `helico` activé (`modules_config`), aucune bande (`FicheEscargots::getLotsProperty`).
+    const moduleDesactive = Boolean(famille.module) && !(donnees.modules ?? []).some((x) => x.species_code === famille.module && x.is_enabled);
+    const lots = moduleDesactive ? [] : donnees.lots.filter((l) => (famille.accepte ? famille.accepte(l) : l.species_code === famille.espece) && l.status === 'actif' && l.is_active !== false);
     const bande = (bandeId !== null ? lots.find((l) => l.id === bandeId) : null) ?? lots[0] ?? null;
     const dateChoisie = dateValide(date) ? date : null; // sans date lisible : aucun jour surligné, aucun transfert (comme le composant)
     const dateAffichee = dateChoisie ?? aujourdhui;
@@ -140,13 +126,24 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui }) {
     const moisDesLots = fichesDesLots.filter(dansLeMois);
     const totalMorts = sommeNum(moisDesLots, (e) => e.mort);
     const totalDepart = moisDesLots.reduce((s, e) => s + effectifVeille(donnees.lots.find((l) => l.id === e.lot_id), donnees.fiches.filter((f) => f.lot_id === e.lot_id), jourDe(e), e.id), 0);
-    const kpis = {
-        effectif_total: sommeNum(lots, (l) => l.current_quantity),
-        geniteurs_m: sommeNum(derniereParLot, (e) => e.effectif_m),
-        geniteurs_f: sommeNum(derniereParLot, (e) => e.effectif_f),
-        naissances_mois: sommeNum(moisDesLots, (e) => e.ne),
-        taux_mortalite_mois: totalDepart > 0 ? arrondiPhp((totalMorts / totalDepart) * 100, 1) : 0,
-    };
+    const taux = totalDepart > 0 ? arrondiPhp((totalMorts / totalDepart) * 100, 1) : 0;
+    const totalOeufs = sommeNum(moisDesLots, (e) => e.ponte_total);
+    const naissains = sommeNum(moisDesLots, (e) => e.ne);
+    const totalCouves = totalOeufs;
+    const kpis = famille.id === 'pondeuses'
+        ? {
+            effectif: sommeNum(lots, (l) => l.current_quantity),
+            taux_ponte_moyen: sommeNum(lots, (l) => l.current_quantity) > 0 && moisDesLots.length > 0 ? arrondiPhp((totalOeufs / moisDesLots.length) / sommeNum(lots, (l) => l.current_quantity) * 100, 1) : 0,
+            stock_plateaux: produitOeufs(donnees.produits) ? Math.floor(Number(produitOeufs(donnees.produits).stock_qty ?? 0)) : null,
+            taux_mortalite_mois: taux,
+        }
+        : famille.id === 'reproducteurs'
+        ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), taux_eclosion: totalCouves > 0 ? arrondiPhp((naissains / totalCouves) * 100, 1) : null, poussins_nes: naissains, taux_mortalite_mois: taux }
+        : famille.id === 'escargots'
+        ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), naissains_mois: naissains, taux_eclosion: totalOeufs > 0 ? arrondiPhp((naissains / totalOeufs) * 100, 1) : null, taux_mortalite_mois: taux }
+        : famille.id === 'porcs'
+        ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), truies: sommeNum(derniereParLot, (e) => e.effectif_f), verrats: sommeNum(derniereParLot, (e) => e.effectif_m), porcelets_sous_mere: sommeNum(derniereParLot, (e) => e.effectif_sevres), taux_mortalite_mois: taux }
+        : { effectif_total: sommeNum(lots, (l) => l.current_quantity), geniteurs_m: sommeNum(derniereParLot, (e) => e.effectif_m), geniteurs_f: sommeNum(derniereParLot, (e) => e.effectif_f), naissances_mois: sommeNum(moisDesLots, (e) => e.ne), taux_mortalite_mois: taux };
 
     // Tableau mensuel : LA bande de la fiche.
     const fichesBande = bande ? donnees.fiches.filter((f) => f.lot_id === bande.id) : [];
@@ -171,9 +168,17 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui }) {
                 achat: f.achat ?? null, ne: f.ne ?? null, mort: f.mort ?? null, vente: f.vente ?? null, don: f.don ?? null,
                 effectif_m: f.effectif_m ?? null, effectif_f: f.effectif_f ?? null, effectif_sevres: f.effectif_sevres ?? null, effectif_smeres: f.effectif_smeres ?? null,
                 effectif_final: f.effectif_final ?? null,
+                // Pondeuses : effectif de début (veille), taux de ponte et œufs commercialisables du Blade.
+                effectif_debut: effectifVeille(bande, fichesBande, d, f.id),
+                comm: Math.max(0, (Number(f.ponte_total) || 0) - (Number(f.ponte_casses) || 0)),
+                taux_ponte: effectifVeille(bande, fichesBande, d, f.id) > 0 ? arrondiPhp(((Number(f.ponte_total) || 0) / effectifVeille(bande, fichesBande, d, f.id)) * 100, 1).toFixed(1) : null,
+                ponte_total: f.ponte_total ?? null, ponte_casses: f.ponte_casses ?? null,
                 taux: arrondiPhp(tauxMortaliteFiche(f, effectifVeille(bande, fichesBande, d, f.id)), 1).toFixed(1),
                 tauxPositif: tauxMortaliteFiche(f, effectifVeille(bande, fichesBande, d, f.id)) > 0,
-                poids_general_g: f.weight_sample_avg_g && f.effectif_final ? Math.round(Number(f.weight_sample_avg_g) * Number(f.effectif_final)) : null,
+                // Lapins : grammes entiers (`poids_general_g`) ; porcs : Kg à une décimale (`round(avg × final / 1000, 1)` du Blade).
+                poids_general_g: f.weight_sample_avg_g && f.effectif_final
+                    ? (famille.kg ? arrondiPhp((Number(f.weight_sample_avg_g) * Number(f.effectif_final)) / 1000, 1) : Math.round(Number(f.weight_sample_avg_g) * Number(f.effectif_final)))
+                    : null,
             },
             traitements: traitementsDuJour(d, f, soinsParJour.get(d) ?? [], donnees.produits),
         };
@@ -183,7 +188,7 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui }) {
     const t = (c) => Math.trunc(Number(duJour?.[c] ?? 0)) || 0;
 
     return {
-        lots, bande, dateAffichee, debutMois: debut,
+        famille, moduleDesactive, lots, bande, dateAffichee, debutMois: debut,
         libelleMois: `${MOIS[moisNum - 1][0].toUpperCase()}${MOIS[moisNum - 1].slice(1)} ${annee}`,
         estMoisCourant: debut.slice(0, 7) >= aujourdhui.slice(0, 7),
         kpis, jours,
@@ -207,74 +212,90 @@ export function texteTransferts(t) {
  * Construit le DOM de l'écran (jamais `innerHTML`) ; `h(tag, attrs, ...enfants)` est le constructeur de la page. `actions` : `{choisirBande, choisirDate, moisPrecedent, moisSuivant}`.
  */
 export function rendreFiche(m, h, actions) {
-    const kpi = (libelle, valeur, icone, couleur) => h('div', { class: `kpi fiche-kpi ${couleur}` }, h('div', { class: 'groupe', style: 'justify-content:space-between' }, h('span', { class: 'kpi-libelle' }, libelle), h('span', { class: 'material-symbols-outlined' }, icone)), h('span', { class: 'kpi-valeur' }, valeur));
+    const F = m.famille;
+    const E = { ...ECRAN_COMMUN, ...F.ecran };
+    const kpi = (libelle, valeur, icone, couleur, legende = null) => h('div', { class: `kpi fiche-kpi ${couleur}` }, h('div', { class: 'groupe', style: 'justify-content:space-between' }, h('span', { class: 'kpi-libelle' }, libelle), h('span', { class: 'material-symbols-outlined' }, icone)), h('span', { class: 'kpi-valeur' }, valeur), legende ? h('small', { class: 'muted' }, legende) : null);
 
+    if (m.moduleDesactive) {
+        return [h('div', { class: 'carte', id: 'fiche-module-desactive', style: 'text-align:center' }, h('span', { class: 'material-symbols-outlined', style: 'font-size:56px;color:#9ca3af' }, 'lock'), h('h2', {}, MODULE_DESACTIVE.titre), h('p', { class: 'muted' }, MODULE_DESACTIVE.texte))];
+    }
     const noeuds = [
         h('div', { class: 'fiche-entete' },
-            h('div', {}, h('h2', {}, h('span', { class: 'material-symbols-outlined' }, 'cruelty_free'), ECRAN.titre), h('p', { class: 'muted' }, ECRAN.sousTitre)),
-            h('button', { type: 'button', class: 'btn', disabled: true, title: ECRAN.exportPdfHorsLigne, 'data-export-pdf': true }, h('span', { class: 'material-symbols-outlined' }, 'picture_as_pdf'), ECRAN.exportPdf)),
+            h('div', {}, h('h2', {}, h('span', { class: 'material-symbols-outlined' }, F.icone), E.titre), h('p', { class: 'muted' }, E.sousTitre)),
+            h('button', { type: 'button', class: 'btn', disabled: true, title: E.exportPdfHorsLigne, 'data-export-pdf': true }, h('span', { class: 'material-symbols-outlined' }, 'picture_as_pdf'), E.exportPdf)),
         h('div', { class: 'fiche-kpis' },
-            kpi(ECRAN.kpis[0], nombre(m.kpis.effectif_total), 'pets', 'emerald'),
-            kpi(ECRAN.kpis[1], `${m.kpis.geniteurs_m} / ${m.kpis.geniteurs_f}`, 'favorite', 'blue'),
-            kpi(ECRAN.kpis[2], String(m.kpis.naissances_mois), 'child_care', 'maize'),
-            kpi(ECRAN.kpis[3], `${virgule(m.kpis.taux_mortalite_mois)} %`, 'trending_down', 'red')),
+            ...F.kpiValeurs(m.kpis).map((v, i) => kpi(E.kpis[i], v, E.kpiIcones[i], ['emerald', 'blue', 'maize', 'red'][i], (F.kpiLegendeDe ? F.kpiLegendeDe(m.kpis)[i] : E.kpiLegendes?.[i]) ?? null)),
+            ),
     ];
 
     if (m.lots.length === 0) {
-        noeuds.push(h('div', { class: 'carte', style: 'text-align:center' }, h('span', { class: 'material-symbols-outlined', style: 'font-size:44px;color:#9ca3af' }, 'inbox'), h('p', { style: 'font-weight:600;margin:8px 0 0' }, ECRAN.aucuneBande)));
+        noeuds.push(h('div', { class: 'carte', style: 'text-align:center' }, h('span', { class: 'material-symbols-outlined', style: 'font-size:44px;color:#9ca3af' }, 'inbox'), h('p', { style: 'font-weight:600;margin:8px 0 0' }, E.aucuneBande)));
         return noeuds;
     }
 
     const selecteurs = [];
-    if (m.lots.length > 1) {
-        const select = h('select', { id: 'fiche-bande', class: 'fiche-select' }, ...m.lots.map((l) => h('option', { value: l.id }, l.code)));
+    if (m.lots.length > 1 || E.bandeToujours) {
+        const select = h('select', { id: 'fiche-bande', class: 'fiche-select' }, ...m.lots.map((l) => h('option', { value: l.id }, E.bandeToujours ? `${l.code} (${F.libelleStade(l.stage)} — ${l.current_quantity} têtes)` : l.code)));
         select.value = m.bande.id;
         select.addEventListener('change', () => actions.choisirBande(select.value));
-        selecteurs.push(h('span', { class: 'muted' }, ECRAN.bande), select);
+        selecteurs.push(h('span', { class: 'muted' }, E.bandeLabel ?? E.bande), select);
     }
     const champDate = h('input', { type: 'date', id: 'fiche-date', class: 'fiche-select', value: m.dateAffichee });
     champDate.addEventListener('change', () => actions.choisirDate(champDate.value));
-    selecteurs.push(h('span', { class: 'muted' }, ECRAN.date), champDate, h('span', { class: 'muted' }, ECRAN.mois),
+    selecteurs.push(h('span', { class: 'muted' }, E.date), champDate, h('span', { class: 'muted' }, E.mois),
         h('div', { class: 'groupe', 'data-mois-de-fiche': true, style: 'gap:0;border:1px solid #d1d5db;border-radius:8px;overflow:hidden' },
-            h('button', { type: 'button', class: 'btn', title: ECRAN.moisPrecedent, 'aria-label': ECRAN.moisPrecedent, id: 'fiche-mois-precedent', onclick: actions.moisPrecedent }, '‹'),
+            h('button', { type: 'button', class: 'btn', title: E.moisPrecedent, 'aria-label': E.moisPrecedent, id: 'fiche-mois-precedent', onclick: actions.moisPrecedent }, '‹'),
             h('span', { id: 'fiche-libelle-mois', style: 'padding:0 8px;font-weight:700' }, m.libelleMois),
-            h('button', { type: 'button', class: 'btn', title: ECRAN.moisSuivant, 'aria-label': ECRAN.moisSuivant, id: 'fiche-mois-suivant', disabled: m.estMoisCourant, onclick: actions.moisSuivant }, '›')));
+            h('button', { type: 'button', class: 'btn', title: E.moisSuivant, 'aria-label': E.moisSuivant, id: 'fiche-mois-suivant', disabled: m.estMoisCourant, onclick: actions.moisSuivant }, '›')));
     noeuds.push(h('div', { class: 'carte' },
         h('div', { class: 'groupe', style: 'justify-content:space-between;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin-bottom:12px' },
-            h('h3', {}, h('span', { class: 'material-symbols-outlined' }, 'edit_note'), ECRAN.saisieTitre), h('div', { class: 'groupe' }, ...selecteurs)),
+            h('h3', {}, h('span', { class: 'material-symbols-outlined' }, 'edit_note'), E.saisieTitre), h('div', { class: 'groupe' }, ...selecteurs)),
         m.bandeau ? h('div', { class: 'bandeau neutre', 'data-bandeau-exercice': true }, h('span', { class: 'material-symbols-outlined' }, 'lock'), h('b', {}, m.bandeau.texte)) : null,
-        texteTransferts(m.transferts) ? h('div', { class: 'bandeau neutre', id: 'fiche-transferts', role: 'status' }, h('span', { class: 'material-symbols-outlined' }, 'swap_horiz'), `${ECRAN.transferts} ${texteTransferts(m.transferts)} ${ECRAN.transfertsSuite} ${ECRAN.transfertsEcran}.`) : null,
+        texteTransferts(m.transferts) ? h('div', { class: 'bandeau neutre', id: 'fiche-transferts', role: 'status' }, h('span', { class: 'material-symbols-outlined' }, 'swap_horiz'), `${E.transferts} ${texteTransferts(m.transferts)} ${E.transfertsSuite} ${E.transfertsEcran}.`) : null,
         actions.formulaire ? actions.formulaire() : null));
 
     // Tableau mensuel : en-têtes sur deux lignes, comme le Blade.
-    const groupes = ECRAN.groupes.map(([libelle, taille]) => h('th', taille === 'rowspan' ? { rowspan: 2 } : { colspan: taille }, libelle));
-    const sous = ECRAN.sousColonnes.map((libelle) => h('th', {}, libelle));
+    const groupes = E.groupes.map(([libelle, taille]) => h('th', taille === 'rowspan' ? { rowspan: 2 } : { colspan: taille }, libelle));
+    const sous = E.sousColonnes.map((libelle) => h('th', {}, libelle));
     const ligne = (j) => {
         const f = j.fiche;
+        if (E.cellules) {
+            // Famille à tableau propre (reproducteurs) : les cellules suivent l'ordre du Blade.
+            const valeur = (champ) => (champ === 'taux' ? (f ? f.taux : E.vide) : champ === 'traitements' ? j.traitements : champ === 'stock' ? E.vide : champ === 'taux_ponte' ? (f?.taux_ponte ?? E.vide) : cellule(f?.[champ]));
+            const classe = (style) => (style === 'alerte' ? ((f?.mort ?? 0) > 0 ? 'alerte' : '') : style === 'tauxAlerte' ? (f?.tauxPositif ? 'alerte' : '') : style ?? '');
+            return h('tr', { 'data-jour': j.date, class: j.choisi ? 'choisi' : '', onclick: () => actions.choisirDate(j.date) },
+                h('td', { class: 'sticky' }, j.jourMois), ...E.cellules.map(([champ, style]) => h('td', { class: classe(style) }, valeur(champ))));
+        }
         return h('tr', { 'data-jour': j.date, class: j.choisi ? 'choisi' : '', onclick: () => actions.choisirDate(j.date) },
             h('td', { class: 'sticky' }, j.jourMois),
             h('td', {}, cellule(f?.achat)), h('td', {}, cellule(f?.ne)),
             h('td', { class: (f?.mort ?? 0) > 0 ? 'alerte' : '' }, cellule(f?.mort)),
             h('td', {}, cellule(f?.vente)), h('td', {}, cellule(f?.don)),
-            h('td', {}, cellule(f?.effectif_m)), h('td', {}, cellule(f?.effectif_f)), h('td', {}, cellule(f?.effectif_sevres)), h('td', {}, cellule(f?.effectif_smeres)),
+            ...E.colonnesEffectif.map((c) => h('td', {}, cellule(f?.[c]))),
             h('td', { class: 'gras' }, cellule(f?.effectif_final)),
-            h('td', { class: f?.tauxPositif ? 'alerte' : '' }, f ? f.taux : ECRAN.vide),
+            h('td', { class: f?.tauxPositif ? 'alerte' : '' }, f ? f.taux : E.vide),
             h('td', { class: 'num' }, cellule(f?.poids_general_g)),
             h('td', {}, j.traitements));
     };
     noeuds.push(h('div', { class: 'carte fiche-tableau' },
-        h('div', { style: 'overflow-x:auto' }, h('table', { id: 'fiche-mensuel' }, h('thead', {}, h('tr', {}, ...groupes), h('tr', {}, ...sous)), h('tbody', {}, ...m.jours.map(ligne))))));
+        h('div', { style: 'overflow-x:auto' }, h('table', { id: 'fiche-mensuel' }, h('thead', {}, h('tr', {}, ...groupes), h('tr', {}, ...sous)), h('tbody', {}, ...m.jours.map(ligne)))),
+        E.note ? h('p', { class: 'muted', id: 'fiche-note' }, E.note) : null));
 
     // Cartes (petits écrans) : un jour = une carte, mêmes libellés de colonnes.
-    const noms = [...ECRAN.sousColonnes];
+    const noms = E.cartes ? [...E.cartes] : [...E.sousColonnes];
     noeuds.push(h('div', { class: 'fiche-cartes', id: 'fiche-cartes' }, ...m.jours.map((j) => {
         const f = j.fiche;
-        const valeurs = f ? [f.achat, f.ne, f.mort, f.vente, f.don, f.effectif_m, f.effectif_f, f.effectif_sevres, f.effectif_smeres, f.effectif_final] : [];
+        if (E.cellules) {
+            return h('div', { class: `fiche-carte${j.choisi ? ' choisi' : ''}`, 'data-jour': j.date, onclick: () => actions.choisirDate(j.date) },
+                h('b', {}, j.jourMois),
+                h('div', { class: 'fiche-carte-grille' }, ...E.cellules.map(([champ], i) => h('span', {}, h('small', {}, noms[i]), ' ', champ === 'taux' ? (f ? f.taux : E.vide) : champ === 'traitements' ? j.traitements : champ === 'stock' ? E.vide : champ === 'taux_ponte' ? (f?.taux_ponte ?? E.vide) : cellule(f?.[champ])))));
+        }
+        const valeurs = f ? [f.achat, f.ne, f.mort, f.vente, f.don, ...E.colonnesEffectif.map((c) => f[c]), f.effectif_final] : [];
         return h('div', { class: `fiche-carte${j.choisi ? ' choisi' : ''}`, 'data-jour': j.date, onclick: () => actions.choisirDate(j.date) },
             h('b', {}, j.jourMois),
             h('div', { class: 'fiche-carte-grille' }, ...noms.map((n, i) => h('span', {}, h('small', {}, n), ' ', cellule(valeurs[i])))),
-            h('small', {}, `${ECRAN.groupes[4][0]} ${f ? f.taux : ECRAN.vide} · ${ECRAN.groupes[5][0]} ${cellule(f?.poids_general_g)}`),
-            h('small', {}, `${ECRAN.groupes[6][0]} : ${j.traitements}`));
+            h('small', {}, `${E.groupes[4][0]} ${f ? f.taux : E.vide} · ${E.groupes[5][0]} ${cellule(f?.poids_general_g)}`),
+            h('small', {}, `${E.groupes[6][0]} : ${j.traitements}`));
     })));
     return noeuds;
 }
