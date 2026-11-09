@@ -243,7 +243,8 @@ export function rendreFiche(m, h, actions) {
         h('div', { class: 'groupe', style: 'justify-content:space-between;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin-bottom:12px' },
             h('h3', {}, h('span', { class: 'material-symbols-outlined' }, 'edit_note'), ECRAN.saisieTitre), h('div', { class: 'groupe' }, ...selecteurs)),
         m.bandeau ? h('div', { class: 'bandeau neutre', 'data-bandeau-exercice': true }, h('span', { class: 'material-symbols-outlined' }, 'lock'), h('b', {}, m.bandeau.texte)) : null,
-        texteTransferts(m.transferts) ? h('div', { class: 'bandeau neutre', id: 'fiche-transferts', role: 'status' }, h('span', { class: 'material-symbols-outlined' }, 'swap_horiz'), `${ECRAN.transferts} ${texteTransferts(m.transferts)} ${ECRAN.transfertsSuite} ${ECRAN.transfertsEcran}.`) : null));
+        texteTransferts(m.transferts) ? h('div', { class: 'bandeau neutre', id: 'fiche-transferts', role: 'status' }, h('span', { class: 'material-symbols-outlined' }, 'swap_horiz'), `${ECRAN.transferts} ${texteTransferts(m.transferts)} ${ECRAN.transfertsSuite} ${ECRAN.transfertsEcran}.`) : null,
+        actions.formulaire ? actions.formulaire() : null));
 
     // Tableau mensuel : en-têtes sur deux lignes, comme le Blade.
     const groupes = ECRAN.groupes.map(([libelle, taille]) => h('th', taille === 'rowspan' ? { rowspan: 2 } : { colspan: taille }, libelle));

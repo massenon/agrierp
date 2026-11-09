@@ -13,6 +13,7 @@ import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.j
 import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
 import { jourBenin, lotsVendables, bandeSousRemanence, refusDuPanier, elevageApresVentes } from './elevage-hors-ligne.js';
 import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
+import { appliquerSaisies, chargerJour, enregistrerJour, garderSaisie, saisiesEnAttente, rendreFormulaire, refusExerciceClos, ROLES_ECRITURE, MOTIFS as MOTIFS_SAISIE } from './fiche-lapins-saisie.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
 import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, messageBandeauPrix, messageConfirmationVente, niveauPrixPerimes, NIVEAUX_PRIX, LIBELLES_STATUT } from './catalogue.js';
@@ -33,7 +34,8 @@ const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
-    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null },
+    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], saisie: null, saisieCle: null, retour: null },
+    role: null,
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
@@ -85,6 +87,7 @@ async function demarrer() {
         return;
     }
     app.appareil = etat;
+    app.role = etat.utilisateur?.role ?? null;
     app.suspendu = etat.suspendu;
     $('nom-utilisateur').textContent = etat.utilisateur?.name ? `— ${etat.utilisateur.name}` : '';
     await verrouillerEcran(`Saisissez votre PIN pour ouvrir la caisse hors ligne.`);
@@ -146,6 +149,10 @@ async function chargerReferentiels() {
     // PWA-1b — bandes, fiches du jour et rémanences tirées ; les ventes en attente sont rejouées au-dessus (jamais écrites dans la copie tirée).
     app.elevageTire = { lots: await lire('livestock_lots'), fiches: await lire('livestock_daily_entries') };
     app.remanences = await lire('veterinary_withdrawal_periods');
+    // PWA-3 (É3) : saisies de fiche en attente d'envoi, exercices et barème, rejoués AVANT les ventes en attente.
+    app.fiche.saisies = await saisiesEnAttente(app.ctx);
+    app.fiche.exercices = await lire('fiscal_years');
+    app.fiche.rations = (await lire('feed_ration_standards')).filter((r) => r.species_code === 'cuniculture');
     await recalculerElevage();
     // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
     app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries'));
@@ -166,7 +173,8 @@ const jourDuComptoir = () => jourBenin(Date.now() + (app.decalage ?? 0));
 /** Les bandes et fiches APRÈS les ventes en attente (rejouées dans l'ordre de saisie). */
 async function recalculerElevage() {
     const ventes = (await lister(app.ctx, 'pending')).map((l) => l.vente);
-    app.elevage = elevageApresVentes(app.elevageTire, ventes, app.produits);
+    const avecSaisies = appliquerSaisies(app.elevageTire, app.fiche.saisies ?? [], { exercices: app.fiche.exercices ?? [], rations: app.fiche.rations ?? [] });
+    app.elevage = elevageApresVentes({ lots: avecSaisies.lots, fiches: avecSaisies.fiches }, ventes, app.produits);
     if (app.fiche.donnees) { app.fiche.donnees.lots = app.elevage.lots; app.fiche.donnees.fiches = app.elevage.fiches; if (app.fiche.vue) dessinerFiche(); } // la fiche suit les ventes en attente
 }
 
@@ -184,7 +192,45 @@ function dessinerFiche() {
         choisirDate: (d) => { if (d) aller(d); },
         moisPrecedent: () => aller(moisPrecedent(date, aujourdhui)),
         moisSuivant: () => { const d = moisSuivant(date, aujourdhui); if (d) aller(d); },
+        formulaire: () => formulaireDuJour(m),
     }));
+}
+
+/** PWA-3 (É3) : le formulaire de saisie du jour affiché (bande et jour de l'écran). */
+function formulaireDuJour(m) {
+    const bande = m.bande;
+    if (!bande) return null;
+    const jour = m.dateAffichee;
+    const donnees = () => app.fiche.donnees;
+    const lot = () => donnees().lots.find((l) => l.id === bande.id);
+    const cle = `${bande.id}|${jour}`;
+    if (app.fiche.saisieCle !== cle) { app.fiche.saisieCle = cle; app.fiche.saisie = null; app.fiche.retour = null; }
+    if (!app.fiche.saisie) app.fiche.saisie = chargerJour(lot(), donnees().fiches, jour);
+    const s = app.fiche.saisie;
+    const lectureSeule = () => (ROLES_ECRITURE.includes(app.role) ? refusExerciceClos(app.fiche.exercices, jour) : MOTIFS_SAISIE.droit);
+    return rendreFormulaire(h, {
+        s,
+        retourInitial: app.fiche.retour,
+        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations, lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour) }),
+        actions: {
+            enregistrer: async (saisie) => {
+                const existante = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour);
+                const fiche = donnees().fiches.find((f) => f.lot_id === bande.id && String(f.entry_date).slice(0, 10) === jour);
+                const r = enregistrerJour(lot(), donnees().fiches, jour, saisie, { role: app.role, exercices: app.fiche.exercices, rations: app.fiche.rations, idFiche: fiche?.id ?? existante?.id_fiche });
+                if (r.refus !== null) return { refus: r.refus };
+                try {
+                    app.fiche.saisies = await garderSaisie(app.ctx, { id_fiche: r.fiche.id, lot_id: bande.id, jour, saisie: { ...saisie }, cree_le: new Date().toISOString() });
+                } catch (e) {
+                    return { refus: `La saisie n'est PAS enregistrée : ${e?.message ?? 'écriture locale impossible'}.` };
+                }
+                app.fiche.retour = MOTIFS_SAISIE.enregistre;
+                app.fiche.saisie = null;
+                await recalculerElevage();
+                await dessiner();
+                return { refus: null };
+            },
+        },
+    });
 }
 
 function basculerVue(fiche) {

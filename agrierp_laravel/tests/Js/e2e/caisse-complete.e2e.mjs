@@ -312,7 +312,9 @@ try {
     await page.setViewportSize({ width: 390, height: 800 });
     assert.equal(await page.isVisible('#fiche-cartes'), true, 'cartes sous 640 px');
     assert.equal(await page.isVisible('#fiche-mensuel'), false);
-    ok('fiche lapins hors ligne : 4 KPI, une ligne par jour, vente du jour, navigation de mois, export PDF grisé, cartes sur mobile');
+    assert.match(await page.textContent('#saisie-lecture-seule'), /lecture seule/, 'le caissier lit la fiche sans pouvoir l\'écrire (manage-elevage)');
+    assert.equal(await page.isDisabled('#saisie-enregistrer'), true);
+    ok('fiche lapins hors ligne : 4 KPI, une ligne par jour, vente du jour, navigation de mois, export PDF grisé, cartes sur mobile, saisie en lecture seule pour le caissier');
 
 } catch (e) {
     echec = e;
