@@ -57,3 +57,50 @@ export function provendeDuJour(cat, rations) {
     const total = inconnu ? null : repro.total_g + sousMeres.total_g + chair.total_g;
     return { repro, sous_meres: sousMeres, chair, total_g: total, total_kg: total === null ? null : arrondiPhp(total / 1000, 2) };
 }
+
+// ------------------------------------------------------------------------------------------ autonomie alimentaire (É5)
+
+/** `ReleveTerrainService::CRITIQUE_DEPART` : seuil critique d'autonomie (jours) tant qu'aucune règle n'est validée. */
+export const SEUIL_CRITIQUE_DEPART_JOURS = 3;
+const sansAccent = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** `AutonomieAlimentaireService::produitProvende` : le premier produit (par identifiant) de l'espèce dont le nom contient « provende » ou « aliment ». */
+export function produitProvende(produits, especeIds) {
+    return [...produits]
+        .filter((p) => especeIds.includes(p.species_id) && (sansAccent(p.name).includes('provende') || sansAccent(p.name).includes('aliment')))
+        .sort((a, b) => (String(a.id) < String(b.id) ? -1 : 1))[0] ?? null;
+}
+
+/** `Product::stockEnKg` : un sac vaut le poids du premier type de provende (par identifiant), 25 kg à défaut. */
+export function stockEnKg(produit, feedTypes) {
+    const quantite = Number(produit.stock_qty ?? 0) || 0;
+    if (produit.unit !== 'sac') return quantite;
+    const premier = [...feedTypes].sort((a, b) => (String(a.id) < String(b.id) ? -1 : 1))[0];
+    return arrondiPhp(quantite * (Number(premier?.standard_bag_weight_kg) || 25), 2);
+}
+
+/**
+ * `ReleveTerrainService::regleEnVigueur` (la part « seuil critique ») : la ligne `delai_regle` active de plus petit identifiant ; son
+ * `critique_jours` (3 par défaut). ⚠️ Règle VALIDÉE en mode « constaté » : le serveur prend le plus long délai des cinq derniers bons de
+ * commande reçus, que le navigateur ne tire pas : le seuil est alors porté `incertain` (l'écran le dit, jamais une valeur inventée).
+ */
+export function seuilCritique(releves) {
+    const ligne = [...releves].filter((r) => r.type === 'delai_regle' && r.is_active !== false).sort((a, b) => (String(a.id) < String(b.id) ? -1 : 1))[0] ?? null;
+    let d = ligne?.data ?? {};
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = {}; } }
+    const critique = Math.trunc(Number(d.critique_jours ?? SEUIL_CRITIQUE_DEPART_JOURS)) || 0;
+    return { critique, incertain: ligne?.status === 'valide' && (d.mode ?? 'constate') !== 'manuel' };
+}
+
+/** `AutonomieAlimentaireService::evaluer`. `consommationKgJour` : `null` = inconnue. */
+export function evaluerAutonomie(produit, consommationKgJour, feedTypes, releves) {
+    if (!produit) return { available: false };
+    const stockKg = stockEnKg(produit, feedTypes);
+    const rupture = stockKg <= 0;
+    const seuil = seuilCritique(releves);
+    if (consommationKgJour === null || consommationKgJour === undefined) {
+        return { available: true, inconnu: true, product: produit, stock_kg: stockKg, autonomie_jours: null, critique: rupture, rupture, seuilIncertain: seuil.incertain };
+    }
+    const autonomieJours = consommationKgJour > 0 ? arrondiPhp(stockKg / consommationKgJour, 1) : 99;
+    return { available: true, product: produit, stock_kg: stockKg, autonomie_jours: autonomieJours, critique: rupture || autonomieJours <= seuil.critique, rupture, seuilIncertain: seuil.incertain };
+}

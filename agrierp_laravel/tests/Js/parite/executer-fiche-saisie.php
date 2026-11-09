@@ -30,6 +30,9 @@ use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
+use App\Models\FieldSurveyEntry;
+use App\Models\Product;
+use App\Models\ProductCategory;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -63,6 +66,23 @@ foreach ($entree['scenarios'] as $i => $s) {
         foreach ($s['rations'] as $r) {
             FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => $r['stage_label'], 'ration_g_per_day' => $r['ration_g_per_day'], 'is_active' => true]);
         }
+        // É5 : produit de provende, types de provende (poids du sac) et règle de terrain, pour l'autonomie alimentaire de la fiche.
+        $p = $s['provende']['produit'];
+        if ($p !== null) {
+            $produit = new Product(['sku' => 'SP', 'name' => $p['name'], 'category_id' => ProductCategory::create(['label' => 'Parité', 'is_active' => true])->id, 'unit' => $p['unit'], 'pricing_mode' => 'fourchette', 'price_min' => 1, 'price_max' => 2, 'stock_qty' => $p['stock_qty'], 'is_active' => true]);
+            $produit->id = $p['id'];
+            $produit->species_id = $espece->id;
+            $produit->save();
+        }
+        foreach ($s['provende']['feed_types'] as $f) {
+            DB::table('feed_types')->insert(['id' => $f['id'], 'name' => 'T', 'standard_bag_weight_kg' => $f['standard_bag_weight_kg'], 'price_per_kg' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        if ($s['provende']['releve'] !== null) {
+            $r = new FieldSurveyEntry;
+            $r->forceFill(['type' => 'delai_regle', 'label' => 'Règle', 'data' => $s['provende']['releve']['data'], 'status' => $s['provende']['releve']['status'], 'is_active' => true]);
+            $r->id = $s['provende']['releve']['id'];
+            $r->save();
+        }
         $lot = new LivestockLot(['code' => $s['lot']['code'], 'species_id' => $espece->id, 'stage' => $s['lot']['stage'], 'initial_quantity' => $s['lot']['initial_quantity'], 'current_quantity' => $s['lot']['current_quantity'], 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
         $lot->id = $s['lot']['id'];
         $lot->save();
@@ -87,6 +107,7 @@ foreach ($entree['scenarios'] as $i => $s) {
             'veille' => $a->getPreviousEffectifProperty(), 'effectifFinal' => $a->getEffectifFinalCalcProperty(), 'taux' => $a->getMortalityRateCalcProperty(),
             'avertissementMorts' => $a->getAvertissementMortsProperty(), 'poidsEstime' => $a->getPoidsMoyenEstimeProperty(),
             'provende_kg' => $a->getProvendeCalculationProperty()['total_kg'],
+            'autonomie' => (function () use ($a) { $x = $a->getFeedAutonomyProperty(); return ['available' => $x['available'], 'product' => isset($x['product']) ? $x['product']->id : null, 'stock_kg' => $x['stock_kg'] ?? null, 'autonomie_jours' => $x['autonomie_jours'] ?? null, 'critique' => $x['critique'] ?? null, 'rupture' => $x['rupture'] ?? null, 'inconnu' => $x['inconnu'] ?? false]; })(),
             'cat' => array_intersect_key($cat, array_flip(['mode', 'repro', 'sevre', 'jeune', 'motif', 'refus_passage', 'avertissements', 'depart_requis', 'depart_date'])),
         ];
         $t->call('saveDay');

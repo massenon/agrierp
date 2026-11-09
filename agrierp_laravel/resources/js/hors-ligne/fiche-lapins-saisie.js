@@ -15,7 +15,7 @@
 
 import { computeEffectifFinal, effectifVeille, etatPourJour, jourDe, recalculerEnCascade, teteDeChaine } from './chaine-effectif.js';
 import { LAPINS, calculerJour, departDepuisStade, verifierDepart } from './effectif-categories.js';
-import { provendeDuJour } from './fiche-lapins-calculs.js';
+import { provendeDuJour, LIBELLES as LIBELLES_RATION } from './fiche-lapins-calculs.js';
 import { arrondiPhp } from './calculs-caisse.js';
 import { chiffrer, dechiffrer } from './coffre.js';
 
@@ -49,6 +49,21 @@ export const LIBELLES = {
     effectifFinal: 'Effectif Final du Jour (Calculé dynamique)', taux: 'Taux de Mortalité du Jour (%)',
     pesee: 'Poids Général Pesé (g)', echantillon: 'Taille Échantillon', echantillonAuto: '(Auto = Effectif Final)', poidsMoyen: 'Poids Moyen Constaté',
     gmq: 'Poids moyen estimé (GMQ) :', enregistrer: 'Enregistrer ce Jour',
+    provende: 'Rationnement & Provende Servie par Catégorie (en Grammes g/j)', categorie: 'Catégorie', effectif: 'Effectif', ration: 'Ration Normative', servie: 'Provende Servie (g)',
+    totalProvende: 'TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)',
+};
+
+/** `components/autonomie-alimentaire.blade.php` : les cinq états, mêmes phrases (garde : `fiche-lapins-saisie.test.mjs`). */
+export const AUTONOMIE = {
+    aucunTitre: 'Autonomie alimentaire : aucun stock de provende suivi',
+    aucunTexte: (filiere) => `Aucun produit de provende ${filiere} n'existe en catalogue avec un stock suivi : créez-le et approvisionnez-vous. La fiche s'enregistre quand même.`,
+    ruptureTitre: 'Autonomie alimentaire : rupture de stock',
+    ruptureTexte: (nom, kg) => `Le stock de ${nom} est épuisé (${kg} Kg) : approvisionnez-vous. La fiche s'enregistre quand même.`,
+    inconnu: (nom, kg) => `Autonomie alimentaire : — (${nom}, ${kg} Kg en stock) — la consommation du jour est inconnue tant que les effectifs par catégorie le sont.`,
+    critiqueTitre: 'Alerte critique - Autonomie alimentaire',
+    critiqueTexte: (nom, jours) => `Le stock de ${nom} ne couvre plus que ${jours} jours de consommation théorique du cheptel actif ! Approvisionnez-vous.`,
+    normal: (jours, nom, kg) => `Autonomie alimentaire : ${jours} jours (${nom}, ${kg} Kg en stock).`,
+    seuilIncertain: 'Seuil critique constaté sur les bons de commande : à confirmer en ligne.',
 };
 
 const FORMAT_JOUR = /^\d{4}-\d{2}-\d{2}$/;
@@ -116,9 +131,9 @@ export function poidsMoyenEstime(lot, fiches, jour, s) {
  * Tout ce que l'écran du web calcule à partir de la saisie : effectif de la veille, effectif final, taux, catégories (`categoriesJour`),
  * avertissement des morts, provende, poids estimé.
  */
-export function calculsSaisie(lot, fiches, jour, s, rations = []) {
+export function calculsSaisie(lot, fiches, jour, s, rations = [], autonomie = null) {
     const cat = { mode: 'sans_chaine', repro: null, sevre: null, jeune: null, resultat: null, motif: null, refus_passage: null, avertissements: [], depart_requis: false, depart_date: null, depart: null };
-    const sortie = { veille: 0, vente: 0, effectifFinal: 0, taux: 0, cat, avertissementMorts: null, provende: provendeDuJour({}, rations), poidsEstime: null };
+    const sortie = { veille: 0, vente: 0, effectifFinal: 0, taux: 0, cat, avertissementMorts: null, provende: provendeDuJour({}, rations), poidsEstime: null, autonomie: { available: false } };
     if (!lot) return sortie;
     const valide = dateValide(jour);
     const duLot = fichesDe(lot, fiches);
@@ -161,6 +176,7 @@ export function calculsSaisie(lot, fiches, jour, s, rations = []) {
         }
     }
     sortie.provende = provendeDuJour({ repro: cat.repro, sevre: cat.sevre, jeune: cat.jeune }, rations);
+    sortie.autonomie = autonomie ? autonomie(sortie.provende.total_kg) : { available: false };
     return sortie;
 }
 
@@ -237,13 +253,67 @@ export async function garderSaisie({ base, cle }, item, maintenant = () => new D
 export function appliquerSaisies(tire, saisies, ctx = {}) {
     let courant = { lots: tire.lots, fiches: tire.fiches };
     const sautees = [];
-    for (const it of saisies) {
+    for (const it of saisies.filter((x) => x.sync_status !== 'conflict')) {
         const lot = courant.lots.find((l) => l.id === it.lot_id);
         const r = lot ? enregistrerJour(lot, courant.fiches, it.jour, it.saisie, { ...ctx, role: null, idFiche: it.id_fiche }) : { refus: MOTIFS.aucuneBande };
         if (r.refus !== null) { sautees.push({ ...it, refus: r.refus }); continue; }
         courant = { lots: courant.lots.map((l) => (l.id === r.lot.id ? r.lot : l)), fiches: r.fiches };
     }
     return { ...courant, sautees };
+}
+
+// ------------------------------------------------------------------------------------------------------ file d'envoi (É4)
+
+const ecrireSaisies = async ({ base, cle }, liste, maintenant = () => new Date()) => {
+    if (liste.length === 0) { await base.supprimer('referentiels', TABLE_FICHES_A_ENVOYER); return; }
+    await base.ecrire('referentiels', { table: TABLE_FICHES_A_ENVOYER, tire_le: maintenant().toISOString(), ...(await chiffrer(cle, liste)) });
+};
+
+/** Les saisies à envoyer : `pending` seulement (une saisie refusée reste `conflict` jusqu'à la reprise manuelle, jamais renvoyée en boucle). */
+export const aEnvoyerFiches = (liste) => liste.filter((x) => x.sync_status === 'pending');
+
+/**
+ * La fiche telle que le poste Flutter l'envoie (`_ficheEnJson`) : mêmes colonnes, les mouvements par catégorie seulement quand ils sont
+ * connus, le départ seulement s'il est écrit, JAMAIS `effectif_final` ni `cat_eff_*` (le serveur les recalcule). `vente` part à 0 : les
+ * ventes arrivent par leur propre envoi, juste après, et chacune incrémente la fiche une seule fois (règle S-T9 du serveur).
+ */
+export function ficheEnJson(item, deviceId) {
+    const f = item.fiche;
+    const somme = (a, b, c) => (nonNul(a) && nonNul(b) && nonNul(c) ? n(a) + n(b) + n(c) : null);
+    const connus = {};
+    for (const c of ['mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'effectif_m', 'effectif_f', 'effectif_sevres', 'effectif_smeres']) {
+        if (nonNul(f[c])) connus[c] = n(f[c]);
+    }
+    const depart = nonNul(f.cat_depart_repro) && nonNul(f.cat_depart_sevre) && nonNul(f.cat_depart_jeune);
+    if (!depart) for (const c of ['cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune']) delete connus[c];
+    return {
+        id: f.id, lot_id: f.lot_id, entry_date: jourDe(f), achat: n(f.achat), ne: n(f.ne),
+        mort: somme(f.mort_repro, f.mort_sevre, f.mort_jeune) ?? n(f.mort), vente: 0,
+        don: somme(f.don_repro, f.don_sevre, f.don_jeune) ?? n(f.don),
+        feed_qty_kg: nonNul(f.feed_qty_kg) ? Number(f.feed_qty_kg) : null, weight_sample_avg_g: nonNul(f.weight_sample_avg_g) ? Number(f.weight_sample_avg_g) : null,
+        ...connus, device_id: deviceId, updated_at: item.cree_le,
+    };
+}
+
+const modifier = async (ctx, f, maintenant) => { await ecrireSaisies(ctx, f(await saisiesEnAttente(ctx)), maintenant); };
+
+/** Accusé du serveur : `synced` (reste rejouée sur la copie tirée jusqu'à un tirage ultérieur qui la contient). `fusion` : id de la fiche du serveur. */
+export const marquerFichesSynced = (ctx, ids, maintenant = () => new Date()) => modifier(ctx, (l) => l.map((x) => (ids.includes(x.id_fiche) ? { ...x, sync_status: 'synced', synced_le: maintenant().toISOString(), motif: null } : x)), maintenant);
+export const marquerFicheConflit = (ctx, id, motif, maintenant = () => new Date()) => modifier(ctx, (l) => l.map((x) => (x.id_fiche === id ? { ...x, sync_status: 'conflict', motif } : x)), maintenant);
+export const remettreFicheEnFile = (ctx, id, maintenant = () => new Date()) => modifier(ctx, (l) => l.map((x) => (x.id_fiche === id && x.sync_status === 'conflict' ? { ...x, sync_status: 'pending', motif: null } : x)), maintenant);
+export const abandonnerFiche = (ctx, id, maintenant = () => new Date()) => modifier(ctx, (l) => l.filter((x) => x.id_fiche !== id), maintenant);
+/** Retire les saisies acquittées avant `avant` (instant) : un tirage commencé APRÈS les contient, la copie tirée les porte alors seule. */
+export const retirerFichesSynced = (ctx, avant, maintenant = () => new Date()) => modifier(ctx, (l) => l.filter((x) => !(x.sync_status === 'synced' && Date.parse(x.synced_le ?? 0) < avant)), maintenant);
+
+/** L'alerte d'autonomie alimentaire (classes de la PWA : rouge = `refus`, neutre, vert = `info`). Jamais bloquante. */
+export function rendreAutonomie(h, a, filiere = 'cuniculture') {
+    const bloc = (classe, ...enfants) => h('div', { class: `bandeau ${classe}`, id: 'saisie-autonomie-bloc', style: 'margin:0' }, ...enfants);
+    if (!a.available) return bloc('refus', h('b', {}, AUTONOMIE.aucunTitre), h('p', { style: 'margin:2px 0 0' }, AUTONOMIE.aucunTexte(filiere)));
+    const note = a.seuilIncertain ? h('p', { class: 'muted', style: 'margin:2px 0 0' }, AUTONOMIE.seuilIncertain) : null;
+    if (a.rupture) return bloc('refus', h('b', {}, AUTONOMIE.ruptureTitre), h('p', { style: 'margin:2px 0 0' }, AUTONOMIE.ruptureTexte(a.product.name, a.stock_kg)));
+    if (a.inconnu) return bloc('neutre', AUTONOMIE.inconnu(a.product.name, a.stock_kg));
+    if (a.critique) return bloc('refus', h('b', {}, AUTONOMIE.critiqueTitre), h('p', { style: 'margin:2px 0 0' }, AUTONOMIE.critiqueTexte(a.product.name, a.autonomie_jours)), note);
+    return bloc('info', AUTONOMIE.normal(a.autonomie_jours, a.product.name, a.stock_kg), note);
 }
 
 // ------------------------------------------------------------------------------------------------------------ formulaire
@@ -270,10 +340,19 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
     const gmq = h('p', { id: 'saisie-gmq', class: 'muted' });
     const venteChamp = h('b', { id: 'saisie-vente' });
     const etatEnvoi = h('p', { id: 'saisie-etat', class: 'muted', role: 'status' });
+    const provende = h('div', { id: 'saisie-provende' });
+    const autonomieZone = h('div', { id: 'saisie-autonomie' });
 
     function rafraichir() {
         const ctx = lire();
-        const c = calculsSaisie(ctx.lot, ctx.fiches, ctx.jour, s, ctx.rations);
+        const c = calculsSaisie(ctx.lot, ctx.fiches, ctx.jour, s, ctx.rations, ctx.autonomie);
+        const g = (v) => (v === null || v === undefined ? '—' : `${v} g`);
+        const ligne = (libelle, cle, id, l) => h('tr', {}, h('td', {}, libelle), h('td', { class: 'num' }, h('input', { id: `cat-eff-${id}`, type: 'text', disabled: true, value: String(c.provende[cle].effectif ?? '—'), style: 'width:56px;text-align:center' })), h('td', { class: 'num' }, `${c.provende[cle].ration} g/j`), h('td', { class: 'num', id: `cat-prov-${id}-g` }, g(c.provende[cle].total_g)));
+        provende.replaceChildren(h('b', {}, LIBELLES.provende), h('table', { class: 'rtable' },
+            h('thead', {}, h('tr', {}, ...[LIBELLES.categorie, LIBELLES.effectif, LIBELLES.ration, LIBELLES.servie].map((t) => h('th', {}, t)))),
+            h('tbody', {}, ligne(LIBELLES.reproducteur, 'repro', 'repro'), ligne(LIBELLES.jeune, 'chair', 'chair'), ligne(LIBELLES.sousMeres, 'sous_meres', 'lapereau')),
+            h('tfoot', {}, h('tr', {}, h('td', { colspan: 3 }, LIBELLES.totalProvende), h('td', { class: 'num', id: 'day-total-provende-g' }, c.provende.total_g === null ? '—' : `${c.provende.total_g} g (${c.provende.total_kg} Kg)`)))));
+        autonomieZone.replaceChildren(rendreAutonomie(h, c.autonomie));
         const notes = [];
         const bloc = (texte, classe) => h('div', { class: `bandeau ${classe}`, style: 'margin:6px 0 0', role: classe === 'avert' ? 'status' : 'alert' }, texte);
         if (c.cat.motif) notes.push(bloc(c.cat.motif, 'refus'));
@@ -295,7 +374,7 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
     }
 
     const ctx0 = lire();
-    const c0 = calculsSaisie(ctx0.lot, ctx0.fiches, ctx0.jour, s, ctx0.rations);
+    const c0 = calculsSaisie(ctx0.lot, ctx0.fiches, ctx0.jour, s, ctx0.rations, ctx0.autonomie);
     if (c0.cat.depart_requis) {
         departZone.append(h('div', { class: 'saisie-groupe' }, h('b', {}, LIBELLES.departSaisissable),
             h('p', { class: 'muted' }, `Effectif au DÉBUT du jour, avant les mouvements du jour, pré-rempli automatiquement depuis le stade de la bande. La somme des trois catégories doit égaler l'effectif total au début du jour (${c0.veille}). Corrigez-le seulement pour une bande mixte ; il est verrouillé au premier enregistrement.`),
@@ -307,6 +386,11 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
             c0.cat.mode === 'avant_depart' ? h('p', { class: 'alerte' }, MOTIFS.avantDepart(jourFr(c0.cat.depart_date))) : null));
     }
 
+    const conflit = ctx0.conflit
+        ? h('div', { class: 'bandeau refus', id: 'saisie-conflit', role: 'alert', style: 'margin:0' }, `Fiche refusée par le serveur : ${ctx0.conflit} `,
+            h('button', { type: 'button', class: 'btn', id: 'saisie-renvoyer', onclick: () => actions.renvoyer() }, 'Renvoyer'),
+            h('button', { type: 'button', class: 'btn danger', id: 'saisie-abandonner', onclick: () => actions.abandonner() }, 'Abandonner cette saisie'))
+        : null;
     const bouton = h('button', { type: 'button', class: 'btn plein', id: 'saisie-enregistrer', disabled: Boolean(ctx0.lectureSeule) }, h('span', { class: 'material-symbols-outlined' }, 'save'), LIBELLES.enregistrer);
     const retour = h('p', { id: 'saisie-retour', role: 'alert', class: 'muted' }, retourInitial);
     bouton.addEventListener('click', async () => {
@@ -318,6 +402,7 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
 
     const racine = h('div', { id: 'fiche-saisie', class: 'saisie-form' },
         ctx0.lectureSeule ? h('div', { class: 'bandeau neutre', id: 'saisie-lecture-seule', style: 'margin:0 0 8px' }, ctx0.lectureSeule) : null,
+        conflit,
         h('div', { class: 'saisie-trois' }, entier('achat', LIBELLES.achat), entier('ne', LIBELLES.ne),
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${LIBELLES.vente} ${LIBELLES.venteSuite}`), venteChamp)),
         groupe(LIBELLES.morts, 'mort'), groupe(LIBELLES.dons, 'don'),
@@ -327,6 +412,7 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
         h('div', { class: 'saisie-trois' },
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.effectifFinal), finale),
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.taux), taux)),
+        provende, autonomieZone,
         h('div', { class: 'saisie-trois' }, entier('peseeTotal', LIBELLES.pesee),
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${LIBELLES.echantillon} ${LIBELLES.echantillonAuto}`), echantillon),
             h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.poidsMoyen), poidsMoyen)),

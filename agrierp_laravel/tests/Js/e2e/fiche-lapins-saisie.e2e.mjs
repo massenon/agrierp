@@ -6,7 +6,9 @@
  * Même sûreté que les autres e2e (php -S, base SQLITE TEMPORAIRE). Scénario (compte `admin`, qui a `manage-elevage`) : appairage → tirage →
  * réseau COUPÉ → fiche lapins → saisie d'un jour passé (3 morts) : refus avec la phrase du web (départ faux), puis enregistrement ; l'effectif
  * des jours SUIVANTS change à l'écran (cascade) ; le serveur n'a RIEN reçu ; la page est rechargée HORS LIGNE : la saisie est toujours là,
- * toujours « en attente d'envoi ».
+ * toujours « en attente d'envoi ». Puis (É4) le réseau revient : la fiche part au serveur, effectif du serveur = effectif du navigateur, second
+ * envoi sans effet ; un exercice clos refuse une seconde saisie avec la phrase du serveur (reprise ou abandon). (É5) L'autonomie alimentaire
+ * et la provende du jour s'affichent comme sur le web.
  */
 import { createRequire } from 'node:module';
 import { spawn, execFileSync } from 'node:child_process';
@@ -42,6 +44,8 @@ php(['artisan', 'migrate:fresh', '--seed', '--force']);
 php(['artisan', 'tinker', '--execute', `
     $lap = \\App\\Models\\LivestockSpecies::firstOrCreate(['code' => 'cuniculture'], ['label' => 'Cuniculture', 'is_enabled' => true]);
     $lot = \\App\\Models\\LivestockLot::forceCreate(['code' => 'LAP-SAISIE', 'species_id' => $lap->id, 'stage' => 'engraissement', 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
+    $cat = \\App\\Models\\ProductCategory::first() ?? \\App\\Models\\ProductCategory::create(['label' => 'Aliments', 'is_active' => true]);
+    \\App\\Models\\Product::forceCreate(['sku' => 'PROV-LAP', 'name' => 'Provende lapin', 'category_id' => $cat->id, 'species_id' => $lap->id, 'unit' => 'kg', 'pricing_mode' => 'fourchette', 'price_min' => 400, 'price_max' => 500, 'stock_qty' => 10, 'tva_rate' => 0, 'is_active' => true]);
     foreach ([2, 1, 0] as $k) {
         $f = new \\App\\Models\\LivestockDailyEntry();
         $f->forceFill(['lot_id' => $lot->id, 'entry_date' => now()->setTimezone('Africa/Porto-Novo')->subDays($k)->toDateString(), 'achat' => 0, 'ne' => 0, 'mort' => 0, 'vente' => 0, 'don' => 0, 'effectif_final' => 40]);
@@ -103,6 +107,8 @@ try {
     await page.waitForSelector(`#fiche-mensuel tbody tr.choisi[data-jour="${hier}"]`);
     assert.equal(await page.isDisabled('#saisie-enregistrer'), false, 'le compte admin peut écrire');
     assert.equal(await page.inputValue('#saisie-departJeune'), '40', 'départ proposé d\'après le stade (engraissement = Jeune)');
+    assert.equal((await page.textContent('#saisie-autonomie')).trim(), 'Autonomie alimentaire : 4.2 jours (Provende lapin, 10 Kg en stock).', 'autonomie : 10 kg ÷ (40 jeunes × 60 g)');
+    assert.equal(await page.textContent('#day-total-provende-g'), '2400 g (2.4 Kg)');
     ok('fiche ouverte hors ligne sur un jour passé, départ proposé d\'après le stade, bouton « Enregistrer ce Jour » actif');
 
     // --- Refus : départ faux, avec la phrase du web ; rien d'écrit ---
@@ -143,6 +149,49 @@ try {
     assert.deepEqual(await colonne(), ['40', '37', '37']);
     assert.equal(effectifsServeur(), avant);
     ok('page rechargée hors ligne : la saisie (3 morts) est toujours là, toujours en attente d\'envoi, effectifs recalculés');
+
+    // --- ÉTAPE É4 : retour du réseau, la fiche part au serveur ---
+    assert.ok(Number(sql("select count(*) from fiscal_years where status='ouvert'")) >= 1, 'un exercice ouvert couvre les jours saisis');
+    await contexte.setOffline(false);
+    await page.click('#btn-synchroniser');
+    await page.waitForFunction(() => /Synchronisation terminée/.test(document.querySelector('#avis').textContent), null, { timeout: 40000 });
+    assert.equal(effectifsServeur(), '40,37,37', 'le serveur a la fiche et la chaîne recalculée');
+    assert.equal(sql(`select mort_jeune||'|'||cat_depart_jeune from livestock_daily_entries where entry_date='${hier}'`), '3|40');
+    assert.equal(sql("select current_quantity from livestock_lots where code='LAP-SAISIE'"), '37', 'effectif de la bande au serveur = celui du navigateur');
+    assert.equal(sql('select count(*) from livestock_daily_entries'), '3', 'aucune fiche en double');
+    assert.deepEqual(await colonne(), ['40', '37', '37'], 'l\'effectif affiché ne « remonte » pas');
+    assert.equal(await page.textContent('#saisie-etat'), '', 'plus « en attente d\'envoi »');
+    ok('retour du réseau : fiche au serveur, effectif du serveur = effectif du navigateur (37), rien en double, aucune remontée à l\'écran');
+
+    await page.click('#btn-synchroniser');
+    await page.waitForTimeout(1500);
+    assert.equal(sql('select count(*) from livestock_daily_entries'), '3');
+    assert.equal(effectifsServeur(), '40,37,37');
+    ok('second envoi : rien d\'écrit ni de dupliqué');
+
+    // --- Refus d'exercice clos : motif du serveur montré, jamais renvoyé en boucle ---
+    await contexte.setOffline(true);
+    const avantier = sql("select entry_date from livestock_daily_entries order by entry_date limit 1");
+    await page.fill('#fiche-date', avantier);
+    await page.dispatchEvent('#fiche-date', 'change');
+    await page.waitForSelector(`#fiche-mensuel tbody tr.choisi[data-jour="${avantier}"]`);
+    await page.fill('#saisie-mortChair', '1');
+    await page.click('#saisie-enregistrer');
+    await page.waitForFunction(() => /Jour enregistré avec succès\./.test(document.querySelector('#saisie-retour')?.textContent ?? ''));
+    sql("update fiscal_years set status='cloture'");
+    await contexte.setOffline(false);
+    await page.evaluate(() => { document.querySelector('#avis').textContent = ''; });
+    await page.click('#btn-synchroniser');
+    await page.waitForFunction(() => /Synchronisation terminée/.test(document.querySelector('#avis').textContent), null, { timeout: 40000 });
+    assert.match(await page.textContent('#avis'), /1 fiche\(s\) d'élevage refusée\(s\)/);
+    await page.waitForSelector('#saisie-conflit');
+    assert.match(await page.textContent('#saisie-conflit'), /clôturé : aucune saisie ne peut être datée du/);
+    assert.equal(sql(`select coalesce(mort_jeune, 0) from livestock_daily_entries where entry_date='${avantier}'`), '0', 'le serveur n\'a rien écrit');
+    await page.click('#btn-synchroniser');
+    await page.waitForTimeout(1500);
+    await page.click('#saisie-abandonner');
+    await page.waitForFunction(() => !document.querySelector('#saisie-conflit'));
+    ok('exercice clos : refus du serveur affiché avec sa phrase, rien d\'écrit, reprise manuelle ou abandon proposés');
 } catch (e) {
     echec = e;
 } finally {

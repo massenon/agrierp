@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { evaluerAutonomie, produitProvende } from '../../resources/js/hors-ligne/fiche-lapins-calculs.js';
 import { calculsSaisie, chargerJour, enregistrerJour, MOTIFS } from '../../resources/js/hors-ligne/fiche-lapins-saisie.js';
 import { computeEffectifFinal, jourDe } from '../../resources/js/hors-ligne/chaine-effectif.js';
 
@@ -64,8 +65,13 @@ for (let i = 0; i < NB; i++) {
     mettre('effectifM', alea(10)); mettre('effectifF', alea(30)); mettre('effectifSevres', alea(40)); mettre('effectifSmeres', alea(40));
     if (alea(3) === 0) mettre('peseeTotal', alea(3) === 0 ? null : 500 + alea(9000));
     if (alea(3) === 0) { mettre('departRepro', alea(4) === 0 ? null : alea(80)); mettre('departSevre', alea(4) === 0 ? null : alea(80)); mettre('departJeune', alea(4) === 0 ? null : alea(80)); }
+    const provende = {
+        produit: alea(4) === 0 ? null : { id: uuid(++compteur), name: ['Provende lapin', 'Aliment lapin', 'Sac de provende'][alea(3)], unit: alea(2) === 0 ? 'sac' : 'kg', stock_qty: alea(5) === 0 ? 0 : alea(400) },
+        feed_types: Array.from({ length: alea(3) }, () => ({ id: uuid(++compteur), standard_bag_weight_kg: [25, 20, 50][alea(3)] })),
+        releve: alea(3) === 0 ? null : { id: uuid(++compteur), status: alea(2) === 0 ? 'valide' : 'a_valider', data: { mode: alea(2) === 0 ? 'manuel' : 'constate', critique_jours: 1 + alea(8) } },
+    };
     scenarios.push({
-        aujourdhui: '2026-11-09', lot, fiches, exercices, jour, saisie: surcharges,
+        aujourdhui: '2026-11-09', lot, provende, fiches, exercices, jour, saisie: surcharges,
         rations: Array.from({ length: alea(4) }, () => ({ stage_label: ['Reproducteur', 'Jeune', 'Sous-mères', 'Lapin de Chair'][alea(4)], ration_g_per_day: 20 + alea(200) })),
     });
 }
@@ -90,14 +96,16 @@ const PROPS = ['achat', 'ne', 'mortRepro', 'mortChair', 'mortLapereau', 'donRepr
 
 test('saisie = vrai saveDay : saisie rechargée, refus, fiches écrites, chaîne et effectif de la bande', (t) => {
     if (!retour) return t.skip(raison);
-    const stats = { ok: 0, clos: 0, passage: 0, depart: 0, ancienne: 0, cascade: 0, morts: 0, somme: 0, gmq: 0 };
+    const stats = { ok: 0, clos: 0, passage: 0, depart: 0, ancienne: 0, cascade: 0, morts: 0, somme: 0, gmq: 0, autonomie: 0, alerte: 0 };
     scenarios.forEach((s, i) => {
         const p = retour[i];
         const ctx = `scénario ${i}`;
         const charge = chargerJour(s.lot, s.fiches, s.jour);
         for (const k of PROPS) assert.equal(charge[k] ?? null, p.charge[k] ?? null, `${ctx} saisie rechargée ${k}`);
         const saisie = { ...charge, ...s.saisie };
-        const c = calculsSaisie(s.lot, s.fiches, s.jour, saisie, s.rations);
+        const produits = s.provende.produit ? [{ ...s.provende.produit, species_id: 'ESP' }] : [];
+        const releves = s.provende.releve ? [{ id: s.provende.releve.id, type: 'delai_regle', status: s.provende.releve.status, is_active: true, data: s.provende.releve.data }] : [];
+        const c = calculsSaisie(s.lot, s.fiches, s.jour, saisie, s.rations, (kg) => evaluerAutonomie(produitProvende(produits, ['ESP']), kg, s.provende.feed_types, releves));
         const a = p.apercu;
         assert.equal(c.veille, a.veille, `${ctx} effectif de la veille`);
         assert.equal(c.effectifFinal, a.effectifFinal, `${ctx} effectif final calculé`);
@@ -106,6 +114,13 @@ test('saisie = vrai saveDay : saisie rechargée, refus, fiches écrites, chaîne
         assert.equal(c.poidsEstime, a.poidsEstime, `${ctx} poids moyen estimé (GMQ)`);
         assert.equal(c.provende.total_kg, a.provende_kg, `${ctx} provende du jour`);
         for (const k of ['mode', 'repro', 'sevre', 'jeune', 'motif', 'refus_passage', 'depart_requis', 'depart_date']) assert.equal(c.cat[k] ?? null, a.cat[k] ?? null, `${ctx} catégories : ${k}`);
+        assert.equal(c.autonomie.available, a.autonomie.available, `${ctx} autonomie : disponible`);
+        if (c.autonomie.available) {
+            assert.equal(c.autonomie.product.id, a.autonomie.product, `${ctx} autonomie : produit`);
+            for (const k of ['stock_kg', 'autonomie_jours', 'critique', 'rupture']) assert.equal(c.autonomie[k], a.autonomie[k], `${ctx} autonomie : ${k}`);
+            assert.equal(Boolean(c.autonomie.inconnu), a.autonomie.inconnu, `${ctx} autonomie : inconnu`);
+            stats.autonomie++; if (c.autonomie.critique) stats.alerte++;
+        }
         assert.deepEqual(c.cat.avertissements, a.cat.avertissements, `${ctx} avertissements des catégories`);
         if (c.avertissementMorts) stats.morts++;
         if (c.cat.avertissements.length) stats.somme++;
@@ -124,5 +139,5 @@ test('saisie = vrai saveDay : saisie rechargée, refus, fiches écrites, chaîne
         stats.ok++;
         if (normaliser(r.fiches).some((f, k) => f.effectif_final !== normaliser(s.fiches.concat([r.fiche]).filter((x, idx, arr) => arr.findIndex((y) => jourDe(y) === jourDe(x)) === idx))[k]?.effectif_final)) stats.cascade++;
     });
-    if (NB === 420) assert.ok(stats.ok > 120 && stats.clos > 5 && stats.passage > 5 && stats.depart > 5 && stats.ancienne > 3 && stats.morts > 5 && stats.somme > 5 && stats.gmq > 20, `couverture insuffisante : ${JSON.stringify(stats)}`);
+    if (NB === 420) assert.ok(stats.ok > 120 && stats.clos > 5 && stats.passage > 5 && stats.depart > 5 && stats.ancienne > 3 && stats.morts > 5 && stats.somme > 5 && stats.gmq > 20 && stats.autonomie > 150 && stats.alerte > 20, `couverture insuffisante : ${JSON.stringify(stats)}`);
 });

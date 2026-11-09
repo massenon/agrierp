@@ -17,6 +17,7 @@
 import { lotAEnvoyer, marquerSynced, marquerConflit, compterTentative, nettoyerSynced, reaffecterClient, journaliser } from './file-envoi.js';
 import { clientsEnAttente, aEnvoyer, retirerClients, refuserClient, clientEnJson } from './clients-hors-ligne.js';
 import { chiffrer, dechiffrer } from './coffre.js';
+import { aEnvoyerFiches, ficheEnJson, marquerFicheConflit, marquerFichesSynced, retirerFichesSynced, saisiesEnAttente } from './fiche-lapins-saisie.js';
 import { classerReponse, delaiDeReessai, heureDuServeur } from './etat.js';
 
 /** Tables gardées par la caisse hors ligne (le reste du tirage est ignoré, jamais stocké). */
@@ -26,11 +27,13 @@ export const TABLES_GARDEES = [
     'livestock_lots', 'livestock_daily_entries', 'veterinary_withdrawal_periods',
     // PWA-3 (fiche lapins, É1) — barèmes de rationnement, prophylaxie, soins du mois, transferts, types de provende, exercices (lecture seule).
     'feed_ration_standards', 'prophylaxis_schedule_standards', 'veterinary_records', 'livestock_transfers', 'feed_types', 'fiscal_years',
+    // PWA-3 (É5) — règle de terrain (seuil critique d'autonomie), lue seule.
+    'field_survey_entries',
 ];
 /** Familles PAGINÉES par le serveur : leurs lignes arrivent sur TOUTES les pages (les autres tables, sur la première seulement). */
 export const TABLES_PAGINEES = ['livestock_daily_entries', 'veterinary_records', 'livestock_transfers'];
 /** Tables servies EN ENTIER à chaque tirage (jamais incrémentales) : leur copie est remplacée, une rémanence levée disparaît. */
-export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years'];
+export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years', 'field_survey_entries'];
 const COLONNES_ENTREPRISE = ['company_name', 'tva_enabled', 'tva_default_rate', 'mecef_actif'];
 export const TAILLE_LOT = 20;
 const TIMEOUT_MS = 30_000;
@@ -255,6 +258,43 @@ export function creerSynchro({
         return { statut: 'ok', clients: acceptes.size };
     }
 
+    /**
+     * PWA-3 (É4) — les fiches saisies hors ligne partent AVANT les ventes (le serveur traite `livestock_daily_entries` avant `sales` : une vente
+     * de sujets vivants se répercute sur la fiche). Même clé, mêmes colonnes et même règle que le poste (`pushDailyEntries`). Accusé : `synced`
+     * (la copie locale reste rejouée jusqu'à un tirage ultérieur qui contient la fiche : l'effectif ne « remonte » pas) ; refus : `conflict`
+     * avec le motif français du serveur, journalisé, jamais renvoyé en boucle (reprise manuelle depuis la fiche).
+     */
+    async function envoyerFiches() {
+        const liste = aEnvoyerFiches(await saisiesEnAttente(ctx));
+        if (liste.length === 0) return { statut: 'ok', acceptees: 0, refusees: 0 };
+        const corps = { device_id: deviceName, livestock_daily_entries: liste.map((i) => ficheEnJson(i, deviceName)) };
+        const reset = await base.meta('data_reset_at');
+        if (reset) corps.data_reset_at = reset;
+        let r;
+        try {
+            r = await appel('POST', '/api/sync/push', corps);
+        } catch {
+            return { statut: 'hors_ligne', message: MESSAGES.injoignable };
+        }
+        const classe = classerReponse(r.statut);
+        if (classe === 'suspendre') return suspendre();
+        if (classe === 'refuser' || classe === 'reinitialisation') {
+            const motif = r.json?.message ?? `Envoi refusé par le serveur (${r.statut}).`;
+            for (const i of liste) { await marquerFicheConflit(ctx, i.id_fiche, motif, maintenant); await journaliser(ctx, { vente_id: i.id_fiche, motif: `Fiche refusée : ${motif}` }, maintenant); }
+            return { statut: 'ok', acceptees: 0, refusees: liste.length };
+        }
+        if (classe !== 'ok') return { statut: 'erreur', message: r.json?.message ?? `Le serveur n'a pas pu recevoir les fiches (${r.statut}).` };
+        const c = r.json?.livestock_daily_entries ?? { accepted: [], rejected: [], merged: [] };
+        const acceptees = new Set(c.accepted ?? []);
+        await marquerFichesSynced(ctx, [...acceptees], maintenant);
+        for (const x of c.rejected ?? []) {
+            const motif = x.reason || 'Fiche refusée par le serveur.';
+            await marquerFicheConflit(ctx, x.id, motif, maintenant);
+            await journaliser(ctx, { vente_id: x.id, motif: `Fiche refusée : ${motif}` }, maintenant);
+        }
+        return { statut: 'ok', acceptees: acceptees.size, refusees: (c.rejected ?? []).length };
+    }
+
     async function envoyer() {
         let taille = tailleLot;
         let envoyes = 0;
@@ -318,6 +358,7 @@ export function creerSynchro({
         if (etat.suspendu && !manuel) return { statut: 'suspendu', message: MESSAGES.suspendu };
         if (!manuel) { /* automatique : respecte la suspension seulement */ }
         let recus = 0;
+        const debutTirage = maintenant().getTime();
         try {
             const t = await tirer();
             if (t.statut !== 'ok') {
@@ -325,6 +366,8 @@ export function creerSynchro({
             }
             const a = await absorber(t);
             recus = a.recus;
+            // PWA-3 (É4) : un tirage commencé plus de 5 s après l'accusé contient la fiche du serveur : la copie locale devient inutile.
+            await retirerFichesSynced(ctx, debutTirage - 5000, maintenant);
         } catch (e) {
             if (e?.name === 'ErreurBase') throw e;
             etat.essai++;
@@ -336,6 +379,12 @@ export function creerSynchro({
             etat.essai++;
             return { ...cl, recus, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
         }
+        const fi = await envoyerFiches();
+        if (fi.statut === 'suspendu') return fi;
+        if (fi.statut !== 'ok') {
+            etat.essai++;
+            return { ...fi, recus, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
+        }
         const e = await envoyer();
         if (e.statut === 'suspendu') return e;
         if (e.statut !== 'ok') {
@@ -345,7 +394,7 @@ export function creerSynchro({
         etat.essai = 0;
         // PWA-1b — des ventes viennent d'être acceptées : leur effet sur les bandes et les fiches n'est dans la copie tirée qu'au tirage
         // SUIVANT. On le tire tout de suite (au mieux) : sans lui, l'effectif d'une bande « remonterait » entre l'accusé et le prochain tirage.
-        if (e.envoyes > 0) {
+        if (e.envoyes > 0 || fi.acceptees > 0) {
             try {
                 const t2 = await tirer();
                 if (t2.statut === 'ok') recus += (await absorber(t2)).recus;
@@ -357,7 +406,7 @@ export function creerSynchro({
         await nettoyerSynced(ctx, undefined, maintenant);
         const serveur = await base.meta('curseur');
         await base.poserMeta('derniere_synchro', serveur);
-        return { statut: 'ok', recus, envoyes: e.envoyes, refuses: e.refuses, message: MESSAGES.termine(recus, e.envoyes), heureServeur: heureDuServeur(serveur) };
+        return { statut: 'ok', recus, envoyes: e.envoyes, refuses: e.refuses, message: MESSAGES.termine(recus, e.envoyes) + (fi.refusees > 0 ? ` ${fi.refusees} fiche(s) d'élevage refusée(s) par le serveur : voir la fiche concernée.` : ''), heureServeur: heureDuServeur(serveur) };
     }
 
     async function synchroniser({ manuel = false } = {}) {

@@ -13,7 +13,8 @@ import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.j
 import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
 import { jourBenin, lotsVendables, bandeSousRemanence, refusDuPanier, elevageApresVentes } from './elevage-hors-ligne.js';
 import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
-import { appliquerSaisies, chargerJour, enregistrerJour, garderSaisie, saisiesEnAttente, rendreFormulaire, refusExerciceClos, ROLES_ECRITURE, MOTIFS as MOTIFS_SAISIE } from './fiche-lapins-saisie.js';
+import { produitProvende, evaluerAutonomie } from './fiche-lapins-calculs.js';
+import { appliquerSaisies, chargerJour, enregistrerJour, garderSaisie, saisiesEnAttente, remettreFicheEnFile, abandonnerFiche, rendreFormulaire, refusExerciceClos, ROLES_ECRITURE, MOTIFS as MOTIFS_SAISIE } from './fiche-lapins-saisie.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
 import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, messageBandeauPrix, messageConfirmationVente, niveauPrixPerimes, NIVEAUX_PRIX, LIBELLES_STATUT } from './catalogue.js';
@@ -34,7 +35,7 @@ const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
-    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], saisie: null, saisieCle: null, retour: null },
+    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], feedTypes: [], releves: [], saisie: null, saisieCle: null, retour: null },
     role: null,
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
@@ -152,6 +153,8 @@ async function chargerReferentiels() {
     // PWA-3 (É3) : saisies de fiche en attente d'envoi, exercices et barème, rejoués AVANT les ventes en attente.
     app.fiche.saisies = await saisiesEnAttente(app.ctx);
     app.fiche.exercices = await lire('fiscal_years');
+    app.fiche.feedTypes = await lire('feed_types');
+    app.fiche.releves = await lire('field_survey_entries');
     app.fiche.rations = (await lire('feed_ration_standards')).filter((r) => r.species_code === 'cuniculture');
     await recalculerElevage();
     // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
@@ -211,15 +214,29 @@ function formulaireDuJour(m) {
     return rendreFormulaire(h, {
         s,
         retourInitial: app.fiche.retour,
-        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations, lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour) }),
+        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations, autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === 'cuniculture').map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves), lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'), conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null }),
         actions: {
+            renvoyer: async () => {
+                const it = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict');
+                if (!it) return;
+                await remettreFicheEnFile(app.ctx, it.id_fiche);
+                await chargerReferentiels();
+                $('btn-synchroniser').click();
+            },
+            abandonner: async () => {
+                const it = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict');
+                if (!it) return;
+                await abandonnerFiche(app.ctx, it.id_fiche);
+                app.fiche.saisie = null;
+                await chargerReferentiels();
+            },
             enregistrer: async (saisie) => {
                 const existante = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour);
                 const fiche = donnees().fiches.find((f) => f.lot_id === bande.id && String(f.entry_date).slice(0, 10) === jour);
                 const r = enregistrerJour(lot(), donnees().fiches, jour, saisie, { role: app.role, exercices: app.fiche.exercices, rations: app.fiche.rations, idFiche: fiche?.id ?? existante?.id_fiche });
                 if (r.refus !== null) return { refus: r.refus };
                 try {
-                    app.fiche.saisies = await garderSaisie(app.ctx, { id_fiche: r.fiche.id, lot_id: bande.id, jour, saisie: { ...saisie }, cree_le: new Date().toISOString() });
+                    app.fiche.saisies = await garderSaisie(app.ctx, { id_fiche: r.fiche.id, lot_id: bande.id, jour, saisie: { ...saisie }, fiche: r.fiche, cree_le: new Date().toISOString() });
                 } catch (e) {
                     return { refus: `La saisie n'est PAS enregistrée : ${e?.message ?? 'écriture locale impossible'}.` };
                 }

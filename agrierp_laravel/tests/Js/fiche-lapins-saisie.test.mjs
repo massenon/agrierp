@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { LIBELLES, MOTIFS, ROLES_ECRITURE } from '../../resources/js/hors-ligne/fiche-lapins-saisie.js';
+import { AUTONOMIE, LIBELLES, MOTIFS, ROLES_ECRITURE } from '../../resources/js/hors-ligne/fiche-lapins-saisie.js';
 
 /**
  * PWA-3 (fiche lapins, É3) — GARDE DE SOURCES de la saisie : le PHP (`FicheLapins.php`, `ClosedFiscalYearException`) et le Blade sont les MAÎTRES.
@@ -74,4 +74,26 @@ test('droit d\'écriture : manage-elevage (les rôles du seeder), lecture seule 
         assert.ok(!bloc.slice(0, bloc.indexOf(']')).includes('manage-elevage'), `${role} n'a pas manage-elevage`);
     }
     assert.ok(seeder.includes("'animalier'") && seeder.includes('manage-elevage'));
+});
+
+test('autonomie alimentaire : les cinq états et leurs phrases sont ceux du composant Blade', () => {
+    const composant = norm(lire('resources/views/components/autonomie-alimentaire.blade.php'));
+    const dans = (texte) => assert.ok(composant.includes(norm(texte)), `absent du composant : « ${texte} »`);
+    dans(AUTONOMIE.aucunTitre);
+    dans(AUTONOMIE.aucunTexte('{{ $filiere }}'));
+    dans(AUTONOMIE.ruptureTitre);
+    dans(AUTONOMIE.ruptureTexte("{{ $a['product']->name }}", "{{ $a['stock_kg'] }}"));
+    dans(AUTONOMIE.inconnu("{{ $a['product']->name }}", "{{ $a['stock_kg'] }}").replace('—', '<strong>—</strong>'));
+    dans(AUTONOMIE.critiqueTitre);
+    dans(AUTONOMIE.critiqueTexte("{{ $a['product']->name }}", "{{ $a['autonomie_jours'] }}"));
+    assert.ok(composant.includes(norm("Autonomie alimentaire : <strong>{{ $a['autonomie_jours'] }} jours</strong> ({{ $a['product']->name }}, {{ $a['stock_kg'] }} Kg en stock).")));
+    assert.equal(AUTONOMIE.normal('4.5', 'P', '9'), 'Autonomie alimentaire : 4.5 jours (P, 9 Kg en stock).');
+    // Le seuil critique et la formule viennent du service PHP.
+    const service = norm(lire('app/Services/AutonomieAlimentaireService.php'));
+    assert.ok(service.includes("round($stockKg / $consommationKgJour, 1) : 99") && service.includes("$rupture || $autonomieJours <= "));
+    assert.ok(service.includes("'%provende%'") && service.includes("'%aliment%'"));
+});
+
+test('rationnement et provende : libellés du tableau dans le Blade', () => {
+    for (const k of ['provende', 'categorie', 'effectif', 'ration', 'servie', 'totalProvende']) assert.ok(blade.includes(norm(LIBELLES[k])), `« ${LIBELLES[k]} » absent du Blade`);
 });
