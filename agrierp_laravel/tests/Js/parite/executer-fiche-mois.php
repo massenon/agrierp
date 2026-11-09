@@ -3,7 +3,7 @@
 /**
  * PWA-3 (fiche lapins, É2) — PARITÉ EXÉCUTÉE de `resources/js/hors-ligne/fiche-lapins-ecran.js` (`modeleFiche`) : chaque scénario (bandes, fiches,
  * soins, produits, exercices, jour « aujourd'hui », jour et bande choisis) est écrit dans une base SQLITE EN MÉMOIRE (migrations réelles), puis
- * le VRAI composant `FicheLapins` donne KPI, tableau mensuel, taux, traitements, libellé du mois, bandeau et transferts du jour.
+ * le VRAI composant `FicheLapins` ou `FichePorcs` (clé `famille`) donne KPI, tableau mensuel, taux, traitements, libellé du mois, bandeau et transferts du jour.
  *
  *   php tests/Js/parite/executer-fiche-mois.php < scenarios.json
  */
@@ -24,6 +24,7 @@ Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
 app()->setLocale('fr');
 
 use App\Livewire\Elevage\FicheLapins;
+use App\Livewire\Elevage\FichePorcs;
 use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -70,7 +71,7 @@ foreach ($entree['scenarios'] as $i => $s) {
             $soin->save();
         }
 
-        $c = new FicheLapins;
+        $c = $s['famille'] === 'porcs' ? new FichePorcs : new FicheLapins;
         $c->selectedDate = $s['date'];
         $c->bandeId = $s['bandeId'];
         $kpis = $c->getKpisProperty();
@@ -83,7 +84,10 @@ foreach ($entree['scenarios'] as $i => $s) {
                 'date' => $jour,
                 'fiche' => $entry === null ? null : [
                     'taux' => number_format($entry->mortality_rate, 1),
-                    'poids_general_g' => $entry->poids_general_g,
+                    // Lapins : `poids_general_g` (g) ; porcs : `round(avg × final / 1000, 1)` du Blade (Kg).
+                    'poids_general_g' => $s['famille'] === 'porcs'
+                        ? (($entry->weight_sample_avg_g && $entry->effectif_final) ? round(($entry->weight_sample_avg_g * $entry->effectif_final) / 1000, 1) : null)
+                        : $entry->poids_general_g,
                     'effectif_final' => $entry->effectif_final,
                     'effectif_m' => $entry->effectif_m,
                     'mort' => $entry->mort,

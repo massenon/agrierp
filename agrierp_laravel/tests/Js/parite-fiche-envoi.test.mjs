@@ -20,10 +20,11 @@ const jourDuMois = (d) => `2026-${d > 31 ? '11' : '10'}-${deux(d > 31 ? d - 31 :
 
 let compteur = 0;
 const scenarios = [];
-const NB = Number(process.env.SCENARIOS_LIMITE ?? 220);
+const NB = Number(process.env.SCENARIOS_LIMITE ?? 400);
 for (let i = 0; i < NB * 3 && scenarios.length < NB; i++) {
+    const espece = i % 2 === 0 ? 'cuniculture' : 'porciculture'; // lapins et porcs : même règle d'envoi, chaîne propre à l'espèce
     const initial = 20 + alea(200);
-    const lot = { id: uuid(++compteur), code: `LAP-${i}`, species_code: 'cuniculture', stage: ['reproduction', 'croissance', 'engraissement'][alea(3)], initial_quantity: initial, current_quantity: initial, status: 'actif', is_active: true };
+    const lot = { id: uuid(++compteur), code: `LAP-${i}`, species_code: espece, stage: ['reproduction', 'croissance', 'engraissement'][alea(3)], initial_quantity: initial, current_quantity: initial, status: 'actif', is_active: true };
     const chaine = alea(2) === 0;
     const jours = [...new Set(Array.from({ length: alea(6) }, () => 25 + alea(16)))].sort((a, b) => a - b);
     const fiches = [];
@@ -54,7 +55,7 @@ for (let i = 0; i < NB * 3 && scenarios.length < NB; i++) {
         if (fiches.some((f) => jourDe(f) === jour)) continue;
         serveur = [...fiches, { id: uuid(++compteur), lot_id: lot.id, entry_date: jour, achat: 0, ne: 0, mort: 0, vente: 0, don: 0, effectif_final: courant }];
     }
-    scenarios.push({ aujourdhui: '2026-11-09', lot, fiches: serveur, exercices, type, jour, envois: type === 'normal' ? 2 : 1, charge: [ficheEnJson(item, 'pwa-test')], local: r, item });
+    scenarios.push({ espece, aujourdhui: '2026-11-09', lot, fiches: serveur, exercices, type, jour, envois: type === 'normal' ? 2 : 1, charge: [ficheEnJson(item, 'pwa-test')], local: r, item });
 }
 
 let retour = null;

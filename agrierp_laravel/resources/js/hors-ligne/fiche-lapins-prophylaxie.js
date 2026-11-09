@@ -14,6 +14,7 @@ import { META_AUTRES_EN_ATTENTE } from './base-locale.js';
 
 export const TABLE_SOINS_A_ENVOYER = 'soins_a_envoyer';
 export const ESPECE = 'cuniculture';
+/** Espèce du barème et des bandes ; `cuniculture` par défaut (lapins), `porciculture` pour les porcs. */
 
 export const LIBELLES = {
     titre: 'Traitements & Prophylaxie',
@@ -45,7 +46,7 @@ const j10 = (d) => String(d).slice(0, 10);
 const jours = (a, b) => Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 86400000);
 const ajouterJours = (d, n) => { const x = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10) + n)); return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`; };
 const parCleTexte = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-const actifs = (standards) => standards.filter((s) => s.species_code === ESPECE && s.is_active !== false);
+const actifs = (standards, espece = ESPECE) => standards.filter((s) => s.species_code === espece && s.is_active !== false);
 
 /** `ProtocoleDuJourService::dateDeReference` puis `jourDeCycle` : le jour du cycle (1 le jour de référence), `null` si la référence est inconnue. */
 export function jourDeCycle(lot, evenements, jour) {
@@ -58,17 +59,17 @@ export function jourDeCycle(lot, evenements, jour) {
 export const motifIndetermine = (lot) => (lot.stage === 'reproduction' ? MOTIFS.reproduction : MOTIFS.miseEnLot);
 
 /** `ProtocoleDuJourService::pourBande`. `soins` : les soins connus (tirés et en attente) ; `deja_administre` = un soin actif du jour porte ce traitement. */
-export function protocoleDuJour({ lot, evenements, standards, soins, jour }) {
+export function protocoleDuJour({ lot, evenements, standards, soins, jour, espece = ESPECE }) {
     const cycle = jourDeCycle(lot, evenements, jour);
     const faits = new Set(soins.filter((s) => s.lot_id === lot.id && s.is_active !== false && j10(s.record_date) === jour).map((s) => s.action_type));
-    const pool = actifs(standards).filter((s) => s.cycle_day_start !== null && s.cycle_day_start !== undefined);
+    const pool = actifs(standards, espece).filter((s) => s.cycle_day_start !== null && s.cycle_day_start !== undefined);
     const ordre = (l) => l.sort((a, b) => Number(a.cycle_day_start) - Number(b.cycle_day_start) || parCleTexte(a.treatment, b.treatment));
     const dus = cycle === null ? ordre([...pool]) : ordre(pool.filter((s) => Number(s.cycle_day_start) <= cycle && Number(s.cycle_day_end) >= cycle));
     return {
         traitements: dus.map((standard) => ({ standard, deja_administre: faits.has(standard.treatment) })),
         jourDeCycle: cycle,
         motifIndetermine: cycle === null ? motifIndetermine(lot) : null,
-        calendairesNonEvalues: actifs(standards).filter((s) => s.cycle_day_start === null || s.cycle_day_start === undefined).length,
+        calendairesNonEvalues: actifs(standards, espece).filter((s) => s.cycle_day_start === null || s.cycle_day_start === undefined).length,
     };
 }
 
@@ -85,11 +86,11 @@ export function etatProtocole(p) {
  * `validerTraitements` : refus et messages du web, puis un soin par traitement coché non encore administré (`ValidateProphylaxisTreatmentsAction`).
  * Aucune écriture si un refus. Les soins rendus portent la rémanence (`withdrawal_days`) que le serveur transformera en période.
  */
-export function validerTraitements({ lot, evenements, standards, soins, jour, aujourdhui, idsCoches, observations = null, nouvelId = () => globalThis.crypto.randomUUID(), role = null, rolesEcriture = ['admin', 'animalier'] }) {
+export function validerTraitements({ lot, evenements, standards, soins, jour, aujourdhui, espece = ESPECE, idsCoches, observations = null, nouvelId = () => globalThis.crypto.randomUUID(), role = null, rolesEcriture = ['admin', 'animalier'] }) {
     if (role !== null && !rolesEcriture.includes(role)) return { refus: MOTIFS.droit };
     if (!lot) return { refus: MOTIFS.aucuneBande };
     if (jour > aujourdhui) return { refus: MOTIFS.jourAVenir };
-    const p = protocoleDuJour({ lot, evenements, standards, soins, jour });
+    const p = protocoleDuJour({ lot, evenements, standards, soins, jour, espece });
     const notes = observations !== null && String(observations).trim() !== '' ? String(observations).trim() : null;
     const crees = [];
     for (const ligne of p.traitements) {
@@ -147,7 +148,7 @@ export const remanencesAvecLocales = (tirees, items) => [...tirees, ...items.fil
 // ----------------------------------------------------------------------------------------------------------------- rendu
 
 /** Le bloc « Traitements & Prophylaxie » (DOM, jamais `innerHTML`). `coches` : Set des identifiants du barème cochés ; `actions.valider()`. */
-export function rendreProphylaxie(h, { protocole: p, coches, lectureSeule, actions }) {
+export function rendreProphylaxie(h, { protocole: p, coches, lectureSeule, actions, titre = LIBELLES.titre }) {
     const cle = !determinable(p) ? 'indetermine' : (p.traitements.length === 0 ? 'libre' : (enAttente(p) === 0 ? 'valide' : 'prevus'));
     const classes = { indetermine: 'refus', libre: 'neutre', prevus: 'avert', valide: 'info' };
     const lignes = p.traitements.map(({ standard: s, deja_administre: fait }) => {
@@ -159,7 +160,7 @@ export function rendreProphylaxie(h, { protocole: p, coches, lectureSeule, actio
             Number(s.withdrawal_days) > 0 ? h('span', { class: 'pastille neutre' }, LIBELLES.remanence(Number(s.withdrawal_days))) : null);
     });
     return h('div', { id: 'saisie-prophylaxie', class: 'saisie-groupe' },
-        h('b', {}, LIBELLES.titre),
+        h('b', {}, titre),
         h('div', { class: 'groupe', style: 'justify-content:space-between' },
             h('span', { class: 'muted', id: 'prophy-cycle' }, determinable(p) ? LIBELLES.jour(p.jourDeCycle) : LIBELLES.jourInconnu),
             h('span', { class: `pastille ${classes[cle]}`, id: 'prophy-etat' }, etatProtocole(p))),

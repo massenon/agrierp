@@ -147,3 +147,40 @@ export function evaluerAutonomie(produit, consommationKgJour, feedTypes, releves
     const autonomieJours = consommationKgJour > 0 ? arrondiPhp(stockKg / consommationKgJour, 1) : 99;
     return { available: true, product: produit, stock_kg: stockKg, autonomie_jours: autonomieJours, critique: rupture || autonomieJours <= seuil.critique, rupture, seuilIncertain: seuil.incertain };
 }
+
+// ------------------------------------------------------------------------------------------------- porcs (PWA-3, fiche porcs)
+
+export const PORC_REPRODUCTEUR = 'reproducteur';
+export const PORC_PORCELET = 'porcelet';
+export const PORC_MARCHAND = 'marchand';
+/** `CategorieRationPorc::RATIONS_DE_SECOURS` — UNIQUEMENT si le barème ne porte pas la catégorie. */
+export const RATIONS_PORCS_DE_SECOURS = { [PORC_REPRODUCTEUR]: 2000, [PORC_PORCELET]: 300, [PORC_MARCHAND]: 600 };
+/** `CategorieRationPorc::LIBELLES` : « Porc Marchand » est le libellé de la maquette (D15), le barème dit « Jeune porc ». */
+export const LIBELLES_PORCS = { [PORC_REPRODUCTEUR]: 'Reproducteur', [PORC_PORCELET]: 'Porcelet', [PORC_MARCHAND]: 'Porc Marchand' };
+
+/** `CategorieRationPorc::cle`. */
+export function cleRationPorc(libelle) {
+    const l = ascii(libelle);
+    if (l === '') return null;
+    if (l.includes('reproducteur')) return PORC_REPRODUCTEUR;
+    if (l.includes('porcelet')) return PORC_PORCELET;
+    if (l.includes('marchand') || l.includes('engraissement') || /^jeune( porc)?$/.test(l)) return PORC_MARCHAND;
+    return null;
+}
+
+/** `CategorieRationPorc::ration`. */
+export function rationPorc(rations, cle) {
+    const ligne = rations.find((r) => cleRationPorc(r.stage_label) === cle);
+    return Math.trunc(Number(ligne?.ration_g_per_day ?? RATIONS_PORCS_DE_SECOURS[cle])) || 0;
+}
+
+/** `FichePorcs::getProvendeCalculationProperty` : porcelet (`sevre`), porc marchand (`jeune`), reproducteur (`repro`). */
+export function provendeDuJourPorcs(cat, rations) {
+    const ligne = (effectif, ration) => ({ ration, effectif, total_g: effectif === null || effectif === undefined ? null : effectif * ration });
+    const porcelet = ligne(cat.sevre ?? null, rationPorc(rations, PORC_PORCELET));
+    const jeune = ligne(cat.jeune ?? null, rationPorc(rations, PORC_MARCHAND));
+    const repro = ligne(cat.repro ?? null, rationPorc(rations, PORC_REPRODUCTEUR));
+    const inconnu = porcelet.total_g === null || jeune.total_g === null || repro.total_g === null;
+    const total = inconnu ? null : porcelet.total_g + jeune.total_g + repro.total_g;
+    return { porcelet, jeune, repro, total_g: total, total_kg: total === null ? null : arrondiPhp(total / 1000, 2) };
+}

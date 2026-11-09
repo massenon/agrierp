@@ -36,25 +36,29 @@ const php = (args) => execFileSync('php', args, { cwd: racine, env, encoding: 'u
 // Pas de binaire `sqlite3` requis : PDO de PHP lit/écrit la base temporaire.
 const sql = (requete) => execFileSync('php', ['-r', "$p = new PDO('sqlite:'.$argv[1]); $p->setAttribute(PDO::ATTR_TIMEOUT, 10); $s = $p->query($argv[2]); if ($s && $s->columnCount()) { foreach ($s->fetchAll(PDO::FETCH_NUM) as $r) { echo implode('|', $r).\"\\n\"; } }", db, requete], { encoding: 'utf8' }).trim();
 
+// FICHE_FAMILLE=porcs : MÊME scénario sur la fiche porcs (espèce porciculture, bouton « Fiches Porcs », provende de 600 g/j par porc marchand).
+const PORCS = process.env.FICHE_FAMILLE === 'porcs';
+const ESPECE = PORCS ? 'porciculture' : 'cuniculture';
+const BOUTON = PORCS ? '#btn-vue-porcs' : '#btn-vue-fiche';
 const resultats = [];
 const ok = (nom) => { resultats.push(nom); console.log(`  ✔ ${nom}`); };
 
 console.log(`Base temporaire : ${db}\nServeur : ${base}`);
 php(['artisan', 'migrate:fresh', '--seed', '--force']);
 php(['artisan', 'tinker', '--execute', `
-    $lap = \\App\\Models\\LivestockSpecies::firstOrCreate(['code' => 'cuniculture'], ['label' => 'Cuniculture', 'is_enabled' => true]);
-    $lot = \\App\\Models\\LivestockLot::forceCreate(['code' => 'LAP-SAISIE', 'species_id' => $lap->id, 'stage' => 'engraissement', 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
+    $lap = \\App\\Models\\LivestockSpecies::firstOrCreate(['code' => '${ESPECE}'], ['label' => 'Espece', 'is_enabled' => true]);
+    $lot = \\App\\Models\\LivestockLot::forceCreate(['code' => 'BANDE-SAISIE', 'species_id' => $lap->id, 'stage' => 'engraissement', 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
     $cat = \\App\\Models\\ProductCategory::first() ?? \\App\\Models\\ProductCategory::create(['label' => 'Aliments', 'is_active' => true]);
-    \\App\\Models\\Product::forceCreate(['sku' => 'PROV-LAP', 'name' => 'Provende lapin', 'category_id' => $cat->id, 'species_id' => $lap->id, 'unit' => 'kg', 'pricing_mode' => 'fourchette', 'price_min' => 400, 'price_max' => 500, 'stock_qty' => 10, 'tva_rate' => 0, 'is_active' => true]);
+    \\App\\Models\\Product::forceCreate(['sku' => 'PROV-LAP', 'name' => '${PORCS ? 'Provende porc' : 'Provende lapin'}', 'category_id' => $cat->id, 'species_id' => $lap->id, 'unit' => 'kg', 'pricing_mode' => 'fourchette', 'price_min' => 400, 'price_max' => 500, 'stock_qty' => 10, 'tva_rate' => 0, 'is_active' => true]);
     \\DB::table('prophylaxis_schedule_standards')->update(['is_active' => false]);
-    \\DB::table('prophylaxis_schedule_standards')->insert(['id' => '00000000-0000-4000-8000-0000000000aa', 'species_code' => 'cuniculture', 'period_label' => 'E2E', 'treatment' => 'Vermifuge E2E', 'product_recommended' => 'Ivermectine', 'dosage' => '1 ml', 'withdrawal_days' => 5, 'is_active' => true, 'cycle_day_start' => 1, 'cycle_day_end' => 9999, 'created_at' => now(), 'updated_at' => now()]);
+    \\DB::table('prophylaxis_schedule_standards')->insert(['id' => '00000000-0000-4000-8000-0000000000aa', 'species_code' => '${ESPECE}', 'period_label' => 'E2E', 'treatment' => 'Vermifuge E2E', 'product_recommended' => 'Ivermectine', 'dosage' => '1 ml', 'withdrawal_days' => 5, 'is_active' => true, 'cycle_day_start' => 1, 'cycle_day_end' => 9999, 'created_at' => now(), 'updated_at' => now()]);
     foreach ([2, 1, 0] as $k) {
         $f = new \\App\\Models\\LivestockDailyEntry();
         $f->forceFill(['lot_id' => $lot->id, 'entry_date' => now()->setTimezone('Africa/Porto-Novo')->subDays($k)->toDateString(), 'achat' => 0, 'ne' => 0, 'mort' => 0, 'vente' => 0, 'don' => 0, 'effectif_final' => 40]);
         $f->save();
     }
 `]);
-const lotId = sql("select id from livestock_lots where code='LAP-SAISIE'");
+const lotId = sql("select id from livestock_lots where code='BANDE-SAISIE'");
 
 const serveur = spawn('php', ['-S', `127.0.0.1:${port}`, path.join(racine, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')], { cwd: path.join(racine, 'public'), env, stdio: 'ignore' });
 const arreter = () => { try { serveur.kill('SIGTERM'); } catch { /* déjà arrêté */ } };
@@ -96,13 +100,13 @@ try {
     await page.click('#form-pin button');
     await page.waitForSelector('#contenu:not([hidden])');
     await page.waitForFunction(() => /Synchronisé/.test(document.querySelector('#etat-synchro').textContent), null, { timeout: 30000 });
-    await page.waitForSelector('#btn-vue-fiche:not([hidden])');
+    await page.waitForSelector(`${BOUTON}:not([hidden])`);
     ok('tirage initial : la fiche lapins est offerte');
 
     const colonne = async () => page.$$eval('#fiche-mensuel tbody tr[data-jour] td:nth-child(11)', (t) => t.map((x) => x.textContent).filter((v) => v !== '—'));
     // --- Hors ligne : ouvrir la fiche, choisir hier ---
     await contexte.setOffline(true);
-    await page.click('#btn-vue-fiche');
+    await page.click(BOUTON);
     await page.waitForSelector('#fiche-saisie');
     const hier = sql("select entry_date from livestock_daily_entries order by entry_date limit 1 offset 1");
     const aujourdhui = sql("select entry_date from livestock_daily_entries order by entry_date desc limit 1");
@@ -111,8 +115,19 @@ try {
     await page.waitForSelector(`#fiche-mensuel tbody tr.choisi[data-jour="${hier}"]`);
     assert.equal(await page.isDisabled('#saisie-enregistrer'), false, 'le compte admin peut écrire');
     assert.equal(await page.inputValue('#saisie-departJeune'), '40', 'départ proposé d\'après le stade (engraissement = Jeune)');
-    assert.equal((await page.textContent('#saisie-autonomie')).trim(), 'Autonomie alimentaire : 4.2 jours (Provende lapin, 10 Kg en stock).', 'autonomie : 10 kg ÷ (40 jeunes × 60 g)');
-    assert.equal(await page.textContent('#day-total-provende-g'), '2400 g (2.4 Kg)');
+    if (PORCS) {
+        assert.match((await page.textContent('#saisie-autonomie')).trim(), /Alerte critique - Autonomie alimentaire.*Provende porc ne couvre plus que 0\.4 jours/, 'autonomie : 10 kg ÷ (40 porcs × 600 g) = 0,4 jour : critique');
+        assert.equal(await page.textContent('#day-total-provende-g'), '24000 g (24 Kg)');
+    } else {
+        assert.equal((await page.textContent('#saisie-autonomie')).trim(), 'Autonomie alimentaire : 4.2 jours (Provende lapin, 10 Kg en stock).', 'autonomie : 10 kg ÷ (40 jeunes × 60 g)');
+        assert.equal(await page.textContent('#day-total-provende-g'), '2400 g (2.4 Kg)');
+    }
+    if (PORCS) {
+        const entetes = await page.$$eval('#fiche-mensuel thead th', (t) => t.map((x) => x.textContent));
+            assert.ok(entetes.includes('Poids Général (Kg)') && entetes.includes('Truies Gest.') && entetes.includes('Verrats'), 'colonnes de la fiche porcs');
+        assert.match(await page.textContent('.fiche-kpi'), /^Effectif Porcins Vivants/);
+        assert.equal(await page.textContent('#saisie-prophylaxie b'), 'Suivi Clinique & Prophylaxie');
+    }
     ok('fiche ouverte hors ligne sur un jour passé, départ proposé d\'après le stade, bouton « Enregistrer ce Jour » actif');
 
     // --- Refus : départ faux, avec la phrase du web ; rien d'écrit ---
@@ -142,8 +157,8 @@ try {
     await page.waitForSelector('#champ-pin');
     await page.fill('#champ-pin', '4821');
     await page.click('#form-pin button');
-    await page.waitForSelector('#btn-vue-fiche:not([hidden])');
-    await page.click('#btn-vue-fiche');
+    await page.waitForSelector(`${BOUTON}:not([hidden])`);
+    await page.click(BOUTON);
     await page.waitForSelector('#fiche-saisie');
     await page.fill('#fiche-date', hier);
     await page.dispatchEvent('#fiche-date', 'change');
@@ -177,7 +192,7 @@ try {
     await page.waitForFunction(() => /Synchronisation terminée/.test(document.querySelector('#avis').textContent), null, { timeout: 40000 });
     assert.equal(effectifsServeur(), '40,37,37', 'le serveur a la fiche et la chaîne recalculée');
     assert.equal(sql(`select mort_jeune||'|'||cat_depart_jeune from livestock_daily_entries where entry_date='${hier}'`), '3|40');
-    assert.equal(sql("select current_quantity from livestock_lots where code='LAP-SAISIE'"), '37', 'effectif de la bande au serveur = celui du navigateur');
+    assert.equal(sql("select current_quantity from livestock_lots where code='BANDE-SAISIE'"), '37', 'effectif de la bande au serveur = celui du navigateur');
     assert.equal(sql('select count(*) from livestock_daily_entries'), '3', 'aucune fiche en double');
     assert.equal(sql("select action_type||'|'||product_used||'|'||dose||'|'||symptomes||'|'||is_active from veterinary_records"), 'Vermifuge E2E|Ivermectine|1 ml|RAS|1', 'le soin validé hors ligne est au registre du serveur');
     assert.equal(sql("select product_used||'|'||withdrawal_days from veterinary_withdrawal_periods"), 'Ivermectine|5', 'la rémanence est créée par le serveur');

@@ -42,7 +42,7 @@ test('libellés du formulaire : tous dans le Blade, dans le même ordre', () => 
     const dansBlade = ordre.map((k) => blade.indexOf(norm(LIBELLES[k])));
     assert.deepEqual([...dansBlade].sort((a, b) => a - b), dansBlade, 'ordre des libellés dans le Blade');
     const debut = saisieSource.indexOf('const racine = h(');
-    const refs = ['LIBELLES.achat', 'LIBELLES.ne', 'LIBELLES.morts', 'LIBELLES.dons', 'LIBELLES.passage', 'departZone', 'LIBELLES.effectifM', 'LIBELLES.effectifF', 'LIBELLES.effectifSevres', 'LIBELLES.effectifSmeres', 'LIBELLES.effectifFinal', 'LIBELLES.taux', 'LIBELLES.pesee', 'LIBELLES.poidsMoyen'];
+    const refs = ['L.achat', 'L.ne', 'L.morts', 'L.dons', 'L.passage', 'departZone', 'L.effectifM', 'L.effectifF', 'L.effectifSevres', 'L.effectifSmeres', 'L.effectifFinal', 'L.taux', 'L.pesee', 'L.poidsMoyen'];
     const dansJs = refs.map((r) => saisieSource.indexOf(r, debut));
     assert.ok(dansJs.every((p) => p > 0), 'tous les champs sont dans le formulaire');
     assert.deepEqual([...dansJs].sort((a, b) => a - b), dansJs, 'ordre des champs du formulaire JavaScript');
@@ -60,7 +60,7 @@ test('contrôles de saveDay dans le même ordre', () => {
     const ordrePhp = ['authorize(\'manage-elevage\')', 'Aucune bande active', 'Date invalide', 'refusExerciceClos', "$cat['refus_passage']", 'verifierDepart($departSaisi', 'non ventilés par catégorie'].map((m) => php.indexOf(m));
     assert.deepEqual([...ordrePhp].sort((a, b) => a - b), ordrePhp);
     const fonction = saisieSource.slice(saisieSource.indexOf('export function enregistrerJour'));
-    const ordreJs = ['ROLES_ECRITURE', 'MOTIFS.aucuneBande', 'MOTIFS.dateInvalide', 'refusExerciceClos(', 'refus_passage', 'verifierDepart(', 'MOTIFS.ancienneFiche'].map((m) => fonction.indexOf(m));
+    const ordreJs = ['ROLES_ECRITURE', 'F.motifs.aucuneBande', 'MOTIFS.dateInvalide', 'refusExerciceClos(', 'refus_passage', 'verifierDepart(', 'F.motifs.ancienneFiche'].map((m) => fonction.indexOf(m));
     assert.ok(ordreJs.every((p) => p >= 0));
     assert.deepEqual([...ordreJs].sort((a, b) => a - b), ordreJs);
     assert.ok(php.includes('recalculerEnCascade($lot->id, $this->selectedDate)') && fonction.includes('recalculerEnCascade('));

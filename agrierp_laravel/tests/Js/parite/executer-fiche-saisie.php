@@ -2,7 +2,7 @@
 
 /**
  * PWA-3 (fiche lapins, É3) — PARITÉ EXÉCUTÉE de `resources/js/hors-ligne/fiche-lapins-saisie.js` : chaque scénario (bandes, fiches, exercices,
- * barème, jour et saisie) est joué sur le VRAI composant `FicheLapins` (ouverture du jour puis `saveDay`, base SQLITE EN MÉMOIRE, migrations
+ * barème, jour et saisie) est joué sur le VRAI composant `FicheLapins` ou `FichePorcs` (clé `famille` ; ouverture du jour puis `saveDay`, base SQLITE EN MÉMOIRE, migrations
  * réelles) : saisie rechargée à l'ouverture, refus (message du toast) ou fiches écrites et effectif de la bande après la cascade.
  *
  *   php tests/Js/parite/executer-fiche-saisie.php < scenarios.json
@@ -25,6 +25,7 @@ app()->setLocale('fr');
 Illuminate\Support\Facades\Gate::before(fn ($utilisateur = null) => true);
 
 use App\Livewire\Elevage\FicheLapins;
+use App\Livewire\Elevage\FichePorcs;
 use App\Models\FeedRationStandard;
 use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
@@ -59,12 +60,14 @@ foreach ($entree['scenarios'] as $i => $s) {
     try {
         Carbon::setTestNow(Carbon::parse($s['aujourdhui'].' 12:00:00', 'Africa/Porto-Novo'));
         session()->flush();
-        $espece = LivestockSpecies::firstOrCreate(['code' => 'cuniculture'], ['label' => 'Cuniculture', 'is_enabled' => true]);
+        $porcs = ($s['famille'] ?? 'lapins') === 'porcs';
+        $code = $porcs ? 'porciculture' : 'cuniculture';
+        $espece = LivestockSpecies::firstOrCreate(['code' => $code], ['label' => ucfirst($code), 'is_enabled' => true]);
         foreach ($s['exercices'] as $e) {
             FiscalYear::create(['year' => $e['year'], 'start_date' => $e['start_date'], 'end_date' => $e['end_date'], 'status' => $e['status']]);
         }
         foreach ($s['rations'] as $r) {
-            FeedRationStandard::create(['species_code' => 'cuniculture', 'stage_label' => $r['stage_label'], 'ration_g_per_day' => $r['ration_g_per_day'], 'is_active' => true]);
+            FeedRationStandard::create(['species_code' => $code, 'stage_label' => $r['stage_label'], 'ration_g_per_day' => $r['ration_g_per_day'], 'is_active' => true]);
         }
         // É5 : produit de provende, types de provende (poids du sac) et règle de terrain, pour l'autonomie alimentaire de la fiche.
         $p = $s['provende']['produit'];
@@ -92,20 +95,22 @@ foreach ($entree['scenarios'] as $i => $s) {
             $fiche->save();
         }
 
-        $t = Livewire::test(FicheLapins::class)->set('bandeId', $lot->id)->set('selectedDate', $s['jour']);
+        // Noms internes de la saisie (ceux des emplacements de synchronisation) → propriétés du composant des porcs.
+        $noms = $porcs ? ['mortChair' => 'mortMarchand', 'mortLapereau' => 'mortPorcelet', 'donChair' => 'donMarchand', 'donLapereau' => 'donPorcelet', 'effectifM' => 'effectifVerrats', 'effectifF' => 'effectifTruies', 'effectifSevres' => 'effectifPorcelets', 'effectifSmeres' => 'effectifEngraissement', 'peseeTotal' => 'peseeTotalKg'] : [];
+        $t = Livewire::test($porcs ? FichePorcs::class : FicheLapins::class)->set('bandeId', $lot->id)->set('selectedDate', $s['jour']);
         $c = $t->instance();
         $charge = [];
         foreach (['achat', 'ne', 'mortRepro', 'mortChair', 'mortLapereau', 'donRepro', 'donChair', 'donLapereau', 'passage', 'effectifM', 'effectifF', 'effectifSevres', 'effectifSmeres', 'departRepro', 'departSevre', 'departJeune', 'peseeTotal', 'mortAncienTotal', 'donAncienTotal'] as $p) {
-            $charge[$p] = $c->{$p};
+            $charge[$p] = $c->{$noms[$p] ?? $p};
         }
         foreach ($s['saisie'] as $p => $v) {
-            $t->set($p, $v);
+            $t->set($noms[$p] ?? $p, $v);
         }
         $a = $t->instance();
         $cat = $a->getCategoriesJourProperty();
         $apercu = [
             'veille' => $a->getPreviousEffectifProperty(), 'effectifFinal' => $a->getEffectifFinalCalcProperty(), 'taux' => $a->getMortalityRateCalcProperty(),
-            'avertissementMorts' => $a->getAvertissementMortsProperty(), 'poidsEstime' => $a->getPoidsMoyenEstimeProperty(),
+            'avertissementMorts' => $a->getAvertissementMortsProperty(), 'poidsEstime' => $porcs ? $a->getPoidsMoyenEstimeKgProperty() : $a->getPoidsMoyenEstimeProperty(),
             'provende_kg' => $a->getProvendeCalculationProperty()['total_kg'],
             'autonomie' => (function () use ($a) { $x = $a->getFeedAutonomyProperty(); return ['available' => $x['available'], 'product' => isset($x['product']) ? $x['product']->id : null, 'stock_kg' => $x['stock_kg'] ?? null, 'autonomie_jours' => $x['autonomie_jours'] ?? null, 'critique' => $x['critique'] ?? null, 'rupture' => $x['rupture'] ?? null, 'inconnu' => $x['inconnu'] ?? false]; })(),
             'cat' => array_intersect_key($cat, array_flip(['mode', 'repro', 'sevre', 'jeune', 'motif', 'refus_passage', 'avertissements', 'depart_requis', 'depart_date'])),

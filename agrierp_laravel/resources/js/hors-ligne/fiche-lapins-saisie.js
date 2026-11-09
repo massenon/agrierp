@@ -18,6 +18,7 @@ import { LAPINS, calculerJour, departDepuisStade, verifierDepart } from './effec
 import { provendeDuJour, LIBELLES as LIBELLES_RATION } from './fiche-lapins-calculs.js';
 import { arrondiPhp } from './calculs-caisse.js';
 import { chiffrer, dechiffrer } from './coffre.js';
+import { FAMILLE_PAR_DEFAUT, LAPINS_F, familleDuLot } from './fiche-familles.js';
 import { rendreProphylaxie, LIBELLES as LIBELLES_PROPHY } from './fiche-lapins-prophylaxie.js';
 import { META_AUTRES_EN_ATTENTE } from './base-locale.js';
 
@@ -33,9 +34,9 @@ export const ROLES_ECRITURE = ['admin', 'animalier'];
 
 /** Phrases et libellés (garde : lus dans le PHP et le Blade). */
 export const MOTIFS = {
-    aucuneBande: "Aucune bande active en cuniculture. Créez d'abord une bande.",
+    aucuneBande: LAPINS_F.motifs.aucuneBande,
     dateInvalide: 'Date invalide : choisissez un jour.',
-    ancienneFiche: "Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les (Reproducteur / Jeune / Sous-mères) avant d'enregistrer.",
+    ancienneFiche: LAPINS_F.motifs.ancienneFiche,
     droit: "Votre profil ne permet pas d'enregistrer la fiche d'élevage : lecture seule.",
     exerciceClos: (annee, jourFr) => `L'exercice ${annee} est clôturé : aucune saisie ne peut être datée du ${jourFr}.`,
     mortsAuDessus: (morts, veille) => `Morts du jour (${morts}) supérieurs à l'effectif de la veille (${veille}) : l'effectif est ramené à 0, vérifiez la saisie.`,
@@ -46,20 +47,8 @@ export const MOTIFS = {
     enAttente: "Enregistrée sur cet appareil — en attente d'envoi.",
 };
 
-export const LIBELLES = {
-    titre: 'Saisie Journalière du Cheptel',
-    achat: 'Achats du jour', ne: 'Nés (Mise bas)', vente: 'Ventes', venteSuite: '(POS, réel)',
-    morts: 'Morts par catégorie', dons: 'Dons par catégorie',
-    reproducteur: 'Reproducteur', jeune: 'Jeune', sousMeres: 'Sous-mères',
-    passage: 'Sevrage du jour (Sous-mères → Jeune)',
-    departSaisissable: 'Effectif de départ par catégorie (déduit du stade de la bande)', departVerrouille: 'Effectif de départ par catégorie (verrouillé)',
-    effectifM: 'Effectif Mâles', effectifF: 'Effectif Femelles', effectifSevres: 'Jeunes', effectifSmeres: 'S/Mères',
-    effectifFinal: 'Effectif Final du Jour (Calculé dynamique)', taux: 'Taux de Mortalité du Jour (%)',
-    pesee: 'Poids Général Pesé (g)', echantillon: 'Taille Échantillon', echantillonAuto: '(Auto = Effectif Final)', poidsMoyen: 'Poids Moyen Constaté',
-    gmq: 'Poids moyen estimé (GMQ) :', enregistrer: 'Enregistrer ce Jour',
-    provende: 'Rationnement & Provende Servie par Catégorie (en Grammes g/j)', categorie: 'Catégorie', effectif: 'Effectif', ration: 'Ration Normative', servie: 'Provende Servie (g)',
-    totalProvende: 'TOTAL PROVENDE SERVIE DU JOUR (CUMUL EN GRAMMES)',
-};
+/** Libellés de la saisie des lapins (chaînes seules : la garde de sources les lit toutes dans le Blade). */
+export const LIBELLES = Object.fromEntries(Object.entries(LAPINS_F.libelles).filter(([, v]) => typeof v === 'string'));
 
 /** `components/autonomie-alimentaire.blade.php` : les cinq états, mêmes phrases (garde : `fiche-lapins-saisie.test.mjs`). */
 export const AUTONOMIE = {
@@ -93,10 +82,12 @@ export const saisieVide = () => ({
     peseeTotal: null, mortAncienTotal: null, donAncienTotal: null,
 });
 
+/** Le barème de LA famille (les barèmes tirés couvrent toutes les espèces ; sans `species_code`, tel quel). */
+const rationsDe = (rations, F) => rations.filter((r) => r.species_code === undefined || r.species_code === F.espece);
 const fichesDe = (lot, fiches) => fiches.filter((f) => f.lot_id === lot.id);
 
 /** `loadDay` : la saisie telle que le web l'ouvre pour ce jour (fiche existante rechargée, sinon zéros ; départ proposé d'après le stade). */
-export function chargerJour(lot, fiches, jour) {
+export function chargerJour(lot, fiches, jour, F = FAMILLE_PAR_DEFAUT) {
     const s = saisieVide();
     if (lot === null || lot === undefined) return s;
     const duLot = fichesDe(lot, fiches);
@@ -114,34 +105,38 @@ export function chargerJour(lot, fiches, jour) {
     s.passage = n(f.passage_sevre_jeune);
     s.effectifM = n(f.effectif_m); s.effectifF = n(f.effectif_f); s.effectifSevres = n(f.effectif_sevres); s.effectifSmeres = n(f.effectif_smeres);
     const final = n(f.effectif_final);
-    s.peseeTotal = f.weight_sample_avg_g && final > 0 ? Math.round(Number(f.weight_sample_avg_g) * final) : null;
+    // Lapins : total pesé en grammes (arrondi) ; porcs : en Kg, deux décimales (`round(avg × effectif / 1000, 2)`).
+    s.peseeTotal = f.weight_sample_avg_g && final > 0
+        ? (F.kg ? arrondiPhp((Number(f.weight_sample_avg_g) * final) / 1000, 2) : Math.round(Number(f.weight_sample_avg_g) * final))
+        : null;
     return s;
 }
 
 /** `getPoidsMoyenEstimeProperty` : poids moyen estimé (GMQ entre la première et la dernière pesée), `null` si aucune pesée ou pesée saisie. */
-export function poidsMoyenEstime(lot, fiches, jour, s) {
+export function poidsMoyenEstime(lot, fiches, jour, s, F = FAMILLE_PAR_DEFAUT) {
     if (nonNul(s.peseeTotal) || !lot || !dateValide(jour)) return null;
     const pesees = fichesDe(lot, fiches).filter((f) => nonNul(f.weight_sample_avg_g) && jourDe(f) < jour).sort((a, b) => (jourDe(a) < jourDe(b) ? -1 : 1));
     if (pesees.length === 0) return null;
     const derniere = pesees.at(-1);
     const ecoules = jours(jourDe(derniere), jour);
     const poids = Number(derniere.weight_sample_avg_g);
-    if (ecoules <= 0) return arrondiPhp(poids, 0);
+    if (ecoules <= 0) return F.kg ? arrondiPhp(poids / 1000, 2) : arrondiPhp(poids, 0);
     let gmq = 0;
     if (pesees.length >= 2) {
         const jg = jours(jourDe(pesees[0]), jourDe(derniere));
         gmq = jg > 0 ? (poids - Number(pesees[0].weight_sample_avg_g)) / jg : 0;
     }
-    return arrondiPhp(poids + gmq * ecoules, 0);
+    return F.kg ? arrondiPhp((poids + gmq * ecoules) / 1000, 2) : arrondiPhp(poids + gmq * ecoules, 0);
 }
 
 /**
  * Tout ce que l'écran du web calcule à partir de la saisie : effectif de la veille, effectif final, taux, catégories (`categoriesJour`),
  * avertissement des morts, provende, poids estimé.
  */
-export function calculsSaisie(lot, fiches, jour, s, rations = [], autonomie = null) {
+export function calculsSaisie(lot, fiches, jour, s, rations = [], autonomie = null, F = FAMILLE_PAR_DEFAUT) {
+    rations = rationsDe(rations, F);
     const cat = { mode: 'sans_chaine', repro: null, sevre: null, jeune: null, resultat: null, motif: null, refus_passage: null, avertissements: [], depart_requis: false, depart_date: null, depart: null };
-    const sortie = { veille: 0, vente: 0, effectifFinal: 0, taux: 0, cat, avertissementMorts: null, provende: provendeDuJour({}, rations), poidsEstime: null, autonomie: { available: false } };
+    const sortie = { veille: 0, vente: 0, effectifFinal: 0, taux: 0, cat, avertissementMorts: null, provende: F.provende({}, rations), poidsEstime: null, autonomie: { available: false } };
     if (!lot) return sortie;
     const valide = dateValide(jour);
     const duLot = fichesDe(lot, fiches);
@@ -154,7 +149,7 @@ export function calculsSaisie(lot, fiches, jour, s, rations = [], autonomie = nu
     sortie.effectifFinal = computeEffectifFinal(sortie.veille, n(s.achat), n(s.ne), mort, sortie.vente, don, transferts.transfert_entree, transferts.transfert_sortie);
     sortie.taux = sortie.veille > 0 ? arrondiPhp((mort / sortie.veille) * 100, 1) : 0;
     if (mort > sortie.veille) sortie.avertissementMorts = MOTIFS.mortsAuDessus(mort, sortie.veille);
-    sortie.poidsEstime = poidsMoyenEstime(lot, fiches, jour, s);
+    sortie.poidsEstime = poidsMoyenEstime(lot, fiches, jour, s, F);
 
     if (valide) {
         const etat = etatPourJour(lot, duLot, jour);
@@ -174,7 +169,7 @@ export function calculsSaisie(lot, fiches, jour, s, rations = [], autonomie = nu
             }
         }
         if (continuer && veille !== null && veille !== undefined) {
-            const r = calculerJour(LAPINS, veille, {
+            const r = calculerJour(F.calcul, veille, {
                 achat: n(s.achat), ne: n(s.ne), vente: sortie.vente,
                 mort_repro: n(s.mortRepro), mort_sevre: n(s.mortLapereau), mort_jeune: n(s.mortChair),
                 don_repro: n(s.donRepro), don_sevre: n(s.donLapereau), don_jeune: n(s.donChair), passage: n(s.passage), ...transferts,
@@ -183,7 +178,7 @@ export function calculsSaisie(lot, fiches, jour, s, rations = [], autonomie = nu
             if (r.sommeDifferente === true) cat.avertissements.push(MOTIFS.somme(jourFr(jour), r.repro + r.sevre + r.jeune, sortie.effectifFinal));
         }
     }
-    sortie.provende = provendeDuJour({ repro: cat.repro, sevre: cat.sevre, jeune: cat.jeune }, rations);
+    sortie.provende = F.provende({ repro: cat.repro, sevre: cat.sevre, jeune: cat.jeune }, rations);
     sortie.autonomie = autonomie ? autonomie(sortie.provende.total_kg) : { available: false };
     return sortie;
 }
@@ -201,13 +196,14 @@ export function refusExerciceClos(exercices, jour) {
  * @returns {{refus:string}|{refus:null, fiche:object, lot:object, fiches:object[]}}
  */
 export function enregistrerJour(lot, fiches, jour, s, ctx = {}) {
+    const F = ctx.famille ?? familleDuLot(lot) ?? FAMILLE_PAR_DEFAUT;
     if (ctx.role !== undefined && ctx.role !== null && !ROLES_ECRITURE.includes(ctx.role)) return { refus: MOTIFS.droit };
-    if (!lot) return { refus: MOTIFS.aucuneBande };
+    if (!lot) return { refus: F.motifs.aucuneBande };
     if (!dateValide(jour)) return { refus: MOTIFS.dateInvalide };
     const clos = refusExerciceClos(ctx.exercices ?? [], jour);
     if (clos !== null) return { refus: clos };
 
-    const c = calculsSaisie(lot, fiches, jour, s, ctx.rations ?? []);
+    const c = calculsSaisie(lot, fiches, jour, s, ctx.rations ?? [], null, F);
     if (c.cat.refus_passage !== null && c.cat.refus_passage !== undefined) return { refus: c.cat.refus_passage };
     const saisiDepart = { repro: s.departRepro, sevre: s.departSevre, jeune: s.departJeune };
     let departAEcrire = false;
@@ -218,7 +214,7 @@ export function enregistrerJour(lot, fiches, jour, s, ctx = {}) {
     }
     const mort = n(s.mortRepro) + n(s.mortChair) + n(s.mortLapereau);
     const don = n(s.donRepro) + n(s.donChair) + n(s.donLapereau);
-    if ((nonNul(s.mortAncienTotal) && mort === 0) || (nonNul(s.donAncienTotal) && don === 0)) return { refus: MOTIFS.ancienneFiche };
+    if ((nonNul(s.mortAncienTotal) && mort === 0) || (nonNul(s.donAncienTotal) && don === 0)) return { refus: F.motifs.ancienneFiche };
 
     const donnees = {
         achat: n(s.achat), ne: n(s.ne), mort, vente: c.vente, don, effectif_final: c.effectifFinal,
@@ -227,7 +223,7 @@ export function enregistrerJour(lot, fiches, jour, s, ctx = {}) {
         mort_repro: n(s.mortRepro), mort_sevre: n(s.mortLapereau), mort_jeune: n(s.mortChair),
         don_repro: n(s.donRepro), don_sevre: n(s.donLapereau), don_jeune: n(s.donChair),
         passage_sevre_jeune: n(s.passage),
-        weight_sample_avg_g: s.peseeTotal && c.effectifFinal > 0 ? arrondiPhp(n(s.peseeTotal) / c.effectifFinal, 0) : null,
+        weight_sample_avg_g: s.peseeTotal && c.effectifFinal > 0 ? arrondiPhp((F.kg ? Number(s.peseeTotal) * 1000 : n(s.peseeTotal)) / c.effectifFinal, 0) : null,
     };
     if (departAEcrire) Object.assign(donnees, { cat_depart_repro: s.departRepro, cat_depart_sevre: s.departSevre, cat_depart_jeune: s.departJeune });
 
@@ -264,7 +260,7 @@ export function appliquerSaisies(tire, saisies, ctx = {}) {
     const sautees = [];
     for (const it of saisies.filter((x) => x.sync_status !== 'conflict')) {
         const lot = courant.lots.find((l) => l.id === it.lot_id);
-        const r = lot ? enregistrerJour(lot, courant.fiches, it.jour, it.saisie, { ...ctx, role: null, idFiche: it.id_fiche }) : { refus: MOTIFS.aucuneBande };
+        const r = lot ? enregistrerJour(lot, courant.fiches, it.jour, it.saisie, { ...ctx, role: null, idFiche: it.id_fiche }) : { refus: LAPINS_F.motifs.aucuneBande };
         if (r.refus !== null) { sautees.push({ ...it, refus: r.refus }); continue; }
         courant = { lots: courant.lots.map((l) => (l.id === r.lot.id ? r.lot : l)), fiches: r.fiches };
     }
@@ -332,15 +328,17 @@ export function rendreAutonomie(h, a, filiere = 'cuniculture') {
  * Le formulaire (DOM, jamais `innerHTML`). `lire()` rend `{lot, fiches, jour, rations, lectureSeule, enAttente}` à jour ; `actions.enregistrer(s)`
  * rend `{refus}` ou `{ok}` ; `s` est l'objet de saisie (modifié en place).
  */
-export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) {
+export function rendreFormulaire(h, { s, lire, actions, retourInitial = null, famille = FAMILLE_PAR_DEFAUT }) {
+    const F = famille;
+    const L = F.libelles;
     const champs = new Map();
     const entier = (cle, libelle, classe = '') => {
-        const input = h('input', { type: 'number', min: '0', id: `saisie-${cle}`, class: `fiche-select ${classe}`, value: String(s[cle] ?? '') });
-        input.addEventListener('input', () => { s[cle] = input.value === '' ? (cle.startsWith('depart') || cle === 'peseeTotal' ? null : 0) : Math.max(0, Math.trunc(Number(input.value)) || 0); rafraichir(); });
+        const input = h('input', { type: 'number', min: '0', ...(cle === 'peseeTotal' && F.kg ? { step: '0.1' } : {}), id: `saisie-${cle}`, class: `fiche-select ${classe}`, value: String(s[cle] ?? '') });
+        input.addEventListener('input', () => { s[cle] = input.value === '' ? (cle.startsWith('depart') || cle === 'peseeTotal' ? null : 0) : Math.max(0, cle === 'peseeTotal' && F.kg ? (Number(input.value) || 0) : (Math.trunc(Number(input.value)) || 0)); rafraichir(); });
         champs.set(cle, input);
         return h('label', { class: 'saisie-champ' }, h('span', { class: 'muted' }, libelle), input);
     };
-    const groupe = (titre, cles) => h('div', { class: 'saisie-groupe' }, h('b', {}, titre), h('div', { class: 'saisie-trois' }, ...[['Repro', LIBELLES.reproducteur], ['Chair', LIBELLES.jeune], ['Lapereau', LIBELLES.sousMeres]].map(([suffixe, l]) => entier(`${cles}${suffixe}`, l))));
+    const groupe = (titre, cles, etiquettes) => h('div', { class: 'saisie-groupe' }, h('b', {}, titre), h('div', { class: 'saisie-trois' }, ...['Repro', 'Chair', 'Lapereau'].map((suffixe, i) => entier(`${cles}${suffixe}`, etiquettes[i]))));
     const alertes = h('div', { id: 'saisie-alertes', class: 'saisie-alertes', role: 'status' });
     const departZone = h('div', { id: 'saisie-depart' });
     const finale = h('b', { id: 'saisie-effectif-final' });
@@ -356,14 +354,14 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
 
     function rafraichir() {
         const ctx = lire();
-        const c = calculsSaisie(ctx.lot, ctx.fiches, ctx.jour, s, ctx.rations, ctx.autonomie);
+        const c = calculsSaisie(ctx.lot, ctx.fiches, ctx.jour, s, ctx.rations, ctx.autonomie, F);
         const g = (v) => (v === null || v === undefined ? '—' : `${v} g`);
-        const ligne = (libelle, cle, id, l) => h('tr', {}, h('td', {}, libelle), h('td', { class: 'num' }, h('input', { id: `cat-eff-${id}`, type: 'text', disabled: true, value: String(c.provende[cle].effectif ?? '—'), style: 'width:56px;text-align:center' })), h('td', { class: 'num' }, `${c.provende[cle].ration} g/j`), h('td', { class: 'num', id: `cat-prov-${id}-g` }, g(c.provende[cle].total_g)));
-        provende.replaceChildren(h('b', {}, LIBELLES.provende), h('table', { class: 'rtable' },
-            h('thead', {}, h('tr', {}, ...[LIBELLES.categorie, LIBELLES.effectif, LIBELLES.ration, LIBELLES.servie].map((t) => h('th', {}, t)))),
-            h('tbody', {}, ligne(LIBELLES.reproducteur, 'repro', 'repro'), ligne(LIBELLES.jeune, 'chair', 'chair'), ligne(LIBELLES.sousMeres, 'sous_meres', 'lapereau')),
-            h('tfoot', {}, h('tr', {}, h('td', { colspan: 3 }, LIBELLES.totalProvende), h('td', { class: 'num', id: 'day-total-provende-g' }, c.provende.total_g === null ? '—' : `${c.provende.total_g} g (${c.provende.total_kg} Kg)`)))));
-        autonomieZone.replaceChildren(rendreAutonomie(h, c.autonomie));
+        const ligne = (libelle, cle, id) => h('tr', {}, h('td', {}, libelle), h('td', { class: 'num' }, h('input', { id: `cat-eff-${id}`, type: 'text', disabled: true, value: String(c.provende[cle].effectif ?? '—'), style: 'width:56px;text-align:center' })), h('td', { class: 'num' }, F.rationAffichee(cle, c.provende[cle].ration)), h('td', { class: 'num', id: `cat-prov-${id}-g` }, g(c.provende[cle].total_g)));
+        provende.replaceChildren(h('b', {}, L.provende), h('table', { class: 'rtable' },
+            h('thead', {}, h('tr', {}, ...[L.categorie, L.effectif, L.ration, L.servie].map((t) => h('th', {}, t)))),
+            h('tbody', {}, ...L.lignesProvende.map(([cle, id, libelle]) => ligne(libelle, cle, id))),
+            h('tfoot', {}, h('tr', {}, h('td', { colspan: 3 }, L.totalProvende), h('td', { class: 'num', id: 'day-total-provende-g' }, c.provende.total_g === null ? '—' : `${c.provende.total_g} g (${c.provende.total_kg} Kg)`)))));
+        autonomieZone.replaceChildren(rendreAutonomie(h, c.autonomie, F.filiere));
         const notes = [];
         const bloc = (texte, classe) => h('div', { class: `bandeau ${classe}`, style: 'margin:6px 0 0', role: classe === 'avert' ? 'status' : 'alert' }, texte);
         if (c.cat.motif) notes.push(bloc(c.cat.motif, 'refus'));
@@ -375,25 +373,25 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
         finale.textContent = String(c.effectifFinal);
         taux.textContent = `${c.taux.toFixed(1).replace('.', ',')} %`;
         echantillon.textContent = String(c.effectifFinal);
-        poidsMoyen.textContent = s.peseeTotal && c.effectifFinal > 0 ? `${arrondiPhp(s.peseeTotal / c.effectifFinal, 0)} g` : '—';
+        poidsMoyen.textContent = s.peseeTotal && c.effectifFinal > 0 ? (F.kg ? `${arrondiPhp(s.peseeTotal / c.effectifFinal, 1).toFixed(1)} Kg` : `${arrondiPhp(s.peseeTotal / c.effectifFinal, 0)} g`) : '—';
         venteChamp.textContent = String(c.vente);
-        gmq.replaceChildren(...(c.poidsEstime !== null ? [`${LIBELLES.gmq} `, h('b', {}, `${c.poidsEstime} g / animal`)] : []));
-        const placeholder = c.poidsEstime !== null && c.effectifFinal > 0 ? `~${c.poidsEstime * c.effectifFinal} g (estimé)` : 'ex : 3500';
+        gmq.replaceChildren(...(c.poidsEstime !== null ? [`${L.gmq} `, h('b', {}, F.kg ? `${arrondiPhp(c.poidsEstime, 2).toFixed(2)} Kg / animal` : `${c.poidsEstime} g / animal`)] : []));
+        const placeholder = c.poidsEstime !== null && c.effectifFinal > 0 ? (F.kg ? `~${arrondiPhp(c.poidsEstime * c.effectifFinal, 1).toFixed(1)} Kg (estimé)` : `~${c.poidsEstime * c.effectifFinal} g (estimé)`) : L.peseeExemple;
         champs.get('peseeTotal')?.setAttribute('placeholder', placeholder);
         etatEnvoi.textContent = ctx.enAttente ? MOTIFS.enAttente : '';
         return c;
     }
 
     const ctx0 = lire();
-    const c0 = calculsSaisie(ctx0.lot, ctx0.fiches, ctx0.jour, s, ctx0.rations, ctx0.autonomie);
+    const c0 = calculsSaisie(ctx0.lot, ctx0.fiches, ctx0.jour, s, ctx0.rations, ctx0.autonomie, F);
     if (c0.cat.depart_requis) {
-        departZone.append(h('div', { class: 'saisie-groupe' }, h('b', {}, LIBELLES.departSaisissable),
+        departZone.append(h('div', { class: 'saisie-groupe' }, h('b', {}, L.departSaisissable),
             h('p', { class: 'muted' }, `Effectif au DÉBUT du jour, avant les mouvements du jour, pré-rempli automatiquement depuis le stade de la bande. La somme des trois catégories doit égaler l'effectif total au début du jour (${c0.veille}). Corrigez-le seulement pour une bande mixte ; il est verrouillé au premier enregistrement.`),
-            h('div', { class: 'saisie-trois' }, entier('departRepro', LIBELLES.reproducteur), entier('departJeune', LIBELLES.jeune), entier('departSevre', LIBELLES.sousMeres))));
+            h('div', { class: 'saisie-trois' }, ...L.ordreDepart.map(([prop, , libelle]) => entier(prop, libelle)))));
     } else if (c0.cat.depart) {
-        departZone.append(h('div', { class: 'saisie-groupe' }, h('b', {}, LIBELLES.departVerrouille),
+        departZone.append(h('div', { class: 'saisie-groupe' }, h('b', {}, L.departVerrouille),
             h('p', { class: 'muted' }, `Effectif de départ fixé le ${jourFr(c0.cat.depart_date)} (au début de ce jour).`),
-            h('div', { class: 'saisie-trois' }, ...[['repro', LIBELLES.reproducteur], ['jeune', LIBELLES.jeune], ['sevre', LIBELLES.sousMeres]].map(([k, l]) => h('label', { class: 'saisie-champ' }, h('span', { class: 'muted' }, l), h('input', { type: 'number', value: String(c0.cat.depart[k]), disabled: true, class: 'fiche-select' })))),
+            h('div', { class: 'saisie-trois' }, ...L.ordreDepart.map(([, k, l]) => h('label', { class: 'saisie-champ' }, h('span', { class: 'muted' }, l), h('input', { type: 'number', value: String(c0.cat.depart[k]), disabled: true, class: 'fiche-select' })))),
             c0.cat.mode === 'avant_depart' ? h('p', { class: 'alerte' }, MOTIFS.avantDepart(jourFr(c0.cat.depart_date))) : null));
     }
 
@@ -403,13 +401,13 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
             h('button', { type: 'button', class: 'btn danger', id: 'saisie-abandonner', onclick: () => actions.abandonner() }, 'Abandonner cette saisie'))
         : null;
     const coches = new Set();
-    const observations = h('input', { type: 'text', id: 'saisie-observations', class: 'fiche-select', style: 'width:100%', placeholder: LIBELLES_PROPHY.observationsExemple, disabled: Boolean(ctx0.lectureSeule) });
+    const observations = h('input', { type: 'text', id: 'saisie-observations', class: 'fiche-select', style: 'width:100%', placeholder: F.prophylaxie.observationsExemple, disabled: Boolean(ctx0.lectureSeule) });
     const conflitsSoins = (ctx0.conflitsSoins ?? []).map((x) => h('div', { class: 'bandeau refus', role: 'alert', style: 'margin:6px 0 0', 'data-conflit-soin': x.id }, `Soin « ${x.soin.action_type} » refusé par le serveur : ${x.motif} `,
         h('button', { type: 'button', class: 'btn', onclick: () => actions.renvoyerSoin(x.id) }, 'Renvoyer'), h('button', { type: 'button', class: 'btn danger', onclick: () => actions.abandonnerSoin(x.id) }, 'Abandonner ce soin')));
     const message = (r) => { retour.textContent = r.refus ?? r.avertissement ?? r.message ?? ''; retour.className = r.refus ? 'alerte' : 'muted'; };
-    prophyZone.append(rendreProphylaxie(h, { protocole: ctx0.protocole, coches, lectureSeule: ctx0.lectureSeule, actions: { valider: async () => message(await actions.validerTraitements([...coches], observations.value)) } }), ...conflitsSoins,
-        h('label', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES_PROPHY.observations), observations));
-    const bouton = h('button', { type: 'button', class: 'btn plein', id: 'saisie-enregistrer', disabled: Boolean(ctx0.lectureSeule) }, h('span', { class: 'material-symbols-outlined' }, 'save'), LIBELLES.enregistrer);
+    prophyZone.append(rendreProphylaxie(h, { titre: F.prophylaxie.titre, protocole: ctx0.protocole, coches, lectureSeule: ctx0.lectureSeule, actions: { valider: async () => message(await actions.validerTraitements([...coches], observations.value)) } }), ...conflitsSoins,
+        h('label', { class: 'saisie-champ' }, h('span', { class: 'muted' }, F.prophylaxie.observations), observations));
+    const bouton = h('button', { type: 'button', class: 'btn plein', id: 'saisie-enregistrer', disabled: Boolean(ctx0.lectureSeule) }, h('span', { class: 'material-symbols-outlined' }, 'save'), L.enregistrer);
     const retour = h('p', { id: 'saisie-retour', role: 'alert', class: 'muted' }, retourInitial);
     bouton.addEventListener('click', async () => {
         const r = await actions.enregistrer(s);
@@ -421,19 +419,19 @@ export function rendreFormulaire(h, { s, lire, actions, retourInitial = null }) 
     const racine = h('div', { id: 'fiche-saisie', class: 'saisie-form' },
         ctx0.lectureSeule ? h('div', { class: 'bandeau neutre', id: 'saisie-lecture-seule', style: 'margin:0 0 8px' }, ctx0.lectureSeule) : null,
         conflit,
-        h('div', { class: 'saisie-trois' }, entier('achat', LIBELLES.achat), entier('ne', LIBELLES.ne),
-            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${LIBELLES.vente} ${LIBELLES.venteSuite}`), venteChamp)),
-        groupe(LIBELLES.morts, 'mort'), groupe(LIBELLES.dons, 'don'),
-        h('div', { class: 'saisie-trois' }, entier('passage', LIBELLES.passage)),
+        h('div', { class: 'saisie-trois' }, entier('achat', L.achat), entier('ne', L.ne),
+            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${L.vente} ${L.venteSuite}`), venteChamp)),
+        groupe(L.morts, 'mort', L.mortsCat), groupe(L.dons, 'don', L.donsCat),
+        h('div', { class: 'saisie-trois' }, entier('passage', L.passageSuite ? `${L.passage} ${L.passageSuite}` : L.passage)),
         departZone, alertes,
-        h('div', { class: 'saisie-quatre' }, entier('effectifM', LIBELLES.effectifM), entier('effectifF', LIBELLES.effectifF), entier('effectifSevres', LIBELLES.effectifSevres), entier('effectifSmeres', LIBELLES.effectifSmeres)),
+        h('div', { class: 'saisie-quatre' }, entier('effectifM', L.effectifM), entier('effectifF', L.effectifF), entier('effectifSevres', L.effectifSevres), entier('effectifSmeres', L.effectifSmeres)),
         h('div', { class: 'saisie-trois' },
-            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.effectifFinal), finale),
-            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.taux), taux)),
+            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, L.effectifFinal), finale),
+            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, L.taux), taux)),
         provende, autonomieZone,
-        h('div', { class: 'saisie-trois' }, entier('peseeTotal', LIBELLES.pesee),
-            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${LIBELLES.echantillon} ${LIBELLES.echantillonAuto}`), echantillon),
-            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, LIBELLES.poidsMoyen), poidsMoyen)),
+        h('div', { class: 'saisie-trois' }, entier('peseeTotal', L.pesee),
+            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, `${L.echantillon} ${L.echantillonAuto}`), echantillon),
+            h('div', { class: 'saisie-champ' }, h('span', { class: 'muted' }, L.poidsMoyen), poidsMoyen)),
         gmq, prophyZone, retour, etatEnvoi, h('div', { class: 'groupe', style: 'justify-content:flex-end' }, bouton));
     if (ctx0.lectureSeule) for (const el of racine.querySelectorAll('input')) el.disabled = true;
     rafraichir();

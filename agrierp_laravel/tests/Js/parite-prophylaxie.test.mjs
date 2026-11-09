@@ -20,19 +20,22 @@ const TRAITEMENTS = ['Vermifuge', 'Vitamines', 'Anticoccidien', 'Vaccin VHD', 'A
 
 let compteur = 0;
 const scenarios = [];
-const NB = Number(process.env.SCENARIOS_LIMITE ?? 400); // une valeur réduite sert aux contrôles par mutation seulement
+const NB = Number(process.env.SCENARIOS_LIMITE ?? 600); // une valeur réduite sert aux contrôles par mutation seulement
 for (let i = 0; i < NB; i++) {
+    const famille = i % 2 === 0 ? 'lapins' : 'porcs';
+    const espece = famille === 'porcs' ? 'porciculture' : 'cuniculture';
+    const autre = famille === 'porcs' ? 'cuniculture' : 'porciculture';
     const stage = ['reproduction', 'croissance', 'engraissement'][alea(3)];
     const lot = { id: uuid(++compteur), stage, created_date: jour(10 + alea(20)) };
     const evenements = stage === 'reproduction' ? Array.from({ length: alea(4) }, () => ({ id: uuid(++compteur), saillie_date: jour(alea(40)) })) : [];
     const standards = Array.from({ length: 2 + alea(10) }, () => {
         const debut = alea(6) === 0 ? null : 1 + alea(22);
-        return { id: uuid(++compteur), species_code: alea(6) === 0 ? 'porciculture' : 'cuniculture', treatment: TRAITEMENTS[alea(TRAITEMENTS.length)], product_recommended: `Produit ${alea(5)}`, dosage: `${1 + alea(5)} ml`, withdrawal_days: alea(3) === 0 ? 1 + alea(14) : 0, is_active: alea(8) === 0 ? 0 : 1, cycle_day_start: debut, cycle_day_end: debut === null ? null : debut + alea(6) };
+        return { id: uuid(++compteur), species_code: alea(6) === 0 ? autre : espece, treatment: TRAITEMENTS[alea(TRAITEMENTS.length)], product_recommended: `Produit ${alea(5)}`, dosage: `${1 + alea(5)} ml`, withdrawal_days: alea(3) === 0 ? 1 + alea(14) : 0, is_active: alea(8) === 0 ? 0 : 1, cycle_day_start: debut, cycle_day_end: debut === null ? null : debut + alea(6) };
     });
     const j = jour(alea(9) === 0 ? 41 + alea(5) : 20 + alea(21)); // jusqu'à aujourd'hui (jour 40 = 10 nov.) et parfois le futur
     const soins = standards.filter(() => alea(5) === 0).map((s) => ({ id: uuid(++compteur), action_type: s.treatment, record_date: alea(4) === 0 ? jour(alea(40)) : j, is_active: alea(5) !== 0 }));
     const coches = [...standards.filter(() => alea(4) !== 0).map((s) => s.id), ...(alea(6) === 0 ? [uuid(999999)] : [])];
-    scenarios.push({ aujourdhui: jour(39), lot, evenements, standards, soins, jour: j, coches, observations: ['', '  ', null, 'RAS', '  légère toux  ', 'x'.repeat(30)][alea(6)] ?? '' });
+    scenarios.push({ famille, espece, aujourdhui: jour(39), lot, evenements, standards, soins, jour: j, coches, observations: ['', '  ', null, 'RAS', '  légère toux  ', 'x'.repeat(30)][alea(6)] ?? '' });
 }
 
 let retour = null;
@@ -57,7 +60,7 @@ test('prophylaxie du jour = vrai FicheLapins : protocole, refus, messages, soins
         const ctx = `scénario ${i}`;
         const standards = s.standards.map((x) => ({ ...x, is_active: Boolean(x.is_active) }));
         const lot = { ...s.lot, id: s.lot.id };
-        const protocole = protocoleDuJour({ lot, evenements: s.evenements.map((e) => ({ ...e, lot_id: lot.id })), standards, soins: s.soins.map((x) => ({ ...x, lot_id: lot.id })), jour: s.jour });
+        const protocole = protocoleDuJour({ lot, evenements: s.evenements.map((e) => ({ ...e, lot_id: lot.id })), standards, soins: s.soins.map((x) => ({ ...x, lot_id: lot.id })), jour: s.jour, espece: s.espece });
         assert.equal(protocole.jourDeCycle, p.avant.jourDeCycle, `${ctx} jour de cycle`);
         assert.equal(protocole.motifIndetermine, p.avant.motif, `${ctx} motif`);
         assert.equal(protocole.calendairesNonEvalues, p.avant.calendaires, `${ctx} calendaires`);
@@ -67,7 +70,7 @@ test('prophylaxie du jour = vrai FicheLapins : protocole, refus, messages, soins
         stats.protocoles++; if (protocole.jourDeCycle === null) stats.indetermine++; if (lot.stage === 'reproduction') stats.reproduction++;
 
         let n = 0;
-        const r = validerTraitements({ lot, evenements: s.evenements.map((e) => ({ ...e, lot_id: lot.id })), standards, soins: s.soins.map((x) => ({ ...x, lot_id: lot.id })), jour: s.jour, aujourdhui: s.aujourdhui, idsCoches: s.coches, observations: s.observations, nouvelId: () => `n${++n}` });
+        const r = validerTraitements({ lot, evenements: s.evenements.map((e) => ({ ...e, lot_id: lot.id })), standards, soins: s.soins.map((x) => ({ ...x, lot_id: lot.id })), jour: s.jour, aujourdhui: s.aujourdhui, espece: s.espece, idsCoches: s.coches, observations: s.observations, nouvelId: () => `n${++n}` });
         const attendu = r.refus ? { message: r.refus, type: 'error' } : r.avertissement ? { message: r.avertissement, type: 'warning' } : { message: r.message, type: 'success' };
         assert.deepEqual(p.toast, attendu, `${ctx} message`);
         const nouveaux = (r.soins ?? []).map((x) => ({ action_type: x.action_type, product_used: x.product_used, dose: x.dose, symptomes: x.symptomes, record_date: x.record_date, is_active: true }));
@@ -78,5 +81,5 @@ test('prophylaxie du jour = vrai FicheLapins : protocole, refus, messages, soins
         if (r.soins?.length) stats.succes++; else if (r.refus) stats.futur++; else stats.rien++;
         stats.remanences += periodes.length;
     });
-    if (NB === 400) assert.ok(stats.succes > 80 && stats.rien > 20 && stats.futur > 15 && stats.remanences > 30 && stats.indetermine > 15 && stats.reproduction > 80, `couverture insuffisante : ${JSON.stringify(stats)}`);
+    if (NB === 600) assert.ok(stats.succes > 80 && stats.rien > 20 && stats.futur > 15 && stats.remanences > 30 && stats.indetermine > 15 && stats.reproduction > 80, `couverture insuffisante : ${JSON.stringify(stats)}`);
 });

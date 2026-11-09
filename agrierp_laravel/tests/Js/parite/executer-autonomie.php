@@ -54,7 +54,7 @@ foreach ($entree['scenarios'] as $i => $s) {
             $r->save();
         }
         $service = app(AutonomieAlimentaireService::class);
-        $produit = $service->produitProvende('cuniculture');
+        $produit = $service->produitProvende($s['espece'] ?? 'cuniculture');
         $a = $service->evaluer($produit, $s['consommation']);
         $sortie[$i] = ['available' => $a['available'], 'product' => $produit?->id, 'stock_kg' => $a['stock_kg'] ?? null, 'autonomie_jours' => $a['autonomie_jours'] ?? null,
             'critique' => $a['critique'] ?? null, 'rupture' => $a['rupture'] ?? null, 'inconnu' => $a['inconnu'] ?? false];

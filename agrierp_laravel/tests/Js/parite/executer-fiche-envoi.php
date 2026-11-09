@@ -72,7 +72,8 @@ foreach ($entree['scenarios'] as $i => $s) {
     DB::beginTransaction();
     try {
         Carbon::setTestNow(Carbon::parse($s['aujourdhui'].' 12:00:00', 'Africa/Porto-Novo'));
-        $espece = LivestockSpecies::firstOrCreate(['code' => 'cuniculture'], ['label' => 'Cuniculture', 'is_enabled' => true]);
+        $code = $s['espece'] ?? 'cuniculture';
+        $espece = LivestockSpecies::firstOrCreate(['code' => $code], ['label' => ucfirst($code), 'is_enabled' => true]);
         foreach ($s['exercices'] as $e) {
             FiscalYear::create(['year' => $e['year'], 'start_date' => $e['start_date'], 'end_date' => $e['end_date'], 'status' => $e['status']]);
         }

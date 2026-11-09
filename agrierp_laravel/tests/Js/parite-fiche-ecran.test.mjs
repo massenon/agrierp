@@ -4,10 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { modeleFiche } from '../../resources/js/hors-ligne/fiche-lapins-ecran.js';
+import { FAMILLES } from '../../resources/js/hors-ligne/fiche-familles.js';
 
 /**
  * PWA-3 (fiche lapins, É2) — TEST D'ÉCRAN SUR DONNÉES TIRÉES SIMULÉES : l'effectif, les KPI, le taux de mortalité, le poids, les traitements, le mois,
- * le bandeau d'exercice clos et les transferts que l'écran AFFICHE sont égaux à ceux que calcule le VRAI composant PHP `FicheLapins` sur le même
+ * le bandeau d'exercice clos et les transferts que l'écran AFFICHE sont égaux à ceux que calcule le VRAI composant PHP `FicheLapins` ou `FichePorcs` sur le même
  * jeu (base SQLITE en mémoire). Sans `php` : sauté AVEC sa raison.
  */
 const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -19,7 +20,10 @@ const deux = (n) => String(n).padStart(2, '0');
 const AUJOURDHUI = ['2026-11-09', '2026-01-31', '2026-03-01', '2027-02-15'];
 let compteur = 0;
 const scenarios = [];
-for (let i = 0; i < 160; i++) {
+for (let i = 0; i < 240; i++) {
+    const famille = i % 2 === 0 ? 'lapins' : 'porcs'; // une moitié des scénarios par fiche
+    const espece = famille === 'porcs' ? 'porciculture' : 'cuniculture';
+    const autre = famille === 'porcs' ? 'cuniculture' : 'porciculture';
     const aujourdhui = AUJOURDHUI[i % AUJOURDHUI.length];
     const annee = Number(aujourdhui.slice(0, 4));
     const produits = [{ id: uuid(++compteur), name: 'Vermifuge' }, { id: uuid(++compteur), name: 'Anticoccidien' }];
@@ -27,9 +31,9 @@ for (let i = 0; i < 160; i++) {
         { id: 2, year: annee, start_date: `${annee}-01-01`, end_date: `${annee}-12-31`, status: i % 7 === 0 ? 'cloture' : 'ouvert' }];
     if (i % 11 === 0) exercices.length = 1;
     const lots = [];
-    for (let k = 0; k < 1 + alea(3); k++) lots.push({ id: uuid(++compteur), code: `LAP-${i}-${k}`, species_code: 'cuniculture', status: 'actif', is_active: true, initial_quantity: 50 + alea(150), current_quantity: alea(200) });
-    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `ARCH-${i}`, species_code: 'cuniculture', status: 'archive', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
-    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `POR-${i}`, species_code: 'porciculture', status: 'actif', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
+    for (let k = 0; k < 1 + alea(3); k++) lots.push({ id: uuid(++compteur), code: `LAP-${i}-${k}`, species_code: espece, status: 'actif', is_active: true, initial_quantity: 50 + alea(150), current_quantity: alea(200) });
+    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `ARCH-${i}`, species_code: espece, status: 'archive', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
+    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `POR-${i}`, species_code: autre, status: 'actif', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
     const fiches = [];
     const soins = [];
     for (const lot of lots) {
@@ -56,7 +60,7 @@ for (let i = 0; i < 160; i++) {
     const mois = alea(3);
     const choisi = new Date(Date.UTC(annee, Number(aujourdhui.slice(5, 7)) - 1 - mois - (i % 2 === 0 ? 0 : 6), 1 + alea(28)));
     scenarios.push({
-        aujourdhui, produits, exercices, lots, fiches, soins, bandeId: alea(4) === 0 ? null : lotChoisi.id,
+        famille, aujourdhui, produits, exercices, lots, fiches, soins, bandeId: alea(4) === 0 ? null : lotChoisi.id,
         date: alea(12) === 0 ? 'pas-une-date' : `${choisi.getUTCFullYear()}-${deux(choisi.getUTCMonth() + 1)}-${deux(choisi.getUTCDate())}`,
     });
 }
@@ -73,13 +77,13 @@ test('préparation : le PHP répond', (t) => {
     }
 });
 
-const jourDe = (s) => s.date;
+
 test('écran = vrai FicheLapins : KPI, mois, jours, taux, poids, traitements, bandeau, transferts', (t) => {
     if (!retour) return t.skip(raison);
     let jours = 0; let bandeaux = 0; let avecTraitement = 0;
     scenarios.forEach((s, i) => {
         const donnees = { lots: s.lots, fiches: s.fiches, soins: s.soins, produits: s.produits.map((p) => ({ id: p.id, name: p.name })), exercices: s.exercices };
-        const m = modeleFiche(donnees, { bandeId: s.bandeId, date: s.date, aujourdhui: s.aujourdhui });
+        const m = modeleFiche(donnees, { bandeId: s.bandeId, date: s.date, aujourdhui: s.aujourdhui, famille: FAMILLES[s.famille] });
         const p = retour[i];
         const ctx = `scénario ${i}`;
         assert.deepEqual(m.kpis, p.kpis, `${ctx} KPI`);
@@ -105,5 +109,5 @@ test('écran = vrai FicheLapins : KPI, mois, jours, taux, poids, traitements, ba
         });
         if (m.bandeau) bandeaux++;
     });
-    assert.ok(jours > 4000 && bandeaux > 10 && avecTraitement > 100, `couverture insuffisante : ${jours} jours, ${bandeaux} bandeaux, ${avecTraitement} traitements`);
+    assert.ok(jours > 5000 && bandeaux > 10 && avecTraitement > 100, `couverture insuffisante : ${jours} jours, ${bandeaux} bandeaux, ${avecTraitement} traitements`);
 });

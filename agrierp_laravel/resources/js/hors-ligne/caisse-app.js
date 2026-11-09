@@ -12,6 +12,7 @@ import { ErreurPin, dechiffrer } from './coffre.js';
 import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.js';
 import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
 import { jourBenin, lotsVendables, bandeSousRemanence, refusDuPanier, elevageApresVentes } from './elevage-hors-ligne.js';
+import { FAMILLES } from './fiche-familles.js';
 import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
 import { soinsEnAttente, garderSoins, remettreSoinEnFile, abandonnerSoin, soinsAvecLocaux, remanencesAvecLocales, protocoleDuJour, validerTraitements } from './fiche-lapins-prophylaxie.js';
 import { produitProvende, evaluerAutonomie, delaisFournisseurs } from './fiche-lapins-calculs.js';
@@ -36,7 +37,7 @@ const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
-    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], feedTypes: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
+    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], famille: 'lapins', feedTypes: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
     role: null,
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
@@ -163,7 +164,7 @@ async function chargerReferentiels() {
     app.fiche.delais = (await app.base.lire('referentiels', 'purchase_orders'))
         ? delaisFournisseurs({ bons: await lire('purchase_orders'), achats: await lire('purchases'), produits: app.produits, categories: app.categories })
         : null;
-    app.fiche.rations = (await lire('feed_ration_standards')).filter((r) => r.species_code === 'cuniculture');
+    app.fiche.rations = await lire('feed_ration_standards'); // toutes les espèces : chaque fiche filtre la sienne
     await recalculerElevage();
     // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
     app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries'));
@@ -171,7 +172,8 @@ async function chargerReferentiels() {
         lots: app.elevage.lots, fiches: app.elevage.fiches, soins: soinsAvecLocaux(await lire('veterinary_records'), app.fiche.soinsEnAttente), produits: app.produits, exercices: await lire('fiscal_years'),
     } : null;
     $('btn-vue-fiche').hidden = !app.fiche.servie;
-    if (!app.fiche.servie && app.fiche.vue) basculerVue(false);
+    $('btn-vue-porcs').hidden = !app.fiche.servie;
+    if (!app.fiche.servie && app.fiche.vue) basculerVue(null);
     if (app.fiche.vue) dessinerFiche();
     app.serverTime = (await app.base.meta('curseur')) ?? null;
     app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
@@ -195,7 +197,7 @@ function dessinerFiche() {
     if (!app.fiche.donnees) return;
     const aujourdhui = jourDuComptoir();
     const date = app.fiche.date ?? aujourdhui;
-    const m = modeleFiche(app.fiche.donnees, { bandeId: app.fiche.bandeId, date, aujourdhui });
+    const m = modeleFiche(app.fiche.donnees, { bandeId: app.fiche.bandeId, date, aujourdhui, famille: FAMILLES[app.fiche.famille] });
     app.fiche.bandeId = m.bande?.id ?? null;
     const aller = (d) => { app.fiche.date = d; dessinerFiche(); };
     $('fiche-racine').replaceChildren(...rendreFiche(m, h, {
@@ -209,23 +211,24 @@ function dessinerFiche() {
 
 /** PWA-3 (É3) : le formulaire de saisie du jour affiché (bande et jour de l'écran). */
 function formulaireDuJour(m) {
+    const F = m.famille;
     const bande = m.bande;
     if (!bande) return null;
     const jour = m.dateAffichee;
     const donnees = () => app.fiche.donnees;
     const lot = () => donnees().lots.find((l) => l.id === bande.id);
-    const cle = `${bande.id}|${jour}`;
+    const cle = `${F.id}|${bande.id}|${jour}`;
     if (app.fiche.saisieCle !== cle) { app.fiche.saisieCle = cle; app.fiche.saisie = null; app.fiche.retour = null; }
-    if (!app.fiche.saisie) app.fiche.saisie = chargerJour(lot(), donnees().fiches, jour);
+    if (!app.fiche.saisie) app.fiche.saisie = chargerJour(lot(), donnees().fiches, jour, F);
     const s = app.fiche.saisie;
     const lectureSeule = () => (ROLES_ECRITURE.includes(app.role) ? refusExerciceClos(app.fiche.exercices, jour) : MOTIFS_SAISIE.droit);
     return rendreFormulaire(h, {
-        s,
+        s, famille: F,
         retourInitial: app.fiche.retour,
-        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations, autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === 'cuniculture').map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves, app.fiche.delais), conflitsSoins: app.fiche.soinsEnAttente.filter((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict'), protocole: protocoleDuJour({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour }), lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'), conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null }),
+        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations.filter((r) => r.species_code === F.espece), autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === F.espece).map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves, app.fiche.delais), conflitsSoins: app.fiche.soinsEnAttente.filter((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict'), protocole: protocoleDuJour({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, espece: F.espece }), lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'), conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null }),
         actions: {
             validerTraitements: async (idsCoches, observations) => {
-                const r = validerTraitements({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, aujourdhui: jourDuComptoir(), idsCoches, observations, role: app.role });
+                const r = validerTraitements({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, aujourdhui: jourDuComptoir(), espece: F.espece, idsCoches, observations, role: app.role });
                 if (r.refus || r.avertissement || r.soins.length === 0) return { refus: r.refus ?? null, avertissement: r.avertissement ?? null };
                 try {
                     await garderSoins(app.ctx, r.soins);
@@ -255,7 +258,7 @@ function formulaireDuJour(m) {
             enregistrer: async (saisie) => {
                 const existante = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour);
                 const fiche = donnees().fiches.find((f) => f.lot_id === bande.id && String(f.entry_date).slice(0, 10) === jour);
-                const r = enregistrerJour(lot(), donnees().fiches, jour, saisie, { role: app.role, exercices: app.fiche.exercices, rations: app.fiche.rations, idFiche: fiche?.id ?? existante?.id_fiche });
+                const r = enregistrerJour(lot(), donnees().fiches, jour, saisie, { role: app.role, exercices: app.fiche.exercices, rations: app.fiche.rations.filter((r) => r.species_code === F.espece), idFiche: fiche?.id ?? existante?.id_fiche, famille: F });
                 if (r.refus !== null) return { refus: r.refus };
                 try {
                     app.fiche.saisies = await garderSaisie(app.ctx, { id_fiche: r.fiche.id, lot_id: bande.id, jour, saisie: { ...saisie }, fiche: r.fiche, cree_le: new Date().toISOString() });
@@ -272,11 +275,15 @@ function formulaireDuJour(m) {
     });
 }
 
-function basculerVue(fiche) {
-    app.fiche.vue = fiche;
-    $('contenu').hidden = fiche; $('contenu-fiche').hidden = !fiche;
-    $('btn-vue-fiche').lastChild.textContent = fiche ? 'Caisse' : 'Fiches Lapins';
-    if (fiche) dessinerFiche();
+/** `famille` : `'lapins'`, `'porcs'`, ou `null` (retour à la caisse). Changer de fiche repart du jour courant et de la première bande. */
+function basculerVue(famille) {
+    const change = famille !== null && famille !== app.fiche.famille;
+    app.fiche.vue = famille !== null;
+    if (famille !== null) app.fiche.famille = famille;
+    if (change) { app.fiche.bandeId = null; app.fiche.date = null; app.fiche.saisie = null; app.fiche.saisieCle = null; app.fiche.retour = null; }
+    $('contenu').hidden = app.fiche.vue; $('contenu-fiche').hidden = !app.fiche.vue;
+    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
+    if (app.fiche.vue) dessinerFiche();
 }
 
 // ----------------------------------------------------------------------------------------------- affichage
@@ -593,7 +600,8 @@ function poserEcouteursGeneraux() {
         const d = decider({ maintenant: Date.now(), derniereActivite: app.derniereActivite, minutes: app.minutesVerrou, requetesEnCours: app.requetes });
         if (d === 'verrouiller') verrouillerEcran('Application verrouillée après inactivité. Saisissez votre PIN.');
     }, 5000);
-    $('btn-vue-fiche').addEventListener('click', () => basculerVue(!app.fiche.vue));
+    $('btn-vue-fiche').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'lapins' ? null : 'lapins'));
+    $('btn-vue-porcs').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'porcs' ? null : 'porcs'));
     $('btn-verrouiller').addEventListener('click', () => verrouillerEcran('Application verrouillée. Saisissez votre PIN.'));
 }
 
