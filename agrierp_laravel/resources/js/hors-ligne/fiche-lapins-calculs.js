@@ -216,3 +216,43 @@ export function tableauReproducteurs(rations, effectifs) {
     const total = inconnu ? null : lignes.reduce((s, l) => s + l.total_g, 0);
     return { lignes, total_g: total, total_kg: total === null ? null : arrondiPhp(total / 1000, 2) };
 }
+
+// -------------------------------------------------------------------------- volailles pondeuses (PWA-3, fiche pondeuses)
+
+/** `EggStockLedgerService::OEUFS_PAR_PLATEAU`. */
+export const OEUFS_PAR_PLATEAU = 30;
+/** `StadePondeuse::CLES` (ordre du barème) et `LIBELLES` (tranche d'âge comprise, affichée telle quelle). */
+export const CLES_STADES_PONDEUSE = ['poussin_ponte', 'poussin_croissance', 'poulette', 'pondeuse'];
+export const LIBELLES_STADES_PONDEUSE = {
+    poussin_ponte: 'Poussin ponte (0 à 2 mois)', poussin_croissance: 'Poussin en croissance (2 à 4 mois)', poulette: 'Poulette (4 à 5.5 mois)', pondeuse: 'Pondeuse (6 à 18 mois)',
+};
+/** `StadePondeuse::EMPLACEMENTS`. */
+export const EMPLACEMENTS_STADES_PONDEUSE = { pondeuse: 'repro', poulette: 'jeune', poussin_croissance: 'sevre', poussin_ponte: 'quatre' };
+/** `StadePondeuse::RATIONS_PAR_DEFAUT` — UNIQUEMENT si le barème ne porte pas la ligne. */
+export const RATIONS_STADES_PONDEUSE_PAR_DEFAUT = { poussin_ponte: 30, poussin_croissance: 60, poulette: 80, pondeuse: 110 };
+
+/** `StadePondeuse::normaliser` : la tranche d'âge entre parenthèses est ignorée, ASCII, minuscules, espaces réduits. */
+const normaliserStade = (t) => sansAccent(String(t ?? '').replace(/\([^)]*\)/gu, ' ')).replace(/\s+/gu, ' ').trim();
+
+/** `StadePondeuse::cleDuLibelle` : ÉGALITÉ STRICTE du libellé normalisé, `null` sinon. */
+export function cleStadePondeuse(libelle) {
+    const l = normaliserStade(libelle);
+    return CLES_STADES_PONDEUSE.find((c) => l === normaliserStade(LIBELLES_STADES_PONDEUSE[c])) ?? null;
+}
+
+/** `StadePondeuse::ration`. */
+export function rationStadePondeuse(rations, cle) {
+    const ligne = rations.find((r) => cleStadePondeuse(r.stage_label) === cle);
+    return Math.trunc(Number(ligne?.ration_g_per_day ?? RATIONS_STADES_PONDEUSE_PAR_DEFAUT[cle])) || 0;
+}
+
+/** `StadePondeuse::tableau` : une ligne par stade (effectif calculé × ration), total g et kg (2 décimales), `null` si un stade est inconnu. */
+export function tableauPondeuses(rations, effectifs) {
+    const lignes = CLES_STADES_PONDEUSE.map((cle) => {
+        const effectif = effectifs[EMPLACEMENTS_STADES_PONDEUSE[cle]] ?? null;
+        const ration = rationStadePondeuse(rations, cle);
+        return { cle, libelle: LIBELLES_STADES_PONDEUSE[cle], ration, effectif: effectif === null ? null : Math.trunc(effectif), total_g: effectif === null ? null : Math.trunc(effectif) * ration };
+    });
+    const total = lignes.some((l) => l.total_g === null) ? null : lignes.reduce((s, l) => s + l.total_g, 0);
+    return { lignes, total_g: total, total_kg: total === null ? null : arrondiPhp(total / 1000, 2) };
+}

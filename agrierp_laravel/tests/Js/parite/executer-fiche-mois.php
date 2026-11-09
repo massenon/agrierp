@@ -27,6 +27,7 @@ use App\Livewire\Elevage\FicheLapins;
 use App\Livewire\Elevage\FichePorcs;
 use App\Livewire\Elevage\FicheEscargots;
 use App\Livewire\Elevage\FicheReproducteurs;
+use App\Livewire\Elevage\FichePondeuses;
 use App\Models\ModuleConfig;
 use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
@@ -49,7 +50,7 @@ foreach ($entree['scenarios'] as $i => $s) {
         session()->flush();
         $categorie = ProductCategory::create(['label' => 'Parité', 'is_active' => true]);
         foreach ($s['produits'] as $p) {
-            $produit = new Product(['sku' => 'S'.$p['id'], 'name' => $p['name'], 'category_id' => $categorie->id, 'unit' => 'u', 'pricing_mode' => 'fourchette', 'price_min' => 1, 'price_max' => 2, 'stock_qty' => 1, 'is_active' => true]);
+            $produit = new Product(['sku' => 'S'.$p['id'], 'name' => $p['name'], 'category_id' => $categorie->id, 'unit' => 'u', 'pricing_mode' => 'fourchette', 'price_min' => 1, 'price_max' => 2, 'stock_qty' => $p['stock_qty'] ?? 1, 'is_active' => true]);
             $produit->id = $p['id'];
             $produit->save();
         }
@@ -77,7 +78,7 @@ foreach ($entree['scenarios'] as $i => $s) {
         if ($s['famille'] === 'escargots' && $s['module'] !== null) {
             ModuleConfig::create(['species_code' => 'helico', 'is_enabled' => $s['module']]);
         }
-        $c = match ($s['famille']) { 'porcs' => new FichePorcs, 'escargots' => new FicheEscargots, 'reproducteurs' => new FicheReproducteurs, default => new FicheLapins };
+        $c = match ($s['famille']) { 'porcs' => new FichePorcs, 'escargots' => new FicheEscargots, 'reproducteurs' => new FicheReproducteurs, 'pondeuses' => new FichePondeuses, default => new FicheLapins };
         if ($c instanceof FicheReproducteurs) {
             // `mount()` : la bande choisie, sinon la première (`selectedLotId`) ; ici on ne monte pas le composant.
             $c->selectedLotId = $s['bandeId'] ?? ($c->getLotsProperty()->first()?->id ?? '');
@@ -104,6 +105,12 @@ foreach ($entree['scenarios'] as $i => $s) {
                     'effectif_final' => $entry->effectif_final,
                     'effectif_m' => $entry->effectif_m,
                     'mort' => $entry->mort,
+                    // Pondeuses (colonnes du Blade) : effectif de début, œufs, taux de ponte et commercialisables.
+                    'effectif_debut' => $entry->previousEffectif(),
+                    'ponte_total' => $entry->ponte_total,
+                    'ponte_casses' => $entry->ponte_casses,
+                    'comm' => max(0, ($entry->ponte_total ?? 0) - ($entry->ponte_casses ?? 0)),
+                    'taux_ponte' => $entry->previousEffectif() > 0 ? number_format(round((($entry->ponte_total ?? 0) / $entry->previousEffectif()) * 100, 1), 1) : null,
                 ],
                 'traitements' => method_exists($c, 'traitementsDuJour') ? $c->traitementsDuJour($jour, $entry) : null,   // pas de colonne de traitements chez les reproducteurs
             ];

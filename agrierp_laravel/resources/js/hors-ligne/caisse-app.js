@@ -176,6 +176,7 @@ async function chargerReferentiels() {
     $('btn-vue-porcs').hidden = !app.fiche.servie;
     $('btn-vue-escargots').hidden = !app.fiche.servie;
     $('btn-vue-reproducteurs').hidden = !app.fiche.servie;
+    $('btn-vue-pondeuses').hidden = !app.fiche.servie;
     if (!app.fiche.servie && app.fiche.vue) basculerVue(null);
     if (app.fiche.vue) dessinerFiche();
     app.serverTime = (await app.base.meta('curseur')) ?? null;
@@ -235,6 +236,7 @@ function formulaireDuJour(m) {
             // Lapins et porcs : barème, autonomie alimentaire et prophylaxie du jour (les escargots n'en ont pas au web).
             ...(F.escargots ? {} : {
                 rations: app.fiche.rations.filter((r) => r.species_code === F.espece),
+                produits: app.produits, // pondeuses : le produit « Œufs » du dernier tirage (stock affiché ; l'incrémentation est faite par le serveur)
                 autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === F.espece).map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves, app.fiche.delais),
                 conflitsSoins: app.fiche.soinsEnAttente.filter((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict'),
                 protocole: protocoleDuJour({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, espece: F.espece }),
@@ -296,7 +298,7 @@ function basculerVue(famille) {
     if (famille !== null) app.fiche.famille = famille;
     if (change) { app.fiche.bandeId = null; app.fiche.date = null; app.fiche.saisie = null; app.fiche.saisieCle = null; app.fiche.retour = null; }
     $('contenu').hidden = app.fiche.vue; $('contenu-fiche').hidden = !app.fiche.vue;
-    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots'], ['btn-vue-reproducteurs', 'reproducteurs']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
+    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots'], ['btn-vue-reproducteurs', 'reproducteurs'], ['btn-vue-pondeuses', 'pondeuses']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
     if (app.fiche.vue) dessinerFiche();
 }
 
@@ -617,6 +619,7 @@ function poserEcouteursGeneraux() {
     $('btn-vue-fiche').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'lapins' ? null : 'lapins'));
     $('btn-vue-porcs').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'porcs' ? null : 'porcs'));
     $('btn-vue-reproducteurs').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'reproducteurs' ? null : 'reproducteurs'));
+    $('btn-vue-pondeuses').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'pondeuses' ? null : 'pondeuses'));
     $('btn-vue-escargots').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'escargots' ? null : 'escargots'));
     $('btn-verrouiller').addEventListener('click', () => verrouillerEcran('Application verrouillée. Saisissez votre PIN.'));
 }

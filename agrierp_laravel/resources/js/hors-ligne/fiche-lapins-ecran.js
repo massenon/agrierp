@@ -14,6 +14,7 @@
 import { arrondiPhp } from './calculs-caisse.js';
 import { effectifVeille, jourDe } from './chaine-effectif.js';
 import { ECRAN_COMMUN, LAPINS_F, FAMILLE_PAR_DEFAUT } from './fiche-familles.js';
+import { produitOeufs } from './fiche-pondeuses.js';
 
 export const ESPECE = 'cuniculture';
 
@@ -129,7 +130,14 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille
     const totalOeufs = sommeNum(moisDesLots, (e) => e.ponte_total);
     const naissains = sommeNum(moisDesLots, (e) => e.ne);
     const totalCouves = totalOeufs;
-    const kpis = famille.id === 'reproducteurs'
+    const kpis = famille.id === 'pondeuses'
+        ? {
+            effectif: sommeNum(lots, (l) => l.current_quantity),
+            taux_ponte_moyen: sommeNum(lots, (l) => l.current_quantity) > 0 && moisDesLots.length > 0 ? arrondiPhp((totalOeufs / moisDesLots.length) / sommeNum(lots, (l) => l.current_quantity) * 100, 1) : 0,
+            stock_plateaux: produitOeufs(donnees.produits) ? Math.floor(Number(produitOeufs(donnees.produits).stock_qty ?? 0)) : null,
+            taux_mortalite_mois: taux,
+        }
+        : famille.id === 'reproducteurs'
         ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), taux_eclosion: totalCouves > 0 ? arrondiPhp((naissains / totalCouves) * 100, 1) : null, poussins_nes: naissains, taux_mortalite_mois: taux }
         : famille.id === 'escargots'
         ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), naissains_mois: naissains, taux_eclosion: totalOeufs > 0 ? arrondiPhp((naissains / totalOeufs) * 100, 1) : null, taux_mortalite_mois: taux }
@@ -160,6 +168,11 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille
                 achat: f.achat ?? null, ne: f.ne ?? null, mort: f.mort ?? null, vente: f.vente ?? null, don: f.don ?? null,
                 effectif_m: f.effectif_m ?? null, effectif_f: f.effectif_f ?? null, effectif_sevres: f.effectif_sevres ?? null, effectif_smeres: f.effectif_smeres ?? null,
                 effectif_final: f.effectif_final ?? null,
+                // Pondeuses : effectif de début (veille), taux de ponte et œufs commercialisables du Blade.
+                effectif_debut: effectifVeille(bande, fichesBande, d, f.id),
+                comm: Math.max(0, (Number(f.ponte_total) || 0) - (Number(f.ponte_casses) || 0)),
+                taux_ponte: effectifVeille(bande, fichesBande, d, f.id) > 0 ? arrondiPhp(((Number(f.ponte_total) || 0) / effectifVeille(bande, fichesBande, d, f.id)) * 100, 1).toFixed(1) : null,
+                ponte_total: f.ponte_total ?? null, ponte_casses: f.ponte_casses ?? null,
                 taux: arrondiPhp(tauxMortaliteFiche(f, effectifVeille(bande, fichesBande, d, f.id)), 1).toFixed(1),
                 tauxPositif: tauxMortaliteFiche(f, effectifVeille(bande, fichesBande, d, f.id)) > 0,
                 // Lapins : grammes entiers (`poids_general_g`) ; porcs : Kg à une décimale (`round(avg × final / 1000, 1)` du Blade).
@@ -211,7 +224,7 @@ export function rendreFiche(m, h, actions) {
             h('div', {}, h('h2', {}, h('span', { class: 'material-symbols-outlined' }, F.icone), E.titre), h('p', { class: 'muted' }, E.sousTitre)),
             h('button', { type: 'button', class: 'btn', disabled: true, title: E.exportPdfHorsLigne, 'data-export-pdf': true }, h('span', { class: 'material-symbols-outlined' }, 'picture_as_pdf'), E.exportPdf)),
         h('div', { class: 'fiche-kpis' },
-            ...F.kpiValeurs(m.kpis).map((v, i) => kpi(E.kpis[i], v, E.kpiIcones[i], ['emerald', 'blue', 'maize', 'red'][i], E.kpiLegendes?.[i] ?? null)),
+            ...F.kpiValeurs(m.kpis).map((v, i) => kpi(E.kpis[i], v, E.kpiIcones[i], ['emerald', 'blue', 'maize', 'red'][i], (F.kpiLegendeDe ? F.kpiLegendeDe(m.kpis)[i] : E.kpiLegendes?.[i]) ?? null)),
             ),
     ];
 
@@ -248,7 +261,7 @@ export function rendreFiche(m, h, actions) {
         const f = j.fiche;
         if (E.cellules) {
             // Famille à tableau propre (reproducteurs) : les cellules suivent l'ordre du Blade.
-            const valeur = (champ) => (champ === 'taux' ? (f ? f.taux : E.vide) : cellule(f?.[champ]));
+            const valeur = (champ) => (champ === 'taux' ? (f ? f.taux : E.vide) : champ === 'traitements' ? j.traitements : champ === 'stock' ? E.vide : champ === 'taux_ponte' ? (f?.taux_ponte ?? E.vide) : cellule(f?.[champ]));
             const classe = (style) => (style === 'alerte' ? ((f?.mort ?? 0) > 0 ? 'alerte' : '') : style === 'tauxAlerte' ? (f?.tauxPositif ? 'alerte' : '') : style ?? '');
             return h('tr', { 'data-jour': j.date, class: j.choisi ? 'choisi' : '', onclick: () => actions.choisirDate(j.date) },
                 h('td', { class: 'sticky' }, j.jourMois), ...E.cellules.map(([champ, style]) => h('td', { class: classe(style) }, valeur(champ))));
@@ -275,7 +288,7 @@ export function rendreFiche(m, h, actions) {
         if (E.cellules) {
             return h('div', { class: `fiche-carte${j.choisi ? ' choisi' : ''}`, 'data-jour': j.date, onclick: () => actions.choisirDate(j.date) },
                 h('b', {}, j.jourMois),
-                h('div', { class: 'fiche-carte-grille' }, ...E.cellules.map(([champ], i) => h('span', {}, h('small', {}, noms[i]), ' ', champ === 'taux' ? (f ? f.taux : E.vide) : cellule(f?.[champ])))));
+                h('div', { class: 'fiche-carte-grille' }, ...E.cellules.map(([champ], i) => h('span', {}, h('small', {}, noms[i]), ' ', champ === 'taux' ? (f ? f.taux : E.vide) : champ === 'traitements' ? j.traitements : champ === 'stock' ? E.vide : champ === 'taux_ponte' ? (f?.taux_ponte ?? E.vide) : cellule(f?.[champ])))));
         }
         const valeurs = f ? [f.achat, f.ne, f.mort, f.vente, f.don, ...E.colonnesEffectif.map((c) => f[c]), f.effectif_final] : [];
         return h('div', { class: `fiche-carte${j.choisi ? ' choisi' : ''}`, 'data-jour': j.date, onclick: () => actions.choisirDate(j.date) },

@@ -8,7 +8,7 @@
  * Kg pour les porcs). Les libellés sont lus dans `fiche-lapins.blade.php` / `fiche-porcs.blade.php` par les gardes de sources.
  */
 
-import { LAPINS, PORCS, VOLAILLES_REPRO } from './effectif-categories.js';
+import { LAPINS, PORCS, VOLAILLES_REPRO, VOLAILLES_PONTE } from './effectif-categories.js';
 import { provendeDuJour, provendeDuJourPorcs } from './fiche-lapins-calculs.js';
 
 /** Libellés communs aux deux écrans (identiques dans les deux Blade). */
@@ -173,7 +173,39 @@ export const REPRODUCTEURS_F = {
     prophylaxie: { titre: 'Traitements & Prophylaxie', observations: 'Observations', observationsExemple: 'ex : RAS' },
 };
 
-export const FAMILLES = { lapins: LAPINS_F, porcs: PORCS_F, escargots: ESCARGOTS_F, reproducteurs: REPRODUCTEURS_F };
+/**
+ * Volailles PONDEUSES (VOL-2) : QUATRE stades (Poussin ponte / Poussin en croissance / Poulette / Pondeuse = emplacements `quatre` / `sevre` / `jeune` / `repro`), départ
+ * obligatoire, trois passages, œufs récoltés / cassés. Les bandes : aviculture au stade `ponte`. Tableau mensuel propre (cheptel, ponte, stock d'œufs, traitements).
+ * Le stock d'œufs jour par jour (SRH / TS / OS / final) est calculé par le serveur : le tableau l'affiche « — » hors ligne.
+ */
+export const PONDEUSES_F = {
+    id: 'pondeuses', espece: 'aviculture', calcul: VOLAILLES_PONTE, filiere: 'aviculture', bouton: 'Fiches Pondeuses', icone: 'egg', kg: false, pondeuses: true,
+    accepte: (lot) => lot.species_code === 'aviculture' && lot.stage === 'ponte',
+    libelleStade: (stade) => STADES_AVICULTURE[stade] ?? (stade ? `${String(stade)[0].toUpperCase()}${String(stade).slice(1)}` : ''),
+    ecran: {
+        titre: 'Fiches Pondeuses - Aviculture',
+        sousTitre: "Suivi quotidien de la ponte et récolte d'œufs — transcription fidèle du registre de la ferme.",
+        kpis: ['Effectif Pondeuses Vivantes', 'Taux de Ponte Moyen', 'Stock Plateaux (30 œufs)', 'Taux de Mortalité'],
+        kpiIcones: ['pets', 'egg', 'grid_view', 'trending_down'],
+        aucuneBande: 'Aucune bande active au stade Ponte pour le moment.',
+        saisieTitre: 'Saisie Journalière Ponte & Cheptel',
+        groupes: [['Date / Jour', 'rowspan'], ['Cheptel du Jour', 4], ['Suivi de la Ponte & Récolte', 4], ['Stock Œufs & Plateaux (30)', 4], ['Traitements & Rappels', 'rowspan']],
+        sousColonnes: ['Eff. Début', 'Morts', 'Taux Mort %', 'Eff. Fin', 'Total (OR)', 'Taux Ponte %', 'Cassés (OF)', 'Comm. (OR-OF)', 'SRH', 'TS', 'OS', 'Stock Final'],
+        cartes: ['Eff. Début', 'Morts', 'Taux Mort %', 'Eff. Fin', 'Total (OR)', 'Taux Ponte %', 'Cassés (OF)', 'Comm. (OR-OF)', 'SRH', 'TS', 'OS', 'Stock Final', 'Traitements & Rappels'],
+        cellules: [['effectif_debut'], ['mort', 'alerte'], ['taux'], ['effectif_final', 'gras'], ['ponte_total'], ['taux_ponte'], ['ponte_casses'], ['comm', 'gras'], ['stock'], ['stock'], ['stock'], ['stock'], ['traitements']],
+        note: 'Colonnes SRH/TS/OS/Stock Final : le stock d\'œufs jour par jour est calculé par le serveur (grand livre de mouvements de stock) : disponible en ligne seulement.',
+    },
+    kpiValeurs: (k) => [nombre(k.effectif), `${virgule(k.taux_ponte_moyen)} %`, k.stock_plateaux === null ? '—' : `${k.stock_plateaux} Plateaux`, `${virgule(k.taux_mortalite_mois)} %`],
+    kpiLegendeDe: (k) => [null, null, k.stock_plateaux === null ? 'Disponible après qu\'un produit "Œufs de table" existe au catalogue' : null, null],
+    motifs: {
+        aucuneBande: "Aucune bande active au stade Ponte. Créez d'abord une bande.",
+        ancienneFiche: "Cette fiche porte des morts ou des dons non ventilés par stade : ventilez-les (Poussin ponte / Poussin en croissance / Poulette / Pondeuse) avant d'enregistrer.",
+    },
+    libelles: {},
+    prophylaxie: { titre: 'Traitements & Rappels', observations: 'Observations', observationsExemple: 'ex : RAS' },
+};
+
+export const FAMILLES = { lapins: LAPINS_F, porcs: PORCS_F, escargots: ESCARGOTS_F, reproducteurs: REPRODUCTEURS_F, pondeuses: PONDEUSES_F };
 export const FAMILLE_PAR_DEFAUT = LAPINS_F;
 /** La famille d'une bande (par le code de son espèce), `null` si ni lapins ni porcs. */
 export const familleDuLot = (lot) => Object.values(FAMILLES).find((f) => (f.accepte ? f.accepte(lot ?? {}) : f.espece === lot?.species_code)) ?? null;

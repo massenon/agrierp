@@ -19,6 +19,7 @@ import { provendeDuJour, LIBELLES as LIBELLES_RATION } from './fiche-lapins-calc
 import { arrondiPhp } from './calculs-caisse.js';
 import { chiffrer, dechiffrer } from './coffre.js';
 import { chargerJourVolailles, enregistrerJourVolailles, rendreFormulaireVolailles } from './fiche-volailles.js';
+import { chargerJourPondeuses, enregistrerJourPondeuses, rendreFormulairePondeuses } from './fiche-pondeuses.js';
 import { chargerJourEscargots, enregistrerJourEscargots, rendreFormulaireEscargots } from './fiche-escargots.js';
 import { FAMILLE_PAR_DEFAUT, LAPINS_F, familleDuLot } from './fiche-familles.js';
 import { rendreProphylaxie, LIBELLES as LIBELLES_PROPHY } from './fiche-lapins-prophylaxie.js';
@@ -92,6 +93,7 @@ const fichesDe = (lot, fiches) => fiches.filter((f) => f.lot_id === lot.id);
 export function chargerJour(lot, fiches, jour, F = FAMILLE_PAR_DEFAUT) {
     if (F.escargots) return chargerJourEscargots(lot, fiches, jour);
     if (F.volaille) return chargerJourVolailles(lot, fiches, jour);
+    if (F.pondeuses) return chargerJourPondeuses(lot, fiches, jour);
     const s = saisieVide();
     if (lot === null || lot === undefined) return s;
     const duLot = fichesDe(lot, fiches);
@@ -202,6 +204,7 @@ export function refusExerciceClos(exercices, jour) {
 export function enregistrerJour(lot, fiches, jour, s, ctx = {}) {
     const F = ctx.famille ?? familleDuLot(lot) ?? FAMILLE_PAR_DEFAUT;
     if (F.volaille) return enregistrerJourVolailles(lot, fiches, jour, s, { ...ctx, refusExercice: refusExerciceClos, droit: MOTIFS.droit, roles: ROLES_ECRITURE });
+    if (F.pondeuses) return enregistrerJourPondeuses(lot, fiches, jour, s, { ...ctx, refusExercice: refusExerciceClos, droit: MOTIFS.droit, roles: ROLES_ECRITURE });
     if (F.escargots) return enregistrerJourEscargots(lot, fiches, jour, s, { ...ctx, refusExercice: refusExerciceClos, droit: MOTIFS.droit, roles: ROLES_ECRITURE });
     if (ctx.role !== undefined && ctx.role !== null && !ROLES_ECRITURE.includes(ctx.role)) return { refus: MOTIFS.droit };
     if (!lot) return { refus: F.motifs.aucuneBande };
@@ -291,20 +294,24 @@ export const aEnvoyerFiches = (liste) => liste.filter((x) => x.sync_status === '
  */
 export function ficheEnJson(item, deviceId) {
     const f = item.fiche;
-    const somme = (a, b, c) => (nonNul(a) && nonNul(b) && nonNul(c) ? n(a) + n(b) + n(c) : null);
+    // Pondeuses : QUATRE stades (`*_4`), trois passages, œufs cassés ; les trois ou quatre colonnes d'un mouvement partent ensemble, sinon aucune.
+    const ponte = nonNul(f.mort_4);
+    const somme = (a, b, c, d) => (nonNul(a) && nonNul(b) && nonNul(c) && (!ponte || nonNul(d)) ? n(a) + n(b) + n(c) + (ponte ? n(d) : 0) : null);
     const connus = {};
-    for (const c of ['mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'effectif_m', 'effectif_f', 'effectif_sevres', 'effectif_smeres']) {
+    for (const c of ['mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        ...(ponte ? ['mort_4', 'don_4', 'passage_4_sevre', 'passage_jeune_repro', 'cat_depart_4'] : []), 'effectif_m', 'effectif_f', 'effectif_sevres', 'effectif_smeres']) {
         if (nonNul(f[c])) connus[c] = n(f[c]);
     }
-    const depart = nonNul(f.cat_depart_repro) && nonNul(f.cat_depart_sevre) && nonNul(f.cat_depart_jeune);
-    if (!depart) for (const c of ['cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune']) delete connus[c];
+    const depart = nonNul(f.cat_depart_repro) && nonNul(f.cat_depart_sevre) && nonNul(f.cat_depart_jeune) && (!ponte || nonNul(f.cat_depart_4));
+    if (!depart) for (const c of ['cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_depart_4']) delete connus[c];
     return {
         id: f.id, lot_id: f.lot_id, entry_date: jourDe(f), achat: n(f.achat), ne: n(f.ne),
-        mort: somme(f.mort_repro, f.mort_sevre, f.mort_jeune) ?? n(f.mort), vente: 0,
-        don: somme(f.don_repro, f.don_sevre, f.don_jeune) ?? n(f.don),
+        mort: somme(f.mort_repro, f.mort_sevre, f.mort_jeune, f.mort_4) ?? n(f.mort), vente: 0,
+        don: somme(f.don_repro, f.don_sevre, f.don_jeune, f.don_4) ?? n(f.don),
         ...(nonNul(f.ponte_total) ? { ponte_total: n(f.ponte_total) } : {}),
+        ...(nonNul(f.ponte_casses) ? { ponte_casses: n(f.ponte_casses) } : {}),
         // Volailles : les ventes par catégorie partent à 0 avec `vente` (chaque vente se range ensuite dans sa catégorie, une seule fois).
-        ...(nonNul(f.vente_repro) ? { vente_repro: 0, vente_sevre: 0, vente_jeune: 0 } : {}),
+        ...(nonNul(f.vente_repro) ? { vente_repro: 0, vente_sevre: 0, vente_jeune: 0, ...(ponte ? { vente_4: 0 } : {}) } : {}),
         feed_qty_kg: nonNul(f.feed_qty_kg) ? Number(f.feed_qty_kg) : null, weight_sample_avg_g: nonNul(f.weight_sample_avg_g) ? Number(f.weight_sample_avg_g) : null,
         ...connus, device_id: deviceId, updated_at: item.cree_le,
     };
@@ -339,6 +346,7 @@ export function rendreAutonomie(h, a, filiere = 'cuniculture') {
  */
 export function rendreFormulaire(h, { s, lire, actions, retourInitial = null, famille = FAMILLE_PAR_DEFAUT }) {
     if (famille.volaille) return rendreFormulaireVolailles(h, { s, lire, actions, retourInitial, messages: MOTIFS, rendreAutonomie, titreProphylaxie: famille.prophylaxie.titre, observationsLibelle: famille.prophylaxie.observations, observationsExemple: famille.prophylaxie.observationsExemple });
+    if (famille.pondeuses) return rendreFormulairePondeuses(h, { s, lire, actions, retourInitial, messages: MOTIFS, rendreAutonomie, titreProphylaxie: famille.prophylaxie.titre, observationsLibelle: famille.prophylaxie.observations, observationsExemple: famille.prophylaxie.observationsExemple });
     if (famille.escargots) return rendreFormulaireEscargots(h, { s, lire, actions, retourInitial, messages: MOTIFS });
     const F = famille;
     const L = F.libelles;

@@ -20,17 +20,19 @@ const deux = (n) => String(n).padStart(2, '0');
 const AUJOURDHUI = ['2026-11-09', '2026-01-31', '2026-03-01', '2027-02-15'];
 let compteur = 0;
 const scenarios = [];
-for (let i = 0; i < 480; i++) {
-    const famille = ['lapins', 'porcs', 'escargots', 'reproducteurs'][i % 4]; // un quart des scénarios par fiche
-    const espece = { lapins: 'cuniculture', porcs: 'porciculture', escargots: 'helico', reproducteurs: 'aviculture' }[famille];
-    const autre = famille === 'porcs' ? 'cuniculture' : (famille === 'reproducteurs' ? 'aviculture' : 'porciculture');
-    const stageAutre = famille === 'reproducteurs' ? 'ponte' : 'reproduction'; // les pondeuses ne sont PAS dans la fiche des reproducteurs
-    const stageDe = () => (famille === 'reproducteurs' ? ['reproduction', 'croissance', 'engraissement'][alea(3)] : 'reproduction');
+for (let i = 0; i < 500; i++) {
+    const famille = ['lapins', 'porcs', 'escargots', 'reproducteurs', 'pondeuses'][i % 5]; // un cinquième des scénarios par fiche
+    const espece = { lapins: 'cuniculture', porcs: 'porciculture', escargots: 'helico', reproducteurs: 'aviculture', pondeuses: 'aviculture' }[famille];
+    const autre = famille === 'porcs' ? 'cuniculture' : (famille === 'reproducteurs' || famille === 'pondeuses' ? 'aviculture' : 'porciculture');
+    const stageAutre = famille === 'reproducteurs' ? 'ponte' : 'reproduction'; // les pondeuses ne sont PAS dans la fiche des reproducteurs, ni l'inverse
+    const stageDe = () => (famille === 'reproducteurs' ? ['reproduction', 'croissance', 'engraissement'][alea(3)] : (famille === 'pondeuses' ? 'ponte' : 'reproduction'));
     // Escargots : le module `helico` activé, désactivé ou jamais configuré.
     const module = famille === 'escargots' ? [true, true, true, false, null][alea(5)] : null;
     const aujourdhui = AUJOURDHUI[i % AUJOURDHUI.length];
     const annee = Number(aujourdhui.slice(0, 4));
     const produits = [{ id: uuid(++compteur), name: 'Vermifuge' }, { id: uuid(++compteur), name: 'Anticoccidien' }];
+    // Pondeuses : le produit « Œufs » (premier par nom) est présent, absent, ou doublé ; son stock a une partie décimale.
+    if (famille === 'pondeuses') for (const nom of [['Œufs de table'], ['Plateau d\'oeufs frais', 'Œufs de table'], []][alea(3)]) produits.push({ id: uuid(++compteur), name: nom, stock_qty: alea(40) + (alea(2) ? 0.5 : 0) });
     const exercices = [{ id: 1, year: annee - 1, start_date: `${annee - 1}-01-01`, end_date: `${annee - 1}-12-31`, status: i % 3 === 0 ? 'cloture' : 'ouvert' },
         { id: 2, year: annee, start_date: `${annee}-01-01`, end_date: `${annee}-12-31`, status: i % 7 === 0 ? 'cloture' : 'ouvert' }];
     if (i % 11 === 0) exercices.length = 1;
@@ -51,7 +53,7 @@ for (let i = 0; i < 480; i++) {
                 const date = `${base.getUTCFullYear()}-${deux(base.getUTCMonth() + 1)}-${deux(d)}`;
                 fiches.push({
                     id: uuid(++compteur), lot_id: lot.id, entry_date: date, achat: alea(4) === 0 ? alea(5) : 0, ne: alea(12), mort: alea(5) === 0 ? alea(8) : 0, vente: alea(6) === 0 ? alea(6) : 0, don: alea(9) === 0 ? alea(3) : 0,
-                    effectif_m: alea(10), effectif_f: alea(30), effectif_sevres: alea(40), effectif_smeres: alea(40), effectif_final: 20 + alea(300), ponte_total: alea(3) === 0 ? null : alea(60),
+                    effectif_m: alea(10), effectif_f: alea(30), effectif_sevres: alea(40), effectif_smeres: alea(40), effectif_final: 20 + alea(300), ponte_total: alea(3) === 0 ? null : alea(60), ponte_casses: alea(3) === 0 ? null : alea(8),
                     weight_sample_avg_g: alea(3) === 0 ? null : 500 + alea(4000), symptomes: alea(6) === 0 ? 'Diarrhée' : null,
                     treatment_product_id: alea(5) === 0 ? produits[alea(2)].id : null,
                     transfert_entree: alea(8) === 0 ? 1 + alea(5) : 0, transfert_sortie: alea(8) === 0 ? 1 + alea(5) : 0,
@@ -64,7 +66,7 @@ for (let i = 0; i < 480; i++) {
     const choisissables = famille === 'reproducteurs' ? lots.filter((l) => l.status === 'actif' && l.stage !== 'ponte') : lots;
     const lotChoisi = choisissables[alea(choisissables.length)] ?? lots[0];
     const mois = alea(3);
-    const choisi = new Date(Date.UTC(annee, Number(aujourdhui.slice(5, 7)) - 1 - mois - (Math.floor(i / 4) % 2 === 0 ? 0 : 6), 1 + alea(28)));
+    const choisi = new Date(Date.UTC(annee, Number(aujourdhui.slice(5, 7)) - 1 - mois - (Math.floor(i / 5) % 2 === 0 ? 0 : 6), 1 + alea(28)));
     scenarios.push({
         famille, module, aujourdhui, produits, exercices, lots, fiches, soins, bandeId: alea(4) === 0 ? null : lotChoisi.id,
         date: alea(12) === 0 ? 'pas-une-date' : `${choisi.getUTCFullYear()}-${deux(choisi.getUTCMonth() + 1)}-${deux(choisi.getUTCDate())}`,
@@ -86,9 +88,9 @@ test('préparation : le PHP répond', (t) => {
 
 test('écran = vrai FicheLapins : KPI, mois, jours, taux, poids, traitements, bandeau, transferts', (t) => {
     if (!retour) return t.skip(raison);
-    let jours = 0; let bandeaux = 0; let avecTraitement = 0;
+    let jours = 0; let bandeaux = 0; let avecTraitement = 0; let pondeuses = 0; let stocks = 0;
     scenarios.forEach((s, i) => {
-        const donnees = { modules: s.module === null ? [] : [{ species_code: 'helico', is_enabled: s.module }], lots: s.lots, fiches: s.fiches, soins: s.soins, produits: s.produits.map((p) => ({ id: p.id, name: p.name })), exercices: s.exercices };
+        const donnees = { modules: s.module === null ? [] : [{ species_code: 'helico', is_enabled: s.module }], lots: s.lots, fiches: s.fiches, soins: s.soins, produits: s.produits.map((p) => ({ id: p.id, name: p.name, stock_qty: p.stock_qty })), exercices: s.exercices };
         const m = modeleFiche(donnees, { bandeId: s.bandeId, date: s.date, aujourdhui: s.aujourdhui, famille: FAMILLES[s.famille] });
         const p = retour[i];
         const ctx = `scénario ${i}`;
@@ -109,11 +111,20 @@ test('écran = vrai FicheLapins : KPI, mois, jours, taux, poids, traitements, ba
                 assert.equal(j.fiche.poids_general_g, q.fiche.poids_general_g, `${ctx} ${j.date} poids`);
                 assert.equal(j.fiche.effectif_final, q.fiche.effectif_final, `${ctx} ${j.date} effectif affiché`);
                 assert.equal(j.fiche.effectif_m, q.fiche.effectif_m, `${ctx} ${j.date} effectif M`);
+                if (s.famille === 'pondeuses') {
+                    assert.equal(j.fiche.effectif_debut, q.fiche.effectif_debut, `${ctx} ${j.date} effectif de début`);
+                    assert.equal(j.fiche.comm, q.fiche.comm, `${ctx} ${j.date} commercialisables`);
+                    assert.equal(j.fiche.taux_ponte, q.fiche.taux_ponte, `${ctx} ${j.date} taux de ponte`);
+                    assert.equal(j.fiche.ponte_total, q.fiche.ponte_total, `${ctx} ${j.date} œufs`);
+                    assert.equal(j.fiche.ponte_casses, q.fiche.ponte_casses, `${ctx} ${j.date} cassés`);
+                    pondeuses++;
+                }
             }
             if (s.famille !== 'reproducteurs') assert.equal(j.traitements, q.traitements, `${ctx} ${j.date} traitements`);
             jours++; if (j.traitements !== '—') avecTraitement++;
         });
         if (m.bandeau) bandeaux++;
+        if (s.famille === 'pondeuses' && m.kpis.stock_plateaux !== null) stocks++;
     });
-    assert.ok(jours > 5000 && bandeaux > 10 && avecTraitement > 100, `couverture insuffisante : ${jours} jours, ${bandeaux} bandeaux, ${avecTraitement} traitements`);
+    assert.ok(jours > 5000 && bandeaux > 10 && avecTraitement > 100 && pondeuses > 800 && stocks > 20, `couverture insuffisante : ${jours} jours, ${bandeaux} bandeaux, ${avecTraitement} traitements, ${pondeuses} jours de pondeuses, ${stocks} stocks`);
 });

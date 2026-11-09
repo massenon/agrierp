@@ -22,10 +22,10 @@ let compteur = 0;
 const scenarios = [];
 const NB = Number(process.env.SCENARIOS_LIMITE ?? 600); // une valeur réduite sert aux contrôles par mutation seulement
 for (let i = 0; i < NB; i++) {
-    const famille = ['lapins', 'porcs', 'reproducteurs'][i % 3];
-    const espece = { lapins: 'cuniculture', porcs: 'porciculture', reproducteurs: 'aviculture' }[famille];
+    const famille = ['lapins', 'porcs', 'reproducteurs', 'pondeuses'][i % 4];
+    const espece = { lapins: 'cuniculture', porcs: 'porciculture', reproducteurs: 'aviculture', pondeuses: 'aviculture' }[famille];
     const autre = famille === 'porcs' ? 'cuniculture' : (famille === 'reproducteurs' ? 'porciculture' : 'porciculture');
-    const stage = ['reproduction', 'croissance', 'engraissement'][alea(3)];
+    const stage = famille === 'pondeuses' ? (alea(3), 'ponte') : ['reproduction', 'croissance', 'engraissement'][alea(3)];
     const lot = { id: uuid(++compteur), stage, created_date: jour(10 + alea(20)) };
     const evenements = stage === 'reproduction' ? Array.from({ length: alea(4) }, () => ({ id: uuid(++compteur), saillie_date: jour(alea(40)) })) : [];
     const standards = Array.from({ length: 2 + alea(10) }, () => {
@@ -81,5 +81,5 @@ test('prophylaxie du jour = vrai FicheLapins : protocole, refus, messages, soins
         if (r.soins?.length) stats.succes++; else if (r.refus) stats.futur++; else stats.rien++;
         stats.remanences += periodes.length;
     });
-    if (NB === 600) assert.ok(stats.succes > 80 && stats.rien > 20 && stats.futur > 15 && stats.remanences > 30 && stats.indetermine > 15 && stats.reproduction > 80, `couverture insuffisante : ${JSON.stringify(stats)}`);
+    if (NB === 600) assert.ok(stats.succes > 80 && stats.rien > 20 && stats.futur > 15 && stats.remanences > 30 && stats.indetermine > 15 && stats.reproduction > 60, `couverture insuffisante : ${JSON.stringify(stats)}`);
 });
