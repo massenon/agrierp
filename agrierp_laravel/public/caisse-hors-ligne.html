@@ -45,6 +45,7 @@
 <header class="barre">
     <h1><span class="material-symbols-outlined">point_of_sale</span> Caisse hors ligne <span id="nom-utilisateur" class="muted" style="font-weight:500"></span></h1>
     <div class="groupe">
+        <button id="btn-vue-fiche" type="button" class="btn" hidden><span class="material-symbols-outlined">cruelty_free</span>Fiches Lapins</button>
         <span id="etat-synchro" class="pastille neutre" role="status" aria-live="polite">Hors ligne</span>
         <button id="btn-synchroniser" type="button" class="btn"><span class="material-symbols-outlined">sync</span>Synchroniser maintenant</button>
         <button id="btn-verrouiller" type="button" class="btn"><span class="material-symbols-outlined">lock</span>Verrouiller</button>
@@ -137,6 +138,10 @@
             <p class="muted" style="font-size:11px;margin:8px 0 0">La vente est enregistrée sur cet appareil, pas encore envoyée : elle partira au retour du réseau.</p>
         </div>
     </aside>
+</main>
+
+<main id="contenu-fiche" class="fiche-ecran" hidden>
+    <div id="fiche-racine" style="grid-column:1/-1;display:grid;gap:16px"></div>
 </main>
 
 <dialog id="dlg-piece">

@@ -12,6 +12,7 @@ import { ErreurPin, dechiffrer } from './coffre.js';
 import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.js';
 import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
 import { jourBenin, lotsVendables, bandeSousRemanence, refusDuPanier, elevageApresVentes } from './elevage-hors-ligne.js';
+import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
 import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, messageBandeauPrix, messageConfirmationVente, niveauPrixPerimes, NIVEAUX_PRIX, LIBELLES_STATUT } from './catalogue.js';
@@ -32,6 +33,7 @@ const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
+    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null },
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
@@ -51,7 +53,8 @@ function avis(texte, ton = 'neutre', delai = 0) {
 
 function montrer(ecran) {
     for (const id of ['ecran-verrou', 'ecran-inactif']) $(id).hidden = id !== ecran;
-    $('contenu').hidden = ecran !== null;
+    $('contenu').hidden = ecran !== null || app.fiche.vue;
+    $('contenu-fiche').hidden = ecran !== null || !app.fiche.vue;
 }
 
 // ----------------------------------------------------------------------------------------------- démarrage
@@ -144,6 +147,14 @@ async function chargerReferentiels() {
     app.elevageTire = { lots: await lire('livestock_lots'), fiches: await lire('livestock_daily_entries') };
     app.remanences = await lire('veterinary_withdrawal_periods');
     await recalculerElevage();
+    // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
+    app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries'));
+    app.fiche.donnees = app.fiche.servie ? {
+        lots: app.elevage.lots, fiches: app.elevage.fiches, soins: await lire('veterinary_records'), produits: app.produits, exercices: await lire('fiscal_years'),
+    } : null;
+    $('btn-vue-fiche').hidden = !app.fiche.servie;
+    if (!app.fiche.servie && app.fiche.vue) basculerVue(false);
+    if (app.fiche.vue) dessinerFiche();
     app.serverTime = (await app.base.meta('curseur')) ?? null;
     app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
     app.derniereSynchro = heureDuServeur(await app.base.meta('derniere_synchro'));
@@ -156,6 +167,31 @@ const jourDuComptoir = () => jourBenin(Date.now() + (app.decalage ?? 0));
 async function recalculerElevage() {
     const ventes = (await lister(app.ctx, 'pending')).map((l) => l.vente);
     app.elevage = elevageApresVentes(app.elevageTire, ventes, app.produits);
+    if (app.fiche.donnees) { app.fiche.donnees.lots = app.elevage.lots; app.fiche.donnees.fiches = app.elevage.fiches; if (app.fiche.vue) dessinerFiche(); } // la fiche suit les ventes en attente
+}
+
+// ----------------------------------------------------------------------------------------------- fiche lapins (É2, lecture)
+
+function dessinerFiche() {
+    if (!app.fiche.donnees) return;
+    const aujourdhui = jourDuComptoir();
+    const date = app.fiche.date ?? aujourdhui;
+    const m = modeleFiche(app.fiche.donnees, { bandeId: app.fiche.bandeId, date, aujourdhui });
+    app.fiche.bandeId = m.bande?.id ?? null;
+    const aller = (d) => { app.fiche.date = d; dessinerFiche(); };
+    $('fiche-racine').replaceChildren(...rendreFiche(m, h, {
+        choisirBande: (id) => { app.fiche.bandeId = id; dessinerFiche(); },
+        choisirDate: (d) => { if (d) aller(d); },
+        moisPrecedent: () => aller(moisPrecedent(date, aujourdhui)),
+        moisSuivant: () => { const d = moisSuivant(date, aujourdhui); if (d) aller(d); },
+    }));
+}
+
+function basculerVue(fiche) {
+    app.fiche.vue = fiche;
+    $('contenu').hidden = fiche; $('contenu-fiche').hidden = !fiche;
+    $('btn-vue-fiche').lastChild.textContent = fiche ? 'Caisse' : 'Fiches Lapins';
+    if (fiche) dessinerFiche();
 }
 
 // ----------------------------------------------------------------------------------------------- affichage
@@ -472,6 +508,7 @@ function poserEcouteursGeneraux() {
         const d = decider({ maintenant: Date.now(), derniereActivite: app.derniereActivite, minutes: app.minutesVerrou, requetesEnCours: app.requetes });
         if (d === 'verrouiller') verrouillerEcran('Application verrouillée après inactivité. Saisissez votre PIN.');
     }, 5000);
+    $('btn-vue-fiche').addEventListener('click', () => basculerVue(!app.fiche.vue));
     $('btn-verrouiller').addEventListener('click', () => verrouillerEcran('Application verrouillée. Saisissez votre PIN.'));
 }
 

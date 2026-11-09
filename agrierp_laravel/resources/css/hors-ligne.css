@@ -65,3 +65,22 @@ dialog h3 { margin: 0 0 8px; color: var(--forest); }
 .statut { font-weight: 700; font-size: 11px; }
 .statut.pending { color: var(--warn); } .statut.synced { color: var(--emerald); } .statut.conflict { color: var(--err); }
 .muted { color: var(--muted); }
+
+/* PWA-3 (É2) — fiche lapins en lecture */
+.fiche-entete { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.fiche-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .fiche-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fiche-kpi { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; border-left: 4px solid var(--emerald); }
+.fiche-kpi.blue { border-left-color: #2563eb; } .fiche-kpi.maize { border-left-color: #d97706; } .fiche-kpi.red { border-left-color: #dc2626; }
+.kpi-libelle { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+.kpi-valeur { font-size: 26px; font-weight: 800; }
+.fiche-select { height: 34px; border: 1px solid #d1d5db; border-radius: 8px; padding: 0 8px; }
+#fiche-mensuel { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+#fiche-mensuel th, #fiche-mensuel td { border: 1px solid var(--line); padding: 4px 6px; }
+#fiche-mensuel th { background: #f3f4f6; }
+#fiche-mensuel tr.choisi, .fiche-carte.choisi { background: var(--ok-bg); }
+#fiche-mensuel td.alerte { color: #dc2626; font-weight: 700; } #fiche-mensuel td.gras { font-weight: 800; }
+.fiche-cartes { display: none; gap: 8px; }
+.fiche-carte { border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fff; display: grid; gap: 4px; }
+.fiche-carte-grille { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 8px; font-size: 12px; }
+@media (max-width: 640px) { .fiche-tableau { display: none; } .fiche-cartes { display: grid; } }

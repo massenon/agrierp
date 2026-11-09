@@ -281,6 +281,39 @@ try {
     await page.click('[data-fermer="dlg-piece"]');
     ok('vente de sujets vivants hors ligne : bande à 38 sur l\'appareil, fiche du jour et bande à 38 au serveur après la synchronisation, rien ne « remonte » après le tirage');
 
+    // --- 7. PWA-3 (É2) : la fiche lapins du mois, ouverte HORS LIGNE depuis le tirage ---
+    // Un dernier tirage en ligne : le serveur ne ressert une fiche écrite dans la seconde du tirage qu'au tirage suivant (horizon de recouvrement).
+    await page.waitForTimeout(1500); // la fiche écrite dans la seconde du tirage n'est servie qu'au suivant
+    await page.evaluate(() => { document.querySelector('#avis').textContent = ''; });
+    await page.click('#btn-synchroniser');
+    await page.waitForFunction(() => /Synchronisation terminée/.test(document.querySelector('#avis').textContent), null, { timeout: 40000 });
+    await contexte.setOffline(true);
+    await page.waitForSelector('#btn-vue-fiche:not([hidden])');
+    await page.click('#btn-vue-fiche');
+    await page.waitForSelector('#fiche-mensuel');
+    const kpis = await page.$$eval('.fiche-kpi', (k) => k.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+    assert.equal(kpis.length, 4);
+    assert.match(kpis[0], /Effectif Total Vivant.*78$/, 'effectif total = 38 (LAP-E2E après la vente) + 40 (LAP-BLOQ)');
+    assert.match(kpis[3], /Taux de Mortalité.*0,0 %$/);
+    const jourMois = await page.evaluate(() => { const n = new Date(Date.now() + 3600000); return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() + 1, 0)).getUTCDate(); });
+    assert.equal(await page.$$eval('#fiche-mensuel tbody tr', (r) => r.length), jourMois, 'une ligne par jour du mois');
+    const entetes = await page.$$eval('#fiche-mensuel thead th', (t) => t.map((x) => x.textContent));
+    assert.deepEqual(entetes.slice(0, 7), ['Date', 'Entrées', 'Sorties', 'Effectif Final du Jour', 'Taux Mort %', 'Poids Général (g)', 'Traitements & Prophylaxie']);
+    assert.equal(await page.isDisabled('#fiche-mois-suivant'), true, 'pas de mois à venir');
+    await page.selectOption('#fiche-bande', { label: 'LAP-E2E' });
+    const aujourdhui = await page.$eval('#fiche-date', (e) => e.value);
+    const ligne = await page.$$eval(`#fiche-mensuel tbody tr[data-jour="${aujourdhui}"] td`, (t) => t.map((x) => x.textContent));
+    assert.equal(ligne[4], '2', 'la vente de 2 lapins est sur la ligne du jour');
+    assert.equal(ligne[10], '38', 'effectif final du jour');
+    await page.click('#fiche-mois-precedent');
+    await page.waitForFunction((a) => document.querySelector('#fiche-date').value !== a, aujourdhui);
+    assert.equal(await page.isDisabled('#fiche-mois-suivant'), false);
+    assert.equal(await page.isDisabled('[data-export-pdf]'), true, 'export PDF indisponible hors ligne');
+    await page.setViewportSize({ width: 390, height: 800 });
+    assert.equal(await page.isVisible('#fiche-cartes'), true, 'cartes sous 640 px');
+    assert.equal(await page.isVisible('#fiche-mensuel'), false);
+    ok('fiche lapins hors ligne : 4 KPI, une ligne par jour, vente du jour, navigation de mois, export PDF grisé, cartes sur mobile');
+
 } catch (e) {
     echec = e;
 } finally {
