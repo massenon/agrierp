@@ -1,5 +1,7 @@
 # 44 — Étude de faisabilité : PWA hors ligne = poste Flutter compilé pour le web (voie B)
 
+> **Statut (09/11/2026) : étude réalisée — voir `45_PHASE0_RESULTATS_PWA_FLUTTER_WEB.md` (preuve de phase 0) et `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` (phase 1 réalisée, mesures avant / après).** Le texte de l'étude ci-dessous est conservé tel qu'écrit le 07/11/2026.
+
 Date : 07/11/2026. Étude SANS livraison : tout a été fait dans une copie jetable (`/tmp/flutter_web_spike`, supprimée), aucun fichier du dépôt modifié hors ce document. Flutter 3.47.7 / Dart 3.13.5.
 
 ## 1. Ce qui a été réellement compilé

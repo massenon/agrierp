@@ -1,10 +1,10 @@
-# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-24)
+# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-30)
 
 ## USAGE
 
 - **Quand l'utiliser** : avant de toucher à une ration, une vente de poisson, l'incubation des pintades, une alerte d'autonomie, la corbeille, les droits ou les rôles. Ce registre est la SOURCE de ce qui est TRANCHÉ ; les autres fichiers de `docs/logialvia/` portent le texte normatif et renvoient ici par « TRANCHÉ (DV-xx) ».
 - **Ordre** : `10_BRS` → … → `15_REGLES_METIER` → **`16_DECISIONS_VALIDEES`** → modules `20_` à `29_`. En cas de conflit entre ce registre et un autre fichier, ce registre prévaut et l'autre fichier est corrigé.
-- **Date de validation** : 08/11/2026. DV-01 à DV-11 : décisions **validées par le client** (DV-08 à DV-11 : réponses du client du 08/11/2026). DV-12 à DV-14 : **recommandations de l'assistant, adoptées comme valeurs par défaut paramétrables**, statut « **recommandé, à confirmer avec le technicien** ». DV-15 : **décision par défaut** faute de réponse du client, **remplacée par DV-20** (Q-DV-5 et Q-DV-7 tranchées par défaut recommandé). **DV-16 à DV-22 : recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain.**
+- **Date de validation** : 08/11/2026. DV-01 à DV-11 : décisions **validées par le client** (DV-08 à DV-11 : réponses du client du 08/11/2026). DV-12 à DV-14 : **recommandations de l'assistant, adoptées comme valeurs par défaut paramétrables**, statut « **recommandé, à confirmer avec le technicien** ». DV-15 : **décision par défaut** faute de réponse du client, **remplacée par DV-20** (Q-DV-5 et Q-DV-7 tranchées par défaut recommandé). **DV-16 à DV-22 : recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain.** DV-23 et DV-24 : validées par le client le 08/11/2026. **DV-25 à DV-30 (09/11/2026) : décisions de marque, d'adresse, de dépôt, de restauration, de dossier et de captures, appliquées dans LogiAgriERP ; le statut de chacune dit d'où elle vient (DV-26 : décision du client du 21/10/2026).**
 - **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` (lecture seule) ; sans préfixe = monorepo `/home/user/agrierp`.
 
 > **Avertissement général.** Les repères zootechniques de ce registre (taux de ration, températures, humidités, durées, poids, rations par âge, indices de conversion, âges d'abattage) sont des **ORDRES DE GRANDEUR donnés par l'assistant, à confirmer par le technicien/vétérinaire et les fiches techniques des aliments ; seule la décision d'adopter la règle est validée.** Aucune valeur de ce registre ne s'écrit en dur dans le code comme « vérité ferme » : barèmes, seuils et durées sont des PARAMÈTRES éditables, marqués « repère terrain, à valider » tant que le technicien ne les a pas confirmés.
@@ -41,6 +41,12 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 | DV-22 | 08/11/2026 | Libellés lisibles du mode de règlement sur tous les documents | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain ; **implémenté par CONF-3** | — | — |
 | DV-23 | 08/11/2026 | Relevés de terrain : onglet CRUD lié au Dashboard élevage, valeurs par défaut = propositions, statut À valider → Validé par modale ; implémenté dans LogiAgriERP par RELEVES-1 (référence pour LogiALVIA) | validé par le client (« je suis ta proposition ») ; valeurs = repères à valider ; **implémenté par RELEVES-1** | précise DV-11, DV-14, DV-17, DV-18, DV-19 | valeurs ajustées sur le terrain (3 lots, 5 bons, technicien) |
 | DV-24 | 08/11/2026 | Règle générale : tout statut « À valider » se valide par modale ou en enregistrant | validé par le client (08/11/2026) ; **implémenté par RELEVES-1** | — | autres statuts « provisoire » (voir DV-24) |
+| DV-25 | 09/11/2026 | Nom du produit **LogiAgriERP** : « ERP » en jaune `#FFD55F`, le reste en blanc sur le vert ; le tracteur de la barre latérale et de la connexion reste FIXE (jamais remplacé par le logo choisi) | appliquée dans LogiAgriERP (renommage du 09/11/2026) ; accord du client non consigné dans les sources relues | — | nom définitif de LogiALVIA (le dossier sert à le construire : ne pas reprendre « LogiAgriERP ») |
+| DV-26 | 21/10/2026 | Domaine des adresses e-mail : **`fermeolouwachegoun.com`** (ticket MAIL1) : toute adresse `@olouwachegoun.bj` déjà en base est convertie, au web (migration) et au poste (Drift v50) | décision du client du 21/10/2026, appliquée | — | nom de serveur SMTP éventuellement saisi avec l'ancien domaine (à la main) |
+| DV-27 | 09/11/2026 | Dépôt PRIVÉ ; le README dit « projet privé et personnel, tous droits réservés » et donne un contact commercial unique : `rarhodes06@gmail.com` | appliquée (README du dépôt) ; accord du client non consigné | — | — |
+| DV-28 | 09/11/2026 | Restauration d'une sauvegarde au web : SEULEMENT sans ligne `pending` / `conflict`, après confirmation par le mot « RESTAURER », contrôle strict du fichier, tout ou rien dans UNE transaction, schéma plus récent refusé | recommandé et adopté (PWA-2c) ; implémenté | — | essai sur appareil réel et Safari |
+| DV-29 | 09/11/2026 | Poste Windows : l'ancien dossier `Documents\AgriERP` est REPRIS dans `Documents\LogiAgriERP`, jamais d'écrasement ; l'installateur le sauvegarde puis le retire | décision de conception appliquée au renommage ; implémentée | — | essai sur un vrai Windows |
+| DV-30 | 09/11/2026 | Captures du manuel, du README et de l'aperçu social SANS donnée personnelle : nom et e-mail de l'administrateur floutés ; copie non floutée gardée dans le dépôt privé (`manuel/originaux_non_floutes`, jamais publiée) | appliquée (commits du 09/11/2026) | — | — |
 
 ---
 
@@ -225,6 +231,32 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 - **Règle.** Tout statut « À valider » se traite ainsi : un bouton **« Valider »** sur la ligne ouvre une **modale de mise à jour** (valeurs visibles et corrigeables, statut « À valider → Validé », validé par et validé le, audit `releve.valide`) ; **enregistrer** une ligne modifiée la passe aussi à « Validé » : **le statut « À valider » ne subsiste jamais après un enregistrement humain**. Seul un semis par défaut écrit « À valider ».
 - **Étendue (inventaire du 08/11/2026).** Dans LogiAgriERP, la seule table portant un VRAI champ « à valider » est `field_survey_entries`. Les autres mentions sont : des textes (barème ITS « à valider avant toute paie réelle », rations de volailles « provisoires » devenues confirmées le 05/11/2026), ou des états CALCULÉS (exercice « Provisoire » = exercice précédent non clos ; à-nouveaux provisoires) qui se lèvent par un autre geste (clôture de l'exercice précédent) : ils ne portent aucun statut à valider. Tout futur statut « À valider » suivra cette règle.
 
+### DV-25 — Nom du produit LogiAgriERP, « ERP » en jaune, tracteur fixe [décidée par le client le 09/11/2026 (« le nom est LogiAgriERP, c'est ce qui est retenu ») ; appliquée dans LogiAgriERP]
+- **Règle.** Le produit s'appelle **LogiAgriERP** dans tous les textes visibles (web, poste, manuel, README, documents) : « Logi » et « Agri » en blanc sur fond vert, **« ERP » en jaune `#FFD55F`** (couleur `accent-yellow` du design système ; commentaire de `agrierp_flutter/lib/main.dart` : « LogiAgri » blanc puis « ERP » jaune). Le **tracteur** de la barre latérale et de la connexion est FIXE : le logo téléversé ne sert qu'aux documents (voir `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, CONF-2, et la règle `04_UI_UX_DESIGN_SYSTEM.md` § 14).
+- **Ce qui ne change PAS** (identifiants techniques) : `AppId` de l'installateur, `CompanyName` / `ProductName` de `Runner.rc` (le dossier des données du poste en dérive), nom de l'exécutable `agrierp.exe`, paquet Dart `agrierp`, dossiers `agrierp_laravel/` et `agrierp_flutter/`. Marche à suivre complète : `49_CHECKLIST_RENOMMAGE_PRODUIT.md`.
+- **Impact.** Libellés web et poste, manuel, README, aperçu social, spécimens (`presentation/`). **Pour LogiALVIA** : le nom du produit se décide avec le client ; ne JAMAIS recopier « LogiAgriERP » ; charte LogiALVIA = marine/or (fichier 04), pas le vert/jaune.
+
+### DV-26 — Domaine des adresses e-mail : `fermeolouwachegoun.com` (ticket MAIL1) [décision du client du 21/10/2026, appliquée]
+- **Règle.** Tout e-mail `@olouwachegoun.bj` devient `@fermeolouwachegoun.com`, AUSSI ceux déjà enregistrés, au web comme au poste, placeholders compris. Web : migration `2026_10_21_000001_migrer_les_adresses_email_du_domaine` (idempotente, parcours du schéma ; secrets écartés par leur nom, `audit_logs` et `journal_synchronisation` exclus, conflit d'unicité journalisé et ligne laissée ; compte `admin` : `dg@` devient `contact@fermeolouwachegoun.com`). Poste : palier Drift v50 (`_convertirAdressesEmail`, SQL insensible à la casse) ; l'e-mail de la session au coffre est converti à la lecture.
+- **Laissé tel quel** : nom de serveur SMTP saisi avec l'ancien domaine (à corriger à la main dans Paramètres › Email), `support@faguez-sarl.bj` (autre organisation), adresses fictives des tests (`@ferme.bj`, `@resto.bj`).
+- **Impact.** `docs/PLAN_FINALISATION.md` (MAIL1), `docs/GUIDE_DEPLOIEMENT.md` § 4.6, `49_CHECKLIST_RENOMMAGE_PRODUIT.md` (migration des adresses). **Pour LogiALVIA** : le domaine de la ferme se demande au client ; une migration des adresses déjà en base suit le même modèle.
+
+### DV-27 — Dépôt privé, contact commercial unique [décidée par le client le 09/11/2026 (« je garde le dépôt privé » ; contact commercial donné par le client) ; appliquée dans le README]
+- **Règle.** Le dépôt est **privé et personnel**, « tous droits réservés » ; le README donne un seul contact pour toute utilisation commerciale, démonstration ou collaboration : **`rarhodes06@gmail.com`**. Le README présente le projet et ses fonctionnalités illustrées, sans commandes (commit « README : présentation du projet… contact commercial (sans commandes) »).
+- **Impact.** Aucune dépendance à un dépôt public : `logialvia/` n'est lu qu'en lecture seule. Aucun export de base, aucune archive, aucun `.env` versionné (règle racine du `CLAUDE.md`).
+
+### DV-28 — Restauration d'une sauvegarde au web : état sûr, confirmation « RESTAURER », tout ou rien [recommandé et adopté (PWA-2c) ; implémenté]
+- **Règle.** Au navigateur, on peut restaurer le fichier JSON de sauvegarde complète SEULEMENT si la base locale n'a AUCUNE ligne `pending` / `conflict` (sinon refus : « Des saisies ne sont pas encore envoyées au serveur… Synchronisez d'abord ») ; après une confirmation explicite par la modale de confirmation (mot **« RESTAURER »** à recopier) ; contrôle strict du fichier (`schema_version` absent ou PLUS RÉCENT que l'application = refus, table ou colonne inconnue = refus total) ; UNE transaction (tout ou rien) ; puis rechargement de la page. L'identité du poste (`poste.identifiant`, `poste.adresse_serveur`) n'est jamais reprise d'un autre poste. Le natif garde son comportement.
+- **Impact.** `RestaurationSauvegarde` (`agrierp_flutter/lib/features/parametres/sauvegarde_complete_json.dart`), `ModaleRestauration`, `test/restauration_sauvegarde_test.dart` (mutation prouvée : retirer le contrôle « pending » fait rougir 4 tests). Résultats : `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` § 2.3 C.
+
+### DV-29 — Reprise de l'ancien dossier `Documents\AgriERP` dans `Documents\LogiAgriERP` [décision de conception appliquée au renommage ; implémentée]
+- **Règle.** Le poste Windows écrit ses archives, exports et reçus dans `Documents\LogiAgriERP`. Au premier export, un ancien `Documents\AgriERP` est REPRIS : s'il est seul, il est renommé ; si les deux existent, chaque élément de l'ancien est déplacé dans le nouveau SAUF s'il y porte déjà le même nom (**jamais d'écrasement** : l'élément en collision reste dans l'ancien dossier, supprimé seulement s'il est devenu vide) ; une panne de disque n'empêche jamais d'exporter. À la désinstallation, l'installateur sauvegarde aussi l'ancien dossier (`archives-et-exports-ancien-dossier`) puis le retire.
+- **Impact.** `agrierp_flutter/lib/core/systeme/dossier_documents.dart`, `test/dossier_documents_test.dart`, `agrierp_flutter/installer/agrierp.iss`. **Non vérifié** : un vrai Windows (script Inno Setup jamais compilé ici).
+
+### DV-30 — Captures sans donnée personnelle, copie non floutée gardée en dépôt privé [appliquée le 09/11/2026]
+- **Règle.** Les captures du manuel (`manuel/img`, `manuel/jpg`), du README (`docs/images/`) et l'image d'aperçu social ne montrent AUCUNE donnée personnelle : le nom et l'adresse e-mail de l'administrateur sont **floutés** (barre haute, barre latérale, accueil, profil, utilisateurs, audit). Une copie NON floutée est gardée dans `manuel/originaux_non_floutes/` (dépôt privé ; **jamais publiée** : dépôt public, site, PDF diffusé) pour régénérer le manuel en usage interne ; elle est à jour du nom et du domaine. Les captures montrent le nom du produit et le domaine À JOUR, « ERP » en jaune.
+- **Impact.** `manuel/`, `presentation/` (spécimens FICTIFS régénérés par `php presentation/generer.php`), `docs/images/`. Méthode de retouche et règles : `04_UI_UX_DESIGN_SYSTEM.md` § 14 et `49_CHECKLIST_RENOMMAGE_PRODUIT.md`.
+
 ---
 
 ## 3. Repère noté, NON ADOPTÉ (pour plus tard) — ruminants
@@ -246,6 +278,21 @@ Aucune filière ruminants n'existe aujourd'hui. **Non adopté, pour plus tard** 
 
 **Questions restées ouvertes** : aucune Q-DV n'est plus ouverte au sens strict. Restent à confirmer sur le terrain : les réponses du technicien sur le barème des poissons (DV-19), la mesure du délai réel du fournisseur de provende sur ses 5 derniers bons de commande (DV-18), les durées d'incubation après les 3 premiers lots (DV-17) et le résultat de la phase 0 de la PWA (DV-16).
 
+### 4a. Décisions encore OUVERTES au 09/11/2026 (relevées dans `docs/PLAN_FINALISATION.md`)
+
+| Id | Question | Source dans le plan | Recommandation écrite au plan |
+|---|---|---|---|
+| Q-OUV-1 | **A2 — bandes « issues d'une bande » comptées deux fois** dans « Effectif Total Vivant » : le transfert est-il une colonne de la fiche (`transfert_sortie`) ou un écran dédié ? Faut-il corriger les bandes déjà saisies (D6) ? | section A2 (statut ❓) ; un mécanisme de transfert existe depuis (ticket 15.46) : relire la section avant de répondre | proposition : mouvement « Transfert vers bande », avec cascade des deux côtés |
+| Q-OUV-2 | **DEV-Q1** — conversion « devis accepté → facture / vente » (absente du web) : un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | tickets DEV | la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter |
+| Q-OUV-3 | **DEV-Q2** — lignes de devis structurées (produits du catalogue, remise par ligne) | tickets DEV | non tant que le web n'en a pas (description libre) |
+| Q-OUV-4 | **DEV-Q3** — impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de « Exporter » | tickets DEV | oui, web d'abord |
+| Q-OUV-5 | **Caisse hors ligne du navigateur** : appareil personnel ou d'entreprise, le PIN suffit-il ? | PWA-1 « Décisions client en attente » | — |
+| Q-OUV-6 | **Reçu provisoire** à imprimer hors ligne (aujourd'hui : aucun, le numéro de facture est attribué par le serveur à la synchronisation) | PWA-1 | — |
+| Q-OUV-7 | **Essai sur les vrais appareils de la ferme** (Android, iPhone ; Safari pour le poste web) | PWA-1, PWA-2 | à faire avant d'annoncer iOS |
+| Q-OUV-8 | **`export-ventes` du comptable** (PDF de clients, créances, avances : 403 au web, impression locale au poste) : le lui donner ? | CONF-4 / CONF-5 | à confirmer avec le client |
+
+(Le seuil de péremption des prix de la caisse hors ligne, 4ᵉ point des décisions en attente du plan, est tranché par DV-21.)
+
 ## 4b. Contradictions apparentes entre décisions (relevées le 08/11/2026)
 
 - **DV-03 ↔ DV-09** : « pintadeaux » (DV-03) contre « Poussin(s) » (DV-09). Résolue : DV-09 prévaut pour le LIBELLÉ ; DV-13 et le reste du dossier parlent de « poussins de pintade » (« pintadeaux » n'est plus qu'un mot d'usage).
@@ -259,5 +306,6 @@ Aucune filière ruminants n'existe aujourd'hui. **Non adopté, pour plus tard** 
 
 - [ ] Chaque DV porte date, décision, justification, impact par fichier, reste À DÉFINIR, statut.
 - [ ] En tête : l'avertissement « ordres de grandeur… » (présent).
+- [ ] Les décisions DV-25 à DV-30 disent leur origine (client, projet, recommandé) sans la gonfler ; les questions encore ouvertes sont dans le § 4a, jamais dans le texte d'une DV.
 - [ ] Chaque question fermée est remplacée dans son fichier par « TRANCHÉ (DV-xx) ».
 - [ ] Aucun repère zootechnique n'est codé en dur : barèmes, seuils, durées et fenêtres sont des paramètres.

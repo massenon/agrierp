@@ -7,7 +7,7 @@
 > - **Entrées requises.** Réponses du client (section 8) ; compte e-MECeF existant (IFU, jeton, environnement d'essai) ; règles de TVA de LogiALVIA (`15_REGLES_METIER.md`) ; le guide `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` bloc 19.
 > - **Sorties.** Un module MeCeF serveur (passerelle, constructeur unique, choix simple/normalisée, réglage, test de configuration), la migration des factures existantes, le poste allégé, les tests `Http::fake`, la procédure du premier essai réel.
 > - **Avertissements en tête (à répéter au client).** **AUCUN essai réel contre la DGI n'a été fait**, ni dans LogiAgriERP ni dans LogiALVIA (ni jeton ni IFU de test). Les adresses de l'API et les noms de champs viennent d'un paquet **non officiel** ; aucune documentation DGI n'a pu être consultée. Le traitement de l'**AIB** est une lecture de ce paquet : **à confirmer**.
-> - **Voir aussi.** `15_REGLES_METIER.md` (TVA, ventes), `20_MODULES_*` (Ventes, Facturation), `30_DATABASE.md`, `31_TESTING_QA.md`, `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `40_PWA_HORS_LIGNE.md` (hors ligne : « demandée — en attente »).
+> - **Voir aussi.** `15_REGLES_METIER.md` (TVA, ventes), `20_MODULES_*` (Ventes, Facturation), `30_DATABASE_ENGINEERING.md`, `31_TESTING_QA.md`, `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `40_PWA_HORS_LIGNE.md` (hors ligne : « demandée — en attente »), `47_PLAN_BOITIER_MECEF_2.md` (plan du boîtier par le poste).
 
 ---
 
@@ -98,6 +98,34 @@ Contrat défini dans `docs/PLAN_FINALISATION.md` : le poste appelle `http://loca
 
 ### 3.2 ⚠️ Précision à apporter au guide et au plan (écart relevé)
 Le guide (bloc 19) et le plan disent que le boîtier utilisera « le MÊME `MecefFactureBuilder` ». **Ce n'est vrai que pour la logique** (prix entiers, répartition de remise, arrondi, groupes de taxe, libellés ≤ 60). Le **JSON** produit par `MecefFactureBuilder::enveloppe` suit l'API en ligne (`items`/`taxGroup`/`payment`/`type`/`reference`/`aib` = `A|B`) ; le pilote attend un **autre schéma** (`products`/`tax`/`payments`/`vt`|`rt`/`rn`/`aib` = `"1%"|"5%"|"N/A"`, `seller_id`, `seller_name`). MECEF-2 nécessite donc une **couche de traduction** (et, pour l'avoir, la référence « NIM-TC » au lieu de l'`uid`). Ne pas promettre « même charge utile ».
+
+### 3.3 MECEF-2 — état au 09/11/2026 : SQUELETTE seulement (relu dans le code), rien n'est construit côté poste
+
+> Plan d'exécution en prompts réutilisables : `47_PLAN_BOITIER_MECEF_2.md`.
+
+**Contexte (décisions du client du 07/11/2026).** La ferme a un COMPTE e-MECeF (API en ligne de la DGI, sans boîtier) et utilise ce mode ; d'autres structures ont un BOÎTIER **Eltrade CC300** branché sur le poste et la ferme en achètera un : les deux modes doivent pouvoir coexister (`MecefMode` : `desactive` · `emecef` · `boitier`, libellé du réglage « Boîtier MeCeF (à venir) »).
+
+| Pièce | État | Fichier |
+|---|---|---|
+| Mode `boitier` réglable (écran Paramètres › Facturation normalisée, copié au poste dans `app_settings` `mecef.mode`) | FAIT | `agrierp_laravel/app/Support/MecefMode.php` |
+| Fabrique qui résout la passerelle À CHAQUE transmission | FAIT | `app/Services/Mecef/MecefGatewayFactory.php` (`MecefMode::BOITIER => BoitierMecefGateway`) |
+| `BoitierMecefGateway` | **SQUELETTE** : implémente `MecefGatewayInterface` et `MecefAvoirGatewayInterface`, ne transmet RIEN ; répond `success=false`, message « Mode boîtier : transmission par le poste non encore disponible. », état `en_attente` | `app/Services/Mecef/BoitierMecefGateway.php` |
+| Couche de traduction vers le schéma du pilote (`bill.spec.json`) | FAITE, **jamais confrontée à un vrai boîtier** | `app/Services/Mecef/ChargeBoitierEltrade.php` (`MODES` E/M/V/C/D/A, `VENDEUR_MAX` 30, `rt` = FA + `rn` pour l'avoir, `aib` = `"1%"` / `"5%"` / `"N/A"`) |
+| Spécimen de la charge du pilote | FAIT (lu, jamais envoyé) | `presentation/ticket_essai_mecef.json` (vente d'essai de 21 300 FCFA TTC), produit par `MecefFactureBuilder` puis `ChargeBoitierEltrade` |
+| **Appel du boîtier PAR LE POSTE** (`GET /check`, `POST /bill` sur `http://localhost:38917`) | **NON CONSTRUIT** (« à faire à l'achat du boîtier », `docs/PLAN_FINALISATION.md`) | — |
+
+**Pourquoi par le poste.** Le boîtier est un serveur HTTP LOCAL (`http://localhost:38917`) sans authentification : le serveur hébergé ne peut pas l'atteindre ; seule la machine à laquelle il est branché le peut. Le **jeton e-MECeF reste web-only** et inchangé : il n'existe NI colonne, NI champ de saisie, NI clé de demande au poste (l'écran du poste montre seulement « •••• » configuré ou « Aucun jeton enregistré ») ; le pilote n'a aucune authentification (§ 3) et le schéma `bill.spec.json` ne porte aucun jeton : le mode boîtier n'en transmet pas.
+
+**Ce qui reste à faire** (contrat défini au plan, sans rien promettre de plus) :
+1. Le poste (Windows, puis le poste web : voir le point 6) appelle `GET /check` (état `{"status":"Ready"}` ou 503 `DeviceNotConnected`), puis `POST /bill` avec la charge traduite, et **vérifie que `qr_code` est rempli** — jamais le code HTTP (le pilote répond 200 même en échec, § 3).
+2. Le constructeur de charge est en PHP : décision à prendre — le PORTER en Dart avec parité exécutée contre le vrai PHP (modèle : `choix_facture_parite_php_test.dart`), OU faire servir la charge par le serveur (`ChargeBoitierEltrade`) au poste. Ne pas promettre « même charge utile » (§ 3.2).
+3. Reporter le résultat (QR, code MeCeF/DGI, NIM, compteurs, `normalise_le`) dans la vente puis le synchroniser ; le poste ne doit JAMAIS écrire ces colonnes aujourd'hui TIRÉES seulement (`mecef_code`, `mecef_nim`, `mecef_compteurs`, `mecef_normalise_le`, `mecef_message` : garde `mecef_emecef_poste_test`) — c'est un changement de contrat à décider.
+4. Hors ligne : la vente part « demandée — en attente » comme en e-MECeF (`MecefEtat::EN_ATTENTE`) ; le boîtier est local, donc il peut normaliser HORS RÉSEAU : question à poser (le ticket normalisé s'imprime-t-il avant la synchronisation ?).
+5. Avoir sur une facture normalisée par le boîtier : `rt`/`rn` (« NIM-TC » : la référence est celle du boîtier, pas l'`uid` de l'API en ligne).
+6. Poste web (navigateur) : un navigateur ne peut appeler `http://localhost:38917` depuis une page HTTPS qu'avec les restrictions de contenu mixte / accès au réseau privé du navigateur : **NON étudié**, à valider avant de promettre le mode boîtier dans la PWA.
+
+**À valider avec un VRAI appareil (rien de ceci n'a été essayé)** : le schéma `bill.spec.json` tel que traduit (prix entiers TTC, groupes de taxe A à F, `price_change_explanation` ≤ 24, `items` décimaux) ; la durée de `GET /info` (« cette requête prend 4 s » selon le pilote) ; le comportement quand le boîtier est éteint ou débranché (503) ; ce que le pilote renvoie d'autre que `qr_code` (NIM, compteurs : à lire dans la réponse réelle) ; l'AIB ; les arrondis ; le débit d'un boîtier sous plusieurs ventes de suite ; l'impression du ticket.
+
 
 ---
 

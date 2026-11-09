@@ -43,17 +43,25 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 | `13_FRS_FUNCTIONAL_REQUIREMENTS.md` | Exigences fonctionnelles | Après 12 | 12 |
 | `14_NFRS_NON_FUNCTIONAL_REQUIREMENTS.md` | Exigences non fonctionnelles (performance, sécurité, disponibilité…) | Après 12-13 | 12, 13 |
 | `15_REGLES_METIER.md` | Règles métier numérotées (BR-XXX-NNN : effectifs, ventes, stocks, comptabilité…) | Avant tout module qui calcule | 10 à 14 |
-| `16_DECISIONS_VALIDEES.md` | Registre des décisions validées par le client le 08/11/2026 (DV-01 à DV-22 : ration des poissons en % de biomasse, vente de poisson kg + sujets, pintades/incubation 28 j, seuils d'autonomie 7 j/3 j, corbeille sans écritures, droits du caissier, 4 rôles ; DV-08 à DV-11 validées par le client : retours du caissier, libellé « Poussins », départ par stade à l'ouverture de la fiche, règles d'incubation modifiables ; DV-12 à DV-14 recommandées, à confirmer avec le technicien ; DV-15 valeurs par défaut, remplacées par DV-20 ; DV-16 à DV-22 recommandées et ADOPTÉES par le client (« je vais suivre »), à confirmer sur le terrain : phase 0 PWA, incubation et protocole, délai fournisseur de provende, barème poissons provisoire, responsable stock et comptable, prix périmés, libellés des modes de règlement) ; ce qui reste À DÉFINIR ; repères zootechniques = ordres de grandeur à valider | Avant tout calcul de ration, de vente de poisson, d'incubation, d'autonomie, et avant toute matrice de droits | 10 à 15 |
+| `16_DECISIONS_VALIDEES.md` | Registre des décisions validées par le client le 08/11/2026 (DV-01 à DV-30 ; DV-25 à DV-30 du 09/11/2026 : nom du produit LogiAgriERP, domaine `fermeolouwachegoun.com`, dépôt privé, restauration au web, reprise du dossier Documents, captures sans donnée personnelle ; § 4a : décisions encore OUVERTES ; DV-01 à DV-22 : ration des poissons en % de biomasse, vente de poisson kg + sujets, pintades/incubation 28 j, seuils d'autonomie 7 j/3 j, corbeille sans écritures, droits du caissier, 4 rôles ; DV-08 à DV-11 validées par le client : retours du caissier, libellé « Poussins », départ par stade à l'ouverture de la fiche, règles d'incubation modifiables ; DV-12 à DV-14 recommandées, à confirmer avec le technicien ; DV-15 valeurs par défaut, remplacées par DV-20 ; DV-16 à DV-22 recommandées et ADOPTÉES par le client (« je vais suivre »), à confirmer sur le terrain : phase 0 PWA, incubation et protocole, délai fournisseur de provende, barème poissons provisoire, responsable stock et comptable, prix périmés, libellés des modes de règlement) ; ce qui reste À DÉFINIR ; repères zootechniques = ordres de grandeur à valider | Avant tout calcul de ration, de vente de poisson, d'incubation, d'autonomie, et avant toute matrice de droits | 10 à 15 |
 | `20_MODULES_*` | Un prompt PAR MODULE (pilotage, élevage, commercial, stocks, achats, comptabilité, rapports, administration, compte) | Un module par session, dans l'ordre du guide de portage | 01 à 04, 15, 30 |
 | `30_DATABASE_ENGINEERING.md` | Schéma partagé UUID, migrations, migration des données existantes du poste, seeders | Avant la première migration métier | 02, 15 |
 | `31_TESTING_QA.md` | Stratégie de tests, jeux de cas, parité web-poste, recette, mutation | Avant de coder un module, puis à chaque ticket | 03, 15, 20 |
-| `32_SKILLS_LIBRARY.md` | Skills Claude Code du dépôt (`prd`, `plan`, audit…) adaptés à LogiALVIA | Une fois au démarrage, avant le premier ticket | 01, 03 |
+| `32_CLAUDE_CODE_SKILLS_LIBRARY.md` | Skills Claude Code du dépôt (`prd`, `plan`, audit…) adaptés à LogiALVIA | Une fois au démarrage, avant le premier ticket | 01, 03 |
 | `40_PWA_HORS_LIGNE.md` | PWA étroite existante et conception d'un éventuel hors ligne (à valider) | Seulement si le client le confirme | 02, 30, 43 |
 | `41_MECEF_EMECEF.md` | Facturation normalisée e-MECeF : passerelle, modes, construction de la charge utile | Module Ventes/Facturation | 02, 15, 20 |
 | `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md` | Réglages d'administration : MeCeF, SMTP, logo, favicon (secrets chiffrés) | Module Administration | 02, 03, 41 |
 | `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` | Appairage du poste, synchronisation, modale de synchro, alertes | Après le socle et les premiers modules | 02, 30, 15 |
+| `44_ETUDE_FAISABILITE_PWA_FLUTTER_WEB.md` | Étude (07/11/2026) : le poste Flutter compilé pour le navigateur (Drift sur IndexedDB), ce qui compile, ce qui bloque, critères d'arrêt. **Statut : étude réalisée, voir 45 et 46** | Pour comprendre POURQUOI le poste web est possible et ce qu'il fallait prouver | `40_PWA_HORS_LIGNE.md` (voie C) |
+| `45_PHASE0_RESULTATS_PWA_FLUTTER_WEB.md` | Phase 0 (08/11/2026) : preuve d'exécution dans Chromium (démarrage, schéma, tirage, hors ligne, stockage IndexedDB contre OPFS, verdict « go conditionnel ») | Avant d'annoncer un poste web à un client ; pour rejouer la preuve | 44, DV-16 |
+| `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` | Phase 1 RÉALISÉE (PWA-2, PWA-2b, PWA-2c) : service worker propre, synchronisation automatique, écritures groupées (mesures avant / après), deux vrais onglets, restauration de sauvegarde, sondage, mise à jour contrôlée ; limites ; leçons | Avant de construire le poste web de LogiALVIA ; pour dire au client ce qui est prouvé | 44, 45, 43 (§ 2.5), 30 (§ 7.4), 31 (§ 3.2 et 3.3) |
+| `47_PLAN_BOITIER_MECEF_2.md` | Plan en prompts (B0 à B6) du boîtier fiscal Eltrade CC300 branché sur le poste (MECEF-2, NON construit) | Le jour où un boîtier est acheté et branché ; pas avant | 41 (§ 3 et 3.3), 43, 31 |
+| `48_PLAN_IMPORT_MASSE_PHASES.md` | Plan des phases IMPORT-2 et suivantes (employés, plan comptable, barème de rationnement) : clés, droits, points de passage, parité, prompts | Quand le client demande d'importer un module de plus | 28, guide bloc 21, 31 |
+| `49_CHECKLIST_RENOMMAGE_PRODUIT.md` | Check-list du renommage du produit et du changement de domaine des adresses : nom affiché / identifiants techniques, expression sûre, migration des e-mails, reprise du dossier Documents, secrets, captures, contrôles | Au changement de nom ou de domaine (et pour LogiALVIA le jour où son nom est fixé) | 16 (DV-25 à DV-30), 04 (§ 14), 31 |
 
-Les fichiers 10 à 16, 20 à 32 et 40 à 43 sont rédigés par d'autres sessions ; on les désigne ici par leur nom, sans en recopier le contenu. Un fichier cité mais absent du dossier est « à produire » : ne PAS l'inventer, le demander.
+**Mises à jour du 09/11/2026 dans les fichiers existants** : `04` § 14 (règles des captures) ; `16` DV-25 à DV-30 et § 4a ; `30` § 5.18 (colonnes et tables ajoutées, Drift v82 à v86, noms réels corrigés au § 5.15) et § 7.4 (performance au navigateur, mesurée) ; `31` § 3.2 à 3.4 (tests d'instructions SQL, e2e Chromium, mutation, parité, garde-fous) ; `40` et `44` (statut : voie C étudiée puis réalisée, voir 46) ; `41` § 3.3 (MECEF-2) ; `43` § 2.5 (déclencheurs, sondage, verrou entre onglets au navigateur) ; `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` blocs 22 à 24 (§ 24 à 26) ; `45` ne garde que la phase 0.
+
+Les fichiers 10 à 16, 20 à 32 et 40 à 49 sont rédigés par d'autres sessions ; on les désigne ici par leur nom, sans en recopier le contenu. Un fichier cité mais absent du dossier est « à produire » : ne PAS l'inventer, le demander.
 
 ---
 
@@ -64,7 +72,7 @@ Phase 0  Cadrage          README -> GUIDE_PORTAGE -> 01_MASTER_PROMPT
 Phase 1  Exigences        10 BRS -> 11 PRD -> 12 SRS -> 13 FRS -> 14 NFRS -> 15 REGLES_METIER -> 16 DECISIONS_VALIDEES
 Phase 2  Socle web (W0)   02 ARCHITECTURE -> 03 STANDARDS -> 04 DESIGN SYSTEM -> 30 DATABASE -> 31 TESTING -> 32 SKILLS
 Phase 3  Modules          20_MODULES_* (un module = une session, ordre du guide de portage)
-Phase 4  Intégrations     43 APPAIRAGE/SYNCHRO -> 41 MECEF -> 42 CONFIG -> 40 PWA (si confirmé)
+Phase 4  Intégrations     43 APPAIRAGE/SYNCHRO -> 41 MECEF -> 42 CONFIG -> 40 PWA (si confirmé ; poste web : 44 -> 45 -> 46) ; sur demande : 47 BOÎTIER, 48 IMPORT, 49 RENOMMAGE
 Phase 5  Recette          audit de conformité écran par écran (04, prompt B) + 31 recette + corrections
 ```
 
@@ -97,7 +105,7 @@ Règles de séquencement :
 | Terme | Sens |
 |---|---|
 | **LogiALVIA** | Gestion intégrée d'ALLMANY ET COMPAGNIE (Natitingou, Bénin) : élevage, commerce annexe, stocks, achats, comptabilité, rapports ; Flutter Windows aujourd'hui, web à créer. |
-| **LogiAgriERP / LogiAgriERP** | Produit jumeau (Ferme École OLOUWACHEGOUN) : web Laravel + poste Flutter ; réservoir de patrons et de pièges déjà payés. |
+| **LogiAgriERP** | Produit jumeau (Ferme École OLOUWACHEGOUN) : web Laravel + poste Flutter ; réservoir de patrons et de pièges déjà payés. |
 | **Poste** | Client Flutter Windows hors ligne (Drift/SQLite). |
 | **Web** | Application Laravel + Livewire, serveur de référence une fois un module validé. |
 | **Doctrine de portage** | `docs/DOCTRINE_PORTAGE.md` : fidélité web <-> poste, « la vue web est la référence ». |
@@ -117,6 +125,9 @@ Règles de séquencement :
 | **Sanctum** | Jetons d'API, un par poste appairé. |
 | **MeCeF / e-MECeF** | Facturation électronique normalisée (Bénin), via passerelle. |
 | **Appairage** | Association d'un poste à un compte serveur (jeton + PIN local). |
+| **Poste web (PWA-2)** | Le poste Flutter compilé pour le navigateur, servi sous `/poste/` avec son propre service worker et sa base IndexedDB ; réalisé dans LogiAgriERP (46). |
+| **Écritures groupées** | `batch` + lectures `IN` + une transaction par page : au navigateur chaque instruction coûte ≈ 55 ms (30 § 7.4). |
+| **Sondage léger** | `GET /up`, 3 s, jamais en cache, avant de synchroniser au retour en ligne (43 § 2.5). |
 | **PWA étroite** | Manifeste + service worker limité aux fichiers statiques ; ne rend pas le web utilisable hors ligne. |
 | **À DÉFINIR AVEC LE CLIENT** | Marqueur obligatoire d'une règle absente des sources, avec une question précise. |
 | **`ECART_DELIBERE:`** | Marqueur d'un écart assumé avec sa raison (convention de logialvia). |
@@ -145,5 +156,6 @@ Règles de séquencement :
 5. Barèmes de rationnement Goliaths ; taux de ration des poissons-chats en % de biomasse à valider par le technicien (DV-01) ; stades de passage ; plusieurs bandes par filière (01).
 6. ~~Rôle `comptable` : oui/non~~ TRANCHÉ (DV-07) ; périmètre du comptable arrêté par DV-20 (Q-DV-7 tranchée par défaut recommandé). Autres questions nées des décisions : `16_DECISIONS_VALIDEES.md` §4 (fermées : Q-DV-6, Q-DV-8 ; fermées en « recommandé » : Q-DV-1, Q-DV-2, Q-DV-3, Q-DV-4 ; tranchées par défaut recommandé : Q-DV-5, Q-DV-7 (DV-20)).
 7. Plan comptable (SYSCOHADA ?), PWA hors ligne, import xlsx, mode sombre (02).
+7b. Décisions encore ouvertes côté LogiAgriERP au 09/11/2026 (bandes comptées deux fois, devis, appareil de la caisse hors ligne, reçu provisoire, essai sur appareils réels, `export-ventes` du comptable) : `16_DECISIONS_VALIDEES.md` § 4a.
 8. Langue des noms de tables du schéma partagé (03).
 9. Copie du prototype HTML (04).

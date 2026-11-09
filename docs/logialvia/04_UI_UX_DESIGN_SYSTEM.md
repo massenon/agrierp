@@ -371,7 +371,7 @@ Corriger le code ; juger « à l'œil » sans mesure ; fermer un défaut sans pr
 
 ---
 
-## 13. À DÉFINIR AVEC LE CLIENT
+## 13. À DÉFINIR AVEC LE CLIENT (la section 14, après, fixe les règles des captures)
 
 - **Q-DS-1 Police** : Roboto (celle du poste, retenue ici pour la conformité) ou Inter (LogiAgriERP) ? Changer implique de changer le poste aussi.
 - **Q-DS-2 Contrastes** : accepte-t-il (a) un jeton « or lisible sur fond clair » dérivé de `#B58B2A` (valeur à fixer ensemble ; elle n'est PAS inventée ici), (b) de réserver `outline` aux fonds blancs, (c) un texte `success-deep` plus sombre sur `success-container` ?
@@ -382,3 +382,16 @@ Corriger le code ; juger « à l'œil » sans mesure ; fermer un défaut sans pr
 - **Q-DS-7 Modales** : largeur de chaque modale (le poste utilise 480 par défaut, valeur hors échelle Tailwind) : à relever sur le prototype.
 - **Q-DS-8 Mode sombre, rail d'icônes droit, hubs de cartes** : existent-ils dans le prototype de LogiALVIA ? (sources du dépôt cloné muettes ; ne pas les créer par imitation d'LogiAgriERP.)
 - **Prototype HTML** : fournir sa copie (31 pages) : sans elle, la source visuelle de premier niveau manque et plusieurs valeurs ci-dessus restent « à confirmer ».
+
+## 14. Captures d'écran (manuel, README, aperçu social, spécimens) : règles de confidentialité et de fidélité
+
+Règles tirées de ce qui a été fait dans LogiAgriERP (commits du 09/11/2026, décisions DV-25 et DV-30 de `16_DECISIONS_VALIDEES.md`) ; à appliquer telles quelles pour LogiALVIA. Le renommage lui-même est décrit par `49_CHECKLIST_RENOMMAGE_PRODUIT.md`.
+
+1. **Aucune donnée personnelle** dans une image publiée (manuel, README, aperçu social, site) : le NOM et l'adresse E-MAIL de l'administrateur sont **floutés** — barre haute, barre latérale, accueil, profil, gestion des utilisateurs, journal d'audit. Aucun numéro de téléphone, IFU réel ni jeton ne figure sur une capture : les spécimens de `presentation/` sont FICTIFS (IFU `9999999999999`, `8888888888888`, filigrane « SPÉCIMEN », QR à ne pas scanner).
+2. **Copie non floutée gardée en dépôt PRIVÉ** (`manuel/originaux_non_floutes/`, avec son `LISEZMOI.md` : « Ne jamais publier ce dossier ») pour régénérer le manuel en usage interne. Elle est tenue à jour comme les images floutées (nom du produit, domaine).
+3. **Nom du produit et domaine À JOUR** sur chaque image : `LogiAgriERP` (jamais l'ancien `AgriERP`), adresses en `fermeolouwachegoun.com`. Après tout renommage, TOUTES les captures sont revues, pas seulement les textes du code.
+4. **« ERP » en jaune `#FFD55F`** (couleur `accent-yellow`) : « LogiAgri » en blanc sur le vert, « ERP » en jaune de la marque ; le **tracteur** de la barre latérale et de la connexion est FIXE. Ce jaune est un usage de MARQUE sur fond foncé (sur fond blanc il est illisible : voir § 2, `brand-maize-ink`).
+5. **Retouche d'une capture existante, sans refaire la prise de vue** (méthode employée ; AUCUN script n'est versionné dans le dépôt : elle est à refaire avec l'outil du moment) : (a) **lire le texte** de la zone à changer (reconnaissance de caractères) pour retrouver son emplacement, sa taille et sa couleur ; (b) effacer la zone par un aplat de la couleur de fond relevée sur l'image ; (c) **re-rendre le nouveau texte avec la MÊME police — Inter** (la police du web et du poste de LogiAgriERP : `agrierp_laravel/public/assets/fonts/Inter-latin.woff2`, `tailwind.config.js` `sans: ['Inter', 'sans-serif']`), même corps, même graisse, même couleur, même alignement ; (d) refaire le flou des zones personnelles APRÈS la retouche. Une police voisine ou un corps décalé se voit : comparer côte à côte à l'original.
+6. **Contrôle automatique après retouche** : relire par reconnaissance de caractères TOUTES les images (`manuel/img`, `manuel/jpg`, `docs/images/`, `presentation/apercus`) et chercher l'ancien nom, l'ancien domaine, le nom et l'e-mail de l'administrateur ; zéro occurrence. (Contrôle à refaire à la main si l'outil manque : aucune garantie sinon.)
+7. **Dimensions** : l'image d'aperçu social du dépôt fait 1280 × 640 (`docs/images/social-preview.png`) ; les captures du README sont dans `docs/images/` ; celles du manuel en PNG (`manuel/img`) et JPG (`manuel/jpg`), pilotées par `manuel/ecrans.json` et `manuel/reperes.json`, assemblées par `manuel/build.py`.
+8. **Pour LogiALVIA** : charte marine `#1F3864` / or `#B58B2A` et police Roboto (§ 2 et § 3), pas le vert / jaune ni Inter d'LogiAgriERP ; le nom du produit se décide avec le client (DV-25). Ne jamais recopier une capture d'LogiAgriERP dans un document de LogiALVIA.

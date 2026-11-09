@@ -34,6 +34,9 @@ Rédigé le 07/11/2026 depuis le monorepo LogiAgriERP (branche `claude/sleepy-di
 21. Bloc 20 — PWA du poste avec travail hors connexion — À CONCEVOIR (n'existe pas)
 22. Bloc 21 — Importation en masse par tableur xlsx — À CONCEVOIR (n'existe pas), priorité haute
 23. Check-list de démarrage
+24. Bloc 22 — Poste web (PWA-2) : le poste compilé pour le navigateur (RÉALISÉ dans LogiAgriERP, phase 1)
+25. Bloc 23 — Captures, README, aperçu social et spécimens (sans donnée personnelle)
+26. Bloc 24 — Renommage du produit et changement de domaine des adresses
 
 ---
 
@@ -120,6 +123,9 @@ Effort : S ≤ 1 jour · M 2 à 4 jours · L 5 à 10 jours · XL plus de 10 jour
 | 19 MeCeF (poste ET web), e-MECeF côté serveur | L (boîtier : L, À VENIR) | 14, 16, 4 | `agrierp_laravel/app/Services/Mecef/MecefFactureBuilder.php`, `agrierp_laravel/app/Services/Mecef/EmecefGateway.php`, `agrierp_flutter/lib/features/ventes/choix_facture.dart` |
 | 20 PWA hors connexion — À CONCEVOIR (n'existe pas), seulement si le client le confirme | XL | 14, 15, 16 | `agrierp_laravel/public/sw.js`, `agrierp_laravel/public/manifest.webmanifest`, `agrierp_laravel/tests/Feature/PwaEtPolicesLocalesTest.php` (le PWA ÉTROIT existant) |
 | 21 Importation en masse par xlsx — À CONCEVOIR (n'existe pas), priorité haute | L (socle) + M pour les stocks + S à M par autre module | 14, 16 (et 12/1 pour les bandes) | `agrierp_flutter/lib/core/export/export_tableur.dart` (export seulement), `agrierp_laravel/app/Services/ProductCatalogService.php`, `agrierp_laravel/app/Services/FusionReferentielsService.php` |
+| 22 Poste web (PWA-2) : le poste Flutter compilé pour le navigateur — RÉALISÉ dans LogiAgriERP (phase 1) | XL (socle : L ; synchronisation et écritures groupées : L ; deux onglets, restauration, sondage : M) | 14, 15, 16, 17 | `agrierp_flutter/web/`, `agrierp_flutter/outils/construire_poste_web.sh`, `agrierp_flutter/lib/core/systeme/plateforme_poste.dart`, `agrierp_flutter/outils/e2e_poste_web.mjs`, `agrierp_laravel/tests/Feature/PostePwa2Test.php` ; détail : `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` |
+| 23 Captures, README, aperçu social, spécimens sans donnée personnelle | S | 22 (pour les captures du poste web) | `manuel/`, `presentation/`, `docs/images/` ; règles : `04_UI_UX_DESIGN_SYSTEM.md` § 14 |
+| 24 Renommage du produit et du domaine des adresses | M | — | `agrierp_flutter/installer/agrierp.iss`, `agrierp_flutter/windows/runner/Runner.rc`, `agrierp_flutter/lib/core/systeme/dossier_documents.dart` ; check-list : `49_CHECKLIST_RENOMMAGE_PRODUIT.md` |
 
 **Ordre conseillé (révisé le 07/11/2026, le web sera créé)** : **socle serveur + schéma UUID** (14, 8, ossature de 2) → **appairage** (15) → **synchronisation** (16) → **modale de synchronisation** (17, avec 3 et 4 qui partagent la barre du haut) → **fiches, stocks, alertes** (12 bandes, 1 fiches par filière, 5 rationnement, 6 prophylaxie et rappels, 13a seuils, 18 notifications) → **importation en masse** (21, stocks d'abord) → **MeCeF** (19) → **comptabilité et exercices** (9, 4, 11, 13b à 13e, 7 export, 13f aide) → **build** (10) → **PWA hors connexion** (20) seulement si le client la confirme. Raison : tout module partagé exige l'identité (UUID), l'appairage et la synchronisation ; la fiche calculée suppose une bande propre (12) ; le rationnement lit l'effectif calculé ; l'import réutilise les points de passage des modules déjà construits ; MeCeF suppose le serveur et les ventes ; la comptabilité ne s'écrit au poste que par DEMANDES rejouées par le serveur ; le build clôt la chaîne. L'ordre « sans web » d'origine (socle → fenêtre → utilisateurs → plan comptable → exercices → bandes → fiches → rationnement → prophylaxie → import/export → aide → build) reste valable pour les blocs qui ne partagent aucune donnée.
 
@@ -1048,6 +1054,8 @@ Compte e-MECeF existant (IFU, jeton, environnement d'essai puis production) ? Bo
 
 ## 21. Bloc 20 — PWA du poste avec travail hors connexion puis synchronisation à la reconnexion — **À CONCEVOIR**
 
+> **MISE À JOUR du 09/11/2026 (statut seulement ; le texte ci-dessous est conservé tel qu'écrit).** Ce bloc décrit la PWA ÉTROITE de la caisse (PWA-1, `sw.js`) et la conception d'une PWA hors ligne. Depuis, LogiAgriERP a construit autre chose : le **poste Flutter compilé pour le navigateur**, servi sous `/poste/` avec son propre service worker (`poste_sw.js`), qui se recharge SANS réseau, saisit hors ligne (fournisseur, vente de caisse) et se synchronise à la reconnexion. Voir le **bloc 22** (§ 24 de ce guide) et `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` ; le point « La fonction n'existe pas » ci-dessous vaut pour la PWA étroite, plus pour le poste web.
+
 > ⚠️⚠️ **LA FONCTION N'EXISTE PAS dans LogiAgriERP.** Le client pense que LogiAgriERP « fait une PWA qui travaille hors connexion puis se synchronise à la reconnexion » : **c'est faux, vérifié dans le code**. Ce que LogiAgriERP a est un PWA **volontairement étroit** ; le travail hors ligne, lui, est le rôle du **poste Windows Flutter**. Ce bloc dit la vérité, puis propose une conception RÉALISTE **si le client la veut quand même** pour LogiALVIA. Tout ce qui suit la section « Ce qui existe » est **À CONCEVOIR** : rien n'en est construit ni éprouvé.
 
 ### Ce qui existe VRAIMENT dans LogiAgriERP (vérifié)
@@ -1278,3 +1286,46 @@ Quels modules importer en premier (stocks : produits vendables, intrants, ou les
 
 ---
 **Correctif (07/11/2026) — bloc 19, boîtier.** Ne pas lire « le même `MecefFactureBuilder` » comme « le même JSON » : la LOGIQUE (arrondi entier, groupes de taxe, répartition des remises) est partagée, mais le JSON du constructeur suit l'API e-MECeF en ligne ; le pilote CC300 attend un autre schéma (`products`/`tax`/`payments`, `vt` ou `rt`, `rn` au format `NIM-TC`, `aib` en `"5%"`) : prévoir une COUCHE DE TRADUCTION (détail : `41_MECEF_EMECEF.md` §3.2). Voir aussi les écarts relevés dans `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md` (logo et favicon d'LogiAgriERP non utilisés au web, ICO refusé par la validation `image`, etc.).
+
+---
+
+## 24. Bloc 22 — Poste web (PWA-2) : le poste compilé pour le navigateur — **RÉALISÉ dans LogiAgriERP (phase 1)**
+
+> Détail, mesures avant / après et limites : `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` (et `44_ETUDE_FAISABILITE_PWA_FLUTTER_WEB.md`, `45_PHASE0_RESULTATS_PWA_FLUTTER_WEB.md` pour l'étude et la phase 0). Décisions : DV-16 (phase 0 d'abord), DV-28 (restauration au web).
+
+**Ce qui se porte (et dans quel ordre).**
+1. **Cible web du poste** : `flutter create --platforms=web`, puis `web/` adapté (index STATIQUE, manifeste `/poste/`, `flutter_bootstrap.js` à NOUS, `sqlite3.wasm`, `drift_worker.js` versionnés) ; ouverture de la base par IMPORT CONDITIONNEL (`ouverture_base_native.dart` / `_web.dart` : le natif reste EXACTEMENT l'ancien) ; **point de garde unique** `PlateformePoste.navigateur` ; interfaces d'E/S (téléchargement par blob, sélecteur qui rend des octets, justificatifs en IndexedDB).
+2. **Service worker propre sous `/poste/`** (`poste_sw.js`) : précache de l'enveloppe statique versionnée, jamais d'API ni de HTML authentifié ; hébergement par le MÊME serveur (`public/poste/`, MIME wasm, `no-cache`, AUCUN COOP/COEP) ; build `flutter build web --release --no-web-resources-cdn --base-href /poste/` puis `generer_sw_poste.py`.
+3. **Synchronisation au navigateur** : `online`, retour de focus (anti-rebond 30 s), sondage léger `GET /up`, verrou `navigator.locks` entre onglets, indicateur « Hors ligne / En attente (N) / Synchronisé » (`43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` § 2.5).
+4. **Écritures groupées des absorbeurs** (`batch`, lectures `IN`, UNE transaction par page) — `30_DATABASE_ENGINEERING.md` § 7.4 ; preuve par le COMPTE d'instructions (`31_TESTING_QA.md` § 3.2).
+5. **Sauvegarde complète JSON et restauration sûre** (DV-28) ; **mise à jour contrôlée** du service worker (bandeau, jamais de rechargement forcé, l'autre onglet est prévenu).
+6. **Garde-fous Windows** : aucun `dart:html` / `dart:js_interop` / `package:web` hors `*_web.dart`, aucun `dart:io` / `dart:ffi` / `drift/native` dans un `_web` ni dans `app_database.dart` (`garde_imports_web_test`) ; les ~4 250 tests VM ne changent pas.
+
+**Pièges déjà payés** : `flutter_service_worker.js` de Flutter est un stub qui se désinscrit ; CanvasKit vient de gstatic.com sans `--no-web-resources-cdn` ; COOP/COEP font passer drift en OPFS (≈ 150 s au tirage) ; un `await insert` par ligne coûte ≈ 55 ms au navigateur (73 s pour 1 337 comptes) ; `--wasm` échoue avec `flutter_secure_storage_web` 1.2.1.
+
+**Prouvé (Chromium) / NON prouvé** : rechargement hors ligne, vente hors ligne synchronisée sans doublon, deux onglets concurrents, mise à jour du service worker, restauration. NON prouvé : Safari / iOS, Firefox, Edge, appareil réel, Apache, `--wasm`, build Windows après les changements. **Pour LogiALVIA** : même méthode, SEULEMENT si le client le confirme (bloc 20) et APRÈS le serveur web, l'appairage et la synchronisation (blocs 14 à 16) ; les écrans hors pilotes (stocks, fournisseurs, ventes) viennent par lots, comme leur port Windows.
+
+---
+
+## 25. Bloc 23 — Captures, README, aperçu social et spécimens (sans donnée personnelle)
+
+> Règles complètes : `04_UI_UX_DESIGN_SYSTEM.md` § 14 ; décision DV-30 ; renommage : bloc 24.
+
+1. **Manuel** (`manuel/`) : captures `img/` (PNG) et `jpg/`, pilotées par `ecrans.json` et `reperes.json`, assemblées par `build.py` ; nom et e-mail de l'administrateur FLOUTÉS ; copie NON floutée dans `manuel/originaux_non_floutes/` (dépôt privé, jamais publiée).
+2. **README et aperçu social** : `docs/images/` (captures du README), `social-preview.png` en 1280 × 640 ; le README présente le projet, sans commandes, avec UN contact commercial.
+3. **Spécimens** (`presentation/`) : PDF et charge boîtier FICTIFS (« SPÉCIMEN », IFU `9999999999999` / `8888888888888`), régénérés par `php presentation/generer.php` sur SQLite EN MÉMOIRE (le script refuse toute autre base), aucun appel réseau.
+4. **Retouche** : lecture du texte de la zone, aplat de fond, re-rendu avec la MÊME police (Inter pour LogiAgriERP), flou refait après ; relecture automatique de toutes les images ensuite (aucune garantie sans elle).
+5. **Pour LogiALVIA** : chartes différentes (marine / or, Roboto) ; ne jamais réutiliser une capture d'LogiAgriERP.
+
+---
+
+## 26. Bloc 24 — Renommage du produit et changement de domaine des adresses
+
+> Check-list pas à pas : `49_CHECKLIST_RENOMMAGE_PRODUIT.md` ; décisions DV-25, DV-26, DV-29.
+
+1. **Distinguer le nom AFFICHÉ (à renommer) des identifiants TECHNIQUES (à garder)** : `AppId` de l'installateur, `CompanyName` et `ProductName` de `Runner.rc` (le dossier des données du poste en dérive : les changer fait PERDRE la base locale), exécutable, paquet Dart, dossiers `agrierp_*`, variables en majuscules.
+2. **Expression sûre** `(?<![A-Za-z])AgriERP` → `LogiAgriERP`, jamais sur une chaîne déjà renommée ; contrôle de sortie : `grep -rIPn "Logi(?=Logi)"` = zéro occurrence (aucun « Logi » doublé).
+3. **Migrer les adresses e-mail déjà en base** (MAIL1 : migration web + palier Drift v50, secrets écartés, historique exclu, unicité journalisée).
+4. **Reprendre l'ancien dossier `Documents\AgriERP`** dans `Documents\LogiAgriERP` sans jamais écraser (DV-29) ; l'installateur le sauvegarde puis le retire.
+5. **Secrets et variables** (`SGMEF_*`, `.env`) : jamais renommés ; `APP_NAME` des serveurs déjà installés à changer à la main.
+6. **Captures** (bloc 23) puis suites complètes et lecture automatique des textes d'image.

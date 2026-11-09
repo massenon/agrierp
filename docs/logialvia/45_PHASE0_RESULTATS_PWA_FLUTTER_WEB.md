@@ -128,31 +128,6 @@ Estimation globale révisée : **≈ 42 à 65 j-h** (étude 44 : 35 à 60). Le c
 - Les clics à coordonnées fixes sont fragiles ; une saisie rapide a perdu des caractères sous charge (mot de passe tronqué) dans un essai : artefact du pilotage, à ne pas confondre avec un défaut produit sans nouvel essai.
 - Aucun fichier du dépôt n'a été modifié, hors ce document et `docs/logialvia/img/phase0/` (4 captures, 150 à 220 Ko). Rien n'a été commité.
 
+## Suite : la phase 1 (PWA-2, PWA-2b, PWA-2c)
 
-## Suite : PWA-2 (phase 1, socle) — voir la section « PWA-2 » de `agrierp_flutter/CLAUDE.md`
-
-**Verdict : le bloquant n°1 est LEVÉ. Rechargement de la page HORS LIGNE : OUI** (`context.setOffline(true)` + `reload`, puis navigateur fermé et rouvert sans réseau) — l'application se recharge depuis le service worker `poste_sw.js` (portée `/poste/`) et affiche ses données locales. Script : `agrierp_flutter/outils/e2e_poste_web.mjs` (Chromium headless, `deviceScaleFactor` 1, serveur `php -S` + SQLite temporaire + `DemoDataSeeder`, build servi sous `/poste/` par le MÊME serveur).
-
-| Mesure (sandbox, rendu logiciel) | Résultat |
-|---|---|
-| Démarrage à froid (écran de connexion) | ≈ 5,0 s |
-| Connexion + PIN + tirage complet (7 pages) | ≈ 19,4 s (dont 8 s d'attentes du script) ; effectif 312 affiché |
-| Rechargement hors ligne (reload, verrou PIN compris) | ≈ 3,8 s |
-| Réouverture du navigateur, en ligne / SANS réseau | ≈ 4,2 s / ≈ 4,3 s, session, PIN et données conservés |
-| Service worker | portée `/poste/`, 42 fichiers précachés (28,3 Mo listés ; Chromium annonce 51,7 Mo de « caches », écart non élucidé), aucun `/api`, `/livewire`, `/login` dans le cache, un seul cache (purge des anciens) |
-| IndexedDB | 2,6 Mo après le tirage, 4,7 Mo après une synchronisation incrémentale et une saisie |
-| Saisie hors ligne puis reconnexion | fournisseur créé hors ligne (liste locale : 7), absent du serveur ; après « Synchroniser maintenant » : `POST /api/sync/push` 200, **une seule ligne** côté serveur, une synchro de plus ne la duplique pas |
-
-**Points ouverts mesurés** : (1) la synchronisation incrémentale après reconnexion a duré **134 s** (2 pages `pull?since=` : la page 1 a été appliquée en ≈ 90 s, contre 6 s pour le tirage initial complet) — cause non élucidée (application de pages existantes en IndexedDB, fil principal ?) : à instruire en priorité en phase 1 ; (2) la synchronisation automatique n'a pas envoyé le fournisseur en 30 s (elle est sur minuterie de 5 min) : l'essai a utilisé le bouton ; (3) le tableau de bord affiché pendant le tirage ne se rafraîchit pas seul ; (4) la vente de caisse du poste n'a PAS été jouée ; (5) Safari/iPhone, appareil réel, Apache (essai sous `php -S` seulement) : non vérifiés. Captures : `docs/logialvia/img/pwa2/`.
-
-## Suite : PWA-2b (phase 1, suite) — voir la section « PWA-2b » de `agrierp_flutter/CLAUDE.md`
-
-Le point ouvert n°1 est ÉLUCIDÉ : les 134 s venaient d'un `await insert` par compte du plan comptable (1 337 lignes servies en entier à chaque tirage) — ≈ 55 ms par instruction au navigateur, 73 s sur 95,6 s de page 1 — plus une latence par instruction amplifiée par la saturation du fil principal (peinture logicielle). Corrigé par une rafale `batch` : reconnexion → synchronisé en **1,5 s** dans Chromium. Les points 2 (synchro automatique : `online`, focus), 3 (tableau de bord relu seul) et 4 (vente de caisse hors ligne : une vente, stock −1, trésorerie +25 000 côté serveur, rien de doublé) sont traités ; sauvegarde complète en JSON, justificatifs en IndexedDB, mise à jour contrôlée du service worker et verrou entre onglets sont faits. Non vérifiés : Safari / iOS, deux onglets réellement concurrents, build Windows.
-
-## Suite : PWA-2c (fin de la phase 1) — voir la section « PWA-2c » de `agrierp_flutter/CLAUDE.md`
-
-Les écritures des absorbeurs sont regroupées (tirage incrémental de 68 tables : 228 → 134 instructions ; une transaction par page ; fiches journalières, pointages, ventes, achats et journal en rafales `batch`) ; deux vrais onglets Chromium sont éprouvés (drift partage UN worker SQLite en `sharedIndexedDb`, verrou `navigator.locks`, saisies simultanées, mise à jour du service worker à deux onglets) ; la restauration de la sauvegarde JSON est permise au web dans un état sûr ; un sondage léger `/up` précède la synchronisation au retour en ligne. Reste : Safari / Firefox / Edge / appareil réel, build Windows, `--wasm`, phase 2.
-
-Suite PWA-2c : les huit absorbeurs encore lents sont regroupés en rafales (224 → 156 instructions sur huit tables à petite charge ; 0,3–2,4 s → ≤ 0,17 s dans Chromium ; tirage complet 26–33 s → 20–22 s ; reconnexion → synchronisé 1,5 s). Reste 0,3–0,5 s sur Fiches, Clients, Avances, Fournisseurs, Courriers, Documents, Archives, Entreprise, Journal.
-
-Suite 2 PWA-2c : les neuf dernières tables écrites ligne à ligne (Fiches, Clients, Avances, Fournisseurs, Courriers, Documents, Archives, Entreprise, Journal) sont regroupées (209 → 164 instructions ; 0,3–0,45 s → ≤ 0,17 s dans Chromium ; reconnexion → synchronisé 1,5 s). Reste ≈ 0,43 s au premier tirage pour Fiches et Journal (volumes), ≈ 0,3 s pour Modules, Rôles, Dépenses.
+Ce fichier ne contient que la **phase 0** (preuve d'exécution du 08/11/2026). Les résultats de la phase 1 — socle (service worker propre, rechargement hors ligne), synchronisation automatique, regroupement des écritures, deux vrais onglets, restauration de sauvegarde, sondage léger, mise à jour contrôlée — sont dans `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` (chiffres avant / après compris : les sections « Suite : PWA-2 », « Suite : PWA-2b » et « Suite : PWA-2c » y ont été déplacées sans perte).

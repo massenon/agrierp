@@ -77,6 +77,8 @@ De la base (rapide, nombreuse) au sommet (lent, rare). Chaque étage a un **but 
 | E9 **MariaDB réel** | `agrierp_flutter/outils/essai_multipostes.sh` (MariaDB privé jetable, `utf8mb4_unicode_ci`) | collations, unicités, arrondis `decimal`, interblocages | la durée d'usage |
 | E10 **Essai multipostes à coupures aléatoires** | même script : 5 postes, `PHP_CLI_SERVER_WORKERS=4`, coupures au hasard, graines rejouables | idempotence du push, absence de doublons, convergence, compteurs sous concurrence | le matériel réel |
 | E11 **Recette humaine (UAT)** | sections 8–9 | le logiciel fait ce que la ferme attend | — |
+| E12 **Compte d'instructions SQL** | `flutter_test` + `QueryInterceptor` de drift (`agrierp_flutter/test/absorption_performance_test.dart`) | le nombre de messages qui atteignent le moteur SQLite reste borné (chacun coûte ≈ 55 ms au navigateur) ; une ligne `pending` survit | la durée réelle (une VM ne montre pas le défaut) |
+| E13 **E2E Chromium (poste web)** | Node 22 + Playwright + Chromium, lancés À LA MAIN (`agrierp_flutter/outils/e2e_poste_web.mjs`, `e2e_poste_mise_a_jour.mjs`, `e2e_poste_deux_onglets.mjs`) | le poste compilé pour le web tourne vraiment : hors ligne, service worker, deux onglets, synchronisation | Safari, Firefox, appareil réel, Apache, GPU (rendu logiciel) |
 
 Règles de la pyramide :
 - Le gros des tests est en E1–E5 ; Dusk (E6) est RÉSERVÉ aux changements qui touchent Alpine, z-index ou empilement d'overlays (`agrierp_laravel/CLAUDE.md` § Tests).
@@ -99,6 +101,37 @@ Règles de la pyramide :
 | Aucun `DELETE` physique comptable | `app/**` | suppression d'une écriture ou d'une vente |
 
 Chaque garde-fou : (1) échoue d'abord sur un échantillon cassé (T2), (2) donne un message **en français** qui nomme le fichier et la ligne, (3) a une liste d'exclusions **nominative et commentée** (jamais un motif large).
+
+### 3.2 Tests qui COMPTENT les instructions SQL (E12) — la preuve de performance du poste web
+
+**Pourquoi.** Au navigateur chaque instruction attendue est un aller-retour vers le worker SQLite (≈ 55 ms) ; en VM la même boucle est quasi gratuite (114 ms pour 1 337 `insert`, contre 73 s mesurées dans Chromium). On ne prouve donc pas la performance par une durée mais par un **nombre d'instructions** (`30_DATABASE_ENGINEERING.md` § 7.4).
+
+**Modèle** : `agrierp_flutter/test/absorption_performance_test.dart`. Un `QueryInterceptor` (`NativeDatabase.memory().interceptWith(compteur)`) compte `runSelect`, `runInsert`, `runUpdate`, `runDelete`, `runCustom`, `runBatched` ET `beginTransaction` / `commitTransaction` (un point de sauvegarde imbriqué = 2 messages de plus), et garde le texte SQL pour dire QUI émet quoi (`reason: 'par table : …'`). Quatre cas :
+1. 3 000 comptes déjà connus : < 150 instructions (3 082 avant), et une ligne `pending` survit ;
+2. tirage incrémental de ~68 tables à charge faible (toutes les clés de `_absorberPage`, lues dans la source, servies VIDES) : 228 → 134, borne < 170, et au plus 10 `BEGIN` ;
+3. huit tables à petite charge (8 lignes chacune) : 224 → 156, borne < 165 ;
+4. neuf tables à petite charge : 209 → 164, borne < 175 ; un client et un courrier locaux `pending` ne sont jamais écrasés.
+
+**Règles.** Borne LARGE (elle doit laisser passer le bruit : ≈ 25 contrôles « rien à envoyer » côté envoi), mais assez serrée pour rougir si un absorbeur revient à « une instruction par ligne » ; chaque cas dit en commentaire les chiffres avant / après ; **mutation prouvée** : rejouer le test contre l'ancien moteur (`git show <commit>:…/sync_engine.dart`) donne le chiffre d'avant (224, 209…) et le test ROUGIT.
+
+### 3.3 E2E Chromium du poste web (E13) — lancés à la main, jamais par `flutter test`
+
+Préparation : `agrierp_flutter/outils/construire_poste_web.sh` (build + dépôt dans `agrierp_laravel/public/poste/`, ignoré par git). Serveur : `php -S` (routeur de Laravel) sur un port libre, base SQLITE TEMPORAIRE dans le dossier temporaire du système (le script REFUSE toute autre base ; jamais le `.env`, jamais MySQL). `E2E_BASE_PRETE=<base semée>` évite la graine de démonstration (≈ 30 s), `E2E_DEBUG=1` imprime la console du navigateur, `E2E_CAPTURES=<dossier>` garde les captures. Flutter dessine dans un canvas : le script active l'arbre de sémantique (`flt-semantics-placeholder`) pour LIRE les textes ; clics à coordonnées fixes (fenêtre 1280×900, `deviceScaleFactor` 1) avec une pause après chaque focus (une saisie immédiate perd le premier caractère).
+
+| Script | Ce qu'il prouve |
+|---|---|
+| `outils/e2e_poste_web.mjs` | démarrage à froid → connexion → PIN → tirage complet (7 pages, 312 têtes) → service worker actif (42 fichiers précachés, rien d'authentifié en cache) → **rechargement hors ligne** → fournisseur ET vente de caisse hors ligne → reconnexion → synchronisation AUTOMATIQUE (une vente, stock −1, trésorerie +25 000, rien de doublé) → retour de focus (anti-rebond 30 s) → fermeture / réouverture → démarrage hors ligne à froid ; imprime les mesures en JSON |
+| `outils/e2e_poste_mise_a_jour.mjs` | mise à jour contrôlée du service worker : bandeau « Nouvelle version disponible », page NON rechargée (marqueur de saisie intact), « Plus tard », « Recharger » → version B |
+| `outils/e2e_poste_deux_onglets.mjs` | DEUX pages d'un même contexte : base partagée, verrou `agrierp-synchro` (aucun chevauchement), saisie de A visible dans B, deux saisies simultanées ni perdues ni doublées, mise à jour du service worker à deux onglets (l'autre onglet est prévenu, jamais rechargé de force) |
+
+Pièges : l'arbre de sémantique REPÈTE le libellé d'une ligne (nœuds imbriqués) : l'unicité se prouve par COMPARAISON avec une ligne connue pour être unique, jamais par un compte absolu ; Chromium sans fenêtre n'émet pas `visibilitychange` (émis à la main) ; ne JAMAIS reconstruire `public/poste/` pendant qu'un e2e tourne ; un seul e2e à la fois ; arrêter son propre processus par `kill <pid>`, jamais `pkill`.
+
+### 3.4 Preuve par mutation, parité exécutée, garde-fous qui lisent les sources : les exemples DU DÉPÔT
+
+- **Mutation** (prompt T2) : restauration web (le contrôle « pending » retiré fait rougir 4 tests de `restauration_sauvegarde_test.dart`) ; compte d'instructions (§ 3.2) ; MAIL1 (7 mutations tuées : contrôle d'unicité, exclusion de `audit_logs`, filtre des secrets, `updated_at`, palier v50, `app_settings`, conversion de la session) ; droits du comptable (garde de dépense retirée, caisse visible au comptable…).
+- **Parité exécutée contre le VRAI PHP** (prompt T3, `test/php_laravel.dart`) : `choix_facture_parite_php_test`, `paie_parite_php_test`, `importation_parite_php_test`, `releve_terrain_parite_php_test`, `mode_paiement_parite_php_test`, `rappels_du_jour_parite_php_test`, `cloture_exercice_parite_php_test`, `immobilisations_parite_php_test`, `avoirs_parite_php_test`. Le poste et le PHP donnent les mêmes résultats sur les mêmes jeux ; un format qui diverge d'un seul côté fait rougir.
+- **Garde-fous qui LISENT les sources** : `conformite_portage_test`, `fidelite_libelles_test` (littéraux de chaînes seulement, jamais les commentaires), `conformite_structure_test`, `garde_imports_web_test` (aucun `dart:io` / `dart:ffi` / `drift/native` dans un `_web`, ni dans `app_database.dart`), `verrou_parite_web_test` et les `*_blade_test` (libellés lus dans le Blade), `localisation_francaise_test` (aucun message d'erreur anglais dans les chaînes de `lib/` : il a rougi sur une interpolation `$e`, dont le détail technique anglais doit aller à `debugPrint`), `PostePwa2Test` côté Laravel (règles du service worker du poste lues dans sa source, MIME wasm, **aucun COOP/COEP**, mise à jour jamais forcée).
+- **Contrat d'environnement** : suite Flutter complète `flutter test --concurrency=2` (UNE passe finale), filtre `php artisan test --testsuite=Feature --filter="Pwa|Sw|Poste"`, `flutter analyze` propre ; les e2e § 3.3 sont lancés après le build web.
 
 ## 4. Jeux de données
 

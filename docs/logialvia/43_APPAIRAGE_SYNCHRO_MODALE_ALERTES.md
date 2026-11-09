@@ -7,7 +7,7 @@
 > - **Entrées requises.** Le web de LogiALVIA (Laravel 12 + Livewire 3) ; le poste `logialvia_app/` ; `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md` d'LogiAgriERP lu **en entier** ; les règles métier de LogiALVIA (`15_REGLES_METIER.md`, `logialvia/docs/B6_Regles_Metier.md`).
 > - **Sorties.** Appairage révocable ; moteur de synchronisation prouvé par l'essai multipostes ; bouton et modale « Synchroniser » (web + poste) ; notifications serveur planifiées + cloche du poste copiée du serveur ; fenêtre « Rappels du jour » ; rationnement et prophylaxie branchés sur des règles uniques.
 > - **Ce fichier ne recopie pas le blueprint** : il le résume, y renvoie, et ajoute les étapes de construction avec critères. En cas de doute, **le blueprint et le code d'LogiAgriERP font foi**.
-> - **Voir aussi.** `15_REGLES_METIER.md`, `20_MODULES_*`, `40_PWA_HORS_LIGNE.md` (un « poste navigateur » est un poste de plus), `41_MECEF_EMECEF.md` (transmission au serveur), `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `31_TESTING_QA.md`.
+> - **Voir aussi.** `15_REGLES_METIER.md`, `20_MODULES_*`, `40_PWA_HORS_LIGNE.md` (un « poste navigateur » est un poste de plus), `41_MECEF_EMECEF.md` (transmission au serveur), `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `31_TESTING_QA.md`, `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` (déclencheurs, sondage, verrou entre onglets au navigateur : § 2.5).
 
 ### Cadre commun à coller en tête de CHAQUE prompt (P0)
 
@@ -140,6 +140,20 @@ Serveur (`agrierp_laravel/tests/Feature/`) : `SyncEssaiMultipostesTest`, `Resync
 
 ### 2.4 Questions au client
 Intervalle automatique (5 min) ? Seuil d'« inactivité » d'un poste au web (3 jours) ? Une vente en rupture de stock reçue d'un poste : accepter et signaler (recommandé) ou refuser ? Quels postes (nombre, lieux) et quelle qualité de réseau (taille des lots) ?
+
+### 2.5 Au navigateur (poste web, PWA-2b / PWA-2c) — ce qui s'AJOUTE aux déclencheurs ci-dessus
+
+Source : `agrierp_flutter/CLAUDE.md` (« PWA-2b », « PWA-2c »), `agrierp_flutter/lib/core/sync/synchronisation_automatique.dart`, `lib/core/systeme/evenements_navigateur*.dart`, `lib/core/systeme/verrou_onglets*.dart`. Résultats chiffrés et preuves Chromium : `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md`. Le poste Windows ne change pas (flux d'événements vide, aucun verrou, aucun indicateur ajouté).
+
+| Mécanisme | Règle (relue dans le code) |
+|---|---|
+| **Synchronisation automatique du navigateur** | Flux `EvenementNavigateur` : `online` (retour du réseau : JAMAIS retenu par l'anti-rebond) et `visibilitychange` vers « visible » (retour de focus). Ouverture : déjà synchronisée. Retour de focus : pas plus d'une fois par **30 s** depuis la dernière tentative (`delaiAntiRebond`). **Jamais pendant une synchronisation en cours** (`declencher` garde `_enCours`). La minuterie de 5 min est bridée en onglet d'arrière-plan : c'est pourquoi ces deux événements existent. Test : `test/synchronisation_automatique_navigateur_test.dart` (faux déclencheur). |
+| **Sondage léger avant de synchroniser** | Sur `online` et retour de focus, `SyncEngine.serveurJoignable()` fait un `GET /up` (route de santé EXISTANTE de Laravel, sans authentification ni donnée ; AUCUNE route ajoutée), délai **3 s**, `Cache-Control: no-store` + paramètre variable, hors de la portée `/poste/` du service worker (donc jamais mis en cache). Un HTTP < 500 prouve que le serveur répond (même un 401) ; 502 / 503 non. Échec ou délai dépassé = **rester hors ligne SANS erreur rouge et sans réessai bruyant** (hors ligne n'est pas une erreur) ; jamais deux sondages à la fois ; un sondeur qui lève vaut « hors ligne ». Tests : `test/sondage_serveur_test.dart`, `test/synchronisation_automatique_navigateur_test.dart` (faux sondeur). `navigator.onLine` ment (portail captif, pas de route vers le serveur) : d'où le sondage. |
+| **Indicateur « Hors ligne / En attente (N) / Synchronisé »** | Barre supérieure du poste web seulement (`BarreSuperieure.liaison`, texte `etat-synchronisation`), mêmes mots que la modale « Synchronisation » (« Hors ligne », « En attente d'envoi »). Priorité : hors ligne (le dernier sondage ou la dernière synchronisation a échoué sur le réseau) > « En attente (N) » (N = à envoyer + refusés) > « Synchronisé ». État porté par `SyncEngine.liaisonServeur` (`null` jamais vérifié, compte comme en ligne), que lit aussi la modale avant `connectivity_plus`. Panne de RÉSEAU = hors ligne ; un refus du serveur (401, 422…) prouve qu'il répond. |
+| **Verrou entre onglets** | `SyncEngine.synchroniser` passe par `sousVerrouEntreOnglets` : verrou exclusif `navigator.locks` nommé **`agrierp-synchro`** ; une synchronisation à la fois, TOUS ONGLETS confondus (natif : aucun verrou). Preuve avec DEUX vrais onglets Chromium : `online` émis dans les deux au même instant → 2 requêtes, aucun chevauchement, l'autre onglet vu EN ATTENTE (`outils/e2e_poste_deux_onglets.mjs`). Base partagée : drift choisit `sharedIndexedDb` (un seul worker SQLite). |
+| **Cause d'un échec silencieux** | écrite par `debugPrint` dans la console du navigateur (`SynchronisationAutomatique.declencher`), jamais à l'écran. |
+
+Limites : Chromium seulement ; Safari / Firefox / Edge et appareil réel non essayés ; le focus est émis à la main dans l'e2e (Chromium sans fenêtre n'émet pas `visibilitychange`).
 
 ---
 

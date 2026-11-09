@@ -18,7 +18,7 @@
 4. ERD par domaine (8 diagrammes Mermaid)
 5. Dictionnaire de données des tables essentielles
 6. Filières : pisciculture, pintades, goliaths (ce qui est défini, ce qui reste à définir)
-7. Contraintes, index, performance, pagination
+7. Contraintes, index, performance, pagination (dont § 7.4 : performance au navigateur, mesurée)
 8. Migrations : ordre, idempotence, pièges MariaDB
 9. Plan de migration des données existantes de logialvia (25 clés entières → UUID)
 10. Seeders
@@ -56,7 +56,7 @@
 | Enum étendu, MariaDB vs SQLite | `.../2026_02_28_000003_add_retard_to_attendance_records_status_enum.php`, `.../2026_11_05_000005_add_quatre_to_livestock_transfers_categorie.php` |
 | Plan SYSCOHADA (1 332 comptes) | `agrierp_laravel/database/data/plan-comptable-syscohada-revise.csv`, `app/Services/ImporterPlanSyscohadaService.php` (retourne `empreinte` SHA-256 du fichier) |
 | Seeders LogiAgriERP | `agrierp_laravel/database/seeders/` (`RolesAndPermissionsSeeder`, `ChartOfAccountsSeeder`, `FeedRationStandardsSeeder`, `ModulesConfigSeeder`, `LivestockSpeciesSeeder`, `DemoDataSeeder` + `Demo/`) |
-| Schéma Drift LogiAgriERP (v85) | `/home/user/agrierp/agrierp_flutter/lib/core/database/app_database.dart` (`schemaVersion => 85`) ; généré : `app_database.g.dart` (jamais à la main) |
+| Schéma Drift LogiAgriERP (v86) | `/home/user/agrierp/agrierp_flutter/lib/core/database/app_database.dart` (`schemaVersion => 86`) ; généré : `app_database.g.dart` (jamais à la main) |
 | Tests de schéma / migrations du poste | `agrierp_flutter/test/migration_toutes_versions_test.dart`, `migration_bases_reelles_test.dart`, `corbeille_schema_test.dart`, `avoirs_schema_test.dart` |
 | Essai multipostes MariaDB | `agrierp_flutter/outils/essai_multipostes.sh` |
 | Tables Drift de logialvia (22 fichiers) | `/home/user/massenon/logialvia/logialvia_app/lib/{administration,approvisionnement,commercial,comptabilite,elevage}/data/tables/` ; schéma `versionSchema = 26` dans `logialvia_app/lib/core/database/app_database.dart` |
@@ -652,8 +652,9 @@ Table Drift équivalente `IncubationRules` (`app_database.dart`, puis `dart run 
 | | `mecef_api_url` | string(255) | oui | URL de l'API e-MECeF |
 | | `mecef_jeton_encrypted` | text | oui | **secret** (cast `encrypted`, jamais servi au poste) |
 | | `mecef_operateur_id`, `mecef_operateur_nom` | string(50)/(100) | oui | opérateur |
-| `sales`, `credit_notes` | `mecef_code`, `mecef_nim`, `mecef_compteur`, `mecef_lien_verification`, `mecef_normalise_le`, `mecef_erreur`, `mecef_statut` | voir `2026_11_07_000002_add_mecef_normalisation_to_sales_and_credit_notes.php` | oui | champs rendus par la DGI, tous nuls tant qu'ils ne l'ont pas été |
-| `sales` | `choix_facture` (`2026_11_07_000004`), `delivery_in_total` (`..._000005`) | | | à reprendre tels quels |
+| `sales` | `mecef_status` string(20) défaut `en_attente` (texte, ex-enum), `mecef_qr_ref` string(255), **`mecef_uid` string(64)**, **`mecef_code` string(100)**, **`mecef_nim` string(50)**, **`mecef_compteurs` string(50)**, **`mecef_normalise_le` dateTime**, **`mecef_message` text** | `2026_11_07_000002_add_mecef_normalisation_to_sales_and_credit_notes.php` (NOMS RÉELS, corrigés le 09/11/2026 : la version précédente de ce tableau citait `mecef_compteur`, `mecef_lien_verification`, `mecef_erreur`, `mecef_statut`, qui n'existent pas) |
+| `credit_notes` | `mecef_status` string(20) NULL (NULL = avoir sur une vente non normalisée : aucune transmission), `mecef_uid`, `mecef_qr_ref`, `mecef_code`, `mecef_nim`, `mecef_compteurs`, `mecef_normalise_le`, `mecef_message` | même migration | oui | champs rendus par la DGI, tous nuls tant qu'ils ne l'ont pas été |
+| `sales` | `facture_type` string(12) (`simple` / `normalisee`), `client_ifu` string(13), `client_nom_facture` string(150), `aib_taux` string(4), `mecef_aib_montant` decimal(14,2) — migration `2026_11_07_000004_add_choix_facture_to_sales_table.php` (les ventes déjà `transmise` y passent `normalisee`, les autres `simple`) ; `delivery_in_total` boolean défaut faux — `..._000005` ; `delivery_fee` existe depuis `2026_03_07_000001_add_delivery_details_to_sales_table.php` | | | à reprendre tels quels (il n'existe PAS de colonne `choix_facture`) |
 | `tax_groups` | `code` (A à F…), `label`, `rate`, `position` | | | groupes de taxe ; logialvia : `GROUPES_TAXE(code PK, libelle, taux, ordre)` |
 
 La règle de normalisation elle-même : `41_MECEF_EMECEF.md`. Ici, uniquement le schéma. ⚠️ logialvia a une table `FACTURES(ref PK, type, venteRef, origineRef, totalHt, totalTaxe, totalTtc, statut, codeMecef, nim, compteur, lienVerification, dateNormalisation, erreurTransmission…)` + `LIGNES_FACTURE`. Décision proposée : **ne pas reprendre `factures` en table distincte** ; les colonnes de normalisation vivent sur `sales` et `credit_notes` (modèle LogiAgriERP). À valider (Q7) car cela fusionne deux notions de logialvia.
@@ -687,6 +688,22 @@ Existe déjà dans le web (migration `agrierp_laravel/database/migrations/2026_1
 | `avertissement` | string(500) | oui | NULL | | |
 | `lignes`, `rapport` | longText | oui | NULL | | valeurs lues le temps de l'aperçu ; à la fin, seules les lignes REFUSÉES |
 | `termine_le` | timestamp | oui | NULL | | |
+
+### 5.18 Tables et colonnes ajoutées à LogiAgriERP depuis les sections ci-dessus (vérifiées le 09/11/2026 dans les migrations Laravel et les paliers Drift 82 à 86)
+
+Source de vérité : `agrierp_laravel/database/migrations/` et `agrierp_flutter/lib/core/database/app_database.dart` (`schemaVersion => 86`, blocs `if (from < 82)` à `if (from < 86)`). Aucune clé de `/api/sync/*` n'a été RENOMMÉE : on a AJOUTÉ des colonnes. Les colonnes de synchronisation (§ 3.4) s'appliquent à toute table « (S) ».
+
+| Palier Drift | Migration(s) Laravel | Ajout (réel) | Remarques |
+|---|---|---|---|
+| **v82** | `2026_11_05_000001`, `000002`, `000003` | `livestock_daily_entries.vente_repro`, `vente_sevre`, `vente_jeune` (unsigned int, NULL = non ventilé) ; `products.categorie_effectif` (string(20), NULL) | effectif par catégorie des reproducteurs (VOL-1) ; rations provisoires 130 / 80 / 30 ; migrations idempotentes (`hasColumn`) |
+| **v83** | `2026_11_05_000004` à `000007` | `livestock_daily_entries.mort_4`, `don_4`, `vente_4`, `cat_depart_4`, `passage_4_sevre`, `passage_jeune_repro` (unsigned int NULL) et `transfert_entree_4`, `transfert_sortie_4` (unsigned int NOT NULL défaut 0, dérivés) ; `livestock_transfers.categorie` accepte `quatre` ; produits de stades des pondeuses ; produit « Poussin ponte » | quatre stades des pondeuses (VOL-2) : `cat_eff_4` existait déjà (dérivé, jamais envoyé). ⚠️ Côté Drift les colonnes se NOMMENT À LA MAIN (`.named('mort_4')`) : la conversion automatique de `mort4` donnerait `mort4` |
+| **v84** | `2026_11_07_000001`, `000002` | Laravel seulement : `company_settings.mecef_mode`, `mecef_api_url`, `mecef_jeton_encrypted` (secret, JAMAIS servi au poste), `mecef_operateur_id`, `mecef_operateur_nom` (le poste n'a PAS ces colonnes : il garde des clés d'`app_settings`, `mecef.mode`, `mecef.api_url`, `mecef.operateur_id`, `mecef.operateur_nom`, `mecef.jeton_configure`, `mecef.actif`) ; `sales.mecef_uid` (Laravel seulement) ; Laravel et Drift : `sales.mecef_code`, `mecef_nim`, `mecef_compteurs`, `mecef_normalise_le`, `mecef_message` ; `credit_notes.mecef_status`, `mecef_uid`, `mecef_qr_ref`, `mecef_code`, `mecef_nim`, `mecef_compteurs`, `mecef_normalise_le`, `mecef_message` | côté poste : tirées, JAMAIS écrites (`mecef_uid` d'un avoir n'est pas servi) ; `mecef_status` devient texte et garde ses clés (`transmise` = « Normalisée », `erreur` = « Refusée ») ; `expiree` est nouveau |
+| **v85** | `2026_11_07_000003`, `000004`, `000005` | `customers.ifu` (string(13) NULL) ; `sales.facture_type`, `client_ifu`, `client_nom_facture`, `aib_taux`, `mecef_aib_montant`, `delivery_in_total` (et `delivery_fee` côté poste) | `facture_type`, `client_ifu`, `client_nom_facture`, `aib_taux` sont ÉCRITS par la caisse du poste et envoyés ; `mecef_aib_montant`, `delivery_fee`, `delivery_in_total` sont TIRÉS seulement |
+| **v86** | `2026_11_08_000003_create_field_survey_entries_table.php` | **`field_survey_entries`** (voir ci-dessous) | relevés de terrain (RELEVES-1, DV-23 / DV-24), table MIXTE de barème, tirée ET envoyée |
+
+`field_survey_entries` (S, mixte) : `id` uuid PK ; `type` string(40) (`incubation_regle`, `incubation_lot`, `delai_regle`, `poisson_marque`, `poisson_bareme`, `poisson_temperature`, `poisson_densite`) ; `label` string(150) ; `species_code` string(40) NULL ; `data` JSON NULL (valeurs) ; `status` string(12) défaut `a_valider` (`a_valider` | `valide`) ; `validated_by` uuid NULL ; `validated_at` dateTime NULL ; `device_id` string(100) NULL ; `sync_status` string(20) défaut `synced` ; `is_active` boolean défaut vrai ; `timestamps` ; index (`type`,`is_active`). Semée par `ReleveTerrainService::semerParDefaut()` (valeurs par défaut = PROPOSITIONS « À valider »). Côté poste : classée dans `tablesEnvoyees` et `tablesConservees` ; règle DV-24 : seul le SERVEUR sème « À valider », le poste n'écrit jamais `a_valider` et n'envoie pas le statut. Elle REMPLACE la table `incubation_rules` imaginée en § 5.8b (DV-23).
+
+Tables serveur seul ajoutées par ailleurs : `import_batches` (§ 5.17, `2026_11_08_000001`). Plus anciens, pour repère : v80 `fiscal_closure_requests` (demandes de clôture ; migration web `2026_10_28_000005`) ; v81 `utilisateurs.must_change_password` (migration web `2026_10_29_000001`).
 
 ## 6. Filières : pisciculture, pintades, goliaths
 
@@ -737,6 +754,29 @@ Un index pour : (a) toute colonne de curseur de tirage (`updated_at`) ; (b) tout
 ### 7.3 Pagination
 
 Aucune liste n'est chargée entière. Livewire : `WithPagination`, 15 à 25 lignes par page, `paginate()` avec tri sur colonne indexée + départage par `id` ; tirage de synchronisation : par curseur (`updated_at`, `id`), page 1 d'abord (voir `SyncCurseurTirageTest`). Exports volumineux : `chunkById`. Tableau de bord : agrégats SQL (`SUM`, `COUNT` groupés), jamais de somme en PHP sur toute une table.
+
+### 7.4 Performance au navigateur : la leçon MESURÉE (PWA-2b et PWA-2c) — à appliquer aussi au serveur de synchronisation et à l'absorption du poste
+
+Dans le navigateur, la base SQLite vit dans un worker (IndexedDB) : **chaque instruction attendue est un message vers ce worker, ≈ 55 ms** (davantage quand le fil principal est saturé par le rendu). Une boucle `await insert` PAR LIGNE coûte donc N × 55 ms, alors qu'en VM natif la même boucle semble innocente (114 ms pour 1 337 lignes). Mesures (Chromium, rendu logiciel ; détail dans `46_PWA_POSTE_WEB_PHASE1_RESULTATS.md` et `agrierp_flutter/CLAUDE.md`, « PWA-2b » / « PWA-2c ») :
+
+| Mesure | Avant | Après |
+|---|---|---|
+| Plan comptable (1 337 comptes, servi en entier à chaque tirage) | 73 s (un `await insert` par compte) | 0,09 s (une rafale `batch`) |
+| Page 1 du tirage incrémental | 95,6 s | ≈ 22 s session neuve / 0,7 s en régime établi |
+| Reconnexion → tout synchronisé | 134 s | 1,5 s (puis 1,0 à 1,5 s) |
+| Instructions, tirage incrémental de 68 tables à charge faible | 228 (dont 82 messages de transactions imbriquées) | 134 |
+| Huit tables à petite charge (créances, prophylaxie, sujets, rations, relevés, revenus de bande, transformations, calendrier) | 224 | 156 (transformations 17 → 3, calendrier 17 → 3) |
+| Neuf tables à petite charge (fiches, clients, avances, fournisseurs, courriers, documents, archives, entreprise, journal) | 209 | 164 |
+| Page 1 du tirage initial (912 fiches journalières × 3 instructions) | ne se terminait pas en plusieurs minutes | fiches 0,46 s ; absorption des 7 pages ≈ 11,4 s cumulées |
+
+**Règles à retenir pour tout absorbeur et tout import :**
+1. **Écritures groupées** : une rafale `batch` par table (`insert` avec `DoUpdate`, `insertAll`), jamais un `await` par ligne.
+2. **Lectures par `IN (...)` en tranches de 500** (`_morceaux`), jamais un `select` par ligne ; les lignes à protéger (`pending` / `conflict`) se lisent en UNE requête avant la rafale.
+3. **UNE transaction par page de tirage** : à l'intérieur, pas de point de sauvegarde par absorbeur (chacun coûtait `SAVEPOINT` + `RELEASE`, soit 2 messages ; −82 par tirage). Suppose qu'aucun absorbeur n'attrape l'erreur d'un autre.
+4. **Aucune requête pour une charge vide** — mais SEULEMENT pour les fusions pures ; un référentiel REMPLACÉ à chaque tirage (une liste vide y veut dire « plus rien ») doit toujours s'exécuter.
+5. **Sémantique stricte inchangée** : un regroupement ne change jamais la règle (jamais d'écrasement d'une ligne `pending` / `conflict`, refus total d'une page incohérente avant la moindre écriture).
+6. **Se prouver par le COMPTE d'instructions**, pas par la durée : test à `QueryInterceptor` avec borne large et mutation (`31_TESTING_QA.md` § 3.2).
+7. **IndexedDB, pas OPFS** : aucun en-tête COOP/COEP (avec eux, drift passe en OPFS : ≈ 150 s au tirage contre ≈ 6 s).
 
 ## 8. Migrations : ordre, idempotence, pièges MariaDB
 
