@@ -1,4 +1,4 @@
-# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-30)
+# 16 — REGISTRE DES DÉCISIONS VALIDÉES PAR LE CLIENT (DV-01 à DV-31)
 
 ## USAGE
 
@@ -47,6 +47,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 | DV-28 | 09/11/2026 | Restauration d'une sauvegarde au web : SEULEMENT sans ligne `pending` / `conflict`, après confirmation par le mot « RESTAURER », contrôle strict du fichier, tout ou rien dans UNE transaction, schéma plus récent refusé | recommandé et adopté (PWA-2c) ; implémenté | — | essai sur appareil réel et Safari |
 | DV-29 | 09/11/2026 | Poste Windows : l'ancien dossier `Documents\AgriERP` est REPRIS dans `Documents\LogiAgriERP`, jamais d'écrasement ; l'installateur le sauvegarde puis le retire | décision de conception appliquée au renommage ; implémentée | — | essai sur un vrai Windows |
 | DV-30 | 09/11/2026 | Captures du manuel, du README et de l'aperçu social SANS donnée personnelle : nom et e-mail de l'administrateur floutés ; copie non floutée gardée dans le dépôt privé (`manuel/originaux_non_floutes`, jamais publiée) | appliquée (commits du 09/11/2026) | — | — |
+| DV-31 | 09/11/2026 | **CAISSE-1, volet animalier** : un animalier seul PEUT activer le mode hors ligne du navigateur et saisir ses fiches (droit d'activer = `manage-ventes` OU `manage-elevage`, un seul Gate `utiliser-mode-hors-ligne` ; comptable toujours refusé) ; l'écran de la PWA suit les droits du compte (caisse = `manage-ventes`, fiches = `view-elevage`, écriture = `manage-elevage`) ; le serveur reste le juge | décision du client (« un animalier seul DOIT pouvoir activer le mode hors ligne et saisir ses fiches ») ; les autres volets de CAISSE-1 (PIN, devis, reçu provisoire, export-ventes) restent en attente |
 
 ---
 

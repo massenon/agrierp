@@ -39,6 +39,10 @@ class AppServiceProvider extends ServiceProvider
         // facture `FA`) s'ouvre à `manage-ventes` (caissier : inchangé) OU `correct-invoices` (comptable). Retransmettre une FACTURE
         // depuis « Facturation » s'ouvre à `manage-facturation` (administrateur : inchangé) OU `correct-invoices`. L'annulation
         // d'une vente, la caisse et tout le reste de `manage-ventes` restent à `manage-ventes` SEUL (jamais ces portes-ci).
+        // CAISSE-1 (volet animalier, décision du client du 09/11/2026) : ACTIVER le mode hors ligne du navigateur (page « Mode hors ligne »,
+        // jeton `pwa-<uuid>`) s'ouvre à `manage-ventes` (caisse) OU `manage-elevage` (fiches). UNE seule porte : la page, la route et le menu la lisent.
+        // Elle ne donne AUCUN droit d'écriture : le serveur juge chaque envoi (`PERMISSION_PAR_TABLE`) et chaque tirage (`PERMISSIONS_DE_TIRAGE`).
+        \Illuminate\Support\Facades\Gate::define('utiliser-mode-hors-ligne', fn ($user) => $user->canAny(['manage-ventes', 'manage-elevage']));
         \Illuminate\Support\Facades\Gate::define('avoir-client', fn ($user) => $user->canAny(['manage-ventes', 'correct-invoices']));
         \Illuminate\Support\Facades\Gate::define('retransmettre-facture', fn ($user) => $user->canAny(['manage-facturation', 'correct-invoices']));
 

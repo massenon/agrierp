@@ -207,8 +207,8 @@
                     </button>
                     <div id="dd-profile" x-show="open" x-cloak class="absolute right-0 mt-sm w-48 bg-white border border-outline-variant rounded-lg shadow-lg z-50 overflow-hidden">
                         <a wire:navigate href="/mon-profil" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">person</span>Mon Profil</a>
-                        {{-- PWA-1 : appairage de ce navigateur pour la caisse hors ligne (comptes qui encaissent). --}}
-                        @can('manage-ventes')
+                        {{-- PWA-1 : appairage de ce navigateur (caisse : manage-ventes ; fiches d'élevage : manage-elevage) — Gate unique. --}}
+                        @can('utiliser-mode-hors-ligne')
                             <a wire:navigate href="/mode-hors-ligne" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">cloud_off</span>Mode hors ligne</a>
                         @endcan
                         <a wire:navigate href="/aide-a-propos" class="flex items-center gap-xs px-md py-sm text-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[16px]">help</span>Aide &amp; À Propos</a>

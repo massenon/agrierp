@@ -88,7 +88,7 @@ export async function activer({ identifiant, motDePasse, pin, fetchFn = (...a) =
         if (enAttente.pending + enAttente.conflict > 0 && existant) {
             throw new ErreurAppairage(`Cet appareil garde ${enAttente.pending + enAttente.conflict} vente(s) non envoyée(s) chiffrée(s) par l'ancien PIN : ouvrez la caisse hors ligne, déverrouillez avec l'ancien PIN et envoyez-les d'abord.`, 'file-existante');
         }
-        const utilisateur = { id: json.user?.id, name: json.user?.name, username: json.user?.username, role: json.user?.role };
+        const utilisateur = { id: json.user?.id, name: json.user?.name, username: json.user?.username, role: json.user?.role, ...(Array.isArray(json.user?.droits) ? { droits: json.user.droits } : {}) };
         const persistant = await demanderPersistance();
         // ⚠️ Tout ce qui est ASYNCHRONE hors IndexedDB (WebCrypto) se fait AVANT la transaction : une transaction IndexedDB se
         // referme dès qu'elle n'a plus de requête en cours, et l'écriture suivante échouerait (ou serait perdue).

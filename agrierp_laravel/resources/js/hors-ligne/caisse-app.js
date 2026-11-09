@@ -16,6 +16,7 @@ import { FAMILLES } from './fiche-familles.js';
 import { modeleFiche, rendreFiche, moisPrecedent, moisSuivant } from './fiche-lapins-ecran.js';
 import { soinsEnAttente, garderSoins, remettreSoinEnFile, abandonnerSoin, soinsAvecLocaux, remanencesAvecLocales, protocoleDuJour, validerTraitements } from './fiche-lapins-prophylaxie.js';
 import { produitProvende, evaluerAutonomie, delaisFournisseurs } from './fiche-lapins-calculs.js';
+import { droitsDeLEcran } from './droits-ecran.js';
 import { appliquerSaisies, chargerJour, enregistrerJour, garderSaisie, saisiesEnAttente, remettreFicheEnFile, abandonnerFiche, rendreFormulaire, refusExerciceClos, ROLES_ECRITURE, MOTIFS as MOTIFS_SAISIE } from './fiche-lapins-saisie.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
@@ -38,7 +39,7 @@ const app = {
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
     fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], famille: 'lapins', feedTypes: [], modules: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
-    role: null,
+    role: null, droits: droitsDeLEcran(null),
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
@@ -91,6 +92,7 @@ async function demarrer() {
     }
     app.appareil = etat;
     app.role = etat.utilisateur?.role ?? null;
+    app.droits = droitsDeLEcran(etat.utilisateur); // CAISSE-1 : l'écran suit les droits du compte (caisse = manage-ventes, fiches = view-elevage, écriture = manage-elevage)
     app.suspendu = etat.suspendu;
     $('nom-utilisateur').textContent = etat.utilisateur?.name ? `— ${etat.utilisateur.name}` : '';
     await verrouillerEcran(`Saisissez votre PIN pour ouvrir la caisse hors ligne.`);
@@ -127,6 +129,16 @@ $('form-pin').addEventListener('submit', async (ev) => {
         }
     }
 });
+
+/** CAISSE-1 : sans `manage-ventes`, l'écran ne montre que les fiches (aucun bouton ni panneau de caisse) ; sans fiches servies, il le dit. */
+function appliquerDroits() {
+    if (app.droits.caisse) return;
+    $('contenu').hidden = true;
+    $('titre-icone').textContent = 'edit_note';
+    $('titre-texte').textContent = 'Fiches hors ligne';
+    if (app.fiche.servie && !app.fiche.vue) basculerVue(app.fiche.famille ?? 'lapins');
+    else if (app.derniereSynchro !== null) avis("Ce compte n'a accès à aucune fiche d'élevage sur cet appareil : demandez un droit d'élevage à un administrateur.", 'avert');
+}
 
 async function ouvrirCaisse() {
     await chargerReferentiels();
@@ -168,7 +180,7 @@ async function chargerReferentiels() {
     app.fiche.rations = await lire('feed_ration_standards'); // toutes les espèces : chaque fiche filtre la sienne
     await recalculerElevage();
     // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
-    app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries'));
+    app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries')) && app.droits.fiches;
     app.fiche.donnees = app.fiche.servie ? {
         modules: app.fiche.modules, lots: app.elevage.lots, fiches: app.elevage.fiches, soins: soinsAvecLocaux(await lire('veterinary_records'), app.fiche.soinsEnAttente), produits: app.produits, exercices: await lire('fiscal_years'),
     } : null;
@@ -182,6 +194,7 @@ async function chargerReferentiels() {
     app.serverTime = (await app.base.meta('curseur')) ?? null;
     app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
     app.derniereSynchro = heureDuServeur(await app.base.meta('derniere_synchro'));
+    appliquerDroits();
 }
 
 /** Le jour du Bénin (UTC+1) à l'heure de l'appareil corrigée du décalage serveur. */
@@ -225,7 +238,7 @@ function formulaireDuJour(m) {
     if (app.fiche.saisieCle !== cle) { app.fiche.saisieCle = cle; app.fiche.saisie = null; app.fiche.retour = null; }
     if (!app.fiche.saisie) app.fiche.saisie = chargerJour(lot(), donnees().fiches, jour, F);
     const s = app.fiche.saisie;
-    const lectureSeule = () => (ROLES_ECRITURE.includes(app.role) ? refusExerciceClos(app.fiche.exercices, jour) : MOTIFS_SAISIE.droit);
+    const lectureSeule = () => (app.droits.ecritureFiches ? refusExerciceClos(app.fiche.exercices, jour) : MOTIFS_SAISIE.droit);
     return rendreFormulaire(h, {
         s, famille: F,
         retourInitial: app.fiche.retour,
@@ -244,7 +257,7 @@ function formulaireDuJour(m) {
         }),
         actions: {
             validerTraitements: async (idsCoches, observations) => {
-                const r = validerTraitements({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, aujourdhui: jourDuComptoir(), espece: F.espece, idsCoches, observations, role: app.role });
+                const r = validerTraitements({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, aujourdhui: jourDuComptoir(), espece: F.espece, idsCoches, observations, role: roleDeSaisie() });
                 if (r.refus || r.avertissement || r.soins.length === 0) return { refus: r.refus ?? null, avertissement: r.avertissement ?? null };
                 try {
                     await garderSoins(app.ctx, r.soins);
@@ -274,7 +287,7 @@ function formulaireDuJour(m) {
             enregistrer: async (saisie) => {
                 const existante = app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour);
                 const fiche = donnees().fiches.find((f) => f.lot_id === bande.id && String(f.entry_date).slice(0, 10) === jour);
-                const r = enregistrerJour(lot(), donnees().fiches, jour, saisie, { role: app.role, exercices: app.fiche.exercices, rations: app.fiche.rations.filter((r) => r.species_code === F.espece), idFiche: fiche?.id ?? existante?.id_fiche, famille: F });
+                const r = enregistrerJour(lot(), donnees().fiches, jour, saisie, { role: roleDeSaisie(), exercices: app.fiche.exercices, rations: app.fiche.rations.filter((r) => r.species_code === F.espece), idFiche: fiche?.id ?? existante?.id_fiche, famille: F });
                 if (r.refus !== null) return { refus: r.refus };
                 try {
                     app.fiche.saisies = await garderSaisie(app.ctx, { id_fiche: r.fiche.id, lot_id: bande.id, jour, saisie: { ...saisie }, fiche: r.fiche, cree_le: new Date().toISOString() });
@@ -292,13 +305,18 @@ function formulaireDuJour(m) {
 }
 
 /** `famille` : `'lapins'`, `'porcs'`, ou `null` (retour à la caisse). Changer de fiche repart du jour courant et de la première bande. */
+/** Le rôle passé aux contrôles de saisie : l'écriture des fiches suit le droit `manage-elevage` du compte (CAISSE-1), jamais le nom du rôle. */
+const roleDeSaisie = () => (app.droits.ecritureFiches ? 'animalier' : 'lecture');
+
 function basculerVue(famille) {
+    // Sans le droit des ventes, il n'y a PAS de caisse : on ne revient jamais à elle, on reste sur une fiche.
+    if (famille === null && !app.droits.caisse) return;
     const change = famille !== null && famille !== app.fiche.famille;
     app.fiche.vue = famille !== null;
     if (famille !== null) app.fiche.famille = famille;
     if (change) { app.fiche.bandeId = null; app.fiche.date = null; app.fiche.saisie = null; app.fiche.saisieCle = null; app.fiche.retour = null; }
     $('contenu').hidden = app.fiche.vue; $('contenu-fiche').hidden = !app.fiche.vue;
-    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots'], ['btn-vue-reproducteurs', 'reproducteurs'], ['btn-vue-pondeuses', 'pondeuses']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
+    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots'], ['btn-vue-reproducteurs', 'reproducteurs'], ['btn-vue-pondeuses', 'pondeuses']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f && app.droits.caisse ? 'Caisse' : FAMILLES[f].bouton;
     if (app.fiche.vue) dessinerFiche();
 }
 

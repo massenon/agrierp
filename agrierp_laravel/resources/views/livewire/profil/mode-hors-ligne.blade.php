@@ -3,7 +3,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">cloud_off</span>Mode hors ligne
         </h2>
-        <p class="text-xs text-outline mt-xs">Vendre à la caisse même quand la liaison de la ferme tombe : les ventes sont gardées sur cet appareil, puis envoyées toutes seules au retour du réseau.</p>
+        <p class="text-xs text-outline mt-xs">Travailler même quand la liaison de la ferme tombe : la caisse (avec le droit des ventes) et les fiches d'élevage (avec le droit d'élevage) sont gardées sur cet appareil, puis envoyées toutes seules au retour du réseau. L'écran suit les droits de votre compte.</p>
     </div>
 
     {{-- Le formulaire est piloté par Alpine/JavaScript, jamais par Livewire : le mot de passe ne passe jamais par Livewire. --}}
@@ -67,7 +67,7 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-xs text-outline space-y-sm">
             <p class="text-sm font-bold text-brand-forest uppercase">Ce que couvre ce mode</p>
             <ul class="list-disc pl-md space-y-xs">
-                <li>Ventes de caisse : produits du catalogue (sujets vivants avec leur bande source et le contrôle de rémanence vétérinaire), panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
+                <li>Ventes de caisse (réservées aux comptes qui ont le droit des ventes) : produits du catalogue (sujets vivants avec leur bande source et le contrôle de rémanence vétérinaire), panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
                 <li>Création d'un client avec le bouton « + » (nom, téléphone, IFU facultatif) ; il est envoyé au serveur à la synchronisation, qui peut le rapprocher d'une fiche déjà connue.</li>
                 <li>Consultation du catalogue et des clients copiés sur l'appareil.</li>
             </ul>
