@@ -152,3 +152,5 @@ Le point ouvert n°1 est ÉLUCIDÉ : les 134 s venaient d'un `await insert` par 
 ## Suite : PWA-2c (fin de la phase 1) — voir la section « PWA-2c » de `agrierp_flutter/CLAUDE.md`
 
 Les écritures des absorbeurs sont regroupées (tirage incrémental de 68 tables : 228 → 134 instructions ; une transaction par page ; fiches journalières, pointages, ventes, achats et journal en rafales `batch`) ; deux vrais onglets Chromium sont éprouvés (drift partage UN worker SQLite en `sharedIndexedDb`, verrou `navigator.locks`, saisies simultanées, mise à jour du service worker à deux onglets) ; la restauration de la sauvegarde JSON est permise au web dans un état sûr ; un sondage léger `/up` précède la synchronisation au retour en ligne. Reste : Safari / Firefox / Edge / appareil réel, build Windows, `--wasm`, phase 2.
+
+Suite PWA-2c : les huit absorbeurs encore lents sont regroupés en rafales (224 → 156 instructions sur huit tables à petite charge ; 0,3–2,4 s → ≤ 0,17 s dans Chromium ; tirage complet 26–33 s → 20–22 s ; reconnexion → synchronisé 1,5 s). Reste 0,3–0,5 s sur Fiches, Clients, Avances, Fournisseurs, Courriers, Documents, Archives, Entreprise, Journal.

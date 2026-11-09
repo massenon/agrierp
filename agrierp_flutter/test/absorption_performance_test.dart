@@ -81,6 +81,31 @@ class _ServeurVide extends Interceptor {
   }
 }
 
+/// PWA-2c (2) — un serveur qui sert, EN PLUS des clés vides, quelques lignes pour les huit tables jusque-là écrites ligne à ligne.
+class _ServeurCharge extends Interceptor {
+  _ServeurCharge(this.cles, this.corps);
+  final Set<String> cles;
+  final Map<String, Object?> corps;
+  bool actif = false;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: options.path.contains('push')
+            ? <String, dynamic>{}
+            : {
+                for (final c in cles) c: _ServeurVide.objets.contains(c) ? <String, dynamic>{} : <dynamic>[],
+                if (actif) ...corps,
+                'server_time': '2026-11-09T12:00:00+00:00',
+              },
+      ),
+    );
+  }
+}
+
 class _Compteur extends QueryInterceptor {
   int instructions = 0;
 
@@ -264,6 +289,68 @@ void main() {
         lessThan(10),
         reason: 'une seule transaction par page : plus de point de sauvegarde par absorbeur',
       );
+    },
+  );
+
+  // PWA-2c (2) — huit tables à petite charge (8 lignes chacune) : créances, prophylaxie, sujets, rations, relevés, revenus de bande,
+  // transformations, calendrier vétérinaire. Avant : une à trois instructions PAR LIGNE ; après : une rafale par table.
+  test(
+    'tirage incrémental de huit tables à petite charge : instructions bornées, aucune ligne pending écrasée',
+    () async {
+      final page = File('lib/core/sync/sync_engine.dart')
+          .readAsStringSync()
+          .split('Future<int> _absorberPage(Map<String, dynamic> corps) async {')[1]
+          .split('\n  }\n')
+          .first;
+      final cles = {for (final m in RegExp(r"corps\['(\w+)'\]").allMatches(page)) m.group(1)!};
+      String u(String t, int i) => '$t-0000-4000-8000-${i.toString().padLeft(12, '0')}';
+      const n = 8;
+      final lot = u('b0b0b0b0', 1);
+      final corps = <String, Object?>{
+        'receivables': [for (var i = 0; i < n; i++) {'id': u('a1a1a1a1', i), 'customer_id': u('c1c1c1c1', 1), 'amount': 1000 + i, 'amount_paid': 0, 'status': 'en_cours'}],
+        'prophylaxis_schedule_standards': [for (var i = 0; i < n; i++) {'id': u('a2a2a2a2', i), 'species_code': 'lapin', 'period_label': 'P$i', 'treatment': 'T$i', 'is_active': true}],
+        'animals': [for (var i = 0; i < n; i++) {'id': u('a3a3a3a3', i), 'identifier': 'S$i', 'is_active': true}],
+        'feed_ration_standards': [for (var i = 0; i < n; i++) {'id': u('a4a4a4a4', i), 'species_code': 'lapin', 'stage_label': 'S$i', 'ration_g_per_day': 50 + i, 'is_active': true}],
+        'field_survey_entries': [for (var i = 0; i < n; i++) {'id': u('a5a5a5a5', i), 'type': 'delai_regle', 'label': 'R$i', 'status': 'valide', 'data': <String, dynamic>{}, 'is_active': true}],
+        'lot_revenues': [for (var i = 0; i < n; i++) {'lot_id': lot, 'product_id': u('d1d1d1d1', i), 'label': 'Rev $i', 'amount': 10 + i}],
+        'transformations': [for (var i = 0; i < n; i++) {'id': u('a6a6a6a6', i), 'lot_id': lot, 'product_id': u('d1d1d1d1', 1), 'qty_animals': 2, 'qty_produced': 3, 'transformation_date': '2026-11-0${1 + i % 8}'}],
+        'veterinary_calendar_events': [for (var i = 0; i < n; i++) {'id': u('a7a7a7a7', i), 'lot_id': lot, 'task_type': 'vaccin', 'scheduled_date': '2026-11-0${1 + i % 8}', 'status': 'planned'}],
+      };
+      final serveur = _ServeurCharge(cles, corps);
+      final compteur = _Compteur();
+      final db = AppDatabase.forTesting(NativeDatabase.memory().interceptWith(compteur));
+      addTearDown(db.close);
+      final moteur = SyncEngine(database: db, client: Dio()..interceptors.add(serveur), deviceId: 'poste-perf', connectivity: _Connectivite());
+      await db.into(db.livestockLots).insert(LivestockLotsCompanion.insert(id: lot, code: 'B1', speciesId: u('e1e1e1e1', 1)));
+      // Une saisie du poste en attente (sujet) : le tirage ne doit jamais la toucher.
+      await db.into(db.animals).insert(AnimalsCompanion.insert(id: u('a3a3a3a3', 3), identifier: 'LOCAL', syncStatus: const Value(SyncStatus.pending)));
+
+      await moteur.synchroniser(); // tirage initial, tout vide
+      serveur.actif = true;
+      await moteur.synchroniser(); // premier tirage de la charge : 8 lignes par table
+      expect((await db.select(db.receivables).get()).length, n);
+      expect((await db.select(db.prophylaxisScheduleStandards).get()).length, n);
+      expect((await db.select(db.feedRationStandards).get()).length, n);
+      expect((await db.select(db.fieldSurveyEntries).get()).length, n);
+      expect((await db.select(db.lotRevenues).get()).length, n);
+      expect((await db.select(db.transformations).get()).length, n);
+      expect((await db.select(db.veterinaryCalendarEvents).get()).length, n);
+      final sujets = await db.select(db.animals).get();
+      expect(sujets.length, n, reason: '7 reçus + le sujet LOCAL conservé, qui occupe l\'identifiant 3');
+      expect(sujets.firstWhere((a) => a.id == u('a3a3a3a3', 3)).identifier, 'LOCAL', reason: 'jamais écrasé');
+
+      compteur.journal.clear();
+      compteur.instructions = 0;
+      await moteur.synchroniser(); // même charge, tout déjà connu
+      final parTable = <String, int>{};
+      for (final sql in compteur.journal) {
+        final t = RegExp(r'(?:FROM|INTO|UPDATE)\s+"?(\w+)"?', caseSensitive: false).firstMatch(sql)?.group(1) ?? sql.split(' ').first;
+        parTable[t] = (parTable[t] ?? 0) + 1;
+      }
+      // Mesuré : 224 instructions avant le regroupement (une à deux PAR LIGNE : 17 pour les transformations, 17 pour le calendrier,
+      // 11 pour les rations / la prophylaxie / les relevés, 9 pour les créances), 156 après (une rafale par table ; il reste ≈ 25
+      // contrôles « rien à envoyer »). Un retour à la ligne à ligne dépasse la borne (mutation vérifiée sur l'ancien moteur : 224).
+      expect(compteur.instructions, lessThan(165), reason: 'par table : $parTable');
     },
   );
 }

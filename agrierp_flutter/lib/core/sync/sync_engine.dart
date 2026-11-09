@@ -1305,11 +1305,19 @@ class SyncEngine {
     }
 
     await _transactionDePage(() async {
-      for (final t in recues) {
-        final locale = await (_db.select(_db.transformations)..where((x) => x.id.equals(t.id.value))).getSingleOrNull();
-        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
-        await _db.into(_db.transformations).insert(t, onConflict: DoUpdate((_) => t));
+      // PWA-2c — lecture groupée des lignes non acquittées parmi celles servies, puis UNE rafale `batch`.
+      final protegees = <String>{};
+      for (final morceau in _morceaux([for (final t in recues) t.id.value])) {
+        for (final e in await (_db.select(_db.transformations)..where((x) => x.id.isIn(morceau))).get()) {
+          if (e.syncStatus != SyncStatus.synced) protegees.add(e.id);
+        }
       }
+      await _db.batch((b) {
+        for (final t in recues) {
+          if (protegees.contains(t.id.value)) continue;
+          b.insert(_db.transformations, t, onConflict: DoUpdate((_) => t));
+        }
+      });
     });
 
     return recues.length;
@@ -1443,14 +1451,20 @@ class SyncEngine {
             'Intervention planifiée ${e.id.value} refusée : bande inconnue du poste.',
           );
         }
-        final locale = await (_db.select(
-          _db.veterinaryCalendarEvents,
-        )..where((x) => x.id.equals(e.id.value))).getSingleOrNull();
-        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
-        await _db
-            .into(_db.veterinaryCalendarEvents)
-            .insert(e, onConflict: DoUpdate((_) => e));
       }
+      // PWA-2c — lecture groupée des lignes non acquittées, puis UNE rafale `batch` (rien n'est écrit si une bande est inconnue).
+      final protegees = <String>{};
+      for (final morceau in _morceaux([for (final e in evenements) e.id.value])) {
+        for (final x in await (_db.select(_db.veterinaryCalendarEvents)..where((t) => t.id.isIn(morceau))).get()) {
+          if (x.syncStatus != SyncStatus.synced) protegees.add(x.id);
+        }
+      }
+      await _db.batch((b) {
+        for (final e in evenements) {
+          if (protegees.contains(e.id.value)) continue;
+          b.insert(_db.veterinaryCalendarEvents, e, onConflict: DoUpdate((_) => e));
+        }
+      });
     });
 
     return evenements.length;
@@ -1948,12 +1962,13 @@ class SyncEngine {
         for (final l in await _db.select(table).get())
           if (statutDe(l) != SyncStatus.synced) idDe(l),
       };
-      for (var i = 0; i < recues.length; i++) {
-        if (protegees.contains(idsServis[i])) continue;
-        await _db
-            .into(table)
-            .insert(recues[i], onConflict: DoUpdate((_) => recues[i]));
-      }
+      // PWA-2c — UNE rafale `batch` au lieu d'une instruction par ligne (sémantique inchangée : une ligne protégée est sautée).
+      await _db.batch((b) {
+        for (var i = 0; i < recues.length; i++) {
+          if (protegees.contains(idsServis[i])) continue;
+          b.insert(table, recues[i], onConflict: DoUpdate((_) => recues[i]));
+        }
+      });
       await (_db.update(
         table,
       )..where((t) => synceeHorsServis(t))).write(archivage);
@@ -2492,21 +2507,21 @@ class SyncEngine {
     final lignes = _lignes(brut);
 
     await _transactionDePage(() async {
-      for (final l in lignes) {
-        await _db
-            .into(_db.receivables)
-            .insertOnConflictUpdate(
-              ReceivablesCompanion.insert(
-                id: l['id'] as String,
-                customerId: (l['customer_id'] ?? '') as String,
-                saleId: Value(l['sale_id'] as String?),
-                amount: _reel(l['amount']) ?? 0,
-                amountPaid: Value(_reel(l['amount_paid']) ?? 0),
-                dueDate: Value(_date(l['due_date'])),
-                status: Value((l['status'] ?? 'en_cours') as String),
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch` (une instruction par créance avant).
+      await _db.batch((b) {
+        for (final l in lignes) {
+          final creance = ReceivablesCompanion.insert(
+            id: l['id'] as String,
+            customerId: (l['customer_id'] ?? '') as String,
+            saleId: Value(l['sale_id'] as String?),
+            amount: _reel(l['amount']) ?? 0,
+            amountPaid: Value(_reel(l['amount_paid']) ?? 0),
+            dueDate: Value(_date(l['due_date'])),
+            status: Value((l['status'] ?? 'en_cours') as String),
+          );
+          b.insert(_db.receivables, creance, onConflict: DoUpdate((_) => creance));
+        }
+      });
 
       final servies = [for (final l in lignes) l['id'] as String];
       await (_db.delete(
@@ -3426,18 +3441,18 @@ class SyncEngine {
     await _transactionDePage(() async {
       await _db.delete(_db.lotRevenues).go();
 
-      for (final l in lignes) {
-        await _db
-            .into(_db.lotRevenues)
-            .insert(
-              LotRevenuesCompanion.insert(
-                lotId: l['lot_id'] as String,
-                productId: l['product_id'] as String,
-                label: (l['label'] ?? '') as String,
-                amount: _reel(l['amount']) ?? 0,
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch`.
+      await _db.batch((b) {
+        b.insertAll(_db.lotRevenues, [
+          for (final l in lignes)
+            LotRevenuesCompanion.insert(
+              lotId: l['lot_id'] as String,
+              productId: l['product_id'] as String,
+              label: (l['label'] ?? '') as String,
+              amount: _reel(l['amount']) ?? 0,
+            ),
+        ]);
+      });
 
       await _db
           .into(_db.appSettings)
@@ -3538,10 +3553,10 @@ class SyncEngine {
       final gardes = {
         for (final a in await _db.select(_db.animals).get()) a.id,
       };
-      for (final a in recues) {
-        if (gardes.contains(a.id.value)) continue;
-        await _db.into(_db.animals).insert(a);
-      }
+      // PWA-2c — UNE rafale `batch` ; un sujet `pending` / `conflict` (gardé) n'est jamais réécrit.
+      await _db.batch((b) {
+        b.insertAll(_db.animals, [for (final a in recues) if (!gardes.contains(a.id.value)) a]);
+      });
     });
 
     return lignes.length;
@@ -4113,12 +4128,15 @@ class SyncEngine {
           .get()) {
         locales[l.read<String>('id')] = l.read<String>('sync_status');
       }
-      for (final r in recus) {
-        final id = (r as dynamic).id.value as String;
-        final statut = locales[id];
-        if (statut != null && statut != 'synced') continue;
-        await _db.into(table).insert(r, onConflict: DoUpdate((_) => _sansDeviceId(r)));
-      }
+      // PWA-2c — UNE rafale `batch` ; une ligne locale `pending` / `conflict` reste intouchable.
+      await _db.batch((b) {
+        for (final r in recus) {
+          final id = (r as dynamic).id.value as String;
+          final statut = locales[id];
+          if (statut != null && statut != 'synced') continue;
+          b.insert(table, r, onConflict: DoUpdate((_) => _sansDeviceId(r)));
+        }
+      });
     });
   }
 
