@@ -6,6 +6,7 @@ import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
 import '../erreurs/message_erreur.dart';
+import '../systeme/plateforme_poste.dart';
 import 'parametres_smtp.dart';
 
 /// Envoi réel d'un message par un serveur SMTP — `send` du paquet `mailer` hors des tests, injecté dans les tests
@@ -37,8 +38,8 @@ class EnvoiEmailTest {
   }) : // `prefer_initializing_formals` suggère `this._parametres` : Dart l'interdit sur un paramètre NOMMÉ privé.
        // ignore: prefer_initializing_formals
        _parametres = parametres,
-       _envoyeur = envoyeur ?? _envoyerReellement,
-       _enLigne = enLigne ?? _connectiviteDuSysteme;
+       _envoyeur = envoyeur ?? envoyerReellement,
+       _enLigne = enLigne ?? connectiviteDuSysteme;
 
   final ParametresSmtp _parametres;
   final EnvoyeurSmtp _envoyeur;
@@ -47,15 +48,18 @@ class EnvoiEmailTest {
   /// Délai d'un envoi : au-delà, l'échec est annoncé plutôt que d'attendre indéfiniment.
   static const delai = Duration(seconds: 30);
 
-  static const sujet = 'AgriERP — Test de configuration SMTP';
+  static const sujet = 'LogiAgriERP — Test de configuration SMTP';
   static const corps =
-      'Ceci est un e-mail de test envoyé depuis un poste AgriERP (Paramètres > Email (SMTP)) — configuration '
+      'Ceci est un e-mail de test envoyé depuis un poste LogiAgriERP (Paramètres > Email (SMTP)) — configuration '
       'SMTP validée avec succès.';
 
-  static Future<void> _envoyerReellement(Message message, SmtpServer serveur) =>
+  /// PWA-2 : un navigateur n'ouvre pas de socket SMTP ; l'essai se fait depuis le web de gestion.
+  static const motifNavigateur = "L'essai SMTP se fait depuis le web de gestion : un navigateur ne peut pas ouvrir de connexion SMTP.";
+
+  static Future<void> envoyerReellement(Message message, SmtpServer serveur) =>
       send(message, serveur, timeout: delai);
 
-  static Future<bool> _connectiviteDuSysteme() async {
+  static Future<bool> connectiviteDuSysteme() async {
     try {
       final liens = await Connectivity().checkConnectivity();
       return liens.any((l) => l != ConnectivityResult.none);
@@ -78,6 +82,7 @@ class EnvoiEmailTest {
 
   /// Envoie l'e-mail de test à [destinataire] ; rend le message de succès du web. Lève [EchecEnvoiEmail].
   Future<String> envoyer(String destinataire) async {
+    if (PlateformePoste.navigateur) throw const EchecEnvoiEmail(motifNavigateur);
     final dest = destinataire.trim();
     if (dest.isEmpty) {
       throw const EchecEnvoiEmail('Le champ destinataire du test est obligatoire.');
@@ -108,7 +113,7 @@ class EnvoiEmailTest {
     }
 
     final message = Message()
-      ..from = Address(expediteur, 'AgriERP')
+      ..from = Address(expediteur, 'LogiAgriERP')
       ..recipients.add(dest)
       ..subject = sujet
       ..text = corps;

@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Services\Mecef\FakeMecefGateway;
 use App\Services\Mecef\MecefGatewayInterface;
 use App\Support\DatesValidationFr;
 use Illuminate\Support\ServiceProvider;
@@ -23,13 +22,25 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(MecefGatewayInterface::class, FakeMecefGateway::class);
+        // MECEF-1 : la passerelle suit le mode réglé (désactivé / e-MECeF / boîtier ; `FakeMecefGateway` en dev et tests).
+        $this->app->bind(MecefGatewayInterface::class, fn () => \App\Services\Mecef\MecefGatewayFactory::make());
     }
 
     public function boot(): void
     {
         // Un champ numérique vidé au clavier vaut 0 au lieu de casser l'écran (voir la classe).
         \App\Support\ChampNumeriqueVide::enregistrer();
+
+        // Ticket IMPORT-1 — l'écran « Importation en masse » s'ouvre à qui peut importer AU MOINS un module : le droit du module
+        // (`manage-stocks`, `manage-ventes`, `manage-achats`) reste vérifié à chaque lecture et écriture (`ImportMasseService`).
+        \Illuminate\Support\Facades\Gate::define('importation-masse', fn ($user) => $user->canAny(['manage-stocks', 'manage-ventes', 'manage-achats']));
+
+        // Ticket CONF-4 (DV-20) — LA CORRECTION COMPTABLE N'OUVRE PAS LA CAISSE. Un AVOIR (créer, marquer traité, retransmettre sa
+        // facture `FA`) s'ouvre à `manage-ventes` (caissier : inchangé) OU `correct-invoices` (comptable). Retransmettre une FACTURE
+        // depuis « Facturation » s'ouvre à `manage-facturation` (administrateur : inchangé) OU `correct-invoices`. L'annulation
+        // d'une vente, la caisse et tout le reste de `manage-ventes` restent à `manage-ventes` SEUL (jamais ces portes-ci).
+        \Illuminate\Support\Facades\Gate::define('avoir-client', fn ($user) => $user->canAny(['manage-ventes', 'correct-invoices']));
+        \Illuminate\Support\Facades\Gate::define('retransmettre-facture', fn ($user) => $user->canAny(['manage-facturation', 'correct-invoices']));
 
         // ⚠️⚠️ TICKET 14.65 — POLITIQUE DE MOT DE PASSE CENTRALISEE. Les deux
         // seuls endroits qui posent un mot de passe (`ResetPassword` et

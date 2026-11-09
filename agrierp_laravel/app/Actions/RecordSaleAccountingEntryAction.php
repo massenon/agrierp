@@ -37,6 +37,15 @@ use App\Services\VatDeclarationService;
  *     Débit  contrepartie selon le mode de paiement ......... TTC
  *     Crédit 701 Ventes de produits ......................... HT
  *     Crédit 443 TVA facturée ............................... TVA (si > 0)
+ *
+ * FRAIS DE LIVRAISON INCLUS DANS LA VENTE (décision du client, 07/11/2026) : pour une vente `delivery_in_total` (les NOUVELLES
+ * ventes seulement ; les anciennes gardent leurs frais hors total, leur écriture ne change pas d'un centime), `sales.total`
+ * contient la livraison. La contrepartie est débitée du TOTAL ENTIER (trésorerie ou créance : les frais sont encaissés ou dus
+ * avec le reste) et la prestation a son PROPRE compte de produit :
+ *     Crédit 7071 Ports, emballages perdus et autres frais facturés ... HT de la livraison (repli sur 701 si le compte manque)
+ *     Crédit 443  TVA facturée ................................... TVA de la livraison, AU TAUX DE LA VENTE
+ * Taux de la livraison = taux de la ligne de produit de plus grand montant (à égalité, le plus haut) : l'accessoire suit le
+ * principal. Le débit = le total = produits + livraison, l'équilibre est exact par construction (le HT absorbe l'arrondi).
  */
 class RecordSaleAccountingEntryAction
 {
@@ -50,6 +59,9 @@ class RecordSaleAccountingEntryAction
      * `treasury_accounts` et les comptes de classe 5 — cesseraient de
      * concorder.
      */
+    /** SYSCOHADA révisé : 7071 « Ports, emballages perdus et autres frais facturés » — la livraison facturée au client. */
+    public const COMPTE_LIVRAISON = '7071';
+
     public const COMPTES_PAR_MODE = [
         'especes' => '531',        // Caisse
         'mobile_money' => '521201', // Mobile Money
@@ -88,12 +100,24 @@ class RecordSaleAccountingEntryAction
             return null;   // plan comptable incomplet — signalé, jamais deviné
         }
 
-        [$ht, $tva] = $this->ventilerHtEtTva($sale);
+        [$ht, $tva, $htLivraison, $tvaLivraison] = $this->ventilerHtEtTva($sale);
+        $tva = round($tva + $tvaLivraison, 2);
 
         $lignes = [
             ['account_id' => $contrepartie->id, 'debit' => round((float) $sale->total, 2), 'credit' => 0],
             ['account_id' => $ventes->id, 'debit' => 0, 'credit' => $ht],
         ];
+
+        if ($htLivraison > 0) {
+            // Compte propre de la prestation de livraison ; à défaut (plan comptable de la ferme sans 7071), le produit des ventes.
+            $comptePort = ChartOfAccount::where('code', self::COMPTE_LIVRAISON)->first() ?? $ventes;
+
+            if ($comptePort->id === $ventes->id) {
+                $lignes[1]['credit'] = round($ht + $htLivraison, 2);
+            } else {
+                $lignes[] = ['account_id' => $comptePort->id, 'debit' => 0, 'credit' => $htLivraison];
+            }
+        }
 
         if ($tva > 0) {
             $tvaCollectee = ChartOfAccount::where('code', '443')->first();
@@ -138,11 +162,14 @@ class RecordSaleAccountingEntryAction
      * L'alternative — un compte de rabais dédié (709) — exigerait un compte
      * absent du plan comptable semé.
      *
-     * @return array{0: float, 1: float}
+     * @return array{0: float, 1: float, 2: float, 3: float} HT et TVA des produits, HT et TVA de la livraison incluse (0 sinon)
      */
     private function ventilerHtEtTva(Sale $sale): array
     {
         $service = app(VatDeclarationService::class);
+
+        // Livraison incluse dans le total (nouvelles ventes) : ses frais sont ventilés à part, les produits portent le reste.
+        $livraison = $sale->delivery_in_total ? round(max(0, (float) $sale->delivery_fee), 2) : 0.0;
 
         // Ticket DEV3 — la facture d'un devis est une prestation libre : AUCUNE ligne, donc aucun produit qui porte un
         // taux. La TVA est celle du devis (neutralisée si l'exploitation n'est pas assujettie, comme pour un produit) ;
@@ -152,7 +179,7 @@ class RecordSaleAccountingEntryAction
             $total = round((float) $sale->total, 2);
             $tva = $service->tva($total, $taux);
 
-            return [round($total - $tva, 2), $tva];
+            return [round($total - $tva, 2), $tva, 0.0, 0.0];
         }
 
         $ht = 0.0;
@@ -170,7 +197,7 @@ class RecordSaleAccountingEntryAction
             $tva += $service->tva($ttc, $taux);
         }
 
-        $total = round((float) $sale->total, 2);
+        $total = round((float) $sale->total - $livraison, 2);
 
         // Sans remise, les lignes couvrent déjà exactement le total.
         if ($ttcLignes > 0 && abs($ttcLignes - $total) >= 0.01) {
@@ -184,6 +211,8 @@ class RecordSaleAccountingEntryAction
         // serait refusée par `AccountingEntryService` et ferait échouer la vente.
         $ht = round($total - $tva, 2);
 
-        return [$ht, $tva];
+        $tvaLivraison = $livraison > 0 ? $service->tva($livraison, $service->tauxDeLaLivraison($sale)) : 0.0;
+
+        return [$ht, $tva, round($livraison - $tvaLivraison, 2), $tvaLivraison];
     }
 }

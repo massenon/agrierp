@@ -36,9 +36,9 @@ class AuditToutesLesRoutesTest extends TestCase
     /** Routes exclues, avec le motif — jamais une exclusion silencieuse. */
     private const EXCLUES = [
         'login' => 'redirige un utilisateur déjà authentifié (middleware guest)',
-        'password.reset' => 'redirige un utilisateur déjà authentifié (middleware guest)',
         'logout' => 'POST uniquement',
         'health-check' => 'sonde JSON, pas un écran',
+        'justificatifs.show' => 'flux d\'un fichier (404 sans pièce), pas un écran : couverte par JustificatifsSynchronisesTest (ticket AC-3)',
     ];
 
     /**
@@ -76,7 +76,7 @@ class AuditToutesLesRoutesTest extends TestCase
         $user = User::create([
             'name' => 'Auditeur',
             'email' => 'audit@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'),
+            'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole('admin');
 
@@ -174,7 +174,7 @@ class AuditToutesLesRoutesTest extends TestCase
                 continue;
             }
 
-            if ($this->estRouteDeFramework($route->getName())) {
+            if ($this->estRouteDeFramework($route->getName()) || isset(self::EXCLUES[$route->getName()])) {
                 continue;
             }
 

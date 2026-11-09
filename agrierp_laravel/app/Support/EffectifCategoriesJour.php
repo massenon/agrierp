@@ -28,20 +28,27 @@ final class EffectifCategoriesJour
         public readonly ?bool $sommeDifferente,
         public readonly ?string $refus,
         public readonly ?int $passageApplique,
+        /** Ticket VOL-2 — quatrième emplacement (Poussin ponte des volailles pondeuses) ; null pour toutes les autres chaînes. */
+        public readonly ?int $quatre = null,
+        /** Ticket VOL-2 — passages réellement appliqués d'une chaîne à quatre stades, par colonne (`passage_4_sevre`, …). */
+        public readonly array $passagesAppliques = [],
     ) {}
 
-    /** @return array{cat_eff_repro: ?int, cat_eff_sevre: ?int, cat_eff_jeune: ?int} */
+    /** @return array{cat_eff_repro: ?int, cat_eff_sevre: ?int, cat_eff_jeune: ?int, cat_eff_4?: ?int} */
     public function versColonnes(): array
     {
-        return ['cat_eff_repro' => $this->repro, 'cat_eff_sevre' => $this->sevre, 'cat_eff_jeune' => $this->jeune];
+        $colonnes = ['cat_eff_repro' => $this->repro, 'cat_eff_sevre' => $this->sevre, 'cat_eff_jeune' => $this->jeune];
+
+        // Ticket VOL-2 : `cat_eff_4` n'est dérivé que pour la chaîne à quatre stades (il reste libre ailleurs).
+        return $this->quatre === null ? $colonnes : $colonnes + ['cat_eff_4' => $this->quatre];
     }
 
-    /** Somme des trois catégories, null si l'une est inconnue. */
+    /** Somme des catégories (quatre pour les volailles pondeuses), null si l'une est inconnue. */
     public function somme(): ?int
     {
         return ($this->repro === null || $this->sevre === null || $this->jeune === null)
             ? null
-            : $this->repro + $this->sevre + $this->jeune;
+            : $this->repro + $this->sevre + $this->jeune + ($this->quatre ?? 0);
     }
 
     public function estComplet(): bool

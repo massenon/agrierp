@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
@@ -539,14 +541,15 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
             border: Border.all(color: AgriColors.outlineVariant),
             borderRadius: BorderRadius.circular(AgriRadius.lg),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: largeur,
-              child: Column(
-                children: [
-                  Container(
-                    key: Key('entete-cycles-$cle'),
+          child: LayoutBuilder(
+            builder: (_, contraintes) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: max(largeur, contraintes.maxWidth),
+                child: Column(
+                  children: [
+                    Container(
+                      key: Key('entete-cycles-$cle'),
                     color: AgriColors.surfaceZebra,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AgriSpacing.sm,
@@ -598,6 +601,7 @@ class _SuiviReproductionScreenState extends State<SuiviReproductionScreen> {
                 ],
               ),
             ),
+          ),
           ),
         ),
         // ⚠️ AJOUT DU POSTE, GARDÉ : le bandeau dit ce qui se saisit ici et ce qui reste web.

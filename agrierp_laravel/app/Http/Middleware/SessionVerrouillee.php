@@ -33,7 +33,6 @@ class SessionVerrouillee
         'session.verrouiller',
         'logout',
         'login',
-        'password.reset',
         'public.welcome',
         'public.presentation',
         'health-check',

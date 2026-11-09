@@ -1,13 +1,20 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io' show File, SocketException;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visibleForTesting;
 
+import '../config/fichiers_entreprise.dart';
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import '../systeme/justificatifs_navigateur.dart';
+import '../systeme/plateforme_poste.dart';
+import '../systeme/verrou_onglets.dart';
 import '../temps/heure_benin.dart';
 import 'fusion_referentiels.dart';
 import 'perimetre_tirage.dart';
@@ -107,6 +114,8 @@ class SyncEngine {
     required String deviceId,
     Connectivity? connectivity,
     DateTime Function()? maintenant,
+    Future<void> Function()? apresSynchronisation,
+    FlutterSecureStorage? coffre,
   }) : // `prefer_initializing_formals` suggère `this._client` : Dart
        // l'interdit sur un paramètre NOMMÉ privé. L'affectation explicite
        // est donc la seule forme possible ici.
@@ -115,13 +124,24 @@ class SyncEngine {
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
        _db = database,
+       _coffre = coffre ?? const FlutterSecureStorage(),
+       // ignore: prefer_initializing_formals
+       _apresSynchronisation = apresSynchronisation,
        _connectivity = connectivity ?? Connectivity(),
        _maintenant = maintenant ?? DateTime.now;
 
   final AppDatabase _db;
+
+  /// Ticket UT-1 — le coffre du système, où un mot de passe saisi au poste attend son envoi (jamais en base).
+  final FlutterSecureStorage _coffre;
   final Dio _client;
   final String _deviceId;
   final Connectivity _connectivity;
+
+  /// ATT-3 — ce que le poste déclare au serveur une fois la liaison établie, hors des tables synchronisées : les émissions
+  /// d'attestation faites hors ligne (le serveur y attribue le numéro et garde la trace). Silencieux : un échec n'est pas
+  /// celui de la synchronisation, et la file reste pour la fois suivante.
+  final Future<void> Function()? _apresSynchronisation;
 
   /// Horloge du poste — injectable pour les tests (F0.90). Elle date la RÉCEPTION d'une vente
   /// tirée du serveur (voir [_absorberVentes]).
@@ -247,8 +267,59 @@ class SyncEngine {
   /// inactivité attend sa fin au lieu de l'interrompre.
   bool get enCours => _tentativeEnCours != null;
 
-  Future<SyncOutcome> synchroniser() => _tentativeEnCours ??=
-      _synchroniserUneFois().whenComplete(() => _tentativeEnCours = null);
+  /// PWA-2b — UNE synchronisation à la fois, TOUS ONGLETS confondus (verrou `navigator.locks` au navigateur ; aucun verrou au natif).
+  /// Remplaçable en test.
+  @visibleForTesting
+  static Future<SyncOutcome> Function(Future<SyncOutcome> Function() action) verrouEntreOnglets = sousVerrouEntreOnglets<SyncOutcome>;
+
+  Future<SyncOutcome> synchroniser() => _tentativeEnCours ??= verrouEntreOnglets(_synchroniserUneFois)
+      .then(
+        (r) {
+          liaisonServeur.value = !r.horsLigne;
+          return r;
+        },
+        onError: (Object e, StackTrace pile) {
+          // Une panne de RÉSEAU dit « hors ligne » ; un refus du serveur (401, 422…) prouve qu'il répond.
+          if (e is SocketException || e is TimeoutException || (e is DioException && e.response == null)) {
+            liaisonServeur.value = false;
+          }
+          Error.throwWithStackTrace(e, pile);
+        },
+      )
+      .whenComplete(() => _tentativeEnCours = null);
+
+  /// PWA-2c — le serveur répond-il VRAIMENT ? (`true` joignable, `false` hors ligne ; `null` : jamais vérifié.) Lu par
+  /// l'indicateur de la barre supérieure et par la modale « Synchronisation » (« En ligne » / « Hors ligne »).
+  final ValueNotifier<bool?> liaisonServeur = ValueNotifier<bool?>(null);
+
+  /// PWA-2c — SONDAGE LÉGER avant de synchroniser au retour en ligne / au retour de focus du navigateur : `navigator.onLine`
+  /// ment (il dit « en ligne » derrière un portail captif ou sans route vers le serveur). Réutilise la route de santé
+  /// EXISTANTE de Laravel (`/up`, sans authentification, sans donnée) ; jamais mise en cache (`Cache-Control: no-store`,
+  /// paramètre variable, hors du périmètre `/poste/` du service worker) ; délai court. NE LÈVE JAMAIS : hors ligne n'est pas une
+  /// erreur. Un HTTP < 500 prouve que le serveur répond (même un 401).
+  Future<bool> serveurJoignable({Duration delai = const Duration(seconds: 3)}) async {
+    bool joignable;
+    try {
+      final r = await _client
+          .get<Object?>(
+            '/up',
+            queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+            options: Options(
+              headers: const {'Cache-Control': 'no-store', 'Pragma': 'no-cache'},
+              sendTimeout: delai,
+              receiveTimeout: delai,
+              validateStatus: (_) => true,
+              responseType: ResponseType.plain,
+            ),
+          )
+          .timeout(delai);
+      joignable = (r.statusCode ?? 599) < 500;
+    } catch (_) {
+      joignable = false;
+    }
+    liaisonServeur.value = joignable;
+    return joignable;
+  }
 
   Future<SyncOutcome> _synchroniserUneFois() async {
     if (!await estEnLigne()) {
@@ -313,11 +384,20 @@ class SyncEngine {
       }
     }
 
+    // Ticket AC-3 — les FICHIERS des justificatifs partent APRÈS les enregistrements acceptés. Ne lève jamais.
+    await _envoyerJustificatifs();
+
     // Ticket H2 — la liaison a abouti (refus compris) : « Dernière synchronisation réussie » prend l'heure
     // du SERVEUR, celle du tirage qui vient d'avoir lieu (`server_time`), jamais l'horloge du poste.
     final etat = await _db.etatDeSynchronisation();
     if (etat?.lastPulledAt != null) {
       await _db.noterEtatDeSynchronisation(reussi: etat!.lastPulledAt);
+    }
+
+    try {
+      await _apresSynchronisation?.call();
+    } on Object catch (e) {
+      debugPrint('Émissions d\'attestation non déclarées (détail technique) : $e');
     }
 
     return SyncOutcome(
@@ -456,6 +536,22 @@ class SyncEngine {
     'cat_depart_jeune',
   ];
 
+  /// Ticket VOL-1 — les trois colonnes de VENTE PAR CATÉGORIE des volailles reproductrices (migration
+  /// `2026_11_05_000001`).
+  static const colonnesVentesParCategorie = ['vente_repro', 'vente_sevre', 'vente_jeune'];
+
+  /// Ticket VOL-2 — les colonnes du QUATRIÈME EMPLACEMENT (Poussin ponte) et des deux passages de plus des volailles
+  /// pondeuses (migrations `2026_11_05_000004`) ; `cat_eff_4` (dérivé) et `transfert_*_4` (dérivés) les complètent au tirage.
+  /// ⚠️ Volontairement HORS de [colonnesVentilation] : un serveur de VOL-1 ne les sert pas et n'est pas « antérieur à 15.39 ».
+  static const colonnesStadesPondeuses = [
+    'mort_4',
+    'don_4',
+    'vente_4',
+    'cat_depart_4',
+    'passage_4_sevre',
+    'passage_jeune_repro',
+  ];
+
   /// Vrai si le dernier tirage a servi au moins une fiche SANS ces colonnes (serveur antérieur à
   /// 15.39) — renseigné par [_absorberFichesJournalieres].
   bool _fichesSansVentilation = false;
@@ -538,25 +634,34 @@ class SyncEngine {
     // ⚠️ Lecture TOLÉRANTE : voir `etatDeSynchronisation` (table dupliquée).
     final etat = await _db.etatDeSynchronisation();
 
-    final resyncFaite = await _lireReglage(cleJournalResync) != null;
+    // PWA-2c — les douze marques de resynchronisation en UNE lecture (`IN (...)`) au lieu de douze `select`.
+    final marques = {
+      for (final r in await (_db.select(_db.appSettings)..where(
+            (t) => t.key.isIn(const [cleJournalResync, cleJournalResyncCreation, cleJournalIncomplet, cleFichesResync, cleFichesResyncCategories, cleLignesResync, cleRetoursResync, cleMouvementsResync, cleFichesResyncU10, cleDepensesResync, cleDepensesResyncU14, cleDepensesResyncDep1]),
+          ))
+          .get())
+        r.key,
+    };
+    bool marque(String cle) => marques.contains(cle);
+    final resyncFaite = marque(cleJournalResync);
     final resyncCreationFaite =
-        await _lireReglage(cleJournalResyncCreation) != null;
-    final etaitIncomplet = await _lireReglage(cleJournalIncomplet) != null;
-    final resyncFichesFaite = await _lireReglage(cleFichesResync) != null;
+        marque(cleJournalResyncCreation);
+    final etaitIncomplet = marque(cleJournalIncomplet);
+    final resyncFichesFaite = marque(cleFichesResync);
     final resyncCategoriesFaite =
-        await _lireReglage(cleFichesResyncCategories) != null;
-    final resyncLignesFaite = await _lireReglage(cleLignesResync) != null;
-    final resyncRetoursFaite = await _lireReglage(cleRetoursResync) != null;
+        marque(cleFichesResyncCategories);
+    final resyncLignesFaite = marque(cleLignesResync);
+    final resyncRetoursFaite = marque(cleRetoursResync);
     final resyncMouvementsFaite =
-        await _lireReglage(cleMouvementsResync) != null;
+        marque(cleMouvementsResync);
     final resyncFichesU10Faite =
-        await _lireReglage(cleFichesResyncU10) != null;
+        marque(cleFichesResyncU10);
     final resyncDepensesFaite =
-        await _lireReglage(cleDepensesResync) != null;
+        marque(cleDepensesResync);
     final resyncDepensesU14Faite =
-        await _lireReglage(cleDepensesResyncU14) != null;
+        marque(cleDepensesResyncU14);
     final resyncDepensesDep1Faite =
-        await _lireReglage(cleDepensesResyncDep1) != null;
+        marque(cleDepensesResyncDep1);
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -653,8 +758,16 @@ class SyncEngine {
       cles.addAll(corps.keys);
 
       final aAbsorber = corps;
+      // PWA-2c — UNE SEULE transaction pour tous les absorbeurs de la page : à l'intérieur, `_transactionDePage` ne
+      // rouvre pas de point de sauvegarde (deux messages de plus au navigateur par absorbeur, ≈ 80 par tirage), car une
+      // erreur d'un absorbeur annule déjà toute la page (aucun ne l'attrape).
       await _db.transaction(() async {
-        recus += await _absorberPage(aAbsorber);
+        _pageEnTransaction = true;
+        try {
+          recus += await _absorberPage(aAbsorber);
+        } finally {
+          _pageEnTransaction = false;
+        }
       });
 
       final suivante = corps['page_suivante'];
@@ -783,6 +896,15 @@ class SyncEngine {
   /// Ticket S-T4 — une page du tirage, absorbée table par table dans l'ordre des dépendances (l'appelant
   /// l'enveloppe dans UNE transaction). Une clé ABSENTE (table non servie à ce compte, ou pas sur cette page) ne
   /// touche à rien : chaque absorbeur l'ignore.
+  /// Vrai pendant que [_absorberPage] tourne DANS la transaction unique de la page (une synchronisation à la fois : le moteur
+  /// n'absorbe jamais deux pages en même temps).
+  bool _pageEnTransaction = false;
+
+  /// Une transaction d'absorbeur : déjà dans celle de la page, on exécute directement (pas de point de
+  /// sauvegarde) ; ailleurs, une vraie transaction. ⚠️ Suppose qu'aucun absorbeur n'attrape l'erreur d'un autre.
+  Future<T> _transactionDePage<T>(Future<T> Function() corps) =>
+      _pageEnTransaction ? corps() : _db.transaction(corps);
+
   Future<int> _absorberPage(Map<String, dynamic> corps) async {
     var recus = 0;
 
@@ -796,6 +918,8 @@ class SyncEngine {
     );
     // Ticket 15.46 — APRÈS les bandes : un transfert d'une bande inconnue est refusé.
     recus += await _absorberTransferts(corps['livestock_transfers']);
+    // Ticket EL-1 — transformations (table mixte : une saisie du poste en attente n'est jamais écrasée).
+    recus += await _absorberTransformations(corps['transformations']);
     // Ticket H8b — APRÈS les bandes : une entrée ou une intervention d'une bande inconnue est refusée.
     recus += await _absorberInfirmerie(corps['infirmary_records']);
     recus += await _absorberCalendrierVeterinaire(
@@ -818,6 +942,8 @@ class SyncEngine {
     recus += await _absorberRelances(corps['customer_reminders']);
     recus += await _absorberProvendes(corps['feed_types']);
     recus += await _absorberNumerotation(corps['elevage_numbering']);
+    // Ticket RELEVES-1 — relevés de terrain (table mixte de barème : une saisie en attente n'est jamais écrasée).
+    recus += await _absorberReleves(corps['field_survey_entries']);
     recus += await _absorberFournisseurs(corps['suppliers']);
     recus += await _absorberBonsCommande(corps['purchase_orders']);
     recus += await _absorberAchats(corps['purchases']);
@@ -845,6 +971,9 @@ class SyncEngine {
     recus += await _absorberMouvementsStock(corps['stock_movements']);
     recus += await _absorberEmployes(corps['employees']);
     recus += await _absorberStagiaires(corps['internships']);
+    // Ticket RH-2 — APRÈS les stagiaires. Ticket RH-4 — barème ITS.
+    recus += await _absorberAbsencesStagiaires(corps['internship_absences']);
+    recus += await _absorberBaremeIts(corps['income_tax_brackets']);
     recus += await _absorberPointages(corps['attendance_records']);
     recus += await _absorberCourriers(corps['mails']);
     // Ticket DEV — devis du serveur (table mixte : les saisies du poste en attente ne sont jamais écrasées).
@@ -852,7 +981,11 @@ class SyncEngine {
     recus += await _absorberDocuments(corps['administrative_documents']);
     recus += await _absorberArchives(corps['archived_documents']);
     recus += await _absorberPlanComptable(corps['chart_of_accounts']);
+    // Ticket CP-3 — registre des immobilisations (table mixte : un bien saisi au poste en attente n'est jamais écrasé).
+    recus += await _absorberImmobilisations(corps['fixed_assets']);
     recus += await _absorberExercices(corps['fiscal_years']);
+    // Ticket CP-4 — clôtures de mois (remplacées à chaque tirage ; clé servie à `view-comptabilite`).
+    recus += await _absorberClotures(corps['periodic_closures']);
     recus += await _absorberJournal(
       corps['accounting_entries'],
       corps['accounting_entry_ids'],
@@ -861,6 +994,10 @@ class SyncEngine {
     recus += await _absorberEntreprise(corps['company_settings']);
     recus += await _absorberModules(corps['modules_config']);
     recus += await _absorberRoles(corps['roles']);
+    // Ticket PA-2 — les droits existants (administrateur), pour la modale « Rôle ».
+    recus += await _absorberDroits(corps['permissions']);
+    // Ticket CP-5 — lignes de relevé bancaire importées (remplacées à chaque tirage).
+    recus += await _absorberRelevesBancaires(corps['bank_statement_lines']);
     recus += await _absorberUtilisateurs(corps['users']);
     recus += await _absorberAudit(corps['audit_logs']);
     recus += await _absorberNotifications(corps['notifications']);
@@ -903,11 +1040,30 @@ class SyncEngine {
       }
     });
 
+    // Ticket #44 — un migrate:fresh --seed sur le serveur recrée chaque catégorie avec un UUID différent. Le DoUpdate
+    // ci-dessus traite les conflits de PRIMARY KEY (même UUID) mais ne supprime pas les anciennes lignes d'UUID différent
+    // portant le même libellé. Le serveur fait autorité : pour chaque libellé tiré, les lignes locales d'AUTRE identifiant
+    // sont des doublons obsolètes.
+    //
+    // ⚠️ Jamais « garder la plus récente par `updated_at` » (version d'origine, `HAVING MAX(updated_at)`) : sans
+    // `updated_at` sur les lignes tirées, la condition est fausse pour tous les groupes, la sous-requête est vide et
+    // `id NOT IN (vide)` SUPPRIMAIT TOUTES LES CATÉGORIES du poste (test_le tirage précède l'envoi).
+    if (lignes.isNotEmpty) {
+      final ids = [for (final l in lignes) l['id'] as String];
+      final libelles = {for (final l in lignes) (l['label'] ?? '') as String};
+      await (_db.delete(_db.productCategories)..where(
+            (t) => Expression.and([t.label.isIn(libelles), t.id.isNotIn(ids)]),
+          ))
+          .go();
+    }
+
     return lignes.length;
   }
 
   Future<int> _absorberProduits(Object? brut) async {
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
     // ⚠️⚠️ UN PRODUIT `pending` OU `conflict` N'EST PAS ÉCRASÉ PAR LE TIRAGE : il
     // n'existe (ou n'a changé) que sur ce poste, et l'effacer perdrait la saisie.
@@ -950,6 +1106,8 @@ class SyncEngine {
         stockQty: Value(_reel(l['stock_qty']) ?? 0),
         alertThreshold: Value(_reel(l['alert_threshold'])),
         description: Value(l['description'] as String?),
+        // Ticket VOL-1 : catégorie d'effectif (reproducteur / jeune / poussin) ; null pour les autres produits.
+        categorieEffectif: Value(l['categorie_effectif'] as String?),
         syncStatus: const Value(SyncStatus.synced),
         isActive: Value(_bool(l['is_active'])),
         updatedAt: Value(_instantTechnique(l['updated_at'])),
@@ -1015,7 +1173,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final b in await (_db.select(_db.livestockLots)..where((t) => t.id.isIn(vus))).get()) b.id: b.syncStatus,
       };
@@ -1083,7 +1241,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final connues = {
         for (final b in await _db.select(_db.livestockLots).get()) b.id,
       };
@@ -1105,6 +1263,64 @@ class SyncEngine {
     });
 
     return transferts.length;
+  }
+
+  /// Ticket EL-1 — TRANSFORMATIONS du serveur (table MIXTE), fusionnées par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT** : un identifiant servi deux fois, ou une ligne illisible (bande, produit, sujets, quantité, jour), refuse
+  /// TOUT le tirage (le curseur n'avance pas). Une transformation `pending` / `conflict` (saisie ici, pas encore acquittée)
+  /// n'est JAMAIS écrasée. Une bande ou un produit inconnu du poste n'est pas un refus : c'est un historique (la bande a pu
+  /// être archivée côté serveur), l'écran écrit alors « — » comme le web sans relation.
+  Future<int> _absorberTransformations(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recues = <TransformationsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Transformation');
+      final lot = l['lot_id'];
+      final produit = l['product_id'];
+      final sujets = _entier(l['qty_animals']);
+      final produite = _reel(l['qty_produced']);
+      final jour = _date(l['transformation_date']);
+      if (lot is! String || produit is! String || sujets == null || sujets < 1 || produite == null || jour == null) {
+        throw FormatException('Transformation $id refusée : élément incomplet ou illisible.');
+      }
+      recues.add(
+        TransformationsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          lotId: lot,
+          productId: produit,
+          qtyAnimals: sujets,
+          qtyProduced: produite,
+          operatorId: Value(l['operator_id'] as String?),
+          transformationDate: DateTime(jour.year, jour.month, jour.day),
+        ),
+      );
+    }
+
+    await _transactionDePage(() async {
+      // PWA-2c — lecture groupée des lignes non acquittées parmi celles servies, puis UNE rafale `batch`.
+      final protegees = <String>{};
+      for (final morceau in _morceaux([for (final t in recues) t.id.value])) {
+        for (final e in await (_db.select(_db.transformations)..where((x) => x.id.isIn(morceau))).get()) {
+          if (e.syncStatus != SyncStatus.synced) protegees.add(e.id);
+        }
+      }
+      await _db.batch((b) {
+        for (final t in recues) {
+          if (protegees.contains(t.id.value)) continue;
+          b.insert(_db.transformations, t, onConflict: DoUpdate((_) => t));
+        }
+      });
+    });
+
+    return recues.length;
   }
 
   /// Ticket H8b (D-H8) — ENTRÉES D'INFIRMERIE du serveur, FUSIONNÉES par identifiant.
@@ -1160,7 +1376,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final connues = {
         for (final b in await _db.select(_db.livestockLots).get()) b.id,
       };
@@ -1225,7 +1441,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final connues = {
         for (final b in await _db.select(_db.livestockLots).get()) b.id,
       };
@@ -1235,14 +1451,20 @@ class SyncEngine {
             'Intervention planifiée ${e.id.value} refusée : bande inconnue du poste.',
           );
         }
-        final locale = await (_db.select(
-          _db.veterinaryCalendarEvents,
-        )..where((x) => x.id.equals(e.id.value))).getSingleOrNull();
-        if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
-        await _db
-            .into(_db.veterinaryCalendarEvents)
-            .insert(e, onConflict: DoUpdate((_) => e));
       }
+      // PWA-2c — lecture groupée des lignes non acquittées, puis UNE rafale `batch` (rien n'est écrit si une bande est inconnue).
+      final protegees = <String>{};
+      for (final morceau in _morceaux([for (final e in evenements) e.id.value])) {
+        for (final x in await (_db.select(_db.veterinaryCalendarEvents)..where((t) => t.id.isIn(morceau))).get()) {
+          if (x.syncStatus != SyncStatus.synced) protegees.add(x.id);
+        }
+      }
+      await _db.batch((b) {
+        for (final e in evenements) {
+          if (protegees.contains(e.id.value)) continue;
+          b.insert(_db.veterinaryCalendarEvents, e, onConflict: DoUpdate((_) => e));
+        }
+      });
     });
 
     return evenements.length;
@@ -1470,6 +1692,17 @@ class SyncEngine {
           catDepartRepro: optionnel(l, 'cat_depart_repro', id),
           catDepartSevre: optionnel(l, 'cat_depart_sevre', id),
           catDepartJeune: optionnel(l, 'cat_depart_jeune', id),
+          // Ticket VOL-1 — ventes par catégorie (volailles), mêmes règles : clé absente = valeur locale gardée.
+          venteRepro: optionnel(l, 'vente_repro', id),
+          venteSevre: optionnel(l, 'vente_sevre', id),
+          venteJeune: optionnel(l, 'vente_jeune', id),
+          // Ticket VOL-2 — quatrième emplacement (Poussin ponte) et passages des pondeuses, mêmes règles.
+          mort4: optionnel(l, 'mort_4', id),
+          don4: optionnel(l, 'don_4', id),
+          vente4: optionnel(l, 'vente_4', id),
+          catDepart4: optionnel(l, 'cat_depart_4', id),
+          passage4Sevre: optionnel(l, 'passage_4_sevre', id),
+          passageJeuneRepro: optionnel(l, 'passage_jeune_repro', id),
           catEffRepro: optionnel(l, 'cat_eff_repro', id),
           catEffSevre: optionnel(l, 'cat_eff_sevre', id),
           catEffJeune: optionnel(l, 'cat_eff_jeune', id),
@@ -1505,6 +1738,8 @@ class SyncEngine {
           transfertSortieRepro: derive(l, 'transfert_sortie_repro', id),
           transfertSortieSevre: derive(l, 'transfert_sortie_sevre', id),
           transfertSortieJeune: derive(l, 'transfert_sortie_jeune', id),
+          transfertEntree4: derive(l, 'transfert_entree_4', id),
+          transfertSortie4: derive(l, 'transfert_sortie_4', id),
         ),
       );
       // F0.95 — un serveur antérieur à 15.39 ne sert pas la ventilation : la resynchronisation
@@ -1521,7 +1756,7 @@ class SyncEngine {
 
     // ── Application, en une transaction ─────────────────────────────────────
     final avertissements = <String>[];
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final codes = <String, String>{};
       final bandes = {for (final f in fiches) f.lotId.value}.toList();
       for (final morceau in _morceaux(bandes)) {
@@ -1539,45 +1774,75 @@ class SyncEngine {
         }
       }
 
+      // PWA-2c — LECTURES GROUPÉES (`IN (...)` par tranches) des fiches déjà connues et des fiches occupant (bande, jour), puis
+      // UNE rafale `batch` : au navigateur, chaque instruction attendue est un aller-retour vers le worker SQLite (912 fiches
+      // = 2 736 instructions avant). Sémantique STRICTE inchangée : une fiche `pending` / `conflict` n'est jamais écrasée ;
+      // une autre fiche déjà là pour (bande, jour) est conservée avec son avertissement.
+      final locales = <String, LivestockDailyEntry>{};
+      for (final morceau in _morceaux([for (final f in fiches) f.id.value])) {
+        for (final e in await (_db.select(_db.livestockDailyEntries)..where((t) => t.id.isIn(morceau))).get()) {
+          locales[e.id] = e;
+        }
+      }
+      int jour(DateTime d) => d.millisecondsSinceEpoch ~/ 1000; // la base garde des SECONDES
+      final occupantes = <String, LivestockDailyEntry>{};
+      for (final morceau in _morceaux(bandes)) {
+        for (final e in await (_db.select(_db.livestockDailyEntries)..where((t) => t.lotId.isIn(morceau))).get()) {
+          occupantes['${e.lotId}|${jour(e.entryDate)}'] = e;
+        }
+      }
+
+      final aEcrire = <LivestockDailyEntriesCompanion>[];
+      final prevues = <String>{}; // identifiants prévus dans la rafale
+      final casesPrevues = <String>{}; // (bande, jour) prévus dans la rafale
+      Future<void> ecrire() async {
+        if (aEcrire.isEmpty) return;
+        final lot = List<LivestockDailyEntriesCompanion>.of(aEcrire);
+        await _db.batch((b) {
+          for (final ligne in lot) {
+            b.insert(_db.livestockDailyEntries, ligne, onConflict: DoUpdate((_) => ligne));
+          }
+        });
+        aEcrire.clear();
+        prevues.clear();
+        casesPrevues.clear();
+      }
+
       for (final f in fiches) {
-        final locale = await (_db.select(
-          _db.livestockDailyEntries,
-        )..where((t) => t.id.equals(f.id.value))).getSingleOrNull();
+        final cle = '${f.lotId.value}|${jour(f.entryDate.value)}';
+        var locale = locales[f.id.value];
+        var occupante = occupantes[cle];
+        // Cas rare : la même fiche, ou le même (bande, jour), est DÉJÀ prévu dans cette rafale par une fiche précédente du lot
+        // servi. On écrit d'abord ce qui est prévu, puis on relit comme le faisait la version ligne à ligne.
+        if (prevues.contains(f.id.value) || casesPrevues.contains(cle)) {
+          await ecrire();
+          locale = await (_db.select(_db.livestockDailyEntries)..where((t) => t.id.equals(f.id.value))).getSingleOrNull();
+          occupante =
+              await (_db.select(_db.livestockDailyEntries)..where(
+                    (t) => Expression.and([t.lotId.equals(f.lotId.value), t.entryDate.equals(f.entryDate.value)]),
+                  ))
+                  .getSingleOrNull();
+        }
 
         // ⚠️⚠️ `pending` / `conflict` : intouchable (n'existe, ou n'a changé, que sur ce poste).
         if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
 
-        final occupante =
-            await (_db.select(_db.livestockDailyEntries)..where(
-                  (t) => Expression.and([
-                    t.lotId.equals(f.lotId.value),
-                    t.entryDate.equals(f.entryDate.value),
-                  ]),
-                ))
-                .getSingleOrNull();
         if (occupante != null && occupante.id != f.id.value) {
-          avertissements.add(
-            _avertissementFicheEnDouble(
-              occupante,
-              codes[f.lotId.value] ?? f.lotId.value,
-            ),
-          );
+          avertissements.add(_avertissementFicheEnDouble(occupante, codes[f.lotId.value] ?? f.lotId.value));
           continue;
         }
 
-        final ligne = f.copyWith(
-          deviceId: Value(locale?.deviceId ?? 'serveur'),
-          syncStatus: const Value(SyncStatus.synced),
-          updatedAt: Value(
-            f.updatedAt.present
-                ? f.updatedAt.value
-                : locale?.updatedAt ?? _maintenant(),
+        aEcrire.add(
+          f.copyWith(
+            deviceId: Value(locale?.deviceId ?? 'serveur'),
+            syncStatus: const Value(SyncStatus.synced),
+            updatedAt: Value(f.updatedAt.present ? f.updatedAt.value : locale?.updatedAt ?? _maintenant()),
           ),
         );
-        await _db
-            .into(_db.livestockDailyEntries)
-            .insert(ligne, onConflict: DoUpdate((_) => ligne));
+        prevues.add(f.id.value);
+        casesPrevues.add(cle);
       }
+      await ecrire();
     });
 
     _avertissements.addAll(avertissements);
@@ -1692,17 +1957,18 @@ class SyncEngine {
     required Expression<bool> Function(T) synceeHorsServis,
     required Insertable<D> archivage,
   }) async {
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final l in await _db.select(table).get())
           if (statutDe(l) != SyncStatus.synced) idDe(l),
       };
-      for (var i = 0; i < recues.length; i++) {
-        if (protegees.contains(idsServis[i])) continue;
-        await _db
-            .into(table)
-            .insert(recues[i], onConflict: DoUpdate((_) => recues[i]));
-      }
+      // PWA-2c — UNE rafale `batch` au lieu d'une instruction par ligne (sémantique inchangée : une ligne protégée est sautée).
+      await _db.batch((b) {
+        for (var i = 0; i < recues.length; i++) {
+          if (protegees.contains(idsServis[i])) continue;
+          b.insert(table, recues[i], onConflict: DoUpdate((_) => recues[i]));
+        }
+      });
       await (_db.update(
         table,
       )..where((t) => synceeHorsServis(t))).write(archivage);
@@ -1800,7 +2066,7 @@ class SyncEngine {
       updatedAt: const Value(null),
     );
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locale = await (_db.select(
         _db.elevageNumberingSettings,
       )..where((t) => t.id.equals('unique'))).getSingleOrNull();
@@ -1865,6 +2131,71 @@ class SyncEngine {
     return recues.length;
   }
 
+  /// Ticket RELEVES-1 — RELEVÉS DE TERRAIN du serveur (Paramètres Élevage), FUSIONNÉS par identifiant.
+  ///
+  /// ⚠️⚠️ **STRICT** : un identifiant servi deux fois, un type inconnu, un libellé absent, un statut hors de
+  /// `a_valider` | `valide`, des valeurs qui ne sont pas un objet ou un `is_active` illisible refusent TOUT le tirage
+  /// (rien n'est écrit, le curseur n'avance pas). Une ligne `pending` / `conflict` (saisie ou validée ici, pas encore
+  /// acquittée) n'est JAMAIS écrasée : une validation faite hors ligne ne revient pas à « À valider » au tirage.
+  Future<int> _absorberReleves(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignesStrictes(brut, 'Relevé de terrain');
+    final vus = <String>{};
+    final recues = <FieldSurveyEntriesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Relevé de terrain');
+      final type = l['type'];
+      final libelle = l['label'];
+      final statut = l['status'];
+      final donnees = l['data'];
+      if (type is! String || !_typesReleves.contains(type)) {
+        throw FormatException('Relevé de terrain $id refusé : type inconnu ($type).');
+      }
+      if (libelle is! String || libelle.isEmpty) {
+        throw FormatException('Relevé de terrain $id refusé : libellé absent.');
+      }
+      if (statut != 'a_valider' && statut != 'valide') {
+        throw FormatException('Relevé de terrain $id refusé : statut illisible ($statut).');
+      }
+      if (donnees is! Map && !(donnees is List && donnees.isEmpty)) {
+        throw FormatException('Relevé de terrain $id refusé : valeurs illisibles.');
+      }
+      recues.add(
+        FieldSurveyEntriesCompanion.insert(
+          id: id,
+          type: type,
+          label: libelle,
+          speciesCode: Value(_texteStrict(l['species_code'], 'Relevé $id : espèce')),
+          dataJson: Value(jsonEncode(donnees is Map ? donnees : <String, dynamic>{})),
+          status: Value(statut as String),
+          validatedBy: Value(_texteStrict(l['validated_by'], 'Relevé $id : validé par')),
+          validatedByName: Value(_texteStrict(l['validated_by_name'], 'Relevé $id : nom du validateur')),
+          validatedAt: Value(_instantTechnique(l['validated_at'])),
+          isActive: Value(_actifStrict(l, 'Relevé $id')),
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: const Value(null),
+        ),
+      );
+    }
+
+    final servis = [for (final r in recues) r.id.value];
+    await _fusionnerBareme(
+      table: _db.fieldSurveyEntries,
+      recues: recues,
+      idsServis: servis,
+      idDe: (FieldSurveyEntry r) => r.id,
+      statutDe: (FieldSurveyEntry r) => r.syncStatus,
+      synceeHorsServis: ($FieldSurveyEntriesTable t) => Expression.and([
+        t.syncStatus.equalsValue(SyncStatus.synced),
+        t.id.isNotIn(servis),
+      ]),
+      archivage: const FieldSurveyEntriesCompanion(isActive: Value(false)),
+    );
+
+    return recues.length;
+  }
+
   /// Ticket U2 (décision client D-U2 du 19/10/2026) — OBJECTIFS DE GMQ (`growth_standards`) : référentiel en
   /// LECTURE SEULE, servi complet à chaque tirage, dont l'ENSEMBLE est remplacé (le poste ne l'écrit jamais : rien
   /// de local à protéger).
@@ -1916,7 +2247,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.growthStandards).go();
       for (final r in recus) {
         await _db.into(_db.growthStandards).insert(r);
@@ -2029,7 +2360,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.veterinaryWithdrawalPeriods).go();
 
       for (final l in lignes) {
@@ -2061,6 +2392,8 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
     // ⚠️⚠️ LES DECLARATIONS EN ATTENTE SONT PRESERVEES. Une saillie declaree
     // au poste et pas encore acquittee n'existe pas encore cote serveur : la
@@ -2119,8 +2452,10 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final c
             in await (_db.select(_db.customers)..where(
@@ -2130,23 +2465,24 @@ class SyncEngine {
           c.id,
       };
 
-      for (final l in lignes) {
-        if (protegees.contains(l['id'])) continue;
-
-        await _db
-            .into(_db.customers)
-            .insertOnConflictUpdate(
-              CustomersCompanion.insert(
-                id: l['id'] as String,
-                name: (l['name'] ?? '') as String,
-                phone: Value(l['phone'] as String?),
-                email: Value(l['email'] as String?),
-                city: Value(l['city'] as String?),
-                creditLimit: Value(_reel(l['credit_limit']) ?? 0),
-                isActive: Value(_bool(l['is_active'])),
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch` ; un client `pending` / `conflict` reste intouchable.
+      await _db.batch((b) {
+        for (final l in lignes) {
+          if (protegees.contains(l['id'])) continue;
+          final client = CustomersCompanion.insert(
+            id: l['id'] as String,
+            name: (l['name'] ?? '') as String,
+            phone: Value(l['phone'] as String?),
+            email: Value(l['email'] as String?),
+            city: Value(l['city'] as String?),
+            // MECEF-3 — IFU du client (13 chiffres, facultatif) : préremplit la facture normalisée.
+            ifu: Value(l['ifu'] as String?),
+            creditLimit: Value(_reel(l['credit_limit']) ?? 0),
+            isActive: Value(_bool(l['is_active'])),
+          );
+          b.insert(_db.customers, client, onConflict: DoUpdate((_) => client));
+        }
+      });
     });
 
     return lignes.length;
@@ -2169,22 +2505,22 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
-      for (final l in lignes) {
-        await _db
-            .into(_db.receivables)
-            .insertOnConflictUpdate(
-              ReceivablesCompanion.insert(
-                id: l['id'] as String,
-                customerId: (l['customer_id'] ?? '') as String,
-                saleId: Value(l['sale_id'] as String?),
-                amount: _reel(l['amount']) ?? 0,
-                amountPaid: Value(_reel(l['amount_paid']) ?? 0),
-                dueDate: Value(_date(l['due_date'])),
-                status: Value((l['status'] ?? 'en_cours') as String),
-              ),
-            );
-      }
+    await _transactionDePage(() async {
+      // PWA-2c — UNE rafale `batch` (une instruction par créance avant).
+      await _db.batch((b) {
+        for (final l in lignes) {
+          final creance = ReceivablesCompanion.insert(
+            id: l['id'] as String,
+            customerId: (l['customer_id'] ?? '') as String,
+            saleId: Value(l['sale_id'] as String?),
+            amount: _reel(l['amount']) ?? 0,
+            amountPaid: Value(_reel(l['amount_paid']) ?? 0),
+            dueDate: Value(_date(l['due_date'])),
+            status: Value((l['status'] ?? 'en_cours') as String),
+          );
+          b.insert(_db.receivables, creance, onConflict: DoUpdate((_) => creance));
+        }
+      });
 
       final servies = [for (final l in lignes) l['id'] as String];
       await (_db.delete(
@@ -2209,7 +2545,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final a
             in await (_db.select(_db.customerAdvances)..where(
@@ -2219,27 +2555,26 @@ class SyncEngine {
           a.id,
       };
 
-      for (final l in lignes) {
-        if (protegees.contains(l['id'])) continue;
-
-        await _db
-            .into(_db.customerAdvances)
-            .insertOnConflictUpdate(
-              CustomerAdvancesCompanion.insert(
-                id: l['id'] as String,
-                customerId: (l['customer_id'] ?? '') as String,
-                amount: _reel(l['amount']) ?? 0,
-                amountUsed: Value(_reel(l['amount_used']) ?? 0),
-                advanceDate: Value(_date(l['advance_date'])),
-                isActive: Value(_bool(l['is_active'])),
-                treasuryAccountId: Value(l['treasury_account_id'] as String?),
-                paymentMode: Value(l['payment_mode'] as String?),
-                motif: Value(l['motif'] as String?),
-                deviceId: Value(l['device_id'] as String?),
-                syncStatus: const Value(SyncStatus.synced),
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch` ; une avance `pending` / `conflict` reste intouchable.
+      await _db.batch((b) {
+        for (final l in lignes) {
+          if (protegees.contains(l['id'])) continue;
+          final avance = CustomerAdvancesCompanion.insert(
+            id: l['id'] as String,
+            customerId: (l['customer_id'] ?? '') as String,
+            amount: _reel(l['amount']) ?? 0,
+            amountUsed: Value(_reel(l['amount_used']) ?? 0),
+            advanceDate: Value(_date(l['advance_date'])),
+            isActive: Value(_bool(l['is_active'])),
+            treasuryAccountId: Value(l['treasury_account_id'] as String?),
+            paymentMode: Value(l['payment_mode'] as String?),
+            motif: Value(l['motif'] as String?),
+            deviceId: Value(l['device_id'] as String?),
+            syncStatus: const Value(SyncStatus.synced),
+          );
+          b.insert(_db.customerAdvances, avance, onConflict: DoUpdate((_) => avance));
+        }
+      });
 
       final servies = [for (final l in lignes) l['id'] as String];
       await (_db.delete(_db.customerAdvances)..where(
@@ -2264,7 +2599,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️⚠️ UNE FICHE `pending` OU `conflict` N'EST NI EFFACÉE NI ÉCRASÉE : elle n'existe
       // (ou n'a changé) que sur ce poste. Seules les fiches synchronisées sont remplacées
       // par le tirage — l'ensemble, comme avant.
@@ -2281,12 +2616,11 @@ class SyncEngine {
         _db.suppliers,
       )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced))).go();
 
-      for (final l in lignes) {
-        if (protegees.contains(l['id'])) continue;
-
-        await _db
-            .into(_db.suppliers)
-            .insert(
+      // PWA-2c — UNE rafale `batch` (les fiches acquittées viennent d'être effacées ; une fiche protégée n'est pas réécrite).
+      await _db.batch((b) {
+        b.insertAll(_db.suppliers, [
+          for (final l in lignes)
+            if (!protegees.contains(l['id']))
               SuppliersCompanion.insert(
                 id: l['id'] as String,
                 name: (l['name'] ?? '') as String,
@@ -2295,33 +2629,109 @@ class SyncEngine {
                 email: Value(l['email'] as String?),
                 address: Value(l['address'] as String?),
               ),
-            );
-      }
+        ]);
+      });
     });
 
     return lignes.length;
   }
 
-  /// Plan comptable — référentiel remplacé à chaque tirage.
+  /// Plan comptable — fusion STRICTE (ticket CP-1).
+  ///
+  /// ⚠️⚠️ **UN COMPTE `pending` / `conflict` N'EST JAMAIS ÉCRASÉ NI RETIRÉ** : créé, modifié ou archivé au poste, il n'est pas
+  /// encore connu du serveur. Les comptes ACQUITTÉS sont remplacés par ce que sert le serveur (qui ne sert que les comptes
+  /// actifs) ; ceux qu'il ne sert plus (archivés ailleurs) sont retirés, comme avant.
   Future<int> _absorberPlanComptable(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // ⚠️ STRICT : un identifiant servi deux fois (ou invalide) refuse TOUT le tirage — deux comptes différents ne se fusionnent
+    // pas en silence, et le plan précédent reste.
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Compte');
+    }
 
-    await _db.transaction(() async {
-      await _db.delete(_db.chartOfAccounts).go();
+    await _transactionDePage(() async {
+      final locaux = {
+        for (final c in await _db.select(_db.chartOfAccounts).get()) c.id: c.syncStatus,
+      };
+      final disparus = [
+        for (final e in locaux.entries)
+          if (e.value == SyncStatus.synced && !vus.contains(e.key)) e.key,
+      ];
+      if (disparus.isNotEmpty) {
+        await (_db.delete(_db.chartOfAccounts)..where((t) => t.id.isIn(disparus))).go();
+      }
+
+      // PWA-2b — UNE rafale `batch` (un seul aller-retour vers le moteur SQLite) au lieu d'un `await insert` par compte :
+      // sur le navigateur chaque instruction attendue est un message vers le worker (≈ 55 ms) — 1 337 comptes = 73 s
+      // mesurés (la table est servie en entier à chaque tirage, y compris incrémental). Sémantique inchangée : un
+      // compte `pending` / `conflict` n'est jamais écrasé.
+      await _db.batch((b) {
+        for (final l in lignes) {
+          final id = l['id'] as String;
+          final statut = locaux[id];
+          if (statut != null && statut != SyncStatus.synced) continue;
+          final compte = ChartOfAccountsCompanion.insert(
+            id: id,
+            code: (l['code'] ?? '') as String,
+            label: (l['label'] ?? '') as String,
+            accountClass: Value(_entier(l['class'])),
+          );
+          b.insert(_db.chartOfAccounts, compte, onConflict: DoUpdate((_) => compte));
+        }
+      });
+    });
+
+    return lignes.length;
+  }
+
+  /// Ticket CP-3 — registre des immobilisations du serveur (table MIXTE). STRICT : un identifiant servi deux fois refuse TOUT
+  /// le tirage. Un bien `pending` / `conflict` n'est jamais écrasé ; un bien acquitté qui n'est plus servi (réinitialisation)
+  /// disparaît.
+  Future<int> _absorberImmobilisations(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Immobilisation');
+    }
+
+    await _transactionDePage(() async {
+      final locaux = {for (final b in await _db.select(_db.fixedAssets).get()) b.id: b.syncStatus};
+      final disparus = [
+        for (final e in locaux.entries)
+          if (e.value == SyncStatus.synced && !vus.contains(e.key)) e.key,
+      ];
+      if (disparus.isNotEmpty) {
+        await (_db.delete(_db.fixedAssets)..where((t) => t.id.isIn(disparus))).go();
+      }
 
       for (final l in lignes) {
-        await _db
-            .into(_db.chartOfAccounts)
-            .insert(
-              ChartOfAccountsCompanion.insert(
-                id: l['id'] as String,
-                code: (l['code'] ?? '') as String,
-                label: (l['label'] ?? '') as String,
-                accountClass: Value(_entier(l['class'])),
-              ),
-            );
+        final id = l['id'] as String;
+        final statut = locaux[id];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        final date = _date(l['acquisition_date']);
+        if (date == null) throw FormatException('Immobilisation $id refusée : date d\'acquisition absente.');
+        final bien = FixedAssetsCompanion.insert(
+          id: id,
+          code: (l['code'] ?? '') as String,
+          label: (l['label'] ?? '') as String,
+          accountCode: (l['account_code'] ?? '') as String,
+          acquisitionDate: date,
+          acquisitionValue: _reel(l['acquisition_value']) ?? 0,
+          durationYears: _entier(l['duration_years']) ?? 1,
+          residualValue: Value(_reel(l['residual_value']) ?? 0),
+          status: Value((l['status'] ?? 'en_service') as String),
+          disposalDate: Value(_date(l['disposal_date'])),
+          disposalReason: Value(l['disposal_reason'] as String?),
+          isCapitalized: Value(l['is_capitalized'] == true),
+          isActive: Value(l['is_active'] != false),
+          counterpart: const Value(null),
+        );
+        await _db.into(_db.fixedAssets).insert(bien, onConflict: DoUpdate((_) => bien));
       }
     });
 
@@ -2334,7 +2744,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.fiscalYears).go();
 
       for (final l in lignes) {
@@ -2347,9 +2757,42 @@ class SyncEngine {
                 startDate: Value(_date(l['start_date'])),
                 endDate: Value(_date(l['end_date'])),
                 status: Value(l['status'] as String?),
+                // Ticket CP-4 — l'étape 1 de la clôture et la date de clôture (heure murale du Bénin).
+                step1ConfirmedAt: Value(_date(l['step1_confirmed_at'])),
+                closedAt: Value(_date(l['closed_at'])),
               ),
             );
       }
+    });
+
+    return lignes.length;
+  }
+
+  /// Ticket CP-4 — clôtures de mois : référentiel remplacé à chaque tirage (les demandes en attente restent dans leur table).
+  Future<int> _absorberClotures(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Clôture de mois');
+    }
+
+    await _transactionDePage(() async {
+      await _db.delete(_db.periodicClosures).go();
+      await _db.batch((b) {
+        for (final l in lignes) {
+          b.insert(
+            _db.periodicClosures,
+            PeriodicClosuresCompanion.insert(
+              id: l['id'] as String,
+              period: (l['period'] ?? '') as String,
+              closedAt: Value(_date(l['closed_at'])),
+              reopenedAt: Value(_date(l['reopened_at'])),
+            ),
+          );
+        }
+      });
     });
 
     return lignes.length;
@@ -2546,12 +2989,14 @@ class SyncEngine {
 
     // ── Application, en une transaction ─────────────────────────────────────
     String? avertissementVidage;
-    await _db.transaction(() async {
-      for (final e in entetes) {
-        await _db
-            .into(_db.accountingEntries)
-            .insert(e, onConflict: DoUpdate((_) => e));
-      }
+    await _transactionDePage(() async {
+      // PWA-2c — une rafale `batch` pour les en-têtes et une pour les lignes (491 écritures + 1 287 lignes = 1 778 instructions
+      // avant : au navigateur chacune coûtait un aller-retour). Même ordre, mêmes règles (une ligne qui heurte une clé refuse la page).
+      await _db.batch((b) {
+        for (final e in entetes) {
+          b.insert(_db.accountingEntries, e, onConflict: DoUpdate((_) => e));
+        }
+      });
 
       // Les lignes d'une écriture servie sont REMPLACÉES : `updateManual` les recrée avec de
       // nouveaux identifiants, les anciennes ne sont plus servies — et ne doivent plus compter.
@@ -2560,9 +3005,7 @@ class SyncEngine {
           _db.accountingEntryLines,
         )..where((l) => l.entryId.isIn(morceau))).go();
       }
-      for (final c in corps) {
-        await _db.into(_db.accountingEntryLines).insert(c);
-      }
+      await _db.batch((b) => b.insertAll(_db.accountingEntryLines, corps));
 
       if (annoncees != null) {
         final locales = [
@@ -2658,6 +3101,35 @@ class SyncEngine {
     if (brut is! Map) return 0;
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
+    await _tirerFichiersEntreprise(l);
+    // PWA-2c — les réglages MeCeF servis sont écrits en UNE rafale `batch` (jusqu'à six instructions avant).
+    final reglages = <AppSettingsCompanion>[];
+    // Ticket VC-5 — le serveur dit si le module MeCeF est activé (clé absente d'un serveur antérieur : le poste garde son défaut).
+    if (l['mecef_actif'] is bool) {
+      reglages.add(AppSettingsCompanion.insert(key: 'mecef.actif', value: l['mecef_actif'] == true ? '1' : '0'));
+    }
+    // MECEF-1 — le mode (`desactive` · `emecef` · `boitier`), l'adresse de l'API, l'opérateur et UN BOOLÉEN « jeton configuré » :
+    // jamais le jeton lui-même (le serveur ne le sert pas). Clés absentes (serveur antérieur) : rien n'est touché.
+    for (final (cleServeur, cleLocale) in const [
+      ('mecef_mode', 'mecef.mode'),
+      ('mecef_api_url', 'mecef.api_url'),
+      ('mecef_operateur_id', 'mecef.operateur_id'),
+      ('mecef_operateur_nom', 'mecef.operateur_nom'),
+    ]) {
+      if (l.containsKey(cleServeur)) {
+        reglages.add(AppSettingsCompanion.insert(key: cleLocale, value: (l[cleServeur] ?? '').toString()));
+      }
+    }
+    if (l['mecef_jeton_configure'] is bool) {
+      reglages.add(AppSettingsCompanion.insert(key: 'mecef.jeton_configure', value: l['mecef_jeton_configure'] == true ? '1' : '0'));
+    }
+    if (reglages.isNotEmpty) {
+      await _db.batch((b) {
+        for (final r in reglages) {
+          b.insert(_db.appSettings, r, onConflict: DoUpdate((_) => r));
+        }
+      });
+    }
 
     final delaiServi = l.containsKey('rappel_soins_jours');
     final delai = l['rappel_soins_jours'];
@@ -2669,7 +3141,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locale = await (_db.select(
         _db.companySettings,
       )..where((t) => t.id.equals('unique'))).getSingleOrNull();
@@ -2687,6 +3159,15 @@ class SyncEngine {
         rccm: Value(l['rccm'] as String?),
         tvaEnabled: Value(_bool(l['tva_enabled'])),
         tvaDefaultRate: Value(_reel(l['tva_default_rate'])),
+        // Ticket RH-4 — taux de paie (clés absentes d'un serveur antérieur : nuls, défauts du web au calcul).
+        vpsRate: Value(_reel(l['vps_rate'])),
+        cnssEmployeeRate: Value(_reel(l['cnss_employee_rate'])),
+        cnssEmployerPensionRate: Value(_reel(l['cnss_employer_pension_rate'])),
+        cnssEmployerFamilyRate: Value(_reel(l['cnss_employer_family_rate'])),
+        cnssEmployerRiskRate: Value(_reel(l['cnss_employer_risk_rate'])),
+        // Tickets PA-3 / PA-7 / PA-8 — verrou de paie (clés absentes : valeurs neutres).
+        payrollLocked: Value(l['payroll_locked'] == true),
+        payrollEditedAt: Value(l['payroll_edited_at'] as String?),
         rappelSoinsJours: delaiServi && !protege
             ? Value(delai as int?)
             : const Value.absent(),
@@ -2713,7 +3194,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️⚠️ TICKET MOD1 — UNE BASCULE FAITE SUR CE POSTE ET PAS ENCORE ACQUITTÉE N'EST JAMAIS ÉCRASÉE. Le référentiel
       // était remplacé en bloc à chaque tirage : le serveur, qui n'avait pas encore reçu la bascule, renvoyait
       // l'ancienne valeur et le module « revenait » tout seul à son état d'avant. Les lignes `pending` / `conflict`
@@ -2761,7 +3242,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.rolesApplicatifs).go();
 
       for (final l in lignes) {
@@ -2784,32 +3265,93 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Utilisateurs — référentiel remplacé à chaque tirage.
-  Future<int> _absorberUtilisateurs(Object? brut) async {
+  /// Ticket CP-5 — lignes de relevé bancaire : référentiel remplacé à chaque tirage (les demandes d'import en attente restent
+  /// dans leur table, jamais touchées).
+  Future<int> _absorberRelevesBancaires(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    final vus = <String>{};
+    for (final l in lignes) {
+      _identifiantStrict(l, vus, 'Ligne de relevé');
+    }
+
+    await _transactionDePage(() async {
+      await _db.delete(_db.bankStatementLines).go();
+      await _db.batch((b) {
+        for (final l in lignes) {
+          final date = _date(l['statement_date']);
+          if (date == null) continue;
+          b.insert(
+            _db.bankStatementLines,
+            BankStatementLinesCompanion.insert(
+              id: l['id'] as String,
+              accountId: (l['account_id'] ?? '') as String,
+              statementDate: date,
+              label: (l['label'] ?? '') as String,
+              amount: _reel(l['amount']) ?? 0,
+            ),
+          );
+        }
+      });
+    });
+
+    return lignes.length;
+  }
+
+  /// Ticket PA-2 — droits existants : référentiel remplacé à chaque tirage (clé servie au seul administrateur).
+  Future<int> _absorberDroits(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
-      await _db.delete(_db.utilisateurs).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.utilisateurs)
-            .insert(
-              UtilisateursCompanion.insert(
-                id: l['id'] as String,
-                name: (l['name'] ?? '') as String,
-                username: Value(l['username'] as String?),
-                email: Value(l['email'] as String?),
-                role: Value(l['role'] as String?),
-                isActive: Value(_bool(l['is_active'])),
-              ),
-            );
-      }
+    await _transactionDePage(() async {
+      await _db.delete(_db.permissionsApplicatives).go();
+      await _db.batch((b) {
+        for (final l in lignes) {
+          b.insert(
+            _db.permissionsApplicatives,
+            PermissionsApplicativesCompanion.insert(id: (l['id'] ?? '').toString(), name: (l['name'] ?? '') as String),
+          );
+        }
+      });
     });
 
     return lignes.length;
+  }
+
+  /// Utilisateurs — référentiel remplacé à chaque tirage.
+  /// Ticket UT-1 — fusion STRICTE : un compte `pending` / `conflict` de ce poste n'est jamais écrasé par le tirage.
+  Future<int> _absorberUtilisateurs(Object? brut) async {
+    if (brut == null) return 0;
+
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <UtilisateursCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Utilisateur');
+      recus.add(
+        UtilisateursCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          name: (l['name'] ?? '') as String,
+          username: Value(l['username'] as String?),
+          email: Value(l['email'] as String?),
+          role: Value(l['role'] as String?),
+          isActive: Value(_bool(l['is_active'])),
+          // MDP-1 : le drapeau seul (affichage de la liste) ; absent d'un serveur ancien = faux. Jamais le mot de passe.
+          mustChangePassword: Value(_bool(l['must_change_password'])),
+        ),
+      );
+    }
+
+    await _fusionnerMixte(_db.utilisateurs, recus, vus);
+
+    return recus.length;
   }
 
   /// Journal d'audit — les deux cents dernières actions (U14 : la liste du web), remplacées à chaque tirage.
@@ -2818,7 +3360,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.auditLogs).go();
 
       for (final l in lignes) {
@@ -2855,7 +3397,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.notifications).go();
 
       for (final l in lignes) {
@@ -2896,21 +3438,21 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.lotRevenues).go();
 
-      for (final l in lignes) {
-        await _db
-            .into(_db.lotRevenues)
-            .insert(
-              LotRevenuesCompanion.insert(
-                lotId: l['lot_id'] as String,
-                productId: l['product_id'] as String,
-                label: (l['label'] ?? '') as String,
-                amount: _reel(l['amount']) ?? 0,
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch`.
+      await _db.batch((b) {
+        b.insertAll(_db.lotRevenues, [
+          for (final l in lignes)
+            LotRevenuesCompanion.insert(
+              lotId: l['lot_id'] as String,
+              productId: l['product_id'] as String,
+              label: (l['label'] ?? '') as String,
+              amount: _reel(l['amount']) ?? 0,
+            ),
+        ]);
+      });
 
       await _db
           .into(_db.appSettings)
@@ -2937,7 +3479,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.livestockSpecies).go();
 
       for (final l in lignes) {
@@ -3005,20 +3547,23 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // Les acquittés sont remplacés par l'ensemble servi ; les `pending` / `conflict` restent tels quels.
       await (_db.delete(_db.animals)..where((t) => t.syncStatus.equalsValue(SyncStatus.synced))).go();
       final gardes = {
         for (final a in await _db.select(_db.animals).get()) a.id,
       };
-      for (final a in recues) {
-        if (gardes.contains(a.id.value)) continue;
-        await _db.into(_db.animals).insert(a);
-      }
+      // PWA-2c — UNE rafale `batch` ; un sujet `pending` / `conflict` (gardé) n'est jamais réécrit.
+      await _db.batch((b) {
+        b.insertAll(_db.animals, [for (final a in recues) if (!gardes.contains(a.id.value)) a]);
+      });
     });
 
     return lignes.length;
   }
+
+  /// Valeur reçue → `Value` Drift : absente (`null`), la colonne garde son défaut.
+  static Value<T> _valeur<T>(T? v) => v == null ? const Value.absent() : Value(v);
 
   /// Modèles d'attestation — l'ENSEMBLE est remplacé à chaque tirage (F0.64).
   ///
@@ -3030,7 +3575,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.attestationTemplates).go();
 
       for (final l in lignes) {
@@ -3041,6 +3586,26 @@ class SyncEngine {
                 id: l['id'] as String,
                 type: l['type'] as String,
                 bodyText: l['body_text'] as String,
+                // ATT-2 : la règle de signature et les signataires. Un serveur plus ancien ne les sert pas : la valeur
+                // absente reprend le défaut de la table (12 mois, le promoteur seul au palier court, les trois au long).
+                seuilSignatureMois: _valeur(_entier(l['seuil_signature_mois'])),
+                appreciationText: _valeur(l['appreciation_text'] as String?),
+                appreciationImprimee: _valeur(l['appreciation_imprimee'] as bool?),
+                sig1Titre: _valeur(l['sig1_titre'] as String?),
+                sig1Nom: _valeur(l['sig1_nom'] as String?),
+                sig1Fonction: _valeur(l['sig1_fonction'] as String?),
+                sig2Titre: _valeur(l['sig2_titre'] as String?),
+                sig2Nom: _valeur(l['sig2_nom'] as String?),
+                sig2Fonction: _valeur(l['sig2_fonction'] as String?),
+                sig3Titre: _valeur(l['sig3_titre'] as String?),
+                sig3Nom: _valeur(l['sig3_nom'] as String?),
+                sig3Fonction: _valeur(l['sig3_fonction'] as String?),
+                sig1Court: _valeur(l['sig1_court'] as bool?),
+                sig2Court: _valeur(l['sig2_court'] as bool?),
+                sig3Court: _valeur(l['sig3_court'] as bool?),
+                sig1Long: _valeur(l['sig1_long'] as bool?),
+                sig2Long: _valeur(l['sig2_long'] as bool?),
+                sig3Long: _valeur(l['sig3_long'] as bool?),
               ),
             );
       }
@@ -3099,7 +3664,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final m
             in await (_db.select(_db.mails)..where(
@@ -3110,6 +3675,8 @@ class SyncEngine {
       };
 
       final servis = <String>{};
+      // PWA-2c — les écritures sont COLLECTÉES puis jouées en UNE rafale `batch` (même ordre) : une instruction par ligne avant.
+      final ops = <void Function(Batch)>[];
 
       for (final l in lignes) {
         final id = l['id'];
@@ -3140,14 +3707,11 @@ class SyncEngine {
 
         // Archivé côté serveur : il quitte la liste du poste (rien n'y est supprimé là-bas).
         if (l.containsKey('is_active') && !_bool(l['is_active'])) {
-          await (_db.delete(_db.mails)..where((t) => t.id.equals(id))).go();
+          ops.add((b) => b.deleteWhere(_db.mails, (t) => t.id.equals(id)));
           continue;
         }
 
-        await _db
-            .into(_db.mails)
-            .insertOnConflictUpdate(
-              MailsCompanion.insert(
+        final ligne = MailsCompanion.insert(
                 id: id,
                 reference: Value(l['reference'] as String?),
                 type: type as String,
@@ -3157,11 +3721,17 @@ class SyncEngine {
                 isActive: const Value(true),
                 syncStatus: const Value(SyncStatus.synced),
                 knownByServer: const Value(true),
-              ),
-            );
+              );
+        ops.add((b) => b.insert(_db.mails, ligne, onConflict: DoUpdate((_) => ligne)));
       }
 
       // Une ligne synchronisée que le serveur n'a PAS servie n'est plus un courrier actif.
+      await _db.batch((b) {
+        for (final o in ops) {
+          o(b);
+        }
+      });
+
       await (_db.delete(_db.mails)..where(
             (t) => Expression.and([
               t.syncStatus.equalsValue(SyncStatus.synced),
@@ -3196,7 +3766,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final d
             in await (_db.select(_db.administrativeDocuments)..where(
@@ -3207,6 +3777,8 @@ class SyncEngine {
       };
 
       final servis = <String>{};
+      // PWA-2c — les écritures sont COLLECTÉES puis jouées en UNE rafale `batch` (même ordre) : une instruction par ligne avant.
+      final ops = <void Function(Batch)>[];
 
       for (final l in lignes) {
         final id = l['id'];
@@ -3253,16 +3825,11 @@ class SyncEngine {
 
         // Retiré côté serveur : il quitte la liste du poste (rien n'y est supprimé là-bas).
         if (l.containsKey('is_active') && !_bool(l['is_active'])) {
-          await (_db.delete(
-            _db.administrativeDocuments,
-          )..where((t) => t.id.equals(id))).go();
+          ops.add((b) => b.deleteWhere(_db.administrativeDocuments, (t) => t.id.equals(id)));
           continue;
         }
 
-        await _db
-            .into(_db.administrativeDocuments)
-            .insertOnConflictUpdate(
-              AdministrativeDocumentsCompanion.insert(
+        final ligne = AdministrativeDocumentsCompanion.insert(
                 id: id,
                 title: titre,
                 type: Value(type),
@@ -3272,11 +3839,17 @@ class SyncEngine {
                 isActive: const Value(true),
                 syncStatus: const Value(SyncStatus.synced),
                 knownByServer: const Value(true),
-              ),
-            );
+              );
+        ops.add((b) => b.insert(_db.administrativeDocuments, ligne, onConflict: DoUpdate((_) => ligne)));
       }
 
       // Une ligne synchronisée que le serveur n'a PAS servie n'est plus un document actif.
+      await _db.batch((b) {
+        for (final o in ops) {
+          o(b);
+        }
+      });
+
       await (_db.delete(_db.administrativeDocuments)..where(
             (t) => Expression.and([
               t.syncStatus.equalsValue(SyncStatus.synced),
@@ -3309,7 +3882,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final a
             in await (_db.select(_db.archivedDocuments)..where(
@@ -3320,6 +3893,8 @@ class SyncEngine {
       };
 
       final servis = <String>{};
+      // PWA-2c — les écritures sont COLLECTÉES puis jouées en UNE rafale `batch` (même ordre) : une instruction par ligne avant.
+      final ops = <void Function(Batch)>[];
 
       for (final l in lignes) {
         final id = l['id'];
@@ -3359,16 +3934,11 @@ class SyncEngine {
 
         // Retiré côté serveur : il quitte la liste du poste (rien n'y est supprimé là-bas).
         if (l.containsKey('is_active') && !_bool(l['is_active'])) {
-          await (_db.delete(
-            _db.archivedDocuments,
-          )..where((t) => t.id.equals(id))).go();
+          ops.add((b) => b.deleteWhere(_db.archivedDocuments, (t) => t.id.equals(id)));
           continue;
         }
 
-        await _db
-            .into(_db.archivedDocuments)
-            .insertOnConflictUpdate(
-              ArchivedDocumentsCompanion.insert(
+        final ligne = ArchivedDocumentsCompanion.insert(
                 id: id,
                 title: titre,
                 category: Value(categorie),
@@ -3377,11 +3947,17 @@ class SyncEngine {
                 isActive: const Value(true),
                 syncStatus: const Value(SyncStatus.synced),
                 knownByServer: const Value(true),
-              ),
-            );
+              );
+        ops.add((b) => b.insert(_db.archivedDocuments, ligne, onConflict: DoUpdate((_) => ligne)));
       }
 
       // Une ligne synchronisée que le serveur n'a PAS servie n'est plus un document actif.
+      await _db.batch((b) {
+        for (final o in ops) {
+          o(b);
+        }
+      });
+
       await (_db.delete(_db.archivedDocuments)..where(
             (t) => Expression.and([
               t.syncStatus.equalsValue(SyncStatus.synced),
@@ -3394,68 +3970,195 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Employés — référentiel remplacé à chaque tirage.
+  /// Employés — table MIXTE depuis RH-1 : fusion par identifiant, un employé `pending` / `conflict` reste intouchable.
   ///
-  /// ⚠️ Un employé archivé côté serveur disparaît du tirage : le garder ferait
-  /// pointer quelqu'un qui a quitté la ferme, et le pointage serait rejeté à
-  /// l'envoi sans que le chef d'équipe comprenne.
+  /// ⚠️⚠️ **STRICT** comme les devis : identifiant invalide ou servi deux fois, nom absent → [FormatException], rien n'est
+  /// écrit. Archivés compris (`is_active`) : un employé archivé au web cesse d'être pointable ici. Une ligne tirée garde
+  /// `device_id = 'serveur'` ; un employé acquitté de CE poste garde son origine.
   Future<int> _absorberEmployes(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    const quoi = 'Employé';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
-      await _db.delete(_db.employees).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.employees)
-            .insert(
-              EmployeesCompanion.insert(
-                id: l['id'] as String,
-                firstName: (l['first_name'] ?? '') as String,
-                lastName: (l['last_name'] ?? '') as String,
-                position: Value(l['position'] as String?),
-                baseSalary: Value(_reel(l['base_salary'])),
-                hireDate: Value(_date(l['hire_date'])),
-                status: Value(l['status'] as String?),
-              ),
-            );
+    final vus = <String>{};
+    final recus = <EmployeesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final prenom = _texteStrict(l['first_name'], '$quoi $id : prénom');
+      final nom = _texteStrict(l['last_name'], '$quoi $id : nom');
+      if (prenom == null || nom == null || nom.isEmpty) {
+        throw FormatException('$quoi $id refusé : nom absent.');
       }
-    });
+      recus.add(
+        EmployeesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          firstName: prenom,
+          lastName: nom,
+          position: Value(_texteStrict(l['position'], '$quoi $id : fonction')),
+          baseSalary: Value(_reel(l['base_salary'])),
+          hireDate: Value(_date(l['hire_date'])),
+          status: Value(_texteStrict(l['status'], '$quoi $id : statut')),
+          isActive: Value(_actifStrict(l, '$quoi $id')),
+        ),
+      );
+    }
 
-    return lignes.length;
+    await _fusionnerMixte(_db.employees, recus, vus);
+
+    return recus.length;
   }
 
-  /// Stagiaires — référentiel remplacé à chaque tirage.
+  /// Stagiaires — table MIXTE depuis RH-2 (mêmes règles que [_absorberEmployes]).
   Future<int> _absorberStagiaires(Object? brut) async {
     if (brut == null) return 0;
 
-    final lignes = _lignes(brut);
+    const quoi = 'Stagiaire';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
-      await _db.delete(_db.internships).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.internships)
-            .insert(
-              InternshipsCompanion.insert(
-                id: l['id'] as String,
-                firstName: (l['first_name'] ?? '') as String,
-                lastName: (l['last_name'] ?? '') as String,
-                school: Value(l['school'] as String?),
-                startDate: Value(_date(l['start_date'])),
-                endDate: Value(_date(l['end_date'])),
-                monthlyFee: Value(_reel(l['monthly_fee'])),
-                feePaid: Value(_bool(l['fee_paid'])),
-              ),
-            );
+    final vus = <String>{};
+    final recus = <InternshipsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final prenom = _texteStrict(l['first_name'], '$quoi $id : prénom');
+      final nom = _texteStrict(l['last_name'], '$quoi $id : nom');
+      if (prenom == null || nom == null || nom.isEmpty) {
+        throw FormatException('$quoi $id refusé : nom absent.');
       }
+      recus.add(
+        InternshipsCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          firstName: prenom,
+          lastName: nom,
+          school: Value(_texteStrict(l['school'], '$quoi $id : établissement')),
+          startDate: Value(_date(l['start_date'])),
+          endDate: Value(_date(l['end_date'])),
+          monthlyFee: Value(_reel(l['monthly_fee'])),
+          feePaid: Value(_bool(l['fee_paid'])),
+          birthDate: Value(_date(l['birth_date'])),
+          birthPlace: Value(_texteStrict(l['birth_place'], '$quoi $id : lieu de naissance')),
+          civilite: Value(_texteStrict(l['civilite'], '$quoi $id : civilité') ?? 'M.'),
+        ),
+      );
+    }
+
+    await _fusionnerMixte(_db.internships, recus, vus);
+
+    return recus.length;
+  }
+
+  /// Ticket RH-2 — absences de stagiaire : table MIXTE, archivées comprises (`is_active`).
+  Future<int> _absorberAbsencesStagiaires(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Absence de stagiaire';
+    final lignes = _lignesStrictes(brut, quoi);
+    if (lignes.isEmpty) return 0;
+
+    final vus = <String>{};
+    final recus = <InternshipAbsencesCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final stagiaire = _texteStrict(l['internship_id'], '$quoi $id : stagiaire');
+      final jour = _date(l['absence_date']);
+      if (stagiaire == null || stagiaire.length != 36) {
+        throw FormatException('$quoi $id refusé : stagiaire absent ou illisible ($stagiaire).');
+      }
+      if (jour == null) {
+        throw FormatException('$quoi $id refusé : date illisible (${l['absence_date']}).');
+      }
+      recus.add(
+        InternshipAbsencesCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _instantTechnique(l['updated_at']) ?? _maintenant(),
+          internshipId: stagiaire,
+          absenceDate: DateTime(jour.year, jour.month, jour.day),
+          reason: Value(_texteStrict(l['reason'], '$quoi $id : motif')),
+          isActive: Value(_actifStrict(l, '$quoi $id')),
+        ),
+      );
+    }
+
+    await _fusionnerMixte(_db.internshipAbsences, recus, vus);
+
+    return recus.length;
+  }
+
+  /// Ticket RH-4 — barème ITS (tranches actives) : référentiel remplacé à chaque tirage.
+  Future<int> _absorberBaremeIts(Object? brut) async {
+    if (brut == null) return 0;
+
+    const quoi = 'Tranche ITS';
+    final lignes = _lignesStrictes(brut, quoi);
+    final vus = <String>{};
+    final recus = <IncomeTaxBracketsCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, quoi);
+      final plancher = _nombreStrict(l['from_amount'], '$quoi $id : plancher');
+      final plafond = _nombreStrict(l['to_amount'], '$quoi $id : plafond');
+      final taux = _nombreStrict(l['rate'], '$quoi $id : taux');
+      if (plancher == null || plancher < 0 || taux == null || taux < 0) {
+        throw FormatException('$quoi $id refusé : plancher ou taux absent ou négatif.');
+      }
+      recus.add(IncomeTaxBracketsCompanion.insert(id: id, fromAmount: plancher, toAmount: Value(plafond), rate: taux));
+    }
+
+    await _transactionDePage(() async {
+      await _db.delete(_db.incomeTaxBrackets).go();
+      await _db.batch((b) => b.insertAll(_db.incomeTaxBrackets, recus));
     });
 
-    return lignes.length;
+    return recus.length;
   }
+
+  /// Fusion d'une table MIXTE (devis, employés, stagiaires, absences) : une ligne locale `pending` / `conflict` n'est
+  /// jamais écrasée ; une ligne acquittée de CE poste garde son `device_id` (l'origine de la saisie).
+  Future<void> _fusionnerMixte<T extends Table, D extends DataClass>(
+    TableInfo<T, D> table,
+    List<UpdateCompanion<D>> recus,
+    Set<String> vus,
+  ) async {
+    await _transactionDePage(() async {
+      final locales = <String, String>{};
+      for (final l in await _db
+          .customSelect(
+            'SELECT id, sync_status FROM ${table.actualTableName} WHERE id IN (${List.filled(vus.length, '?').join(',')})',
+            variables: [for (final id in vus) Variable.withString(id)],
+            readsFrom: {table},
+          )
+          .get()) {
+        locales[l.read<String>('id')] = l.read<String>('sync_status');
+      }
+      // PWA-2c — UNE rafale `batch` ; une ligne locale `pending` / `conflict` reste intouchable.
+      await _db.batch((b) {
+        for (final r in recus) {
+          final id = (r as dynamic).id.value as String;
+          final statut = locales[id];
+          if (statut != null && statut != 'synced') continue;
+          b.insert(table, r, onConflict: DoUpdate((_) => _sansDeviceId(r)));
+        }
+      });
+    });
+  }
+
+  static UpdateCompanion<D> _sansDeviceId<D extends DataClass>(UpdateCompanion<D> c) => switch (c) {
+    EmployeesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    InternshipsCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    InternshipAbsencesCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    CustomerRemindersCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    UtilisateursCompanion e => e.copyWith(deviceId: const Value.absent()) as UpdateCompanion<D>,
+    _ => c,
+  };
 
   /// Pointages — fusion, et un pointage `pending` reste intouchable.
   ///
@@ -3467,12 +4170,19 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
+    // PWA-2c — lecture GROUPÉE (`IN (...)` par tranches) des pointages connus, puis UNE rafale `batch` (au navigateur, une
+    // instruction par ligne coûtait un aller-retour chacune). Un pointage `pending` / `conflict` n'est toujours jamais écrasé.
+    final locales = <String, AttendanceRecord>{};
+    for (final morceau in _morceaux([for (final l in lignes) l['id'] as String])) {
+      for (final e in await (_db.select(_db.attendanceRecords)..where((t) => t.id.isIn(morceau))).get()) {
+        locales[e.id] = e;
+      }
+    }
+    final aEcrire = <AttendanceRecordsCompanion>[];
     for (final l in lignes) {
       final id = l['id'] as String;
 
-      final local = await (_db.select(
-        _db.attendanceRecords,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = locales[id];
 
       if (local != null && local.syncStatus != SyncStatus.synced) continue;
 
@@ -3488,12 +4198,18 @@ class SyncEngine {
         checkIn: Value(l['check_in'] as String?),
         checkOut: Value(l['check_out'] as String?),
         status: (l['status'] ?? 'present') as String,
+        // Ticket RH-3 — archivé au web (ou ici, acquitté) : ne compte plus. Clé absente (serveur antérieur) : actif.
+        isActive: Value(_actifStrict(l, 'Pointage $id')),
       );
 
-      await _db
-          .into(_db.attendanceRecords)
-          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+      aEcrire.add(ligne);
     }
+
+    await _db.batch((b) {
+      for (final ligne in aEcrire) {
+        b.insert(_db.attendanceRecords, ligne, onConflict: DoUpdate((_) => ligne));
+      }
+    });
 
     return lignes.length;
   }
@@ -3514,12 +4230,19 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
+    // PWA-2c — lecture GROUPÉE des ventes connues (`IN (...)` par tranches), puis UNE rafale `batch` : une vente `pending` /
+    // `conflict` reste intouchable, `updatedAt` d'une vente connue reste gardé.
+    final locales = <String, Sale>{};
+    for (final morceau in _morceaux([for (final l in lignes) l['id'] as String])) {
+      for (final e in await (_db.select(_db.sales)..where((t) => t.id.isIn(morceau))).get()) {
+        locales[e.id] = e;
+      }
+    }
+    final aEcrire = <SalesCompanion>[];
     for (final l in lignes) {
       final id = l['id'] as String;
 
-      final locale = await (_db.select(
-        _db.sales,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      final locale = locales[id];
 
       if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
 
@@ -3555,13 +4278,32 @@ class SyncEngine {
         status: Value((l['status'] ?? 'validee') as String),
         mecefStatus: Value(l['mecef_status'] as String?),
         mecefQrRef: Value(l['mecef_qr_ref'] as String?),
+        // MECEF-1 — ce que la DGI a renvoyé (le poste ne les écrit JAMAIS : statut, mentions et QR de la facture PDF).
+        mecefCode: Value(l['mecef_code'] as String?),
+        mecefNim: Value(l['mecef_nim'] as String?),
+        mecefCompteurs: Value(l['mecef_compteurs'] as String?),
+        mecefNormaliseLe: Value(_date(l['mecef_normalise_le'])),
+        mecefMessage: Value(l['mecef_message'] as String?),
+        // MECEF-3 — le choix de la vente (facture simple / normalisée, identité fiscale de l'acheteur, AIB), l'AIB calculé par la
+        // DGI et les frais de livraison inclus. Absents (serveur antérieur) : facture simple, livraison hors total.
+        factureType: Value(l['facture_type'] as String?),
+        clientIfu: Value(l['client_ifu'] as String?),
+        clientNomFacture: Value(l['client_nom_facture'] as String?),
+        aibTaux: Value(l['aib_taux'] as String?),
+        mecefAibMontant: Value(_reel(l['mecef_aib_montant'])),
+        deliveryFee: Value(_reel(l['delivery_fee']) ?? 0),
+        deliveryInTotal: Value(_bool(l['delivery_in_total'])),
         soldAt: vendueLe,
       );
 
-      await _db
-          .into(_db.sales)
-          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+      aEcrire.add(ligne);
     }
+
+    await _db.batch((b) {
+      for (final ligne in aEcrire) {
+        b.insert(_db.sales, ligne, onConflict: DoUpdate((_) => ligne));
+      }
+    });
 
     return lignes.length;
   }
@@ -3833,7 +4575,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️ Un achat que le poste tient `pending` ou en `conflict` n'est pas celui du serveur : rien n'y est touché.
       final achatsLocaux = {
         for (final a in await (_db.select(
@@ -3930,7 +4672,7 @@ class SyncEngine {
       parPiece[piece]!.add(ligne);
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️⚠️ Une pièce `pending` ou en `conflict` sur CE poste garde ses lignes : jamais écrasées.
       final aProteger = await protegees();
       final remplacees = [
@@ -3957,7 +4699,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.payables).go();
 
       for (final l in lignes) {
@@ -3981,33 +4723,70 @@ class SyncEngine {
     return lignes.length;
   }
 
-  /// Bons de commande — référentiel remplacé à chaque tirage.
+  /// Bons de commande — fusion STRICTE (ticket AC-1).
+  ///
+  /// ⚠️⚠️ **UN BON `pending` / `conflict` N'EST JAMAIS ÉCRASÉ** : il n'existe que sur ce poste (fournisseur appelé, livraison
+  /// attendue) et le tirage ne le connaît pas encore. Les bons ACQUITTÉS sont remplacés par ce que sert le serveur — lignes
+  /// comprises —, et ceux que le serveur ne sert plus (réinitialisation, base restaurée) sont retirés, comme avant.
   Future<int> _absorberBonsCommande(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    final vus = <String>{};
+    final recus = <PurchaseOrdersCompanion>[];
+    final lignesDe = <String, List<PurchaseOrderLinesCompanion>>{};
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Bon de commande');
+      recus.add(
+        PurchaseOrdersCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _maintenant(),
+          supplierId: Value(l['supplier_id'] as String?),
+          supplierName: Value(l['supplier_name'] as String?),
+          expectedDeliveryDate: Value(_date(l['expected_delivery_date'])),
+          status: Value(l['status'] as String?),
+          createdAt: Value(_date(l['created_at'])),
+          estimatedTotal: Value(_reel(l['estimated_total']) ?? 0),
+        ),
+      );
+      final vuesLignes = <String>{};
+      lignesDe[id] = [
+        for (final ligne in _lignes(l['lines'] ?? const []))
+          PurchaseOrderLinesCompanion.insert(
+            id: _identifiantStrict(ligne, vuesLignes, 'Ligne de bon de commande'),
+            purchaseOrderId: id,
+            productId: (ligne['product_id'] ?? '') as String,
+            productName: Value(ligne['product_name'] as String?),
+            qty: _reel(ligne['qty']) ?? 0,
+            estimatedUnitPrice: _reel(ligne['estimated_unit_price']) ?? 0,
+          ),
+      ];
+    }
 
-    await _db.transaction(() async {
-      await _db.delete(_db.purchaseOrders).go();
-
-      for (final l in lignes) {
-        await _db
-            .into(_db.purchaseOrders)
-            .insert(
-              PurchaseOrdersCompanion.insert(
-                id: l['id'] as String,
-                supplierId: Value(l['supplier_id'] as String?),
-                supplierName: Value(l['supplier_name'] as String?),
-                expectedDeliveryDate: Value(_date(l['expected_delivery_date'])),
-                status: Value(l['status'] as String?),
-                createdAt: Value(_date(l['created_at'])),
-                estimatedTotal: Value(_reel(l['estimated_total']) ?? 0),
-              ),
-            );
+    await _transactionDePage(() async {
+      final locaux = {
+        for (final b in await _db.select(_db.purchaseOrders).get()) b.id: b.syncStatus,
+      };
+      final disparus = [
+        for (final e in locaux.entries)
+          if (e.value == SyncStatus.synced && !vus.contains(e.key)) e.key,
+      ];
+      if (disparus.isNotEmpty) {
+        await (_db.delete(_db.purchaseOrderLines)..where((t) => t.purchaseOrderId.isIn(disparus))).go();
+        await (_db.delete(_db.purchaseOrders)..where((t) => t.id.isIn(disparus))).go();
+      }
+      for (final r in recus) {
+        final statut = locaux[r.id.value];
+        if (statut != null && statut != SyncStatus.synced) continue;
+        await _db.into(_db.purchaseOrders).insert(r, onConflict: DoUpdate((_) => r.copyWith(deviceId: const Value.absent())));
+        await (_db.delete(_db.purchaseOrderLines)..where((t) => t.purchaseOrderId.equals(r.id.value))).go();
+        await _db.batch((b) => b.insertAll(_db.purchaseOrderLines, lignesDe[r.id.value]!));
       }
     });
 
-    return lignes.length;
+    return recus.length;
   }
 
   /// Achats — fusion, et JAMAIS un remplacement.
@@ -4023,15 +4802,28 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
+    // PWA-2c — UNE lecture groupée (`IN (...)` par tranches) des achats déjà connus et non acquittés au lieu d'un
+    // `select` par ligne, puis UNE rafale `batch`. Sémantique inchangée : un achat `pending` / `conflict` n'est jamais écrasé.
+    final protegees = <String>{};
+    final ids = [for (final l in lignes) l['id'] as String];
+    for (var d = 0; d < ids.length; d += 500) {
+      final tranche = ids.sublist(d, d + 500 > ids.length ? ids.length : d + 500);
+      protegees.addAll(
+        (await (_db.select(_db.purchases)..where(
+                  (t) => t.id.isIn(tranche) & t.syncStatus.equalsValue(SyncStatus.synced).not(),
+                ))
+                .get())
+            .map((a) => a.id),
+      );
+    }
+
+    final aEcrire = <PurchasesCompanion>[];
     for (final l in lignes) {
       final id = l['id'] as String;
-
-      final local = await (_db.select(
-        _db.purchases,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
-
-      if (local != null && local.syncStatus != SyncStatus.synced) continue;
+      if (protegees.contains(id)) continue;
 
       final ligne = PurchasesCompanion.insert(
         id: id,
@@ -4057,10 +4849,14 @@ class SyncEngine {
             : const Value.absent(),
       );
 
-      await _db
-          .into(_db.purchases)
-          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+      aEcrire.add(ligne);
     }
+
+    await _db.batch((b) {
+      for (final ligne in aEcrire) {
+        b.insert(_db.purchases, ligne, onConflict: DoUpdate((_) => ligne));
+      }
+    });
 
     return lignes.length;
   }
@@ -4078,7 +4874,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.supplierCredits).go();
 
       for (final l in lignes) {
@@ -4103,31 +4899,36 @@ class SyncEngine {
   /// contacté ce matin par WhatsApp est présenté exactement comme le voisin que
   /// personne n'a jamais appelé. Le poste faisait rappeler deux fois — la faute
   /// la plus visible pour un client, et la seule qu'il raconte.
+  /// Ticket VC-2 — fusion STRICTE : une relance `pending` / `conflict` de ce poste n'est jamais écrasée par le tirage ;
+  /// ce que le serveur sert (toutes les relances de la ferme, web compris) est fusionné par identifiant.
   Future<int> _absorberRelances(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
-      await _db.delete(_db.customerReminders).go();
+    final vus = <String>{};
+    final recus = <CustomerRemindersCompanion>[];
+    for (final l in lignes) {
+      final id = _identifiantStrict(l, vus, 'Relance');
+      recus.add(
+        CustomerRemindersCompanion.insert(
+          id: id,
+          deviceId: 'serveur',
+          syncStatus: const Value(SyncStatus.synced),
+          updatedAt: _maintenant(),
+          customerId: (l['customer_id'] ?? '') as String,
+          receivableId: Value(l['receivable_id'] as String?),
+          channel: (l['channel'] ?? 'courrier') as String,
+          reminderDate: Value(_date(l['reminder_date'])),
+          message: Value(l['message'] as String?),
+        ),
+      );
+    }
 
-      for (final l in lignes) {
-        await _db
-            .into(_db.customerReminders)
-            .insert(
-              CustomerRemindersCompanion.insert(
-                id: l['id'] as String,
-                customerId: (l['customer_id'] ?? '') as String,
-                receivableId: Value(l['receivable_id'] as String?),
-                channel: (l['channel'] ?? 'courrier') as String,
-                reminderDate: Value(_date(l['reminder_date'])),
-                message: Value(l['message'] as String?),
-              ),
-            );
-      }
-    });
+    await _fusionnerMixte(_db.customerReminders, recus, vus);
 
-    return lignes.length;
+    return recus.length;
   }
 
   /// Protocole prophylactique : référentiel remplacé à chaque tirage.
@@ -4141,7 +4942,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.treasuryAccounts).go();
       await _db.batch((b) {
         for (final l in lignes) {
@@ -4153,6 +4954,13 @@ class SyncEngine {
               accountCode: Value(l['account_code'] as String?),
               type: Value(l['type'] as String?),
               balance: Value(_reel(l['balance']) ?? 0),
+              bankName: Value(l['bank_name'] as String?),
+              holderName: Value(l['holder_name'] as String?),
+              rib: Value(l['rib'] as String?),
+              iban: Value(l['iban'] as String?),
+              operatorName: Value(l['operator_name'] as String?),
+              phoneNumber: Value(l['phone_number'] as String?),
+              simSerial: Value(l['sim_serial'] as String?),
             ),
           );
         }
@@ -4172,7 +4980,7 @@ class SyncEngine {
 
     final libelles = brut.whereType<String>().toList();
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.expenseCategories).go();
       await _db.batch((b) {
         for (final libelle in libelles) {
@@ -4338,7 +5146,7 @@ class SyncEngine {
       }
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final d in await (_db.select(
           _db.expenses,
@@ -4398,7 +5206,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.costCenters).go();
       await _db.batch((b) => b.insertAll(_db.costCenters, recus));
     });
@@ -4478,13 +5286,21 @@ class SyncEngine {
           decision: Value(decision as String?),
           inspectionNotes: Value(notes),
           status: Value(statut as String),
+          // MECEF-1 — facture d'avoir (FA) : tirée, jamais écrite par le poste.
+          mecefStatus: Value(l['mecef_status'] as String?),
+          mecefQrRef: Value(l['mecef_qr_ref'] as String?),
+          mecefCode: Value(l['mecef_code'] as String?),
+          mecefNim: Value(l['mecef_nim'] as String?),
+          mecefCompteurs: Value(l['mecef_compteurs'] as String?),
+          mecefNormaliseLe: Value(_date(l['mecef_normalise_le'])),
+          mecefMessage: Value(l['mecef_message'] as String?),
           // Heure MURALE du serveur, lue telle quelle : le jour du web doit rester le jour.
           createdAt: date,
         ),
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final a in await (_db.select(
           _db.creditNotes,
@@ -4580,7 +5396,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.corbeilleElements).go();
       for (final e in recus) {
         await _db.into(_db.corbeilleElements).insert(e);
@@ -4676,7 +5492,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final d in await (_db.select(
           _db.quotes,
@@ -4736,6 +5552,8 @@ class SyncEngine {
           '$quoi $id refusé : date de règlement illisible (${l['created_at']}).',
         );
       }
+      // Ticket RH-4 — colonnes RH, servies aux seuls comptes `view-rh` (absentes sinon : nulles ici).
+      final periode = _date(l['period_month']);
       recus.add(
         PayslipsCompanion.insert(
           id: id,
@@ -4743,6 +5561,13 @@ class SyncEngine {
           netSalary: net,
           // ⚠️ Heure MURALE du serveur, lue telle quelle : le jour du web (`toDateString()`) doit rester le jour.
           createdAt: instant,
+          employeeId: Value(_texteStrict(l['employee_id'], '$quoi $id : employé')),
+          periodMonth: Value(periode == null ? null : DateTime(periode.year, periode.month, periode.day)),
+          grossSalary: Value(_nombreStrict(l['gross_salary'], '$quoi $id : brut')),
+          absenceDeduction: Value(_nombreStrict(l['absence_deduction'], '$quoi $id : retenue absences')),
+          cnssDeduction: Value(_nombreStrict(l['cnss_deduction'], '$quoi $id : retenue CNSS')),
+          itsDeduction: Value(_nombreStrict(l['its_deduction'], '$quoi $id : retenue ITS')),
+          chargesPatronales: Value(_nombreStrict(l['charges_patronales'], '$quoi $id : charges patronales')),
         ),
       );
     }
@@ -4774,6 +5599,8 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
     final actifs = [
       for (final l in lignes) _actifStrict(l, 'Soin ${l['id']}'),
     ];
@@ -4872,6 +5699,23 @@ class SyncEngine {
       _db.attendanceRecords,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Tickets RH-1, RH-2, RH-4 — registres RH écrits au poste, absences de stagiaire, demandes de règlement de paie.
+    final employes = await (_db.select(_db.employees)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final stagiaires = await (_db.select(_db.internships)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final absencesStagiaires = await (_db.select(_db.internshipAbsences)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final demandesPaie = await (_db.select(_db.payslipRequests)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    // Ticket UT-1 — comptes utilisateurs ; le mot de passe en attente est lu au coffre, jamais en base.
+    final utilisateurs = await (_db.select(_db.utilisateurs)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final motsDePasse = <String, String>{
+      for (final u in utilisateurs)
+        if (await _coffre.read(key: cleMotDePasse(u.id)) case final String mdp) u.id: mdp,
+    };
+    // Ticket MDP-1 — les comptes dont le mot de passe en attente est un mot de passe TEMPORAIRE (réinitialisation).
+    final reinitialisations = <String>{
+      for (final u in utilisateurs)
+        if (motsDePasse.containsKey(u.id) && await _coffre.read(key: cleMotDePasseTemporaire(u.id)) == '1') u.id,
+    };
+
     final produits = await (_db.select(
       _db.products,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4908,6 +5752,52 @@ class SyncEngine {
       _db.advanceImputations,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket VC-1 — encaissements de créances clients : le fait seul part, le serveur applique.
+    final encaissements = await (_db.select(
+      _db.receivablePayments,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket VC-2 — relances de clients : WhatsApp et courrier FAITS, e-mail et SMS DEMANDÉS (le serveur envoie).
+    final relances = await (_db.select(
+      _db.customerReminders,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste (le serveur les traite AVANT les dépenses).
+    final comptes = await (_db.select(
+      _db.chartOfAccounts,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket CP-2 — demandes d'écriture manuelle : créer, modifier, archiver (le serveur fait l'écriture et la numérote).
+    final demandesEcriture = await (_db.select(
+      _db.manualEntryRequests,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket CP-3 — immobilisations saisies au poste (la ligne entière) et demandes de dotation (la date d'arrêté seule).
+    final immobilisations = await (_db.select(
+      _db.fixedAssets,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+    final demandesDotation = await (_db.select(
+      _db.depreciationRequests,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Tickets PA-2/3/4/7/8 — demandes de réglage.
+    final reglages = await (_db.select(_db.settingsRequests)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket CP-4 — demandes de clôture (périodes, exercice, ouverture) : dans l'ordre où elles ont été demandées (le serveur les
+    // joue dans l'ordre reçu : étape 1, puis solde, puis clôture).
+    final demandesCloture = await (_db.select(_db.fiscalClosureRequests)
+          ..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))
+          ..orderBy([(t) => OrderingTerm.asc(CustomExpression<int>('rowid'))]))
+        .get();
+
+    // Ticket CP-5 — relevés bancaires à importer (le texte du fichier part tel quel, le serveur le lit).
+    final releves = await (_db.select(_db.bankStatementImports)..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket AC-1 — bons de commande générés au poste, avec leurs lignes (le serveur les traite AVANT les achats).
+    final bonsCommande = await (_db.select(
+      _db.purchaseOrders,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
     final retours = await (_db.select(
       _db.purchaseReturns,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4929,6 +5819,11 @@ class SyncEngine {
     // Ticket 15.46 — transferts créés ou annulés au poste : le serveur les rejoue.
     final transferts = await (_db.select(
       _db.livestockTransfers,
+    )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
+
+    // Ticket EL-1 — transformations saisies au poste : le fait seul, le serveur sort les sujets et entre le stock.
+    final transformations = await (_db.select(
+      _db.transformations,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
     // Ticket H8b — infirmerie et interventions planifiées saisies au poste.
@@ -4957,6 +5852,13 @@ class SyncEngine {
       _db.elevageNumberingSettings,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
 
+    // Ticket RELEVES-1 — relevés de terrain saisis, validés ou archivés au poste (règles d'incubation AVANT les lots).
+    final relevesTerrain = await (_db.select(_db.fieldSurveyEntries)
+          ..where((t) => t.syncStatus.equalsValue(SyncStatus.pending)))
+        .get()
+      // ⚠️ Une règle d'incubation part AVANT les relevés de lots qui la visent (le serveur exige la règle de l'espèce).
+      ..sort((a, b) => (a.type == 'incubation_regle' ? 0 : 1).compareTo(b.type == 'incubation_regle' ? 0 : 1));
+
     final entreprise = await (_db.select(
       _db.companySettings,
     )..where((t) => t.syncStatus.equalsValue(SyncStatus.pending))).get();
@@ -4976,12 +5878,14 @@ class SyncEngine {
         bandes.isEmpty &&
         sujets.isEmpty &&
         transferts.isEmpty &&
+        transformations.isEmpty &&
         infirmerie.isEmpty &&
         interventions.isEmpty &&
         rations.isEmpty &&
         echeances.isEmpty &&
         provendes.isEmpty &&
         numerotations.isEmpty &&
+        relevesTerrain.isEmpty &&
         entreprise.isEmpty &&
         modules.isEmpty &&
         courriers.isEmpty &&
@@ -4993,6 +5897,11 @@ class SyncEngine {
         demandesCorbeille.isEmpty &&
         avances.isEmpty &&
         imputations.isEmpty &&
+        encaissements.isEmpty &&
+        relances.isEmpty &&
+        bonsCommande.isEmpty &&
+        demandesEcriture.isEmpty &&
+        comptes.isEmpty &&
         produits.isEmpty &&
         reglements.isEmpty &&
         fournisseurs.isEmpty &&
@@ -5004,7 +5913,18 @@ class SyncEngine {
         devis.isEmpty &&
         saillies.isEmpty &&
         achats.isEmpty &&
-        pointages.isEmpty) {
+        pointages.isEmpty &&
+        // Tickets RH-1, RH-2, RH-4.
+        employes.isEmpty &&
+        stagiaires.isEmpty &&
+        absencesStagiaires.isEmpty &&
+        demandesPaie.isEmpty &&
+        immobilisations.isEmpty &&
+        reglages.isEmpty &&
+        releves.isEmpty &&
+        demandesDotation.isEmpty &&
+        demandesCloture.isEmpty &&
+        utilisateurs.isEmpty) {
       return (0, 0, <String>[]);
     }
 
@@ -5013,6 +5933,14 @@ class SyncEngine {
       lignesDAchat[a.id] = await (_db.select(
         _db.purchaseLines,
       )..where((t) => t.purchaseId.equals(a.id))).get();
+    }
+
+    // Ticket AC-1 — lignes des bons à envoyer (lues ici, avec les autres lignes : les TABLES ENVOYÉES sont celles du bon).
+    final lignesDeBon = <String, List<PurchaseOrderLine>>{};
+    for (final b in bonsCommande) {
+      lignesDeBon[b.id] = await (_db.select(
+        _db.purchaseOrderLines,
+      )..where((t) => t.purchaseOrderId.equals(b.id))).get();
     }
 
     final lignesDeVente = <String, List<SaleLine>>{};
@@ -5051,6 +5979,9 @@ class SyncEngine {
     // de départ déjà fixé »).
     final tetes = <String>{};
     for (final lot in {for (final f in fiches) f.lotId}) {
+      // Ticket VOL-2 : le départ COMPLET d'une bande de volailles pondeuses compte aussi le quatrième stade.
+      final bandeTete = await (_db.select(_db.livestockLots)..where((t) => t.id.equals(lot))).getSingleOrNull();
+      final pondeuses = bandeTete?.speciesCode == 'aviculture' && bandeTete?.stage == 'ponte';
       final tete =
           await (_db.select(_db.livestockDailyEntries)
                 ..where(
@@ -5059,6 +5990,7 @@ class SyncEngine {
                     t.catDepartRepro.isNotNull(),
                     t.catDepartSevre.isNotNull(),
                     t.catDepartJeune.isNotNull(),
+                    if (pondeuses) t.catDepart4.isNotNull(),
                   ]),
                 )
                 ..orderBy([(t) => OrderingTerm(expression: t.entryDate)])
@@ -5083,6 +6015,8 @@ class SyncEngine {
         ],
         // Ticket 15.46 — traités par le serveur APRÈS les fiches du même envoi.
         'livestock_transfers': transferts.map(_transfertEnJson).toList(),
+        // Ticket EL-1 — après les fiches et les transferts, comme au serveur.
+        'transformations': transformations.map(_transformationEnJson).toList(),
         // Ticket H8b — `pushInfirmerie` / `pushCalendrierVeterinaire` (manage-elevage).
         'infirmary_records': infirmerie.map(_infirmerieEnJson).toList(),
         'veterinary_calendar_events': interventions
@@ -5100,6 +6034,9 @@ class SyncEngine {
           'feed_types': provendes.map(_provendeEnJson).toList(),
         if (numerotations.isNotEmpty)
           'elevage_numbering': numerotations.map(_numerotationEnJson).toList(),
+        // Ticket RELEVES-1 — `pushFieldSurveyEntries` (manage-elevage) : le statut n'est pas envoyé, le serveur le pose.
+        if (relevesTerrain.isNotEmpty)
+          'field_survey_entries': relevesTerrain.map(_releveEnJson).toList(),
         if (entreprise.isNotEmpty)
           'company_settings': entreprise.map(_rappelSoinsEnJson).toList(),
         // Ticket MOD1 — UNE LIGNE PAR ESPÈCE, valeur explicite (jamais une bascule) ; acquittée sous le code de l'espèce.
@@ -5133,6 +6070,15 @@ class SyncEngine {
             .map((a) => _achatEnJson(a, lignesDAchat[a.id] ?? const []))
             .toList(),
         'attendance_records': pointages.map(_pointageEnJson).toList(),
+        // Tickets RH-1 / RH-2 — `pushEmployees` / `pushInternships` / `pushInternshipAbsences` (manage-rh) : le serveur les
+        // traite AVANT les pointages et la paie du même envoi. Une clé VIDE n'est pas envoyée (postes anciens côté serveur).
+        if (employes.isNotEmpty) 'employees': employes.map(_employeEnJson).toList(),
+        // Ticket UT-1 — `pushUsers` (manage-users), après les employés ; le mot de passe part UNE fois, s'il a été saisi.
+        if (utilisateurs.isNotEmpty) 'users': [for (final u in utilisateurs) _utilisateurEnJson(u, motsDePasse[u.id], reinitialisation: reinitialisations.contains(u.id))],
+        if (stagiaires.isNotEmpty) 'internships': stagiaires.map(_stagiaireEnJson).toList(),
+        if (absencesStagiaires.isNotEmpty) 'internship_absences': absencesStagiaires.map(_absenceStagiaireEnJson).toList(),
+        // Ticket RH-4 — la DEMANDE seule (`pushPayslipRequests`, après les pointages) : jamais un montant.
+        if (demandesPaie.isNotEmpty) 'payslip_requests': demandesPaie.map(_demandePaieEnJson).toList(),
         'products': produits.map(_produitEnJson).toList(),
         'supplier_payments': reglements.map(_reglementEnJson).toList(),
         // ⚠️ TICKET F0.74 — le serveur traite : achats → règlements → RETOURS →
@@ -5155,6 +6101,25 @@ class SyncEngine {
         // les deux voyagent ensemble dans le même paquet, jamais séparés.
         'customer_advances': avances.map(_avanceEnJson).toList(),
         'advance_imputations': imputations.map(_imputationEnJson).toList(),
+        // Ticket VC-1 — traité par le serveur APRÈS les ventes, les avances et leurs imputations.
+        'receivable_payments': encaissements.map(_encaissementEnJson).toList(),
+        // Ticket VC-2 — après les encaissements, comme au serveur.
+        'customer_reminders': relances.map(_relanceEnJson).toList(),
+        // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
+        'chart_of_accounts': comptes.map(_compteEnJson).toList(),
+        // Ticket CP-2 — après le plan comptable (une demande peut viser un compte créé dans le même envoi).
+        'manual_entry_requests': demandesEcriture.map(_demandeEcritureEnJson).toList(),
+        // Ticket CP-3 — après le plan comptable ; la dotation après le registre qu'elle amortit.
+        'fixed_assets': immobilisations.map(_immobilisationEnJson).toList(),
+        'depreciation_requests': demandesDotation.map(_demandeDotationEnJson).toList(),
+        // Tickets PA-* — AVANT les achats et les dépenses : un compte de trésorerie créé ici peut être cité plus bas.
+        'settings_requests': [for (final r in reglages) _reglageEnJson(r, await _fichiersEntreprise(r))],
+        // Ticket CP-5 — après les réglages, avant les dépenses.
+        'bank_statement_imports': [for (final r in releves) {'id': r.id, 'account_id': r.accountId, 'content': r.content}],
+        // Ticket CP-4 — le serveur les joue APRÈS tout le reste de l'envoi (une clôture juge le journal que le paquet vient de remplir).
+        'fiscal_closure_requests': demandesCloture.map(_demandeClotureEnJson).toList(),
+        // Ticket AC-1 — avant les achats : la réception d'un bon vise un bon que ce même envoi vient de créer.
+        'purchase_orders': bonsCommande.map((b) => _bonCommandeEnJson(b, lignesDeBon[b.id] ?? const [])).toList(),
       });
 
     var accepte = 0;
@@ -5256,6 +6221,18 @@ class SyncEngine {
       motifs,
       (n) => rejete += n,
     );
+
+    // Ticket EL-1 — acquittée quand le serveur a rejoué la transformation (sujets sortis, stock entré) : l'effectif de la bande
+    // et le stock du produit fini descendent au tirage de confirmation.
+    final transformationsAcceptees = await _acquitter(
+      'transformations',
+      corps['transformations'],
+      (ids, statut) => (_db.update(_db.transformations)..where((t) => t.id.isIn(ids)))
+          .write(TransformationsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += transformationsAcceptees;
 
     // Ticket H8b — n'acquitte que la VERSION partie (voir [_marquerParStatut]).
     accepte += await _acquitter(
@@ -5373,6 +6350,27 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket RELEVES-1 — n'acquitte que la VERSION partie (instant de saisie inchangé).
+    accepte += await _acquitter(
+      'field_survey_entries',
+      corps['field_survey_entries'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final r in relevesTerrain) (r.id, r.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.fieldSurveyEntries)..where(
+                  (t) => Expression.and([
+                    t.id.equals(id),
+                    saisie == null ? t.updatedAt.isNull() : t.updatedAt.equals(saisie),
+                    t.syncStatus.equalsValue(SyncStatus.pending),
+                  ]),
+                ))
+                .write(FieldSurveyEntriesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+
     // ⚠️ Lignes UNIQUES : le serveur acquitte sous le nom de la clé (`elevage_numbering`, `company_settings`),
     // l'identifiant envoyé avec la ligne — la ligne locale porte la clé fixe `unique`.
     accepte += await _acquitter(
@@ -5480,6 +6478,164 @@ class SyncEngine {
       (ids, statut) =>
           (_db.update(_db.attendanceRecords)..where((t) => t.id.isIn(ids)))
               .write(AttendanceRecordsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Tickets RH-1, RH-2, RH-4 — n'acquittent que la VERSION partie (instant de saisie inchangé) : une ligne modifiée
+    // PENDANT l'envoi reste `pending` et repart.
+    accepte += await _acquitter(
+      'employees',
+      corps['employees'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in employes) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.employees)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(EmployeesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    // Ticket UT-1 — comptes utilisateurs ; le mot de passe acquitté est effacé du coffre (une ligne refusée le garde).
+    accepte += await _acquitter(
+      'users',
+      corps['users'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in utilisateurs) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.utilisateurs)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(UtilisateursCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    for (final u in utilisateurs) {
+      if (_acquittes(corps['users']).contains(u.id)) {
+        await _coffre.delete(key: cleMotDePasse(u.id));
+        await _coffre.delete(key: cleMotDePasseTemporaire(u.id));
+      }
+    }
+    accepte += await _acquitter(
+      'internships',
+      corps['internships'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final e in stagiaires) (e.id, e.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.internships)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(InternshipsCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += await _acquitter(
+      'internship_absences',
+      corps['internship_absences'],
+      (ids, statut) => _marquerSiInchangee(
+        [for (final a in absencesStagiaires) (a.id, a.updatedAt)],
+        ids,
+        (id, saisie) =>
+            (_db.update(_db.internshipAbsences)..where(
+                  (t) => Expression.and([t.id.equals(id), t.updatedAt.equals(saisie!), t.syncStatus.equalsValue(SyncStatus.pending)]),
+                ))
+                .write(InternshipAbsencesCompanion(syncStatus: Value(statut))),
+      ),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += await _acquitter(
+      'payslip_requests',
+      corps['payslip_requests'],
+      (ids, statut) => (_db.update(_db.payslipRequests)..where((t) => t.id.isIn(ids)))
+          .write(PayslipRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket CP-2 — acquittée quand le serveur a joué la demande : l'écriture (numérotée) descend au tirage de confirmation.
+    final demandesAcceptees = await _acquitter(
+      'manual_entry_requests',
+      corps['manual_entry_requests'],
+      (ids, statut) => (_db.update(_db.manualEntryRequests)..where((t) => t.id.isIn(ids)))
+          .write(ManualEntryRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += demandesAcceptees;
+
+    // Ticket CP-3 — acquittés quand le serveur a enregistré le bien (et, payé ou à crédit, son écriture d'acquisition) ou passé la
+    // dotation : les écritures descendent au tirage de confirmation.
+    final immobilisationsAcceptees = await _acquitter(
+      'fixed_assets',
+      corps['fixed_assets'],
+      (ids, statut) => (_db.update(_db.fixedAssets)..where((t) => t.id.isIn(ids)))
+          .write(FixedAssetsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    final reglagesAcceptes = await _acquitter(
+      'settings_requests',
+      corps['settings_requests'],
+      (ids, statut) => (_db.update(_db.settingsRequests)..where((t) => t.id.isIn(ids)))
+          .write(SettingsRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += reglagesAcceptes;
+    // Ticket CP-5 — acquitté quand le serveur a lu le relevé ; les lignes descendent au tirage de confirmation.
+    final relevesAcceptes = await _acquitter(
+      'bank_statement_imports',
+      corps['bank_statement_imports'],
+      (ids, statut) => (_db.update(_db.bankStatementImports)..where((t) => t.id.isIn(ids)))
+          .write(BankStatementImportsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += relevesAcceptes;
+    // Ticket CP-4 — acquittée quand le serveur a joué la demande : les exercices et les mois clôturés descendent au tirage de confirmation.
+    final cloturesAcceptees = await _acquitter(
+      'fiscal_closure_requests',
+      corps['fiscal_closure_requests'],
+      (ids, statut) => (_db.update(_db.fiscalClosureRequests)..where((t) => t.id.isIn(ids)))
+          .write(FiscalClosureRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += cloturesAcceptees;
+    final dotationsAcceptees = await _acquitter(
+      'depreciation_requests',
+      corps['depreciation_requests'],
+      (ids, statut) => (_db.update(_db.depreciationRequests)..where((t) => t.id.isIn(ids)))
+          .write(DepreciationRequestsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+    accepte += immobilisationsAcceptees + dotationsAcceptees;
+
+    // Ticket CP-1 — acquitté quand le serveur a créé, modifié ou archivé le compte (numéro unique, compte non utilisé).
+    accepte += await _acquitter(
+      'chart_of_accounts',
+      corps['chart_of_accounts'],
+      (ids, statut) => (_db.update(_db.chartOfAccounts)..where((t) => t.id.isIn(ids)))
+          .write(ChartOfAccountsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket AC-1 — acquitté quand le serveur a créé le bon (statut `envoye`) avec ses lignes.
+    accepte += await _acquitter(
+      'purchase_orders',
+      corps['purchase_orders'],
+      (ids, statut) => (_db.update(_db.purchaseOrders)..where((t) => t.id.isIn(ids)))
+          .write(PurchaseOrdersCompanion(syncStatus: Value(statut))),
       motifs,
       (n) => rejete += n,
     );
@@ -5736,6 +6892,28 @@ class SyncEngine {
       (n) => rejete += n,
     );
 
+    // Ticket VC-2 — acquittée quand le serveur a fait l'envoi demandé (e-mail, SMS) et tenu la trace.
+    accepte += await _acquitter(
+      'customer_reminders',
+      corps['customer_reminders'],
+      (ids, statut) =>
+          (_db.update(_db.customerReminders)..where((t) => t.id.isIn(ids)))
+              .write(CustomerRemindersCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
+    // Ticket VC-1 — acquitté seulement quand le serveur a passé créance, trésorerie (deux livres) et écriture.
+    accepte += await _acquitter(
+      'receivable_payments',
+      corps['receivable_payments'],
+      (ids, statut) =>
+          (_db.update(_db.receivablePayments)..where((t) => t.id.isIn(ids)))
+              .write(ReceivablePaymentsCompanion(syncStatus: Value(statut))),
+      motifs,
+      (n) => rejete += n,
+    );
+
     // ⚠️ Retours et remboursements : le serveur ne renvoie un `id` en `accepted` qu'une fois
     // le stock, la dette, la trésorerie et l'écriture passés dans UNE transaction.
     final retoursAcceptes = await _acquitter(
@@ -5769,7 +6947,14 @@ class SyncEngine {
         avancesAcceptees +
         imputationsAcceptees +
         retoursAcceptes +
-        remboursementsAcceptes;
+        remboursementsAcceptes +
+        demandesAcceptees +
+        immobilisationsAcceptees +
+        dotationsAcceptees +
+        transformationsAcceptees +
+        reglagesAcceptes +
+        relevesAcceptes +
+        cloturesAcceptees;
 
     // Ticket H13b — un lot a échoué après d'autres : ce qui a été accusé vient d'être acquitté, l'échec remonte
     // (réessai réseau, message de refus) et le reste repartira à la prochaine synchronisation.
@@ -5796,6 +6981,12 @@ class SyncEngine {
     'modules_config',
     'suppliers',
     'customers',
+    // Tickets RH-1 / RH-2 — registres RH après les clients, avant les pointages et la paie du même envoi.
+    'employees',
+    // Ticket UT-1 — comptes utilisateurs, juste après les employés comme au serveur.
+    'users',
+    'internships',
+    'internship_absences',
     // Ticket DEV — APRÈS les clients : un devis du même envoi peut viser le client créé (ou fusionné) à l'instant.
     'quotes',
     // Ticket DEV3 — la DEMANDE de conversion d'un devis, juste après les devis (le devis du même envoi existe alors déjà).
@@ -5811,21 +7002,44 @@ class SyncEngine {
     'animals',
     'livestock_daily_entries',
     'livestock_transfers',
+    // Ticket EL-1 — après les fiches et les transferts, comme au serveur.
+    'transformations',
+    // Ticket RELEVES-1 — relevés de terrain, juste après les transformations, comme au serveur.
+    'field_survey_entries',
+    // Ticket CP-1 — avant les dépenses et les achats, comme au serveur.
+    'chart_of_accounts',
+    // Ticket CP-2 — après le plan comptable, comme au serveur.
+    'manual_entry_requests',
+    // Ticket CP-3 — le registre, puis la dotation qui l'amortit, comme au serveur.
+    'fixed_assets',
+    'depreciation_requests',
+    'settings_requests',
+    'bank_statement_imports',
     'expenses',
+    // Ticket AC-1 — avant les achats : la réception d'un bon vise le bon du même envoi.
+    'purchase_orders',
     'purchases',
     'supplier_payments',
     'purchase_returns',
     'supplier_refunds',
     'attendance_records',
+    // Ticket RH-4 — après les pointages : les absences du mois comptent sur la paie demandée.
+    'payslip_requests',
     'sales',
     // Ticket AV1 — après les ventes (un retour peut viser la vente du même envoi), avant les imputations.
     'credit_notes',
     'advance_imputations',
+    // Ticket VC-1 — après les ventes, les avances et leurs imputations, comme au serveur.
+    'receivable_payments',
+    // Ticket VC-2 — après les encaissements, comme au serveur.
+    'customer_reminders',
     'livestock_reproduction_events',
     'infirmary_records',
     'veterinary_calendar_events',
     'stock_adjustments',
     'veterinary_records',
+    // Ticket CP-4 — après tout le reste, comme au serveur : une clôture juge le journal que l'envoi vient de remplir.
+    'fiscal_closure_requests',
     // Ticket ARC3 — EN DERNIER, comme au serveur : une demande vise ce que le même envoi vient d'archiver.
     'corbeille_demandes',
   ];
@@ -5916,6 +7130,77 @@ class SyncEngine {
       (lot.putIfAbsent(t, () => <Object?>[]) as List).add(ligne);
     }
     return lot;
+  }
+
+  /// Ticket AC-3 — ENVOI DES JUSTIFICATIFS (`POST /api/sync/receipts`) : le contrat de `/sync/push` ne transporte aucun fichier.
+  ///
+  /// Pour chaque achat et chaque dépense ACQUITTÉS dont le fichier local n'est pas encore parti (`receipt_sent` faux) :
+  ///  - fichier envoyé (multipart `table`, `id`, `file`) → `receipt_sent` vrai ;
+  ///  - fichier disparu du disque → marqué envoyé (rien ne pourra jamais partir) et signalé ;
+  ///  - 422 (format ou taille refusés) → marqué envoyé et signalé AVEC LE MOTIF du serveur (le réessayer serait vain) ;
+  ///  - 404 (enregistrement pas encore connu) ou toute autre erreur (réseau, 401, 5xx) → on réessaiera à la prochaine
+  ///    synchronisation, sans bruit.
+  /// ⚠️ NE LÈVE JAMAIS : l'enregistrement est déjà accepté, un fichier qui tarde ne doit pas faire échouer la synchronisation.
+  Future<void> _envoyerJustificatifs() async {
+    try {
+      final achats = await (_db.select(_db.purchases)
+            ..where((t) => t.syncStatus.equalsValue(SyncStatus.synced) & t.receiptLocalPath.isNotNull() & t.receiptSent.equals(false)))
+          .get();
+      for (final a in achats) {
+        final ok = await _envoyerUnJustificatif('purchases', a.id, a.receiptLocalPath!, "l'achat du ${_jour(a.purchaseDate)}");
+        if (ok == null) continue;
+        await (_db.update(_db.purchases)..where((t) => t.id.equals(a.id))).write(PurchasesCompanion(receiptSent: Value(ok)));
+      }
+
+      final depenses = await (_db.select(_db.expenses)
+            ..where((t) => t.syncStatus.equalsValue(SyncStatus.synced) & t.receiptLocalPath.isNotNull() & t.receiptSent.equals(false)))
+          .get();
+      for (final d in depenses) {
+        final ok = await _envoyerUnJustificatif('expenses', d.id, d.receiptLocalPath!, 'la dépense « ${d.label} »');
+        if (ok == null) continue;
+        await (_db.update(_db.expenses)..where((t) => t.id.equals(d.id))).write(ExpensesCompanion(receiptSent: Value(ok)));
+      }
+    } on Object catch (e) {
+      debugPrint('Justificatifs non envoyés (détail technique) : $e');
+    }
+  }
+
+  /// `true` : fini (envoyé, ou impossible à jamais) ; `null` : à réessayer plus tard.
+  Future<bool?> _envoyerUnJustificatif(String table, String id, String chemin, String quoi) async {
+    // PWA-2b — navigateur : la colonne porte une référence `navigateur:<clé>/<nom>` ; les octets viennent du magasin local.
+    final ref = JustificatifsNavigateur.decoder(chemin);
+    Uint8List? octets;
+    if (ref != null) {
+      octets = await JustificatifsNavigateur.magasin.lire(ref.cle);
+      if (octets == null) {
+        _avertissements.add('Justificatif de $quoi introuvable sur ce poste (fichier déplacé ou supprimé) : il ne sera pas envoyé.');
+        return true;
+      }
+    } else if (PlateformePoste.navigateur || !File(chemin).existsSync()) {
+      // Un chemin disque venu d'ailleurs n'existe pas dans le navigateur.
+      _avertissements.add('Justificatif de $quoi introuvable sur ce poste (fichier déplacé ou supprimé) : il ne sera pas envoyé.');
+      return true;
+    }
+    try {
+      final nom = ref?.nom ?? chemin.split(RegExp(r'[\\/]')).last;
+      await _client.post<Map<String, dynamic>>(
+        '/api/sync/receipts',
+        data: FormData.fromMap({
+          'table': table,
+          'id': id,
+          'file': octets != null ? MultipartFile.fromBytes(octets, filename: nom) : await MultipartFile.fromFile(chemin, filename: nom),
+        }),
+      );
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+        final donnees = e.response?.data;
+        final motif = donnees is Map && donnees['message'] is String ? donnees['message'] as String : 'format ou taille refusés';
+        _avertissements.add('Justificatif de $quoi refusé par le serveur : $motif');
+        return true;
+      }
+      return null;
+    }
   }
 
   /// Réponses des lots fusionnées table par table (acceptés et refusés mis bout à bout, compteurs additionnés),
@@ -6297,6 +7582,10 @@ class SyncEngine {
             (_db.update(_db.livestockLots)..where((t) => t.id.equals(conflit.recordId))).write(
               const LivestockLotsCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
+      // Ticket EL-1 — une transformation refusée (effectif insuffisant, exercice clos) se relance une fois la cause levée.
+      'transformations' =>
+        () => (_db.update(_db.transformations)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const TransformationsCompanion(syncStatus: Value(SyncStatus.pending))),
       // Ticket BS3 — un reproducteur refusé (identifiant déjà pris, date…) se corrige puis se relance.
       'animals' =>
         () =>
@@ -6313,6 +7602,23 @@ class SyncEngine {
               ),
             ),
       'sales' => () => _relancerVente(conflit.recordId),
+      // Tickets RH-1, RH-2, RH-4 — un employé, un stagiaire, une absence ou une demande de paie refusés se corrigent puis se relancent.
+      'employees' =>
+        () => (_db.update(_db.employees)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const EmployeesCompanion(syncStatus: Value(SyncStatus.pending))),
+      'internships' =>
+        () => (_db.update(_db.internships)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const InternshipsCompanion(syncStatus: Value(SyncStatus.pending))),
+      // Ticket UT-1 — un compte refusé se corrige puis se relance.
+      'users' =>
+        () => (_db.update(_db.utilisateurs)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const UtilisateursCompanion(syncStatus: Value(SyncStatus.pending))),
+      'internship_absences' =>
+        () => (_db.update(_db.internshipAbsences)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const InternshipAbsencesCompanion(syncStatus: Value(SyncStatus.pending))),
+      'payslip_requests' =>
+        () => (_db.update(_db.payslipRequests)..where((t) => t.id.equals(conflit.recordId)))
+            .write(const PayslipRequestsCompanion(syncStatus: Value(SyncStatus.pending))),
       'veterinary_records' =>
         () =>
             (_db.update(
@@ -6395,6 +7701,26 @@ class SyncEngine {
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
+      // Ticket VC-2 — une relance refusée (client sans adresse, SMS non configuré) se corrige puis se relance.
+      'customer_reminders' =>
+        () =>
+            (_db.update(
+              _db.customerReminders,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const CustomerRemindersCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      // Ticket VC-1 — un encaissement refusé (créance soldée entre-temps, exercice clos…) se relance.
+      'receivable_payments' =>
+        () =>
+            (_db.update(
+              _db.receivablePayments,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ReceivablePaymentsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
       'supplier_payments' =>
         () =>
             (_db.update(
@@ -6403,6 +7729,71 @@ class SyncEngine {
               const SupplierPaymentsCompanion(
                 syncStatus: Value(SyncStatus.pending),
               ),
+            ),
+      // Ticket CP-2 — une demande d'écriture refusée (mois clôturé, écriture verrouillée…) se relance une fois la cause levée.
+      'manual_entry_requests' =>
+        () =>
+            (_db.update(
+              _db.manualEntryRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ManualEntryRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-5 — un relevé refusé (compte inconnu) se corrige puis se relance.
+      'bank_statement_imports' =>
+        () =>
+            (_db.update(
+              _db.bankStatementImports,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const BankStatementImportsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Tickets PA-* — un réglage refusé (barème arrêté, rôle porté, solde insuffisant…) se corrige puis se relance.
+      'settings_requests' =>
+        () =>
+            (_db.update(
+              _db.settingsRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const SettingsRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-3 — un bien refusé (code déjà pris, valeur figée, sortie avant l'acquisition) se corrige puis se relance.
+      'fixed_assets' =>
+        () =>
+            (_db.update(
+              _db.fixedAssets,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FixedAssetsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-4 — une demande de clôture refusée (balance déséquilibrée, étape manquante, échéance…) se relance une fois la
+      // cause levée.
+      'fiscal_closure_requests' =>
+        () =>
+            (_db.update(
+              _db.fiscalClosureRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FiscalClosureRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-3 — une dotation refusée (exercice clos) se relance une fois la cause levée.
+      'depreciation_requests' =>
+        () =>
+            (_db.update(
+              _db.depreciationRequests,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const DepreciationRequestsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket CP-1 — un compte refusé (numéro déjà pris, compte utilisé à l'archivage) se corrige puis se relance.
+      'chart_of_accounts' =>
+        () =>
+            (_db.update(
+              _db.chartOfAccounts,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const ChartOfAccountsCompanion(syncStatus: Value(SyncStatus.pending)),
+            ),
+      // Ticket AC-1 — un bon refusé (fournisseur ou produit inconnu du serveur) se corrige puis se relance.
+      'purchase_orders' =>
+        () =>
+            (_db.update(
+              _db.purchaseOrders,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const PurchaseOrdersCompanion(syncStatus: Value(SyncStatus.pending)),
             ),
       // ⚠️ F0.77 : sans cette entrée, « Relancer » d'un achat refusé (compte absent du
       // plan, total nul) ne faisait RIEN — le bouton s'affichait, l'achat restait en
@@ -6500,6 +7891,16 @@ class SyncEngine {
               _db.prophylaxisScheduleStandards,
             )..where((t) => t.id.equals(conflit.recordId))).write(
               const ProphylaxisScheduleStandardsCompanion(
+                syncStatus: Value(SyncStatus.pending),
+              ),
+            ),
+      // Ticket RELEVES-1 — relevé refusé : « Relancer » le remet en file.
+      'field_survey_entries' =>
+        () =>
+            (_db.update(
+              _db.fieldSurveyEntries,
+            )..where((t) => t.id.equals(conflit.recordId))).write(
+              const FieldSurveyEntriesCompanion(
                 syncStatus: Value(SyncStatus.pending),
               ),
             ),
@@ -6657,6 +8058,7 @@ class SyncEngine {
     'phone': c.phone,
     'email': c.email,
     'city': c.city,
+    'ifu': c.ifu,
     'is_active': c.isActive,
   };
 
@@ -6709,7 +8111,8 @@ class SyncEngine {
         }
       : {'id': d.id, 'is_active': false};
 
-  /// Avance reçue au poste : « tant, de ce client, dans ce compte, ce jour ». Ni solde de
+  /// Avance reçue au poste : « tant, de ce client, dans ce compte, ce jour » ; renvoyée entière quand le poste la MODIFIE
+  /// ou l'ARCHIVE (VC-4). Ni solde de
   /// trésorerie ni écriture ne partent — le serveur entre l'argent dans les DEUX livres
   /// et passe D 5xx / C 419. `amount_used` ne part jamais. `device_id` voyage à la racine.
   Map<String, dynamic> _avanceEnJson(CustomerAdvance a) => {
@@ -6720,6 +8123,10 @@ class SyncEngine {
     'advance_date': a.advanceDate == null ? null : _jour(a.advanceDate!),
     'payment_mode': a.paymentMode,
     'motif': a.motif,
+    // Ticket VC-4 — `false` = archivage d'une avance connue du serveur (jamais de réactivation : le poste n'envoie `true`
+    // que pour une ligne active). Le serveur reconnaît une ligne connue (modification : client, montant, date ; ou archivage)
+    // et acquitte sans rejeu une ligne identique ; une ligne inconnue est une réception.
+    'is_active': a.isActive,
   };
 
   /// Imputation : « tant de cette avance sur cette créance ». Ni plafond, ni reste, ni
@@ -6732,6 +8139,143 @@ class SyncEngine {
     if (i.saleId != null) 'sale_id': i.saleId,
     'amount': i.amount,
     'imputation_date': _jour(i.imputationDate),
+  };
+
+  /// Ticket CP-2 — demande d'écriture telle que `SyncController::pushManualEntryRequests` la valide : le geste, l'écriture visée
+  /// (modifier, archiver) et la saisie (date, libellé, comptes, montant). Aucun numéro ne part : le serveur l'attribue.
+  Map<String, dynamic> _demandeEcritureEnJson(ManualEntryRequest d) => {
+    'id': d.id,
+    'action': d.action,
+    if (d.entryId != null) 'entry_id': d.entryId,
+    if (d.action != 'archiver') ...{
+      'entry_date': d.entryDate == null ? null : _jour(d.entryDate!),
+      'label': d.label,
+      'debit_account_id': d.debitAccountId,
+      'credit_account_id': d.creditAccountId,
+      'amount': d.amount,
+    },
+  };
+
+  /// Ticket CP-3 — immobilisation telle que `SyncController::pushFixedAssets` la valide : la ligne entière (le serveur
+  /// distingue création, modification, sortie et archivage), `counterpart` pour la capitalisation d'un bien NOUVEAU. Ni
+  /// `is_capitalized` ni écriture ne partent : seul le serveur écrit au grand livre.
+  Map<String, dynamic> _immobilisationEnJson(FixedAsset b) => {
+    'id': b.id,
+    'code': b.code,
+    'label': b.label,
+    'account_code': b.accountCode,
+    'acquisition_date': _jour(b.acquisitionDate),
+    'acquisition_value': b.acquisitionValue,
+    'residual_value': b.residualValue,
+    'duration_years': b.durationYears,
+    'status': b.status,
+    'disposal_date': b.disposalDate == null ? null : _jour(b.disposalDate!),
+    'disposal_reason': b.disposalReason,
+    'is_active': b.isActive,
+    'counterpart': b.counterpart ?? '',
+  };
+
+  /// Tickets PA-* — demande de réglage telle que `SyncController::pushSettingsRequests` la lit : {id, kind, payload}. Le secret
+  /// SMS (lu au coffre) rejoint le contenu au dernier moment.
+  Map<String, dynamic> _reglageEnJson(SettingsRequest r, [Map<String, String> fichiers = const {}]) => {
+    'id': r.id,
+    'kind': r.kind,
+    'payload': {...(jsonDecode(r.payload) as Map<String, dynamic>), ...fichiers},
+  };
+
+  /// Ticket CP-4 — demande de clôture telle que `SyncController::pushFiscalClosureRequests` la lit : {id, kind, payload}.
+  Map<String, dynamic> _demandeClotureEnJson(FiscalClosureRequest r) => {
+    'id': r.id,
+    'kind': r.kind,
+    'payload': jsonDecode(r.payload) as Map<String, dynamic>,
+  };
+
+  /// Ticket AUT-2 — octets du logo / du favicon pour une demande « entreprise » qui en annonce un (`logoNom`, `faviconNom`) :
+  /// lus sur le poste au dernier moment, jamais stockés dans la demande.
+  Future<Map<String, String>> _fichiersEntreprise(SettingsRequest r) async {
+    if (r.kind != 'entreprise') return const {};
+    final contenu = jsonDecode(r.payload) as Map<String, dynamic>;
+    final sortie = <String, String>{};
+    for (final genre in FichiersEntreprise.genres) {
+      if (contenu['${genre}Nom'] == null) continue;
+      final octets = await FichiersEntreprise.courant.lire(genre);
+      if (octets != null) sortie['${genre}B64'] = base64Encode(octets);
+    }
+    return sortie;
+  }
+
+  /// Ticket AUT-2 — quand le logo ou le favicon posé au web change (le chemin servi diffère de celui retenu), le poste
+  /// télécharge le fichier. Jamais bloquant : une panne laisse l'ancien fichier, le prochain tirage réessaie.
+  Future<void> _tirerFichiersEntreprise(Map<String, Object?> l) async {
+    for (final genre in FichiersEntreprise.genres) {
+      final chemin = l['${genre}_path'];
+      if (chemin is! String || chemin.isEmpty) {
+        // Ticket CONF-1 — supprimé au web : le fichier qui VENAIT du serveur (chemin retenu) s'efface aussi ici ; un fichier choisi au
+        // poste et pas encore envoyé (aucun chemin retenu) reste.
+        try {
+          if (await FichiersEntreprise.courant.sourceServeur(genre) != null) await FichiersEntreprise.courant.effacer(genre);
+        } catch (_) {}
+        continue;
+      }
+      try {
+        if (await FichiersEntreprise.courant.sourceServeur(genre) == chemin) continue;
+        final r = await _client.get<List<int>>('/api/sync/company-file/$genre', options: Options(responseType: ResponseType.bytes));
+        final octets = r.data;
+        if (octets == null || octets.isEmpty) continue;
+        await FichiersEntreprise.courant.enregistrer(genre, Uint8List.fromList(octets), chemin, sourceServeur: chemin);
+      } catch (_) {}
+    }
+  }
+
+  /// Ticket CP-3 — demande de dotation : la date d'arrêté seule, le serveur recalcule le montant.
+  Map<String, dynamic> _demandeDotationEnJson(DepreciationRequest d) => {
+    'id': d.id,
+    'date_arrete': _jour(d.dateArrete),
+  };
+
+  /// Ticket CP-1 — compte tel que `SyncController::pushChartOfAccounts` le valide : numéro, intitulé, classe, et `is_active`
+  /// (faux = archivage ; le serveur n'en déduit jamais une réactivation).
+  Map<String, dynamic> _compteEnJson(ChartOfAccount c) => {
+    'id': c.id,
+    'code': c.code,
+    'label': c.label,
+    'class': c.accountClass,
+    'is_active': c.isActive,
+  };
+
+  /// Ticket AC-1 — bon de commande tel que `SyncController::pushPurchaseOrders` le valide : fournisseur, livraison attendue,
+  /// lignes (produit, quantité, PRIX ESTIMÉ). Ni statut ni total ne partent : le serveur crée le bon `envoye` et somme.
+  Map<String, dynamic> _bonCommandeEnJson(PurchaseOrder b, List<PurchaseOrderLine> lignes) => {
+    'id': b.id,
+    'supplier_id': b.supplierId,
+    'expected_delivery_date': b.expectedDeliveryDate == null ? null : _jour(b.expectedDeliveryDate!),
+    'lines': [
+      for (final l in lignes)
+        {'id': l.id, 'product_id': l.productId, 'qty': l.qty, 'estimated_unit_price': l.estimatedUnitPrice},
+    ],
+  };
+
+  /// Ticket VC-2 — relance : le fait « ce client / cette créance, ce canal, ce message, ce jour ». Pour l'e-mail et le SMS,
+  /// c'est une DEMANDE d'envoi : le serveur envoie, tient la trace, et refuse avec son motif s'il ne peut pas.
+  Map<String, dynamic> _relanceEnJson(CustomerReminder r) => {
+    'id': r.id,
+    'customer_id': r.customerId,
+    'receivable_id': r.receivableId,
+    'channel': r.channel,
+    'message': r.message ?? '',
+    'reminder_date': r.reminderDate == null ? _jour(HeureBenin.aujourdhui()) : _jour(r.reminderDate!),
+    // Ticket AUT-3 — un e-mail déjà parti du poste n'est pas renvoyé par le serveur.
+    'already_sent': r.alreadySent,
+  };
+
+  /// Ticket VC-1 — encaissement de créance : ni solde, ni écriture, ni imputation ne partent, seulement le fait.
+  Map<String, dynamic> _encaissementEnJson(EncaissementCreance e) => {
+    'id': e.id,
+    'customer_id': e.customerId,
+    'receivable_id': e.receivableId,
+    'treasury_account_id': e.treasuryAccountId,
+    'amount': e.amount,
+    'payment_date': _jour(e.paymentDate),
   };
 
   /// Règlement fournisseur : ni imputation ni solde ne partent, seulement le fait.
@@ -6782,6 +8326,10 @@ class SyncEngine {
     'tva_rate': p.tvaRate,
     'stock_qty': p.stockQty,
     'alert_threshold': p.alertThreshold ?? 0,
+    // Ticket VOL-1 : catégorie d'effectif du produit (aviculture) ; `null` = aucune (le serveur l'efface hors aviculture).
+    'categorie_effectif': p.categorieEffectif,
+    // Ticket ST-1 — `false` = archivage depuis le poste ; le serveur n'en déduit jamais une réactivation.
+    'is_active': p.isActive,
     'updated_at': p.updatedAt?.toUtc().toIso8601String(),
   };
 
@@ -6803,8 +8351,9 @@ class SyncEngine {
     LivestockDailyEntry f, {
     required bool tete,
   }) {
-    int? somme(int? a, int? b, int? c) =>
-        (a == null || b == null || c == null) ? null : a + b + c;
+    // Ticket VOL-2 : quatre stades (le quatrième `mort_4` / `don_4` n'existe que pour les volailles pondeuses).
+    int? somme(int? a, int? b, int? c, [int? d]) =>
+        (a == null || b == null || c == null) ? null : a + b + c + (d ?? 0);
     final connus = <String, int?>{
       'mort_repro': f.mortRepro,
       'mort_sevre': f.mortSevre,
@@ -6813,10 +8362,21 @@ class SyncEngine {
       'don_sevre': f.donSevre,
       'don_jeune': f.donJeune,
       'passage_sevre_jeune': f.passageSevreJeune,
+      // Ticket VOL-1 : ventes par catégorie (volailles), connues seulement ; `vente` en est la somme.
+      'vente_repro': f.venteRepro,
+      'vente_sevre': f.venteSevre,
+      'vente_jeune': f.venteJeune,
+      // Ticket VOL-2 : quatrième emplacement (Poussin ponte) et passages supplémentaires, connus seulement.
+      'mort_4': f.mort4,
+      'don_4': f.don4,
+      'vente_4': f.vente4,
+      'passage_4_sevre': f.passage4Sevre,
+      'passage_jeune_repro': f.passageJeuneRepro,
       if (tete) ...{
         'cat_depart_repro': f.catDepartRepro,
         'cat_depart_sevre': f.catDepartSevre,
         'cat_depart_jeune': f.catDepartJeune,
+        'cat_depart_4': f.catDepart4,
       },
       'effectif_m': f.effectifM,
       'effectif_f': f.effectifF,
@@ -6829,9 +8389,9 @@ class SyncEngine {
       'entry_date': _jour(f.entryDate),
       'achat': f.achat,
       'ne': f.ne,
-      'mort': somme(f.mortRepro, f.mortSevre, f.mortJeune) ?? f.mort,
+      'mort': somme(f.mortRepro, f.mortSevre, f.mortJeune, f.mort4) ?? f.mort,
       'vente': f.vente,
-      'don': somme(f.donRepro, f.donSevre, f.donJeune) ?? f.don,
+      'don': somme(f.donRepro, f.donSevre, f.donJeune, f.don4) ?? f.don,
       'ponte_total': f.ponteTotal,
       'ponte_casses': f.ponteCasses,
       'feed_qty_kg': f.feedQtyKg,
@@ -6846,7 +8406,7 @@ class SyncEngine {
   /// Ticket S-T9 — la SAISIE d'une fiche telle qu'elle part, sans la vente (que les ventes inscrivent au serveur) ni
   /// l'horodatage et le poste : deux versions de même saisie ont la même empreinte.
   String _saisieDeFiche(LivestockDailyEntry f, {required bool tete}) => jsonEncode(
-    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'updated_at', 'device_id'}.contains(cle)),
+    _ficheEnJson(f, tete: tete)..removeWhere((cle, _) => const {'vente', 'vente_repro', 'vente_sevre', 'vente_jeune', 'vente_4', 'updated_at', 'device_id'}.contains(cle)),
   );
 
   /// F0.90 — fiche réduite à son IDENTITÉ (voir [_fichesDIdentite]). `lot_id` et `entry_date`
@@ -6868,6 +8428,8 @@ class SyncEngine {
   /// ventes (ticket 14.71).
   Map<String, dynamic> _achatEnJson(Purchase a, List<PurchaseLine> lignes) => {
     'id': a.id,
+    // Ticket AC-1 — réception d'un bon de commande : le serveur reçoit le BON (ses lignes, sa dette entière).
+    if (a.purchaseOrderId != null) 'purchase_order_id': a.purchaseOrderId,
     'supplier_id': a.supplierId,
     'payment_mode': a.paymentMode,
     'treasury_account_id': a.treasuryAccountId,
@@ -6893,6 +8455,82 @@ class SyncEngine {
     'check_in': p.checkIn,
     'check_out': p.checkOut,
     'status': p.status,
+    // Ticket RH-3 — archivage au poste (`FeuillePointage::archiveRecord` au serveur).
+    'is_active': p.isActive,
+  };
+
+  /// Ticket RH-1 — employé tel que `SyncController::pushEmployees` le valide (règles de `SaisieEmployeAction`).
+  Map<String, dynamic> _employeEnJson(Employee e) => {
+    'id': e.id,
+    'first_name': e.firstName,
+    'last_name': e.lastName,
+    'position': e.position ?? '',
+    'hire_date': e.hireDate == null ? null : _jour(e.hireDate!),
+    'base_salary': e.baseSalary,
+    'status': e.status ?? 'actif',
+    'is_active': e.isActive,
+    'device_id': e.deviceId,
+  };
+
+  /// Identifiants acquittés (`accepted`) d'une réponse de table.
+  static Set<String> _acquittes(Object? resultat) =>
+      resultat is Map ? ((resultat['accepted'] as List?)?.cast<String>().toSet() ?? const {}) : const {};
+
+  /// Ticket UT-1 — clé du coffre où attend le mot de passe d'un compte saisi au poste.
+  static String cleMotDePasse(String idUtilisateur) => 'agrierp.utilisateur.mdp.$idUtilisateur';
+
+  /// Ticket MDP-1 — clé du coffre qui marque le mot de passe en attente comme TEMPORAIRE (réinitialisation par un
+  /// administrateur) : l'envoi porte alors `reset_password: true`. Effacée avec le mot de passe, à l'acquit.
+  static String cleMotDePasseTemporaire(String idUtilisateur) => 'agrierp.utilisateur.reinit.$idUtilisateur';
+
+  /// Ticket UT-1 — compte tel que `pushUsers` le valide (règles de `SaisieUtilisateurAction`) ; `password` seulement
+  /// s'il a été saisi (création, ou changement) : absent, le serveur conserve l'actuel.
+  Map<String, dynamic> _utilisateurEnJson(Utilisateur u, String? motDePasse, {bool reinitialisation = false}) => {
+    'id': u.id,
+    'name': u.name,
+    'username': u.username,
+    'email': u.email,
+    'role': u.role,
+    'is_active': u.isActive,
+    'password': ?motDePasse,
+    // MDP-1 : réinitialisation — `password` est le mot de passe TEMPORAIRE ; le serveur pose le drapeau, ferme jetons
+    // et sessions, refuse le propre compte de l'auteur (même motif que le web).
+    if (reinitialisation) 'reset_password': true,
+    'device_id': u.deviceId,
+  };
+
+  /// Ticket RH-2 — stagiaire tel que `pushInternships` le valide (règles de `SaisieStagiaireAction`).
+  Map<String, dynamic> _stagiaireEnJson(Internship s) => {
+    'id': s.id,
+    'first_name': s.firstName,
+    'last_name': s.lastName,
+    'school': s.school ?? '',
+    'start_date': s.startDate == null ? null : _jour(s.startDate!),
+    'end_date': s.endDate == null ? null : _jour(s.endDate!),
+    'monthly_fee': s.monthlyFee,
+    'fee_paid': s.feePaid,
+    'birth_date': s.birthDate == null ? null : _jour(s.birthDate!),
+    'birth_place': s.birthPlace,
+    'civilite': s.civilite,
+    'device_id': s.deviceId,
+  };
+
+  Map<String, dynamic> _absenceStagiaireEnJson(InternshipAbsence a) => {
+    'id': a.id,
+    'internship_id': a.internshipId,
+    'absence_date': _jour(a.absenceDate),
+    'reason': a.reason,
+    'is_active': a.isActive,
+    'device_id': a.deviceId,
+  };
+
+  /// Ticket RH-4 — la demande : employé, période `AAAA-MM`, instant du clic (UTC). ⚠️ Aucun montant.
+  Map<String, dynamic> _demandePaieEnJson(PayslipRequest d) => {
+    'id': d.id,
+    'employee_id': d.employeeId,
+    'period_month': d.periodMonth,
+    'requested_at': d.requestedAt.toUtc().toIso8601String(),
+    'device_id': d.deviceId,
   };
 
   /// Ticket 15.46 — transfert entre bandes tel que le serveur le rejoue (`TransferBetweenLotsAction`).
@@ -6936,6 +8574,17 @@ class SyncEngine {
     'exit_reason': a.exitReason,
     'is_active': a.isActive,
     'device_id': _deviceId,
+  };
+
+  /// Ticket EL-1 — transformation telle que `SyncController::pushTransformations` la valide : le fait seul (jamais l'effectif
+  /// de la bande, ni la fiche, ni le stock : le serveur les rejoue), identifiée par son UUID (rejeu sans doublon).
+  Map<String, dynamic> _transformationEnJson(Transformation t) => {
+    'id': t.id,
+    'lot_id': t.lotId,
+    'product_id': t.productId,
+    'qty_animals': t.qtyAnimals,
+    'qty_produced': t.qtyProduced,
+    'transformation_date': _jour(t.transformationDate),
   };
 
   Map<String, dynamic> _transfertEnJson(LivestockTransfer t) => {
@@ -6985,6 +8634,33 @@ class SyncEngine {
     'stage_label': r.stageLabel,
     'ration_g_per_day': r.rationGPerDay.round(),
     'is_active': r.isActive,
+  };
+
+  /// Types de relevés connus du serveur (`ReleveTerrainService::FAMILLES`) : un autre type refuse le tirage.
+  static const _typesReleves = {
+    'incubation_regle', 'incubation_lot', 'delai_regle', 'poisson_marque', 'poisson_bareme', 'poisson_temperature', 'poisson_densite',
+  };
+
+  static Object _donneesReleve(FieldSurveyEntry r) {
+    try {
+      final d = jsonDecode(r.dataJson);
+      return d is Map ? d : <String, dynamic>{};
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  /// Ticket RELEVES-1 — relevé tel que `SyncController::pushFieldSurveyEntries` le valide : type, libellé, espèce,
+  /// valeurs et `is_active`. ⚠️ Le STATUT n'est pas envoyé : un envoi du poste est un enregistrement humain, le serveur
+  /// pose « Validé » (validé par = le jeton, validé le = son instant).
+  Map<String, dynamic> _releveEnJson(FieldSurveyEntry r) => {
+    'id': r.id,
+    'type': r.type,
+    'label': r.label,
+    'species_code': r.speciesCode,
+    'data': _donneesReleve(r),
+    'is_active': r.isActive,
+    'device_id': _deviceId,
   };
 
   /// Ticket H9b — échéance de prophylaxie (`prophylaxie()` de l'Action). Les bornes de cycle ne partent pas :
@@ -7068,6 +8744,13 @@ class SyncEngine {
     // basculer de jour toute vente d'avant 01h00 — le defaut que ce
     // ticket corrige, reintroduit par l'autre bout.
     'sold_at': _instant(v.soldAt),
+    // MECEF-3 — le choix fait à la saisie et l'identité fiscale de l'acheteur : le poste les ÉCRIT, le serveur les REVALIDE
+    // (IFU de 13 chiffres s'il est présent, nom obligatoire si normalisée, AIB dans la liste). Jamais l'AIB calculé ni ce que
+    // renvoie la DGI : cela vient d'elle. Facture simple : aucune identité fiscale, jamais transmise.
+    'facture_type': v.factureType ?? 'simple',
+    'client_ifu': v.clientIfu,
+    'client_nom_facture': v.clientNomFacture,
+    'aib_taux': v.aibTaux,
     'device_id': v.deviceId,
     'updated_at': v.updatedAt.toUtc().toIso8601String(),
     'lines': lignes

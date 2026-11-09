@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/database/app_database.dart' show FiscalYear;
 import '../../core/erreurs/message_erreur.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../comptabilite/cloture_exercice_repository.dart';
 import 'premier_demarrage_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -16,12 +18,27 @@ class PremierDemarrageScreen extends StatefulWidget {
     required this.engine,
     required this.utilisateur,
     required this.onTermine,
+    this.depotCloture,
+    this.peutOuvrirExercice = false,
+    this.relance = false,
   });
 
   final PremierDemarrageRepository depot;
   final SyncEngine engine;
   final String utilisateur;
   final VoidCallback onTermine;
+
+  /// Ticket CP-4 — `Parametres\AssistantDemarrage::ouvrirExercice` : le PREMIER exercice (année civile en cours) se DEMANDE
+  /// au serveur. Sans dépôt, l'étape se constate seulement.
+  final ClotureExerciceRepository? depotCloture;
+
+  /// `manage-comptabilite` : sans lui, pas de bouton (le web le masque par `@can`).
+  final bool peutOuvrirExercice;
+
+  /// Ticket AIDE-1 — « Relancer l'assistant de démarrage » du bouton d'aide : le même écran, rouvert depuis le socle d'un poste
+  /// EN SERVICE (module « Assistant de démarrage » allumé, droit `manage-parametres`). Seuls changent le titre, l'introduction
+  /// et le pied (« Fermer ») : les étapes sont les mêmes, toujours constatées, et rien n'est écrit en l'ouvrant.
+  final bool relance;
 
   @override
   State<PremierDemarrageScreen> createState() => _PremierDemarrageScreenState();
@@ -34,6 +51,9 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
   bool _synchronise = false;
   String? _compteRendu;
   String? _echec;
+  List<FiscalYear> _exercices = const [];
+  bool _exerciceDemande = false;
+  String? _refusExercice;
 
   @override
   void initState() {
@@ -45,8 +65,11 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
     final adresse = await widget.depot.adresse();
     final identifiant = await widget.depot.identifiant();
     final neuf = await widget.depot.posteNeuf();
+    final donnees = await widget.depotCloture?.charger();
     if (!mounted) return;
     setState(() {
+      _exercices = donnees?.exercices ?? const [];
+      _exerciceDemande = donnees?.demandeEnAttente('ouvrir_exercice') != null;
       _adresse = adresse;
       _identifiant = identifiant;
       _synchronise = !neuf;
@@ -84,7 +107,7 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
     }
   }
 
-  Widget _etape(String cle, int numero, String titre, String detail, bool fait) {
+  Widget _etape(String cle, int numero, String titre, String detail, bool fait, {Widget? action}) {
     return Container(
       key: Key('premier-etape-$cle'),
       margin: const EdgeInsets.only(bottom: AgriSpacing.sm),
@@ -125,8 +148,45 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
               ],
             ),
           ),
+          ?action,
         ],
       ),
+    );
+  }
+
+  Future<void> _ouvrirExercice() async {
+    try {
+      await widget.depotCloture!.ouvrirPremierExercice();
+      _refusExercice = null;
+    } on RefusCloture catch (e) {
+      _refusExercice = e.motif;
+    }
+    await _charger();
+  }
+
+  /// Étape « Exercice comptable » de l'assistant du web : constatée dans les exercices reçus ; le bouton « Ouvrir l'exercice
+  /// AAAA » écrit la DEMANDE d'ouverture (le serveur la joue à la synchronisation).
+  Widget _etapeExercice() {
+    final annee = widget.depotCloture!.anneeEnCours();
+    final fait = _exercices.isNotEmpty;
+    final detail = fait
+        ? 'Exercice ${_exercices.first.year} en place.'
+        : _exerciceDemande
+        ? "Demande d'ouverture de l'exercice $annee envoyée : il sera ouvert à la prochaine synchronisation."
+        : "Aucun exercice comptable : sans lui, aucune vente ni dépense ne peut être enregistrée. (L'exercice est l'année civile.)";
+    return _etape(
+      'exercice',
+      4,
+      'Exercice comptable',
+      _refusExercice == null ? detail : '$detail\n$_refusExercice',
+      fait,
+      action: fait || _exerciceDemande || !widget.peutOuvrirExercice || !_synchronise
+          ? null
+          : TextButton(
+              key: const Key('premier-ouvrir-exercice'),
+              onPressed: _ouvrirExercice,
+              child: Text("Ouvrir l'exercice $annee", style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
     );
   }
 
@@ -142,8 +202,8 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Premier démarrage du poste',
+                Text(
+                  widget.relance ? 'Assistant de démarrage' : 'Premier démarrage du poste',
                   style: TextStyle(
                     fontSize: AgriTypography.xl,
                     fontWeight: FontWeight.bold,
@@ -151,9 +211,11 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
                   ),
                 ),
                 const SizedBox(height: AgriSpacing.xs),
-                const Text(
-                  "Ce poste n'a encore rien reçu du serveur : bandes, produits, exercice et comptes "
-                  "n'y existent qu'après une première synchronisation.",
+                Text(
+                  widget.relance
+                      ? "Ce qu'il faut en place avant la première saisie — constaté sur ce poste, pas à cocher."
+                      : "Ce poste n'a encore rien reçu du serveur : bandes, produits, exercice et comptes "
+                            "n'y existent qu'après une première synchronisation.",
                   style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
                 ),
                 const SizedBox(height: AgriSpacing.md),
@@ -174,6 +236,7 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
                       : 'À lancer maintenant, poste connecté.',
                   _synchronise,
                 ),
+                if (widget.depotCloture != null) _etapeExercice(),
                 if (_compteRendu != null)
                   Text(
                     _compteRendu!,
@@ -192,12 +255,19 @@ class _PremierDemarrageScreenState extends State<PremierDemarrageScreen> {
                   spacing: AgriSpacing.sm,
                   runSpacing: AgriSpacing.xs,
                   children: [
-                    TextButton(
-                      key: const Key('premier-plus-tard'),
-                      onPressed: widget.onTermine,
-                      child: const Text('Plus tard'),
-                    ),
-                    if (_synchronise)
+                    if (!widget.relance)
+                      TextButton(
+                        key: const Key('premier-plus-tard'),
+                        onPressed: widget.onTermine,
+                        child: const Text('Plus tard'),
+                      ),
+                    if (widget.relance)
+                      TextButton(
+                        key: const Key('premier-fermer'),
+                        onPressed: widget.onTermine,
+                        child: const Text('Fermer'),
+                      ),
+                    if (_synchronise && !widget.relance)
                       FilledButton(
                         key: const Key('premier-continuer'),
                         onPressed: widget.onTermine,

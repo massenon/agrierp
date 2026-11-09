@@ -307,13 +307,19 @@ class SujetsEntreesRepository {
   Future<LivestockDailyEntry> _ecrire(String lotId, DateTime jour, Map<String, int> valeurs) async {
     final existante = await _fiches.chargerJour(lotId, jour);
     int pris(String origine) => valeurs[origine] ?? (existante == null ? 0 : _de(existante, origine));
-    return _fiches.ecrireEntrees(
-      lotId: lotId,
-      jour: jour,
-      achat: pris('Achat'),
-      ne: pris('Naissance'),
-      don: pris('Don'),
-    );
+    try {
+      return await _fiches.ecrireEntrees(
+        lotId: lotId,
+        jour: jour,
+        achat: pris('Achat'),
+        ne: pris('Naissance'),
+        don: pris('Don'),
+      );
+    } on FicheRefusee catch (e) {
+      // Ticket VOL-1 (`SaisieSujetAction::refuserSiVolaillesSansDepart`) : bande de volailles reproductrices sans
+      // départ, entrée avant le départ, ou don (à saisir sur la fiche, ventilé). Mêmes clés d'erreur que le web.
+      throw SujetRefuse({e.motif.contains('les dons se saisissent') ? 'origine' : 'entry_date': e.motif});
+    }
   }
 
   /// Refuse tout effectif négatif à partir de [depuis] (calcul SANS la borne à 0 de la formule). Dans la transaction du

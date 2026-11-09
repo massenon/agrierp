@@ -44,6 +44,8 @@ class ListeClients extends Component
 
     public string $city = '';
 
+    public string $ifu = '';
+
     /**
      * 🔴→✅ TROUVÉ TOTALEMENT ABSENT PAR VÉRIFICATION NIVEAU 2 (lecture
      * ligne par ligne) : la case à cocher "Tout sélectionner" et la barre
@@ -102,18 +104,21 @@ class ListeClients extends Component
 
     public function newCustomer(): void
     {
-        $this->reset(['editingCustomerId', 'name', 'phone', 'email', 'city']);
+        $this->authorize('manage-ventes');
+        $this->reset(['editingCustomerId', 'name', 'phone', 'email', 'city', 'ifu']);
         $this->dispatch('open-modal', name: 'modal-create-client');
     }
 
     public function editCustomer(string $id): void
     {
+        $this->authorize('manage-ventes');
         $customer = Customer::findOrFail($id);
         $this->editingCustomerId = $customer->id;
         $this->name = $customer->name;
         $this->phone = (string) $customer->phone;
         $this->email = (string) $customer->email;
         $this->city = (string) $customer->city;
+        $this->ifu = (string) $customer->ifu;
         $this->dispatch('open-modal', name: 'modal-create-client');
     }
 
@@ -130,6 +135,7 @@ class ListeClients extends Component
             'phone' => $this->phone,
             'email' => $this->email,
             'city' => $this->city,
+            'ifu' => $this->ifu,
         ];
 
         if ($this->editingCustomerId) {
@@ -162,6 +168,8 @@ class ListeClients extends Component
      */
     public function bulkArchiveCustomers(): void
     {
+        $this->authorize('manage-ventes');
+
         if (empty($this->selectedIds)) {
             return;
         }
@@ -175,6 +183,8 @@ class ListeClients extends Component
 
     public function openBulkArchiveModal(): void
     {
+        $this->authorize('manage-ventes');
+
         if (empty($this->selectedIds)) {
             return;
         }

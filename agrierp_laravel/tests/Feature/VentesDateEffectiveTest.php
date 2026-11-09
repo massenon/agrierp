@@ -69,7 +69,7 @@ class VentesDateEffectiveTest extends TestCase
         }
         $role = Role::findOrCreate('caissier', 'web');
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
-        $user = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'de@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $user = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'de@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $user->assignRole($role);
         $this->actingAs($user);
 
@@ -98,7 +98,7 @@ class VentesDateEffectiveTest extends TestCase
         $vente = new Sale([
             'customer_id' => $this->client->id, 'payment_mode' => 'especes',
             'subtotal' => $montant, 'discount' => 0, 'total' => $montant, 'delivery_fee' => 0,
-            'status' => 'validee', 'mecef_status' => 'transmise', 'sold_at' => $vendueLe,
+            'status' => 'validee', 'sold_at' => $vendueLe,
         ]);
         $vente->created_at = $enregistreeLe;
         $vente->updated_at = $enregistreeLe;
@@ -109,7 +109,10 @@ class VentesDateEffectiveTest extends TestCase
             'unit_price' => $montant, 'manual_total_amount' => $montant, 'is_manual_price' => true,
         ]);
 
-        return $vente;
+        // MECEF-1 : une facture normalisée est figée — ses lignes se posent AVANT la normalisation du fixture.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $vente->id)->update(['mecef_status' => 'transmise']);
+
+        return $vente->refresh();
     }
 
     /** @return array<int, string> */
@@ -296,7 +299,7 @@ class VentesDateEffectiveTest extends TestCase
     public function test_le_tirage_sert_les_factures_dans_l_ordre_de_la_date_de_vente_et_garde_le_repli(): void
     {
         $jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => 'caisse', 'password' => 'AgriERP@2026', 'device_name' => 'poste-01',
+            'identifiant' => 'caisse', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-01',
         ])->json('token');
 
         $factures = $this->withHeader('Authorization', 'Bearer '.$jeton)

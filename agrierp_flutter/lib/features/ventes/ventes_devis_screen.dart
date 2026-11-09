@@ -36,6 +36,7 @@ class VentesDevisScreen extends StatefulWidget {
     required this.devis,
     this.imprimer,
     this.peutGerer = true,
+    this.peutCorriger = true,
     this.peutExporter = true,
     this.peutConvertir = false,
     this.peutVoirFacturation = false,
@@ -59,8 +60,12 @@ class VentesDevisScreen extends StatefulWidget {
   /// Éditeur PDF de « Exporter » (onglet Devis), injecté — `EditeursRapports.imprimer` en production.
   final Editeur? imprimer;
 
-  /// `manage-ventes` du rôle de la session : enregistrer un retour, marquer un avoir traité, annuler une vente.
+  /// `manage-ventes` du rôle de la session : la CAISSE (premier onglet, absent sans ce droit), annuler une vente, les devis.
   final bool peutGerer;
+
+  /// Ticket CONF-4 (DV-20) — Gate `avoir-client` du web : `manage-ventes` OU `correct-invoices`. Enregistrer un retour (avoir) et
+  /// le marquer traité, SANS la caisse ni l'annulation (le comptable corrige par l'avoir).
+  final bool peutCorriger;
 
   /// `export-ventes` : « Télécharger PDF » du détail d'une vente.
   final bool peutExporter;
@@ -90,10 +95,18 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
     ('Retours et Avoirs', SymbolesAgri.assignment_return),
   ];
 
-  String _onglet = onglets.first.$1;
+  /// Ticket CONF-4 — « Enregistrer Vente » (la caisse) n'est offerte qu'à `manage-ventes` : le comptable, qui LIT les ventes,
+  /// ouvre le hub sur « Devis Prestations » (comme le web, qui ne monte pas la caisse sans ce droit).
+  static const _caisse = 'Enregistrer Vente';
+
+  List<(String, IconData)> get _visibles => widget.peutGerer ? onglets : [for (final o in onglets) if (o.$1 != _caisse) o];
+
+  late String _onglet = _visibles.first.$1;
 
   @override
   Widget build(BuildContext context) {
+    // Jamais la caisse sans le droit, même si l'onglet courant l'était (rôle changé, état restauré).
+    if (!widget.peutGerer && _onglet == _caisse) _onglet = _visibles.first.$1;
     return Scaffold(
       backgroundColor: AgriColors.surfaceBg,
       body: Column(
@@ -119,10 +132,11 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
                 peutExporter: widget.peutExporter,
                 enregistrer: widget.enregistrerPdf,
                 // `<a href="{{ route('ventes.devis-hub') }}">` : le hub, sur son premier onglet.
-                onNouvelleVente: () => setState(() => _onglet = onglets.first.$1),
+                onNouvelleVente: () => setState(() => _onglet = _visibles.first.$1),
               ),
               // Ticket AV1 — les retours et avoirs : la demande part, le serveur fait les effets.
-              'Retours et Avoirs' => RetoursAvoirsOnglet(depot: widget.avoirs, peutGerer: widget.peutGerer),
+              // CONF-4 : l'avoir s'ouvre à `manage-ventes` OU `correct-invoices` (Gate `avoir-client`), pas à la seule caisse.
+              'Retours et Avoirs' => RetoursAvoirsOnglet(depot: widget.avoirs, peutGerer: widget.peutCorriger),
               _ => CaisseScreen(depot: widget.caisse),
             },
           ),
@@ -140,7 +154,7 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final (titre, icone) in onglets)
+          for (final (titre, icone) in _visibles)
             InkWell(
               key: Key('onglet-ventes-$titre'),
               onTap: () => setState(() => _onglet = titre),

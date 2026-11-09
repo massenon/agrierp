@@ -35,7 +35,7 @@ class SyncPosteJetonTest extends TestCase
 
         $this->animalier = User::create([
             'name' => 'Animalier', 'username' => 'animalier', 'email' => 'animalier@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->animalier->assignRole('animalier');
 
@@ -49,7 +49,7 @@ class SyncPosteJetonTest extends TestCase
     private function jeton(string $poste): string
     {
         return $this->postJson('/api/auth/login', [
-            'identifiant' => 'animalier', 'password' => 'AgriERP@2026', 'device_name' => $poste,
+            'identifiant' => 'animalier', 'password' => 'LogiAgriERP@2026', 'device_name' => $poste,
         ])->assertOk()->json('token');
     }
 

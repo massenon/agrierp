@@ -1,4 +1,23 @@
-<div wire:poll.30s x-data="{ open: false }" class="relative" @click.outside="open = false">
+{{--
+    Relève toutes les 30 s, EN PAUSE tant que l'application est verrouillée (le serveur refuserait chaque requête par un 423,
+    affiché en rouge dans la console) et tant que l'onglet est caché. Remplace la relève automatique de Livewire ; la minuterie est arrêtée quand
+    le composant disparaît (navigation sans rechargement), sinon elles se cumuleraient à chaque page.
+--}}
+<div x-data="{
+        open: false,
+        minuterie: null,
+        init() {
+            this.minuterie = window.setInterval(() => {
+                if (document.hidden || window.agrierpVerrou?.verrouille) {
+                    return;
+                }
+                this.$wire.$refresh();
+            }, 30000);
+        },
+        destroy() {
+            window.clearInterval(this.minuterie);
+        },
+    }" class="relative" @click.outside="open = false">
     <button type="button" dusk="notification-bell" @click="open = !open" class="text-outline hover:text-brand-emerald relative">
         <span class="material-symbols-outlined">notifications</span>
         @if($this->unreadCount > 0)
@@ -29,6 +48,6 @@
                 <p class="text-[11px] text-outline text-center py-lg">Aucune notification pour le moment.</p>
             @endforelse
         </div>
-        <a href="/notifications" class="block text-center py-sm text-xs font-bold text-brand-emerald hover:bg-surface-zebra border-t border-outline-variant">Voir toutes les notifications</a>
+        <a wire:navigate href="/notifications" class="block text-center py-sm text-xs font-bold text-brand-emerald hover:bg-surface-zebra border-t border-outline-variant">Voir toutes les notifications</a>
     </div>
 </div>

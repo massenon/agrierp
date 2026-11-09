@@ -1,6 +1,6 @@
 <div>
-    {{-- Ticket 15.51 — assistant de démarrage (administrateur, tant qu'il n'est pas marqué terminé). --}}
-    <livewire:parametres.assistant-demarrage />
+    {{-- Ticket 15.51 / AIDE-1 — l'assistant de démarrage est monté par `layouts/app.blade.php` (module allumé, `manage-parametres`) :
+         il s'ouvre ici de lui-même, et de n'importe quel écran par « Relancer l'assistant » du bouton d'aide. --}}
 
     <div class="flex flex-col gap-md border-b border-outline-variant pb-md mb-lg">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
@@ -9,23 +9,26 @@
                 <p class="text-xs text-outline mt-xs">Rapport généré le {{ now()->translatedFormat('d/m/Y à H:i') }} · {{ $this->details['exercice'] ? 'Exercice '.$this->details['exercice'].($this->details['exercice_clos'] ? ' clôturé' : ' actif') : 'Aucun exercice ouvert' }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-xs">
-                <a href="/ventes-devis" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
+                <a wire:navigate href="/ventes-devis" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">point_of_sale</span>Enregistrer une Vente
                 </a>
-                <a href="/gestion-elevage" class="flex items-center justify-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
+                <a wire:navigate href="/gestion-elevage" class="flex items-center justify-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">pets</span>Élevage
                 </a>
             </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-sm bg-white border border-outline-variant rounded-lg p-sm">
+        {{-- Période ÉDITABLE (bornes de l'exercice affiché) : l'état choisi s'ouvre avec CETTE période. Le bouton reste
+             désactivé tant qu'aucun état n'est choisi ou que « du » dépasse « au » ; le serveur re-juge (ouvrirEtat). --}}
+        @php [$borneDebut, $borneFin] = \App\Support\ExerciceChoisi::bornes(); @endphp
+        <div x-data="{ report: '', du: '{{ $periodeDu }}', au: '{{ $periodeAu }}' }" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-sm bg-white border border-outline-variant rounded-lg p-sm">
             <div class="flex items-center gap-xs flex-1">
                 <span class="material-symbols-outlined text-outline text-[18px]">calendar_month</span>
-                <input type="date" value="{{ now()->startOfMonth()->format('Y-m-d') }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1" disabled>
+                <input type="date" id="date-du" x-model="du" min="{{ $borneDebut }}" max="{{ $borneFin }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1">
                 <span class="text-outline text-xs">au</span>
-                <input type="date" value="{{ now()->format('Y-m-d') }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1" disabled>
+                <input type="date" id="date-au" x-model="au" min="{{ $borneDebut }}" max="{{ $borneFin }}" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5 flex-1">
             </div>
-            <div class="flex items-center gap-xs" x-data="{ report: '' }">
+            <div class="flex items-center gap-xs">
                 <select x-model="report" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white flex-1 sm:w-56">
                     <option value="">-- Choisir un état / rapport --</option>
                     <option value="/rapports-exports?tab=recettes-depenses">État des Recettes</option>
@@ -37,7 +40,7 @@
                     <option value="/rapports-exports?tab=elevage-synth">Rapport Élevage</option>
                     <option value="/rapports-exports?tab=stocks-synth">Rapport de Stocks</option>
                 </select>
-                <button type="button" x-on:click="if (report) window.location.href = report" :disabled="!report" class="flex items-center gap-1 text-xs font-bold px-md py-2 rounded-lg bg-brand-emerald text-white hover:bg-brand-forest disabled:bg-surface-zebra disabled:text-outline disabled:cursor-not-allowed"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF</button>
+                <button type="button" id="export-pdf" x-on:click="$wire.ouvrirEtat(report, du, au)" :disabled="!report || !du || !au || du > au" class="flex items-center gap-1 text-xs font-bold px-md py-2 rounded-lg bg-brand-emerald text-white hover:bg-brand-forest disabled:bg-surface-zebra disabled:text-outline disabled:cursor-not-allowed" disabled><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF</button>
             </div>
         </div>
     </div>
@@ -224,7 +227,7 @@
         <div x-data="{ tab: 'sale' }" class="bg-white rounded-lg border border-outline-variant shadow-sm p-md">
             <div class="flex items-center justify-between mb-md">
                 <h3 class="text-sm font-bold text-on-surface flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald text-[18px]">receipt_long</span>Transactions Récentes</h3>
-                <a href="/ventes-devis" class="text-[10px] font-bold text-brand-emerald hover:underline">Voir tout</a>
+                <a wire:navigate href="/ventes-devis" class="text-[10px] font-bold text-brand-emerald hover:underline">Voir tout</a>
             </div>
             <div class="flex items-center gap-xs mb-sm border-b border-outline-variant overflow-x-auto">
                 <button type="button" @click="tab = 'sale'" :class="tab === 'sale' ? 'border-brand-emerald text-brand-emerald' : 'border-transparent text-outline'" class="px-sm py-1.5 text-[11px] font-bold border-b-2 whitespace-nowrap">Vente</button>

@@ -99,7 +99,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * | Fiches élevage journalières | Dernier écrivain gagne (upsert par id) |
  * | Ventes POS | Jamais fusionnées — chaque vente hors-ligne insérée comme transaction indépendante, jamais de mise à jour d'une vente existante par push |
  * | Mouvements de stock | Jamais acceptés tels quels — réappliqués via `AdjustStockAction`, seul point d'entrée réel de toute mutation de stock (ticket 6.1), pour garantir un recalcul serveur complet |
- * | Clôture d'exercice | Jamais synchronisée — l'API ne l'accepte sous aucune forme, cohérent avec "bloqué explicitement côté Flutter si pas de connexion" déjà documenté |
+ * | Clôture d'exercice | Ticket CP-4 (décision du client : « le poste doit le faire ») — DEMANDES rejouées par le serveur (`fiscal_closure_requests` → `ClotureExerciceService`, le point de passage du web) ; jamais d'écriture directe de `fiscal_years` ni de `periodic_closures` par le poste, qui les reçoit au tirage |
  *
  * ⚠️ PORTÉE HONNÊTE DE CE TICKET : implémente le mécanisme réel et
  * DÉMONTRE chaque règle sur un jeu de tables représentatif
@@ -120,7 +120,7 @@ class SyncController extends Controller
         // Ticket BS1 — bandes créées, modifiées et archivées au poste.
         'livestock_lots',
         'livestock_reproduction_events', 'purchases', 'attendance_records', 'products', 'suppliers',
-        'customers', 'mails', 'archived_documents', 'administrative_documents', 'supplier_payments',
+        'customers', 'mails', 'archived_documents', 'administrative_documents', 'supplier_payments', 'receivable_payments',
         'purchase_returns', 'supplier_refunds', 'customer_advances', 'advance_imputations',
         'product_categories', 'receivables', 'customer_reminders', 'feed_types', 'elevage_numbering',
         'purchase_orders', 'payables', 'employees', 'internships', 'chart_of_accounts', 'fiscal_years',
@@ -145,6 +145,22 @@ class SyncController extends Controller
         'credit_notes',
         // Ticket ARC2 — Corbeille : demandes de restauration / de suppression définitive (le serveur fait les effets).
         'corbeille_demandes',
+        // Ticket RH-2 / RH-4 — absences de stagiaire et demandes de règlement de paie du poste.
+        'internship_absences', 'payslip_requests',
+        // Ticket CP-2 — demandes d'écriture manuelle (le serveur fait l'écriture et lui attribue son numéro).
+        'manual_entry_requests',
+        // Ticket CP-3 — immobilisations (registre mixte) et demandes de dotation aux amortissements.
+        'fixed_assets', 'depreciation_requests',
+        // Ticket EL-1 — transformations (« Bon d'Abattage & Transformation ») saisies au poste.
+        'transformations',
+        // Ticket RELEVES-1 — « Relevés de terrain » (Paramètres Élevage) : table mixte, point de passage `ReleveTerrainService`.
+        'field_survey_entries',
+        // Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — demandes de réglage de la ferme (entreprise, barème ITS, modes de paiement, rôles).
+        'settings_requests',
+        // Ticket CP-5 — relevés bancaires (CSV) importés au poste, par UUID d'import (rejeu sans doublon).
+        'bank_statement_imports',
+        // Ticket CP-4 — demandes de clôture (périodes, exercice, ouverture) : le serveur les rejoue par `ClotureExerciceService`.
+        'fiscal_closure_requests',
     ];
 
     /** Recouvrement du curseur de tirage (voir `pull`). */
@@ -199,6 +215,8 @@ class SyncController extends Controller
         'livestock_lots' => null,
         'livestock_daily_entries' => null,
         'livestock_transfers' => ['view-elevage'],
+        'transformations' => ['view-elevage'],
+        'field_survey_entries' => ['view-elevage'],
         'feed_ration_standards' => ['view-elevage', 'view-ventes'],
         'growth_standards' => ['view-elevage'],
         'veterinary_withdrawal_periods' => ['view-elevage', 'view-ventes'],
@@ -223,12 +241,24 @@ class SyncController extends Controller
         'employees' => ['view-rh'],
         'internships' => ['view-rh'],
         'attendance_records' => ['view-rh'],
+        // Ticket RH-2 — absences des stagiaires (table mixte au poste depuis RH-2).
+        'internship_absences' => ['view-rh'],
+        // Ticket RH-4 — barème ITS : le poste calcule la paie comme le web (`PayrollCalculationService`).
+        'income_tax_brackets' => ['view-rh'],
         'mails' => ['view-administration'],
         'administrative_documents' => ['view-administration'],
         'archived_documents' => ['view-administration'],
         // Ticket DEP3 — les comptes de CHARGE (classe 6) de la modale « Nouvelle Dépense » : l'écran est celui de
         // `view-achats`, qui n'a pas le journal. Le plan comptable n'a rien de confidentiel (numéros et intitulés).
         'chart_of_accounts' => ['view-comptabilite', 'view-achats'],
+        // Ticket CP-3 — le registre des immobilisations (écran `view-comptabilite`).
+        'fixed_assets' => ['view-comptabilite'],
+        // Ticket CP-4 — les mois clôturés (écran Clôture d'exercice, `view-comptabilite`) ; `fiscal_years` reste de base.
+        'periodic_closures' => ['view-comptabilite'],
+        // Ticket CP-5 — lignes de relevé bancaire importées (rapprochement).
+        'bank_statement_lines' => ['view-comptabilite'],
+        // Ticket PA-2 — la liste des droits sert l'écran « Rôles & Permissions » (administrateur).
+        'permissions' => ['manage-users'],
         // Ticket DEP3 — centres de coût (filières) de l'en-tête d'une dépense : petit référentiel, lecture seule.
         'cost_centers' => ['view-achats', 'view-comptabilite'],
         'fiscal_years' => null,
@@ -269,7 +299,9 @@ class SyncController extends Controller
         // n'affiche aucun bulletin : les cartes de la paie y sont des « — »), ni base ; et seulement ce que le rapport
         // affiche au web à ces mêmes comptes (instant du règlement, nom de l'employé, NET versé) — jamais le brut, les
         // retenues, les charges patronales ni la période (voir [famillesPaginees]).
-        'payslips' => ['view-rapports'],
+        // Ticket RH-4 — aux comptes RH aussi : ils voient les bulletins complets au web (`GestionPaie`) ; les colonnes RH
+        // (employé, période, brut, retenues) ne descendent QU'À EUX, la vue réduite reste celle de `view-rapports`.
+        'payslips' => ['view-rapports', 'view-rh'],
         // Ticket ARC2 — CORBEILLE : l'instantané des éléments archivés, avec ce que le serveur permet d'en faire. Aux
         // seuls comptes qui gèrent les Paramètres (l'administrateur) : la liste agrège les archives de TOUS les modules.
         'corbeille' => ['manage-parametres'],
@@ -818,7 +850,7 @@ class SyncController extends Controller
             'customers' => fn () => Customer::query()
                 ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                 ->orderBy('name')
-                ->get(['id', 'name', 'phone', 'email', 'city', 'credit_limit', 'is_active']),
+                ->get(['id', 'name', 'phone', 'email', 'city', 'ifu', 'credit_limit', 'is_active']),
 
             // ⚠️ SANS FILTRE `since` POUR CE QUI RESTE DU. Une facture echue il y a
             // trois mois n'a plus bouge depuis : un tirage incremental la
@@ -886,6 +918,15 @@ class SyncController extends Controller
             // Ces prefixes nomment les animaux sur le terrain (R1, T1, LOT-VOL-1) :
             // un poste qui les ignore proposerait sa propre convention, et deux
             // registres de la meme ferme ne se liraient plus ensemble.
+            // Ticket RELEVES-1 — relevés de terrain : toute la table (archivées comprises : `is_active`), validateur nommé.
+            'field_survey_entries' => fn () => \App\Models\FieldSurveyEntry::with('validateur:id,name')->orderBy('id')->get()
+                ->map(fn (\App\Models\FieldSurveyEntry $l) => [
+                    'id' => $l->id, 'type' => $l->type, 'label' => $l->label, 'species_code' => $l->species_code,
+                    'data' => $l->data ?? new \stdClass, 'status' => $l->status, 'validated_by' => $l->validated_by,
+                    'validated_by_name' => $l->validateur?->name, 'validated_at' => $l->validated_at?->toIso8601String(),
+                    'is_active' => $l->is_active, 'updated_at' => $l->updated_at?->toIso8601String(),
+                ])->values(),
+
             'elevage_numbering' => fn () => ElevageNumberingSetting::current()->only([
                 'bande_format', 'lapine_prefix', 'male_prefix', 'truie_prefix',
                 'verrat_prefix', 'portee_prefix', 'volaille_prefix', 'parc_prefix',
@@ -938,6 +979,13 @@ class SyncController extends Controller
                     'estimated_total' => $bon->lines->sum(
                         fn ($ligne) => (float) $ligne->qty * (float) $ligne->estimated_unit_price
                     ),
+                    // Ticket AC-1 — les lignes descendent : « Valider la réception » du poste en refait la facture.
+                    'lines' => $bon->lines->map(fn ($ligne) => [
+                        'id' => $ligne->id,
+                        'product_id' => $ligne->product_id,
+                        'qty' => (float) $ligne->qty,
+                        'estimated_unit_price' => (float) $ligne->estimated_unit_price,
+                    ])->values(),
                 ]),
 
             // 🔴→✅ TICKET 14.79 — LES DETTES FOURNISSEURS DESCENDENT.
@@ -971,10 +1019,11 @@ class SyncController extends Controller
             // 7 h a la ferme, ou le reseau n'est pas. Sans les employes au poste,
             // il n'y a personne a pointer ; sans les pointages deja saisis, le
             // chef d'equipe repointe quelqu'un que le web connait deja.
+            // Ticket RH-1 — archivés COMPRIS (`is_active`) : le poste écrit cette table (table mixte) et doit apprendre un
+            // archivage fait au web ; il n'affiche que les actifs, comme le web.
             'employees' => fn () => Employee::query()
-                ->where('is_active', true)
                 ->orderBy('last_name')
-                ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status'])
+                ->get(['id', 'first_name', 'last_name', 'position', 'base_salary', 'hire_date', 'status', 'is_active', 'updated_at'])
                 // 🔴→✅ TICKET S3 — LE SALAIRE NE DESCEND QU'AUX RÔLES RH. Il partait vers tout poste connecté,
                 // caissier compris. Sans `view-rh`, le poste reçoit `null` et affiche « — » (salaire inconnu).
                 ->each(function (Employee $employe) use ($request) {
@@ -991,29 +1040,33 @@ class SyncController extends Controller
                 ->orderByDesc('start_date')
                 ->get(),
 
-            // ⚠️ BORNE A 60 JOURS, ET C'EST DELIBERE. La table porte deja 870
-            // lignes et grossit d'une par employe et par jour : la servir en
-            // entier alourdirait chaque tirage pour une donnee que personne ne
-            // consulte au-dela du mois courant. Le poste a besoin du mois en
-            // cours pour ne pas repointer ; l'historique vit sur le web.
-            'attendance_records' => fn () => AttendanceRecord::query()
-                ->where('is_active', true)
-                ->where('attendance_date', '>=', now()->subDays(60)->toDateString())
-                ->orderByDesc('attendance_date')
-                ->get(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status'])
-                ->map(fn (AttendanceRecord $p) => [
-                    'id' => $p->id,
-                    'employee_id' => $p->employee_id,
-                    // ⚠️⚠️ LE JOUR SE SERT EN 'Y-m-d', JAMAIS EN INSTANT. Eloquent
-                    // serialise une colonne `date` en « 2026-08-16T23:00:00Z » : le
-                    // 17 aout local devient le 16 a 23 h UTC, et un poste qui lit
-                    // l'instant sans le ramener a l'heure locale pointe la veille.
-                    // Le meme piege a deja coute une echeance de creance (14.75).
-                    'attendance_date' => $p->attendance_date?->format('Y-m-d'),
-                    'check_in' => $p->check_in,
-                    'check_out' => $p->check_out,
-                    'status' => $p->status,
+            // Ticket RH-2 — les absences des stagiaires descendent (archivées comprises, `is_active`) : le poste les note et
+            // les archive désormais (table mixte).
+            'internship_absences' => fn () => \App\Models\InternshipAbsence::query()
+                ->orderByDesc('absence_date')
+                ->get(['id', 'internship_id', 'absence_date', 'reason', 'is_active'])
+                ->map(fn (\App\Models\InternshipAbsence $a) => [
+                    'id' => $a->id,
+                    'internship_id' => $a->internship_id,
+                    'absence_date' => $a->absence_date?->format('Y-m-d'),
+                    'reason' => $a->reason,
+                    'is_active' => (bool) $a->is_active,
                 ]),
+
+            // Ticket RH-4 — barème ITS (tranches actives), pour que la paie du poste soit celle du web.
+            'income_tax_brackets' => fn () => \App\Models\IncomeTaxBracket::query()
+                ->where('is_active', true)
+                ->orderBy('from_amount')
+                ->get(['id', 'from_amount', 'to_amount', 'rate'])
+                ->map(fn (\App\Models\IncomeTaxBracket $t) => [
+                    'id' => $t->id,
+                    'from_amount' => (float) $t->from_amount,
+                    'to_amount' => $t->to_amount === null ? null : (float) $t->to_amount,
+                    'rate' => (float) $t->rate,
+                ]),
+
+            // RH-Q3 (décision client du 27/10/2026 : NE PAS LIMITER) — les pointages sont une FAMILLE PAGINÉE
+            // (`famillesPaginees`), servis en entier par le curseur : la paie d'un mois ancien se compte au poste.
 
             // 🔴→✅ TICKET 14.82 — LE SECRETARIAT DESCEND AU POSTE.
             //
@@ -1146,15 +1199,65 @@ class SyncController extends Controller
                 ->orderBy('code')
                 ->get(['id', 'code', 'label', 'class']),
 
+            // Ticket CP-3 — le registre entier, archivés compris (`is_active`) : le poste calcule ses amortissements avec les
+            // MÊMES colonnes que `FixedAsset::cumulAmortissement`, jamais avec un montant servi.
+            'fixed_assets' => fn () => \App\Models\FixedAsset::query()
+                ->orderBy('acquisition_date')->orderBy('code')
+                ->get()
+                ->map(fn (\App\Models\FixedAsset $b) => [
+                    'id' => $b->id,
+                    'code' => $b->code,
+                    'label' => $b->label,
+                    'account_code' => $b->account_code,
+                    'acquisition_date' => $b->acquisition_date?->format('Y-m-d'),
+                    'acquisition_value' => (float) $b->acquisition_value,
+                    'residual_value' => (float) $b->residual_value,
+                    'duration_years' => (int) $b->duration_years,
+                    'status' => $b->status,
+                    'disposal_date' => $b->disposal_date?->format('Y-m-d'),
+                    'disposal_reason' => $b->disposal_reason,
+                    'is_capitalized' => (bool) $b->is_capitalized,
+                    'is_active' => (bool) $b->is_active,
+                ]),
+
+            // Ticket PA-2 — les droits existants, pour la modale « Nouveau Rôle » / « Modifier le Rôle » (administrateur).
+            'permissions' => fn () => \App\Models\Permission::query()->orderBy('name')->get(['id', 'name']),
+
+            // Ticket CP-5 — les lignes de relevé importées : le rapprochement se calcule au poste comme au web.
+            'bank_statement_lines' => fn () => \App\Models\BankStatementLine::query()
+                ->orderBy('statement_date')
+                ->get(['id', 'account_id', 'statement_date', 'label', 'amount'])
+                ->map(fn (\App\Models\BankStatementLine $l) => [
+                    'id' => $l->id,
+                    'account_id' => $l->account_id,
+                    'statement_date' => $l->statement_date?->format('Y-m-d'),
+                    'label' => $l->label,
+                    'amount' => (float) $l->amount,
+                ]),
+
             'fiscal_years' => fn () => FiscalYear::query()
                 ->orderByDesc('year')
-                ->get(['id', 'year', 'start_date', 'end_date', 'status'])
+                ->get(['id', 'year', 'start_date', 'end_date', 'status', 'step1_confirmed_at', 'closed_at'])
                 ->map(fn (FiscalYear $e) => [
                     'id' => $e->id,
                     'year' => $e->year,
                     'start_date' => $e->start_date?->format('Y-m-d'),
                     'end_date' => $e->end_date?->format('Y-m-d'),
                     'status' => $e->status,
+                    // Ticket CP-4 — l'assistant de clôture du poste affiche l'étape 1 confirmée et la date de clôture.
+                    'step1_confirmed_at' => $e->step1_confirmed_at?->format('Y-m-d H:i:s'),
+                    'closed_at' => $e->closed_at?->format('Y-m-d H:i:s'),
+                ]),
+
+            // Ticket CP-4 — l'historique des clôtures de mois (une ligne par mois, déclôtures comprises).
+            'periodic_closures' => fn () => \App\Models\PeriodicClosure::query()
+                ->orderByDesc('period')
+                ->get()
+                ->map(fn (\App\Models\PeriodicClosure $c) => [
+                    'id' => $c->id,
+                    'period' => $c->period,
+                    'closed_at' => $c->closed_at?->format('Y-m-d H:i:s'),
+                    'reopened_at' => $c->reopened_at?->format('Y-m-d H:i:s'),
                 ]),
 
             // 🔴→✅ TICKET 14.84 — LES PARAMETRES GENERAUX DESCENDENT.
@@ -1165,7 +1268,7 @@ class SyncController extends Controller
             // compte SMS et a la boite mail de la ferme. Seule l'IDENTITE de
             // l'entreprise et ses TAUX descendent — jamais un identifiant de
             // service, meme chiffre.
-            'company_settings' => function () {
+            'company_settings' => function () use ($request) {
                 $entreprise = CompanySetting::query()->first();
 
                 return $entreprise === null ? null : [
@@ -1178,8 +1281,30 @@ class SyncController extends Controller
                     'rccm' => $entreprise->rccm,
                     'tva_enabled' => $entreprise->tva_enabled,
                     'tva_default_rate' => $entreprise->tva_default_rate,
+                    // Ticket RH-4 — taux de paie (`PayrollCalculationService`) : le poste calcule comme le web.
+                    'vps_rate' => $entreprise->vps_rate,
+                    'cnss_employee_rate' => $entreprise->cnss_employee_rate,
+                    'cnss_employer_pension_rate' => $entreprise->cnss_employer_pension_rate,
+                    'cnss_employer_family_rate' => $entreprise->cnss_employer_family_rate,
+                    'cnss_employer_risk_rate' => $entreprise->cnss_employer_risk_rate,
                     // Ticket H9b — délai du rappel des soins (R-SOINS-01), réglable au poste comme au web.
                     'rappel_soins_jours' => $entreprise->rappel_soins_jours,
+                    // Ticket PA-3 / PA-7 — le paramétrage de paie est-il arrêté ? (seul un administrateur le modifie alors)
+                    'payroll_locked' => $entreprise->payrollSettingsLocked(),
+                    'payroll_edited_at' => $entreprise->payroll_settings_edited_at?->format('d/m/Y à H:i'),
+                    // Ticket VC-5 — le module MeCeF est-il activé ? (`config/mecef.php`) : le poste montre ou masque ses colonnes MeCeF.
+                    // MECEF-1 — `mecef_actif` est DÉRIVÉ du mode (tout sauf `desactive`). Le poste reçoit le mode, l'adresse de l'API,
+                    // l'opérateur et un BOOLÉEN « jeton configuré » : JAMAIS le jeton lui-même (secret, ni en clair ni chiffré).
+                    'mecef_actif' => app(\App\Services\Mecef\MecefReglage::class)->actif(),
+                    'mecef_mode' => in_array(app(\App\Services\Mecef\MecefReglage::class)->mode(), \App\Support\MecefMode::REGLABLES, true)
+                        ? app(\App\Services\Mecef\MecefReglage::class)->mode() : \App\Support\MecefMode::DESACTIVE,
+                    'mecef_jeton_configure' => app(\App\Services\Mecef\MecefReglage::class)->jetonConfigure(),
+                    'mecef_api_url' => $entreprise->mecef_api_url,
+                    'mecef_operateur_id' => $entreprise->mecef_operateur_id,
+                    'mecef_operateur_nom' => $entreprise->mecef_operateur_nom,
+                    // Ticket AUT-2 — chemins du logo et du favicon : le poste télécharge le fichier quand le chemin change.
+                    'logo_path' => $entreprise->logo_path,
+                    'favicon_path' => $entreprise->favicon_path,
                 ];
             },
 
@@ -1213,16 +1338,20 @@ class SyncController extends Controller
 
             // ⚠️ NI MOT DE PASSE NI JETON : la liste sert a SAVOIR QUI travaille
             // sur la ferme, pas a s'authentifier.
+            // Ticket UT-1 — `updated_at` (ISO 8601) : le poste n'écrase jamais un compte qu'il a en attente.
             'users' => fn () => User::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'username', 'email', 'is_active'])
+                ->get(['id', 'name', 'username', 'email', 'is_active', 'must_change_password', 'updated_at'])
                 ->map(fn (User $u) => [
                     'id' => $u->id,
                     'name' => $u->name,
                     'username' => $u->username,
                     'email' => $u->email,
                     'is_active' => $u->is_active,
+                    // MDP-1 : le drapeau seul (affichage de la liste) — jamais le mot de passe.
+                    'must_change_password' => (bool) $u->must_change_password,
                     'role' => $u->getRoleNames()->first(),
+                    'updated_at' => $u->updated_at?->toIso8601String(),
                 ]),
 
             // ⚠️ BORNE A 100 LIGNES : la table grossit d'une ligne par action et
@@ -1364,11 +1493,7 @@ class SyncController extends Controller
             // ne peut donc pas recompter — le serveur le fait sur l'historique entier.
             'attestation_templates' => fn () => collect(AttestationService::TYPES)
                 ->map(fn (string $type) => AttestationTemplate::forType($type))
-                ->map(fn (AttestationTemplate $m) => [
-                    'id' => $m->id,
-                    'type' => $m->type,
-                    'body_text' => $m->body_text,
-                ])
+                ->map(fn (AttestationTemplate $m) => $m->pourLePoste())
                 ->values(),
             'attestation_counts' => fn () => app(AttestationService::class)->compteurs(),
 
@@ -1379,10 +1504,13 @@ class SyncController extends Controller
             // LIGNE. Sans les comptes de tresorerie, le poste ne peut pas dire
             // QUI paie ; sans la liste des comptes de charge, il devrait la
             // recopier et les deux listes divergeraient au premier ajout.
+            // Ticket PA-4 — RIB, IBAN, titulaire, téléphone : seulement pour qui gère les paramètres (jamais au caissier).
             'treasury_accounts' => fn () => \App\Models\TreasuryAccount::query()
                 ->where('is_active', true)
                 ->orderBy('label')
-                ->get(['id', 'label', 'account_code', 'type', 'balance']),
+                ->get($request->user()?->can('manage-parametres')
+                    ? ['id', 'label', 'account_code', 'type', 'balance', 'bank_name', 'holder_name', 'rib', 'iban', 'operator_name', 'phone_number', 'sim_serial']
+                    : ['id', 'label', 'account_code', 'type', 'balance']),
             // Ticket DEP3 — N'EST PLUS LU PAR LE POSTE MIGRÉ (le compte de charge d'une ligne se choisit dans le plan
             // comptable, classe 6) ; CONSERVÉ pour les postes non migrés, qui l'attendent (le serveur est déployé avant eux).
             'expense_categories' => fn () => \App\Models\Expense::CATEGORIES,
@@ -1458,6 +1586,26 @@ class SyncController extends Controller
                         'motif', 'is_active', 'updated_at']),
             ],
             [
+                // Ticket EL-1 — les transformations (« Bon d'Abattage & Transformation ») : l'historique (20 dernières) et le KPI
+                // du mois de l'écran du poste. Le fait seul descend ; l'effectif de la bande et le stock du produit fini, eux,
+                // descendent avec leurs propres tables (bandes, produits).
+                'cle' => 'transformations',
+                'requete' => fn () => \App\Models\Transformation::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+                'historique' => fn ($q) => $q->orderByDesc('transformation_date')->orderBy('id'),
+                'enJson' => fn (\App\Models\Transformation $t) => [
+                    'id' => $t->id,
+                    'lot_id' => $t->lot_id,
+                    'product_id' => $t->product_id,
+                    'qty_animals' => (int) $t->qty_animals,
+                    'qty_produced' => (float) $t->qty_produced,
+                    'operator_id' => $t->operator_id,
+                    // ⚠️ Le jour se sert en 'Y-m-d', jamais en instant (voir `attendance_records`).
+                    'transformation_date' => $t->transformation_date?->format('Y-m-d'),
+                    'updated_at' => $t->updated_at?->toIso8601String(),
+                ],
+            ],
+            [
                 // Ticket U3 (décision D-U3 du 19/10/2026 : archivage d'un soin au poste comme au web) — `is_active` est
                 // servi. Tirage complet : les soins ACTIFS seuls (un poste neuf n'a que faire des archivés). Tirage
                 // incrémental : tout soin modifié depuis `since`, ARCHIVÉS COMPRIS — sans eux, un poste ne saurait jamais
@@ -1481,6 +1629,30 @@ class SyncController extends Controller
                 'cle' => 'veterinary_calendar_events',
                 'requete' => fn () => \App\Models\VeterinaryCalendarEvent::query()
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since)),
+            ],
+            [
+                // RH-Q3 (27/10/2026) — LES POINTAGES, EN ENTIER. Jusqu'ici bornés à 60 jours (page 1, « l'historique vit sur
+                // le web ») : le client veut la paie de tout mois au poste, donc ses absences. Famille paginée par le
+                // curseur (`updated_at`, `id`) : un poste neuf reçoit l'historique page par page ; ensuite seul ce qui a
+                // bougé. Ticket RH-3 — archivés COMPRIS (`is_active`) : un pointage archivé au web cesse de compter au poste.
+                'cle' => 'attendance_records',
+                'requete' => fn () => AttendanceRecord::query()
+                    ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                    ->select(['id', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'status', 'is_active', 'updated_at']),
+                'historique' => fn ($q) => $q->orderByDesc('attendance_date')->orderBy('id'),
+                'enJson' => fn (AttendanceRecord $p) => [
+                    'id' => $p->id,
+                    'employee_id' => $p->employee_id,
+                    // ⚠️⚠️ LE JOUR SE SERT EN 'Y-m-d', JAMAIS EN INSTANT. Eloquent sérialise une colonne `date` en
+                    // « 2026-08-16T23:00:00Z » : le 17 août local devient le 16 à 23 h UTC, et un poste qui lit l'instant
+                    // sans le ramener à l'heure locale pointe la veille. Le même piège a déjà coûté une échéance (14.75).
+                    'attendance_date' => $p->attendance_date?->format('Y-m-d'),
+                    'check_in' => $p->check_in,
+                    'check_out' => $p->check_out,
+                    'status' => $p->status,
+                    'is_active' => (bool) $p->is_active,
+                    'updated_at' => $p->updated_at?->toIso8601String(),
+                ],
             ],
             [
                 // 🔴→✅ TICKET 14.72 — LE CYCLE DE REPRODUCTION DESCEND AU POSTE.
@@ -1632,6 +1804,20 @@ class SyncController extends Controller
                     'status' => $vente->status,
                     'mecef_status' => $vente->mecef_status,
                     'mecef_qr_ref' => $vente->mecef_qr_ref,
+                    // MECEF-1 — ce que la DGI a renvoyé (le poste ne les écrit JAMAIS : il les lit, pour le statut et le PDF).
+                    'mecef_code' => $vente->mecef_code,
+                    'mecef_nim' => $vente->mecef_nim,
+                    'mecef_compteurs' => $vente->mecef_compteurs,
+                    'mecef_normalise_le' => $vente->mecef_normalise_le?->toIso8601String(),
+                    'mecef_message' => $vente->mecef_message,
+                    // Choix de la vente (écrits par le poste à la saisie) et ce que la DGI a calculé (AIB) ; frais de livraison inclus.
+                    'facture_type' => $vente->typeFacture(),
+                    'client_ifu' => $vente->client_ifu,
+                    'client_nom_facture' => $vente->client_nom_facture,
+                    'aib_taux' => $vente->aib_taux,
+                    'mecef_aib_montant' => $vente->mecef_aib_montant,
+                    'delivery_fee' => $vente->delivery_fee,
+                    'delivery_in_total' => (bool) $vente->delivery_in_total,
                     'sold_at' => $vente->date_effective?->toIso8601String(),
                 ],
                 'lignes' => [
@@ -1671,7 +1857,8 @@ class SyncController extends Controller
                 'requete' => fn () => \App\Models\CreditNote::query()
                     ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
                     ->select(['id', 'credit_note_number', 'sale_id', 'product_id', 'qty', 'amount', 'reason', 'decision',
-                        'inspection_notes', 'status', 'created_at', 'updated_at']),
+                        'inspection_notes', 'status', 'mecef_status', 'mecef_qr_ref', 'mecef_code', 'mecef_nim', 'mecef_compteurs',
+                        'mecef_normalise_le', 'mecef_message', 'created_at', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
                 'enJson' => fn (\App\Models\CreditNote $a) => [
                     'id' => $a->id,
@@ -1684,6 +1871,14 @@ class SyncController extends Controller
                     'decision' => $a->decision,
                     'inspection_notes' => $a->inspection_notes,
                     'status' => $a->status,
+                    // MECEF-1 — facture d'avoir (FA) : lue par le poste, jamais écrite par lui.
+                    'mecef_status' => $a->mecef_status,
+                    'mecef_qr_ref' => $a->mecef_qr_ref,
+                    'mecef_code' => $a->mecef_code,
+                    'mecef_nim' => $a->mecef_nim,
+                    'mecef_compteurs' => $a->mecef_compteurs,
+                    'mecef_normalise_le' => $a->mecef_normalise_le?->toIso8601String(),
+                    'mecef_message' => $a->mecef_message,
                     'created_at' => $a->created_at?->format('Y-m-d H:i:s'),
                 ],
             ],
@@ -1774,14 +1969,27 @@ class SyncController extends Controller
                     ->with('employee:id,first_name,last_name')
                     ->when($since, fn ($q) => $q->where(fn ($w) => $w->where('updated_at', '>', $since)
                         ->orWhereHas('employee', fn ($e) => $e->where('updated_at', '>', $since))))
-                    ->select(['id', 'employee_id', 'net_salary', 'created_at', 'updated_at']),
+                    ->select(['id', 'employee_id', 'period_month', 'gross_salary', 'absence_deduction', 'cnss_deduction',
+                        'its_deduction', 'vps_employer', 'cnss_employer_pension', 'cnss_employer_family', 'cnss_employer_risk',
+                        'net_salary', 'created_at', 'updated_at']),
                 'historique' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
+                // Ticket RH-4 — les colonnes RH (employé, période, brut, retenues, charges) ne descendent QU'AUX comptes
+                // `view-rh`, qui les voient au web (`GestionPaie`) ; `view-rapports` garde la vue réduite (S3).
                 'enJson' => fn (\App\Models\Payslip $p) => [
                     'id' => $p->id,
                     'employee_name' => $p->employee === null ? null : $p->employee->last_name.' '.$p->employee->first_name,
                     'net_salary' => (float) $p->net_salary,
                     'created_at' => $p->created_at?->format('Y-m-d H:i:s'),
-                ],
+                ] + (request()->user()?->can('view-rh') ? [
+                    'employee_id' => $p->employee_id,
+                    'period_month' => $p->period_month?->format('Y-m-d'),
+                    'gross_salary' => (float) $p->gross_salary,
+                    'absence_deduction' => (float) $p->absence_deduction,
+                    'cnss_deduction' => (float) $p->cnss_deduction,
+                    'its_deduction' => (float) ($p->its_deduction ?? 0),
+                    'charges_patronales' => round((float) ($p->vps_employer ?? 0) + (float) ($p->cnss_employer_pension ?? 0)
+                        + (float) ($p->cnss_employer_family ?? 0) + (float) ($p->cnss_employer_risk ?? 0), 2),
+                ] : []),
             ],
             [
                 // 🔴→✅ TICKET U9 — LE GRAND LIVRE DES STOCKS (`stock_movements`) DESCEND AU POSTE.
@@ -1988,9 +2196,15 @@ class SyncController extends Controller
             // 🔴→✅ Ticket U14 — l'échec de la facture d'une vente reçue redevient une ligne du journal d'audit, comme
             // avant S-T13 (qui avait sorti l'appel de la transaction et perdu cette trace) : la vente est gardée, en
             // « Erreur MeCeF », et le journal dit qu'elle vient d'un poste. Libellé dans `AuditLog::ACTION_LABELS`.
-            if (! $facture['transmise'] && ! $facture['deja']) {
+            if (! $facture['transmise'] && ! $facture['deja'] && ! ($facture['inactif'] ?? false) && ! ($facture['simple'] ?? false)) {
                 AuditLog::record('sale.mecef_failed_on_sync', 'facturation');
             }
+        }
+
+        // MECEF-1 — les avoirs reçus sur une facture NORMALISÉE partent comme factures d'avoir `FA`, eux aussi APRÈS la
+        // transaction (jamais dans un essai rejoué). Un avoir sur une vente non normalisée n'a pas d'objet : rien ne part.
+        foreach (array_unique($this->avoirsAFacturer) as $avoirRecu) {
+            app(FacturationMecefService::class)->facturerAvoir($avoirRecu);
         }
 
         // 🔴→✅ Ticket U13 — ALERTE D'AUTONOMIE ALIMENTAIRE des fiches saisies au poste, comme `saveDay()` au web : APRÈS
@@ -2028,6 +2242,7 @@ class SyncController extends Controller
         $this->fichesPortantLesVentes = [];
         $this->ventesAFacturer = [];
         $this->fichesSaisiesAuPoste = [];
+        $this->avoirsAFacturer = [];
 
         $result = [
             'cles_invalides' => $clesInvalides,
@@ -2049,7 +2264,28 @@ class SyncController extends Controller
             'infirmary_records' => ['accepted' => [], 'rejected' => []],
             'veterinary_calendar_events' => ['accepted' => [], 'rejected' => []],
             'purchases' => ['accepted' => [], 'rejected' => []],
+            // Ticket AC-1 — bons de commande saisis au poste.
+            'purchase_orders' => ['accepted' => [], 'rejected' => []],
+            // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste.
+            'chart_of_accounts' => ['accepted' => [], 'rejected' => []],
+            // Ticket CP-2 — demandes d'écriture manuelle (créer, modifier, archiver) saisies au poste.
+            'manual_entry_requests' => ['accepted' => [], 'rejected' => []],
+            'transformations' => ['accepted' => [], 'rejected' => []],
+            // Ticket RELEVES-1 — relevés de terrain du poste, rejoués par `ReleveTerrainService` (le point de passage du web).
+            'field_survey_entries' => ['accepted' => [], 'rejected' => []],
+            'fixed_assets' => ['accepted' => [], 'rejected' => []],
+            'depreciation_requests' => ['accepted' => [], 'rejected' => []],
+            'fiscal_closure_requests' => ['accepted' => [], 'rejected' => []],
+            'settings_requests' => ['accepted' => [], 'rejected' => []],
+            'bank_statement_imports' => ['accepted' => [], 'rejected' => []],
             'attendance_records' => ['accepted' => [], 'rejected' => []],
+            // Tickets RH-1, RH-2, RH-4 — registres RH et demandes de règlement de paie du poste.
+            'employees' => ['accepted' => [], 'rejected' => []],
+            // Ticket UT-1 — comptes utilisateurs créés, modifiés, archivés ou réactivés au poste.
+            'users' => ['accepted' => [], 'rejected' => []],
+            'internships' => ['accepted' => [], 'rejected' => []],
+            'internship_absences' => ['accepted' => [], 'rejected' => []],
+            'payslip_requests' => ['accepted' => [], 'rejected' => []],
             // Ticket S-T5 — `merged` : créations du poste fusionnées avec une fiche existante (voir `FusionReferentielsService`).
             'products' => ['accepted' => [], 'rejected' => [], 'merged' => []],
             'suppliers' => ['accepted' => [], 'rejected' => [], 'merged' => []],
@@ -2061,6 +2297,10 @@ class SyncController extends Controller
             'archived_documents' => ['accepted' => [], 'rejected' => []],
             'administrative_documents' => ['accepted' => [], 'rejected' => []],
             'supplier_payments' => ['accepted' => [], 'rejected' => []],
+            // Ticket VC-1 — encaissements de créances clients saisis au poste.
+            'receivable_payments' => ['accepted' => [], 'rejected' => []],
+            // Ticket VC-2 — relances de clients faites ou demandées au poste.
+            'customer_reminders' => ['accepted' => [], 'rejected' => []],
             'purchase_returns' => ['accepted' => [], 'rejected' => []],
             'supplier_refunds' => ['accepted' => [], 'rejected' => []],
             'customer_advances' => ['accepted' => [], 'rejected' => []],
@@ -2081,17 +2321,16 @@ class SyncController extends Controller
         foreach ([
             'product_categories',
             'receivables',
-            'customer_reminders',
-            'purchase_orders',
+            // Ticket VC-2 : `customer_reminders` s'écrit au poste (`pushCustomerReminders`).
+            // Ticket AC-1 : `purchase_orders` s'écrit au poste (`pushPurchaseOrders`).
             'payables',
-            'employees',
-            'internships',
-            'chart_of_accounts',
+            // Tickets RH-1 / RH-2 : `employees` et `internships` s'écrivent au poste depuis RH-1 (tables mixtes).
+            // Ticket CP-1 : `chart_of_accounts` s'écrit au poste (`pushChartOfAccounts`, `manage-comptabilite`).
             'fiscal_years',
             'accounting_entries',
             'accounting_entry_lines',
             'roles',
-            'users',
+            // Ticket UT-1 : `users` s'écrit au poste (`pushUsers`, `manage-users`).
             'audit_logs',
             'notifications',
             'lot_revenues',
@@ -2152,6 +2391,22 @@ class SyncController extends Controller
         // peut viser un client créé au poste à l'instant.
         if ($request->has('customers')) {
             $result['customers'] = $this->pushCustomers($request->input('customers'), $request->user(), $this->nomDuPoste($request));
+        }
+
+        // Tickets RH-1 / RH-2 — REGISTRES RH AVANT LE POINTAGE ET LA PAIE : un pointage ou une demande de règlement du même
+        // envoi peut viser l'employé créé à l'instant ; une absence, le stagiaire créé à l'instant.
+        if ($request->has('employees')) {
+            $result['employees'] = $this->pushEmployees($request->input('employees'));
+        }
+        // Ticket UT-1 — comptes utilisateurs (`manage-users`), rejoués par `SaisieUtilisateurAction`.
+        if ($request->has('users')) {
+            $result['users'] = $this->pushUsers($request->input('users'), $request->user());
+        }
+        if ($request->has('internships')) {
+            $result['internships'] = $this->pushInternships($request->input('internships'));
+        }
+        if ($request->has('internship_absences')) {
+            $result['internship_absences'] = $this->pushInternshipAbsences($request->input('internship_absences'));
         }
 
         // Ticket DEV — LES DEVIS APRÈS LES CLIENTS : un devis du même envoi peut viser un client créé (ou fusionné) au
@@ -2238,8 +2493,81 @@ class SyncController extends Controller
             );
         }
 
+        // Ticket EL-1 — APRÈS les fiches et les transferts : la transformation sort ses sujets comme une vente de la fiche du jour.
+        if ($request->has('transformations')) {
+            $result['transformations'] = $this->pushTransformations(
+                $request->input('transformations'),
+                $request->user(),
+            );
+        }
+
+        // Ticket RELEVES-1 — relevés de terrain (règles d'incubation avant les relevés de lots qui les visent).
+        if ($request->has('field_survey_entries')) {
+            $result['field_survey_entries'] = $this->pushFieldSurveyEntries(
+                $request->input('field_survey_entries'),
+                $request->user(),
+                $this->nomDuPoste($request),
+            );
+        }
+
+        // Ticket CP-1 — AVANT les dépenses et les achats : une ligne de dépense peut viser un compte créé dans le même envoi.
+        if ($request->has('chart_of_accounts')) {
+            $result['chart_of_accounts'] = $this->pushChartOfAccounts(
+                $this->envoiTraduit($request, 'chart_of_accounts'),
+                $request->user(),
+            );
+        }
+
+        // Ticket CP-2 — APRÈS le plan comptable (une écriture peut viser un compte créé dans le même envoi).
+        if ($request->has('manual_entry_requests')) {
+            $result['manual_entry_requests'] = $this->pushManualEntryRequests(
+                $this->envoiTraduit($request, 'manual_entry_requests'),
+                $request->user(),
+            );
+        }
+
+        // Ticket CP-3 — registre des immobilisations, puis dotation (qui amortit ce que le registre vient de recevoir).
+        if ($request->has('fixed_assets')) {
+            $result['fixed_assets'] = $this->pushFixedAssets(
+                $this->envoiTraduit($request, 'fixed_assets'),
+                $request->user(),
+            );
+        }
+
+        if ($request->has('depreciation_requests')) {
+            $result['depreciation_requests'] = $this->pushDepreciationRequests(
+                $this->envoiTraduit($request, 'depreciation_requests'),
+                $request->user(),
+            );
+        }
+
+        // Tickets PA-* — AVANT tout le reste de la comptabilité : un compte de trésorerie créé ici peut être visé plus bas.
+        if ($request->has('settings_requests')) {
+            $result['settings_requests'] = $this->pushSettingsRequests(
+                $this->envoiTraduit($request, 'settings_requests'),
+                $request->user(),
+            );
+        }
+
+        // Ticket CP-5 — après le plan comptable et les réglages : le compte visé peut être créé dans le même envoi.
+        if ($request->has('bank_statement_imports')) {
+            $result['bank_statement_imports'] = $this->pushBankStatementImports(
+                $this->envoiTraduit($request, 'bank_statement_imports'),
+                $request->user(),
+            );
+        }
+
         if ($request->has('expenses')) {
             $result['expenses'] = $this->pushExpenses($request->input('expenses'));
+        }
+
+        // Ticket AC-1 — AVANT les achats : la réception d'un bon (achat qui porte `purchase_order_id`) vise un bon que le même
+        // envoi vient peut-être de créer.
+        if ($request->has('purchase_orders')) {
+            $result['purchase_orders'] = $this->pushPurchaseOrders(
+                $this->envoiTraduit($request, 'purchase_orders'),
+                $request->user(),
+            );
         }
 
         if ($request->has('purchases')) {
@@ -2280,6 +2608,11 @@ class SyncController extends Controller
             $result['attendance_records'] = $this->pushAttendance($request->input('attendance_records'));
         }
 
+        // Ticket RH-4 — APRÈS les pointages : les absences du mois, reçues dans le même envoi, comptent sur la paie.
+        if ($request->has('payslip_requests')) {
+            $result['payslip_requests'] = $this->pushPayslipRequests($request->input('payslip_requests'));
+        }
+
         if ($request->has('sales')) {
             // ⚠️ 15.30 : les fiches ACCEPTÉES de ce même envoi sont transmises aux ventes, pour que
             // la vente ne rajoute pas sur une fiche ce que cette fiche porte déjà (double comptage).
@@ -2309,6 +2642,24 @@ class SyncController extends Controller
             );
         }
 
+        // Ticket VC-1 — APRÈS les ventes, les avances et leurs imputations (la créance d'une vente du même envoi existe, et ce que l'avance a déjà imputé réduit le solde) : encaissement d'une créance client,
+        // rejoué par `CustomerSettlementService`, le point de passage de `SuiviDettes` et `ProfileClient`.
+        if ($request->has('receivable_payments')) {
+            $result['receivable_payments'] = $this->pushReceivablePayments(
+                $this->envoiTraduit($request, 'receivable_payments'),
+                $request->user(),
+                $request->input('device_id'),
+            );
+        }
+
+        // Ticket VC-2 — APRÈS les encaissements : une relance du poste est jouée avec l'état courant des créances.
+        if ($request->has('customer_reminders')) {
+            $result['customer_reminders'] = $this->pushCustomerReminders(
+                $this->envoiTraduit($request, 'customer_reminders'),
+                $request->user(),
+            );
+        }
+
         if ($request->has('livestock_reproduction_events')) {
             $result['livestock_reproduction_events'] =
                 $this->pushReproductionEvents($request->input('livestock_reproduction_events'));
@@ -2332,6 +2683,14 @@ class SyncController extends Controller
 
         if ($request->has('veterinary_records')) {
             $result['veterinary_records'] = $this->pushVeterinaryRecords($request->input('veterinary_records'));
+        }
+
+        // Ticket CP-4 — demandes de clôture, APRÈS tout le reste de l'envoi : une clôture juge le journal que les ventes, achats et écritures du même paquet viennent de remplir.
+        if ($request->has('fiscal_closure_requests')) {
+            $result['fiscal_closure_requests'] = $this->pushFiscalClosureRequests(
+                $this->envoiTraduit($request, 'fiscal_closure_requests'),
+                $request->user(),
+            );
         }
 
         // 🔴→✅ TICKET ARC2 — EN DERNIER : une demande de restauration ou de suppression porte sur ce que le même envoi
@@ -2384,6 +2743,11 @@ class SyncController extends Controller
             $bandes[] = $transfert['source_lot_id'] ?? null;
             $bandes[] = $transfert['target_lot_id'] ?? null;
         }
+        // Ticket EL-1 — une transformation mouvemente son produit fini et la fiche de sa bande.
+        foreach ($liste($request->input('transformations')) as $transformation) {
+            $produits[] = $transformation['product_id'] ?? null;
+            $bandes[] = $transformation['lot_id'] ?? null;
+        }
 
         return [...$produits, ...OrdreDesVerrous::produitsDesFiches($bandes)];
     }
@@ -2423,18 +2787,51 @@ class SyncController extends Controller
         // Ticket BS3 — le droit de l'écran « Registre des Reproducteurs » du web.
         'animals' => 'manage-elevage',
         'livestock_transfers' => 'manage-elevage',
+        // Ticket EL-1 — le droit de `TransformationForm::validateTransformation()` du web.
+        'transformations' => 'manage-elevage',
+        // Ticket RELEVES-1 — le droit des méthodes d'écriture de `ParametresElevage` du web.
+        'field_survey_entries' => 'manage-elevage',
         'livestock_reproduction_events' => 'manage-elevage',
         'infirmary_records' => 'manage-elevage',
         'veterinary_calendar_events' => 'manage-elevage',
         'veterinary_records' => 'manage-elevage',
         'expenses' => 'manage-achats',
         'purchases' => 'manage-achats',
+        // Ticket AC-1 — le droit de `BonsCommande` du web.
+        'purchase_orders' => 'manage-achats',
+        // Ticket CP-1 — le droit de `PlanComptable` du web.
+        'chart_of_accounts' => 'manage-comptabilite',
+        // Ticket CP-2 — le droit de `JournalComptable` du web.
+        'manual_entry_requests' => 'manage-comptabilite',
+        // Ticket CP-3 — le droit de `Immobilisations` du web.
+        'fixed_assets' => 'manage-comptabilite',
+        'depreciation_requests' => 'manage-comptabilite',
+        // Ticket CP-4 — plancher ; le droit exact dépend du geste (`close-fiscal-year`, `manage-modules`, `manage-comptabilite`).
+        'fiscal_closure_requests' => 'view-comptabilite',
+        // Tickets PA-* — le droit exact dépend du type de la demande (jugé dans `pushSettingsRequests`) ; `view-parametres` est le plancher.
+        'settings_requests' => 'view-parametres',
+        // Ticket CP-5 — le droit de `RapprochementBancaire::importReleve`.
+        'bank_statement_imports' => 'manage-comptabilite',
         'attendance_records' => 'manage-rh',
+        // Tickets RH-1, RH-2, RH-4 — le droit des écrans RH du web (`RegistreEmployes`, `RegistreStagiaires`, `GestionPaie`).
+        'employees' => 'manage-rh',
+        // Ticket UT-1 — le droit de `GestionUtilisateurs` du web : l'écran le plus sensible du projet.
+        'users' => 'manage-users',
+        'internships' => 'manage-rh',
+        'internship_absences' => 'manage-rh',
+        'payslip_requests' => 'manage-rh',
         'sales' => 'manage-ventes',
+        // Ticket VC-1 — le droit de `SuiviDettes` / `ProfileClient` du web.
+        'receivable_payments' => 'manage-ventes',
+        // Ticket VC-2 — le droit de `RelancesClients` / `SuiviDettes` du web.
+        'customer_reminders' => 'manage-ventes',
         // Ticket DEV — le droit du composant `Ventes\Devis` du web.
         'quotes' => 'manage-ventes',
         // Ticket AV1 — le droit de `RetoursAvoirs::saveReturn()` / `markAsTreated()` du web.
-        'credit_notes' => 'manage-ventes',
+        // CONF-4 (DV-20) — `avoir-client` (Gate de `AppServiceProvider`) = `manage-ventes` OU `correct-invoices` : le comptable
+        // envoie ses avoirs SANS pouvoir encaisser (`sales` reste à `manage-ventes` seul : une annulation de vente venant de
+        // lui est refusée, avec son motif).
+        'credit_notes' => 'avoir-client',
         // Ticket ARC2 — le droit de l'écran Corbeille du web (administrateur).
         'corbeille_demandes' => 'manage-parametres',
         'stock_adjustments' => 'manage-stocks',
@@ -2505,7 +2902,11 @@ class SyncController extends Controller
                 $cle = $table === 'stock_adjustments' ? 'client_ref' : 'id';
                 $refus[$table][] = [
                     $cle => is_array($envoi) ? ($envoi[$cle] ?? null) : null,
-                    'reason' => MotifsRefusPush::roleInsuffisant($table),
+                    // CONF-4 — une vente renvoyée `annulee` par un compte sans `manage-ventes` (le comptable) : motif PROPRE à
+                    // l'annulation, qui dit où va la correction (l'avoir).
+                    'reason' => $table === 'sales' && is_array($envoi) && ($envoi['status'] ?? null) === 'annulee'
+                        ? MotifsRefusPush::annulationVenteRefusee()
+                        : MotifsRefusPush::roleInsuffisant($table),
                 ];
             }
 
@@ -2555,6 +2956,10 @@ class SyncController extends Controller
     private const FICHE_COLONNES_VENTILATION = [
         'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune',
         'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        // Ticket VOL-1 : ventes par catégorie (volailles reproductrices). Même règle : `null` = clé absente.
+        'vente_repro', 'vente_sevre', 'vente_jeune',
+        // Ticket VOL-2 : quatrième emplacement (Poussin ponte des pondeuses) et deux passages de plus. Même règle.
+        'mort_4', 'don_4', 'vente_4', 'cat_depart_4', 'passage_4_sevre', 'passage_jeune_repro',
     ];
 
     /** Ticket 15.40 — effectifs par catégorie DÉRIVÉS (comme `effectif_final`) : jamais saisis sur une bande à chaîne. */
@@ -2571,6 +2976,8 @@ class SyncController extends Controller
     private const FICHE_COLONNES_MOUVEMENT = [
         'achat', 'ne', 'mort', 'vente', 'don', 'mort_repro', 'mort_sevre', 'mort_jeune',
         'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        'vente_repro', 'vente_sevre', 'vente_jeune',
+        'mort_4', 'don_4', 'vente_4', 'cat_depart_4', 'passage_4_sevre', 'passage_jeune_repro',
     ];
 
     /**
@@ -2590,7 +2997,7 @@ class SyncController extends Controller
      */
     private function modifieAutreChoseQueLaVente(array $fiche, ?LivestockDailyEntry $existant): bool
     {
-        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant'];
+        $libres = ['id', 'lot_id', 'entry_date', 'vente', 'vente_sexe', 'vente_montant', 'vente_repro', 'vente_sevre', 'vente_jeune', 'vente_4'];
         $aZeroParDefaut = array_merge(self::FICHE_COLONNES_NOT_NULL, ['don'], self::FICHE_COLONNES_VENTILATION);
 
         foreach (array_diff_key($fiche, array_flip($libres)) as $colonne => $valeur) {
@@ -2638,7 +3045,12 @@ class SyncController extends Controller
         $service = app(EffectifParCategorieService::class);
         $lot = $fiche->lot;
         $jour = $fiche->entry_date->format('Y-m-d');
-        $colonnesDepart = ['cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune'];
+        // Ticket VOL-2 : une bande de pondeuses a QUATRE emplacements (le quatrième : colonnes `*_4`).
+        $espece = EffectifParCategorieService::especeDuLot($lot);
+        $pondeuses = $espece === EffectifParCategorieService::VOLAILLES_PONTE;
+        $emplacements = EffectifParCategorieService::emplacementsDe($espece);
+        $col = fn (string $prefixe) => array_map(fn ($e) => EffectifParCategorieService::colonne($prefixe, $e), $emplacements);
+        $colonnesDepart = $col('cat_depart');
         $tete = $service->teteDeChaine($fiche->lot_id);
 
         // (a) DÉPART (D4) : une seule fois par bande, sur une espèce suivie, somme = effectif au début du jour.
@@ -2657,7 +3069,7 @@ class SyncController extends Controller
 
                 $refus = EffectifParCategorieService::verifierDepart([
                     'repro' => $fiche->cat_depart_repro, 'sevre' => $fiche->cat_depart_sevre, 'jeune' => $fiche->cat_depart_jeune,
-                ], $fiche->previousEffectif());
+                ] + ($pondeuses ? ['quatre' => $fiche->cat_depart_4] : []), $fiche->previousEffectif());
                 if ($refus !== null) {
                     $this->refuserFiche($refus);
                 }
@@ -2666,18 +3078,31 @@ class SyncController extends Controller
 
         // Chaîne « en jeu » pour CETTE fiche : un départ complet existe (en base ou posé par cette fiche) à une date
         // antérieure ou égale, sur une espèce suivie. Une fiche antérieure au départ n'est pas dans la chaîne.
-        $departCompletIci = $fiche->cat_depart_repro !== null && $fiche->cat_depart_sevre !== null && $fiche->cat_depart_jeune !== null;
+        $departCompletIci = ! in_array(null, array_map(fn ($c) => $fiche->{$c}, $colonnesDepart), true);
         $dateTete = $tete?->entry_date->format('Y-m-d') ?? ($departCompletIci ? $jour : null);
         $dansLaChaine = $dateTete !== null && $jour >= $dateTete && EffectifParCategorieService::especeDuLot($lot) !== null;
 
-        $groupes = ['mort' => 'morts', 'don' => 'dons'];
+        // 🔁 TICKET VOL-1 — VOLAILLES REPRODUCTRICES : la bande DOIT avoir son départ avant toute journée (aucune catégorie
+        // « inconnue » sur cette fiche, décision du client), les ventes sont ventilées comme les morts et les dons.
+        // 🔁 TICKET VOL-2 — PONDEUSES : mêmes règles, avec quatre stades (le départ, les ventes, les morts et les dons).
+        $volailles = EffectifParCategorieService::estVolailles($espece);
+        if ($volailles && ($existant === null || $this->porteUneColonneDeSaisie($entry))) {
+            if ($dateTete === null) {
+                $this->refuserFiche($pondeuses ? MotifsRefusPush::departRequisPondeuses($lot->code) : MotifsRefusPush::departRequisVolailles($lot->code));
+            }
+            if ($jour < $dateTete) {
+                $this->refuserFiche(MotifsRefusPush::jourAvantLeDepart(Carbon::parse($dateTete)->format('d/m/Y')));
+            }
+        }
+
+        $groupes = ['mort' => 'morts', 'don' => 'dons'] + ($volailles ? ['vente' => 'ventes'] : []);
         $erreurs = [];
 
         // (b) clés de ventilation : les trois ou aucune.
         foreach ($groupes as $total => $libelle) {
-            $presentes = array_filter(["{$total}_repro", "{$total}_sevre", "{$total}_jeune"], fn ($c) => array_key_exists($c, $entry));
-            if ($presentes !== [] && count($presentes) < 3) {
-                $erreurs[] = MotifsRefusPush::ventilationIncomplete($libelle);
+            $presentes = array_filter($col($total), fn ($c) => array_key_exists($c, $entry));
+            if ($presentes !== [] && count($presentes) < count($emplacements)) {
+                $erreurs[] = MotifsRefusPush::ventilationIncomplete($libelle, $volailles, $pondeuses);
             }
         }
         if ($erreurs !== []) {
@@ -2686,7 +3111,7 @@ class SyncController extends Controller
 
         if ($dansLaChaine) {
             // Les catégories sont DÉRIVÉES ici : ce que le client envoie n'est pas écrit (la cascade les recalcule).
-            foreach (self::FICHE_CATEGORIES_DERIVEES as $colonne) {
+            foreach (array_merge(self::FICHE_CATEGORIES_DERIVEES, $pondeuses ? ['cat_eff_4'] : []) as $colonne) {
                 $fiche->setAttribute($colonne, $fiche->getOriginal($colonne));
             }
 
@@ -2695,7 +3120,7 @@ class SyncController extends Controller
             // (c) D7 : des morts/dons non ventilés ne se calculent pas par catégorie. Un total à zéro, lui, est
             // « connu à zéro » dans chaque catégorie (rien d'inventé : trois entiers positifs de somme 0 sont 0).
             foreach ($groupes as $total => $libelle) {
-                $colonnes = ["{$total}_repro", "{$total}_sevre", "{$total}_jeune"];
+                $colonnes = $col($total);
                 if (collect($colonnes)->contains(fn ($c) => $fiche->{$c} === null)) {
                     if (array_key_exists($total, $entry) && (int) $fiche->{$total} > 0) {
                         $erreurs[] = MotifsRefusPush::ficheNonVentilee($libelle);
@@ -2711,16 +3136,18 @@ class SyncController extends Controller
             }
 
             // Un passage absent est « connu à zéro » (un ancien poste ne sait pas faire de passage).
-            if ($fiche->passage_sevre_jeune === null && $aSaisie) {
-                $fiche->passage_sevre_jeune = 0;
+            foreach ($pondeuses ? ['passage_sevre_jeune', 'passage_4_sevre', 'passage_jeune_repro'] : ['passage_sevre_jeune'] as $passage) {
+                if ($fiche->{$passage} === null && $aSaisie) {
+                    $fiche->{$passage} = 0;
+                }
             }
         }
 
         // (d) COHÉRENCE : total = somme des trois catégories, dès que la ventilation est complète (envoyée ou stockée).
         foreach ($groupes as $total => $libelle) {
-            $valeurs = array_map(fn ($c) => $fiche->{$c}, ["{$total}_repro", "{$total}_sevre", "{$total}_jeune"]);
+            $valeurs = array_map(fn ($c) => $fiche->{$c}, $col($total));
             if (! in_array(null, $valeurs, true) && (int) $fiche->{$total} !== array_sum($valeurs)) {
-                $erreurs[] = MotifsRefusPush::ventilationIncoherente($libelle, (int) $fiche->{$total}, array_sum($valeurs));
+                $erreurs[] = MotifsRefusPush::ventilationIncoherente($libelle, (int) $fiche->{$total}, array_sum($valeurs), $pondeuses);
             }
         }
         if ($erreurs !== []) {
@@ -2820,6 +3247,17 @@ class SyncController extends Controller
                     'cat_depart_repro' => ['nullable', 'integer', 'min:0'],
                     'cat_depart_sevre' => ['nullable', 'integer', 'min:0'],
                     'cat_depart_jeune' => ['nullable', 'integer', 'min:0'],
+                    // Ticket VOL-1 — ventes par catégorie (volailles reproductrices), même règle.
+                    'vente_repro' => ['nullable', 'integer', 'min:0'],
+                    'vente_sevre' => ['nullable', 'integer', 'min:0'],
+                    'vente_jeune' => ['nullable', 'integer', 'min:0'],
+                    // Ticket VOL-2 — quatrième emplacement et passages des volailles pondeuses, même règle.
+                    'mort_4' => ['nullable', 'integer', 'min:0'],
+                    'don_4' => ['nullable', 'integer', 'min:0'],
+                    'vente_4' => ['nullable', 'integer', 'min:0'],
+                    'cat_depart_4' => ['nullable', 'integer', 'min:0'],
+                    'passage_4_sevre' => ['nullable', 'integer', 'min:0'],
+                    'passage_jeune_repro' => ['nullable', 'integer', 'min:0'],
                     // 🔴→✅ TICKET S1 — colonnes que `fill()` écrivait SANS contrôle : effectifs négatifs, produit
                     // inexistant (violation de clé étrangère, donc erreur 500 pour tout l'envoi), sexe hors liste.
                     'effectif_m' => ['nullable', 'integer', 'min:0'],
@@ -2936,7 +3374,9 @@ class SyncController extends Controller
                 // bien qu'une fiche réduite (F0.90) n'a plus de vente « déjà portée » à protéger.
                 $porteLesVentes = $existant === null && $fusionnee === null;
                 if ($existant !== null || $fusionnee !== null) {
-                    unset($entry['vente'], $validated['vente']);
+                    // Ticket VOL-1 : la vente ventilée appartient au serveur au même titre que `vente` (dont elle est la somme).
+                    unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'], $entry['vente_4'],
+                        $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune'], $validated['vente_4']);
                 }
 
                 if ($fusionnee !== null) {
@@ -3092,6 +3532,14 @@ class SyncController extends Controller
     private array $ventesAFacturer = [];
 
     /**
+     * MECEF-1 — avoirs reçus (ou connus mais pas encore normalisés), transmis comme factures d'avoir après la transaction
+     * de l'envoi. Vidée au début de chaque essai.
+     *
+     * @var array<int, string>
+     */
+    private array $avoirsAFacturer = [];
+
+    /**
      * Ticket U13 — identifiants (au SERVEUR : celui de la fiche occupante après une fusion S-T9) des fiches ACCEPTÉES
      * de cet envoi qui sont une SAISIE de l'éleveur — l'équivalent d'un `saveDay()` du web : compte `manage-elevage`
      * (la permission de `saveDay`) et fiche qui porte une provende (`feed_qty_kg`, que la fiche du poste écrit comme
@@ -3115,7 +3563,8 @@ class SyncController extends Controller
      */
     private function fusionnerFiche(array $entry, array $validated, LivestockDailyEntry $occupante, array &$cascades): array
     {
-        unset($entry['vente'], $validated['vente']);
+        unset($entry['vente'], $validated['vente'], $entry['vente_repro'], $entry['vente_sevre'], $entry['vente_jeune'], $entry['vente_4'],
+            $validated['vente_repro'], $validated['vente_sevre'], $validated['vente_jeune'], $validated['vente_4']);
         $sansSaisie = ! $this->modifieAutreChoseQueLaVente($validated, null)
             || ! $this->modifieAutreChoseQueLaVente($validated, $occupante);
         $etatAvant = ['ne' => (int) $occupante->ne, 'mort' => (int) $occupante->mort, 'don' => (int) ($occupante->don ?? 0)];
@@ -3470,6 +3919,610 @@ class SyncController extends Controller
      * silencieux, pas une seconde sortie de caisse.
      */
     /**
+     * Ticket AC-3 — JUSTIFICATIF (le fichier) d'un achat ou d'une dépense déjà acceptés par `/sync/push`.
+     *
+     * Multipart : `table` (`purchases` | `expenses`), `id` (UUID du poste, celui de l'enregistrement), `file` (jpg, png ou pdf,
+     * 5 Mo au plus). Même droit que l'écriture de la table (`manage-achats`), même service que le web
+     * (`JustificatifService`). ⚠️ Idempotent : renvoyer le fichier REMPLACE le précédent. 404 : l'enregistrement n'est pas (encore)
+     * connu du serveur — le poste réessaiera après son prochain envoi.
+     */
+    /** Ticket AUT-2 — le fichier du logo ou du favicon de l'entreprise, tiré par le poste quand son chemin a changé. */
+    public function fichierEntreprise(string $genre)
+    {
+        abort_unless(in_array($genre, ['logo', 'favicon'], true), 404);
+
+        $chemin = CompanySetting::query()->first()?->{$genre.'_path'};
+        abort_unless($chemin && \Illuminate\Support\Facades\Storage::disk('public')->exists($chemin), 404, 'Aucun fichier.');
+
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($chemin));
+    }
+
+    public function receipt(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('manage-achats'), 403, 'Votre rôle ne permet pas de joindre un justificatif.');
+
+        $valides = $request->validate([
+            'table' => ['required', 'in:purchases,expenses'],
+            'id' => ['required', 'uuid'],
+            'file' => ['required', 'file', 'mimes:'.\App\Services\JustificatifService::FORMATS, 'max:'.\App\Services\JustificatifService::TAILLE_MAX_KO],
+        ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + ['file' => 'fichier', 'table' => 'table']);
+
+        $type = \App\Services\JustificatifService::typeDeTable($valides['table']);
+        $chemin = app(\App\Services\JustificatifService::class)->rattacher($type, $valides['id'], $request->file('file'));
+
+        if ($chemin === null) {
+            return response()->json(['message' => 'Enregistrement inconnu du serveur : envoyez-le d\'abord.'], 404);
+        }
+
+        return response()->json(['stored' => true]);
+    }
+
+    /**
+     * Ticket CP-2 — DEMANDES D'ÉCRITURE MANUELLE saisies au poste (créer, modifier, archiver une opération diverse).
+     *
+     * ⚠️ Le poste n'écrit jamais une écriture : il envoie la demande (« débiter tel compte, créditer tel compte, de tant, tel
+     * jour, avec ce libellé »). `SaisieEcritureManuelleAction` — partagée avec `JournalComptable` — la joue : mêmes refus, mêmes
+     * messages (débit ≠ crédit, mois clôturé, écriture verrouillée, exercice clos). Le numéro `OD-AAAA-NNNN` est attribué ICI ;
+     * l'écriture descend au tirage suivant. Idempotence : l'UUID de la demande est le `source_id` de l'écriture créée.
+     */
+    private function pushManualEntryRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(\App\Actions\SaisieEcritureManuelleAction::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de saisir une écriture comptable.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'action' => ['required', 'in:creer,modifier,archiver'],
+                    'entry_id' => ['required_if:action,modifier,archiver', 'nullable', 'uuid', 'exists:accounting_entries,id'],
+                    'entry_date' => ['required_unless:action,archiver', 'nullable', 'date'],
+                    'label' => ['required_unless:action,archiver', 'nullable', 'string', 'max:255'],
+                    'debit_account_id' => ['required_unless:action,archiver', 'nullable', 'uuid', 'exists:chart_of_accounts,id'],
+                    'credit_account_id' => ['required_unless:action,archiver', 'nullable', 'uuid', 'exists:chart_of_accounts,id'],
+                    'amount' => ['required_unless:action,archiver', 'nullable', 'numeric', 'min:1'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + [
+                    'action' => 'geste', 'entry_id' => 'écriture', 'entry_date' => 'date de l\'écriture', 'debit_account_id' => 'compte à débiter',
+                    'credit_account_id' => 'compte à créditer', 'label' => 'libellé',
+                ])->validate();
+
+                match ($valides['action']) {
+                    'creer' => $action->creer($valides['debit_account_id'], $valides['credit_account_id'], (float) $valides['amount'], $valides['entry_date'], $valides['label'], $valides['id']),
+                    'modifier' => $action->modifier(\App\Models\AccountingEntry::findOrFail($valides['entry_id']), $valides['debit_account_id'], $valides['credit_account_id'], (float) $valides['amount'], $valides['entry_date'], $valides['label']),
+                    'archiver' => $action->archiver(\App\Models\AccountingEntry::findOrFail($valides['entry_id'])),
+                };
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\Throwable $e) {
+                // Exercice clos ou absent, écriture verrouillée, écriture déséquilibrée… : le motif français, jamais une erreur technique.
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — DEMANDES DE RÉGLAGE de la ferme saisies au poste.
+     *
+     * Un envoi = {id, kind, payload}. Chaque type passe par le service du web (mêmes règles, mêmes messages, mêmes audits) :
+     *  - `entreprise` → EntrepriseService (`manage-parametres`, taux de paie arrêtés = administrateur) ;
+     *  - `bareme_its` → BaremeItsService (`view-parametres`, barème arrêté = administrateur) ;
+     *  - `mode_paiement` → ModesPaiementService (banque, Mobile Money : `manage-parametres` ; virement : `manage-comptabilite`) ;
+     *  - `role` → RoleService (administrateur) ;
+     * Idempotence : l'UUID de la demande est celui du compte créé et le `source_id` du virement ; les autres types remplacent
+     * un état, donc rejouer donne le même état.
+     */
+    private function pushSettingsRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+            $kind = $data['kind'] ?? null;
+            $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
+
+            $droit = match ($kind) {
+                'entreprise' => 'manage-parametres',
+                'bareme_its' => 'view-parametres',
+                'mode_paiement' => ($payload['geste'] ?? '') === 'virement' ? 'manage-comptabilite' : 'manage-parametres',
+                'role' => 'manage-users',
+                default => null,
+            };
+
+            if ($droit === null || ! is_string($id) || ! Str::isUuid($id)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Demande de réglage illisible.'];
+
+                continue;
+            }
+
+            if (! $utilisateur || ! $utilisateur->can($droit)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas ce réglage.'];
+
+                continue;
+            }
+
+            try {
+                $this->jouerReglage($kind, $id, $payload, $utilisateur);
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\Throwable $e) {
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    private function jouerReglage(string $kind, string $id, array $p, $utilisateur): void
+    {
+        $attributs = MotifsRefusPush::attributs();
+
+        match ($kind) {
+            'entreprise' => (function () use ($p, $utilisateur, $attributs) {
+                $service = app(\App\Services\EntrepriseService::class);
+                $v = validator($p, $service->regles(), \App\Services\EntrepriseService::MESSAGES + MotifsRefusPush::messages(), $attributs)->validate();
+                $service->enregistrer($p + $v, $utilisateur, $service->fichiersDepuisBase64($p));
+            })(),
+            'bareme_its' => app(\App\Services\BaremeItsService::class)->remplacer(array_values($p['tranches'] ?? []), $utilisateur),
+            'mode_paiement' => $this->jouerModePaiement($id, $p),
+            'role' => $this->jouerRole($p, $utilisateur),
+        };
+    }
+
+    private function jouerModePaiement(string $id, array $p): void
+    {
+        $service = app(\App\Services\ModesPaiementService::class);
+        $messages = MotifsRefusPush::messages();
+        $attributs = MotifsRefusPush::attributs() + ['bankName' => 'banque', 'phoneNumber' => 'numéro de téléphone', 'operatorName' => 'opérateur'];
+
+        match ($p['geste'] ?? null) {
+            'banque' => (function () use ($service, $p, $id, $messages, $attributs) {
+                validator($p, \App\Services\ModesPaiementService::REGLES_BANQUE, $messages, $attributs)->validate();
+                $service->creerBanque($p, $id);
+            })(),
+            'momo' => (function () use ($service, $p, $id, $messages, $attributs) {
+                validator($p, \App\Services\ModesPaiementService::REGLES_MOMO, $messages, $attributs)->validate();
+                $service->creerMomo($p, $id);
+            })(),
+            'virement' => (function () use ($service, $p, $id, $messages) {
+                $v = validator($p, [
+                    'transferFromId' => ['required', 'exists:treasury_accounts,id'],
+                    'transferToId' => ['required', 'exists:treasury_accounts,id', 'different:transferFromId'],
+                    'transferAmount' => ['required', 'numeric', 'min:1'],
+                    'transferReason' => ['nullable', 'string', 'max:150'],
+                ], ['transferToId.different' => 'Le compte destinataire doit être différent du compte source.'] + $messages, [
+                    'transferFromId' => 'compte source', 'transferToId' => 'compte destinataire', 'transferAmount' => 'montant',
+                ])->validate();
+
+                try {
+                    $service->virer(
+                        \App\Models\TreasuryAccount::findOrFail($v['transferFromId']),
+                        \App\Models\TreasuryAccount::findOrFail($v['transferToId']),
+                        (float) $v['transferAmount'],
+                        $v['transferReason'] ?? null,
+                        $id,
+                    );
+                } catch (\InvalidArgumentException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\NoOpenFiscalYearException $e) {
+                    throw ValidationException::withMessages(['transferAmount' => $e->getMessage()]);
+                }
+            })(),
+            default => throw ValidationException::withMessages(['geste' => 'Geste de paiement inconnu.']),
+        };
+    }
+
+    private function jouerRole(array $p, $utilisateur): void
+    {
+        $service = app(\App\Services\RoleService::class);
+
+        if (($p['geste'] ?? null) === 'supprimer') {
+            $motif = $service->supprimer((string) ($p['roleName'] ?? ''), $utilisateur);
+
+            if ($motif !== null) {
+                throw ValidationException::withMessages(['roleName' => $motif]);
+            }
+
+            return;
+        }
+
+        validator($p, $service->regles($p['ancienNom'] ?? null), ['roleName.regex' => \App\Services\RoleService::MESSAGE_NOM] + MotifsRefusPush::messages(), ['roleName' => 'nom du rôle'])->validate();
+        $service->enregistrer($p['ancienNom'] ?? null, $p['roleName'], array_values(array_filter($p['permissions'] ?? [], 'is_string')), $utilisateur);
+    }
+
+    /**
+     * Ticket CP-5 — RELEVÉS BANCAIRES (CSV `date;libellé;montant`) importés au poste.
+     *
+     * ⚠️ `BankReconciliationService::importCsv` — partagé avec `RapprochementBancaire::importReleve` — lit le texte : lignes
+     * illisibles comptées et ignorées, séparateur `;` ou `,`, montant signé. L'UUID de l'import est posé sur chaque ligne :
+     * rejouer l'envoi ne duplique rien. Un compte inconnu est refusé.
+     */
+    private function pushBankStatementImports(array $imports, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\BankReconciliationService::class);
+
+        foreach ($imports as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'importer un relevé bancaire.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'account_id' => ['required', 'uuid', 'exists:chart_of_accounts,id'],
+                    'content' => ['required', 'string', 'max:2097152'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + ['account_id' => 'compte', 'content' => 'relevé'])->validate();
+
+                $service->importCsv($valides['account_id'], $valides['content'], $valides['id']);
+                \App\Models\AuditLog::record('bank_statement.imported', 'comptabilite');
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-3 — IMMOBILISATIONS saisies au poste (enregistrer, modifier, sortir, archiver).
+     *
+     * ⚠️ `ImmobilisationService` — partagé avec `Comptabilite\Immobilisations` — porte les règles du web : code unique, nature
+     * du plan, valeur résiduelle < valeur d'acquisition, valeur figée d'un bien comptabilisé, sortie après l'acquisition.
+     * Le poste envoie la LIGNE entière : inconnue du serveur = enregistrement (avec `counterpart` : '' reprise d'antériorité,
+     * 'credit', ou le compte de trésorerie qui paie) ; connue = modification, puis sortie si le poste en porte une et que le
+     * bien est encore en service. Un bien déjà sorti n'est plus modifié par le poste (le serveur l'emporte).
+     */
+    private function pushFixedAssets(array $biens, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ImmobilisationService::class);
+
+        foreach ($biens as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de modifier le registre des immobilisations.'];
+
+                continue;
+            }
+
+            try {
+                if (! is_string($id) || ! Str::isUuid($id)) {
+                    throw ValidationException::withMessages(['id' => 'Identifiant d\'immobilisation invalide.']);
+                }
+
+                $existant = \App\Models\FixedAsset::find($id);
+
+                if ($existant !== null && ! $existant->is_active) {
+                    $accepted[] = $id;   // archivé : rien ne le ressuscite
+
+                    continue;
+                }
+
+                $saisie = [
+                    'code' => $data['code'] ?? null,
+                    'label' => $data['label'] ?? null,
+                    'accountCode' => $data['account_code'] ?? null,
+                    'acquisitionDate' => $data['acquisition_date'] ?? null,
+                    'acquisitionValue' => $data['acquisition_value'] ?? null,
+                    'residualValue' => $data['residual_value'] ?? 0,
+                    'durationYears' => $data['duration_years'] ?? null,
+                    'contrepartie' => $data['counterpart'] ?? '',
+                ];
+
+                $attributs = \App\Services\ImmobilisationService::ATTRIBUTS + ['code' => 'code', 'label' => 'désignation'];
+
+                // Un bien déjà connu : la nature, la date et la contrepartie ne se rejugent pas (déjà acceptées, ou rangées
+                // depuis dans le plan) — seules les règles de saisie courantes s'appliquent, celles du web.
+                $valides = validator($saisie, $service->regles($existant?->id), MotifsRefusPush::messages(), MotifsRefusPush::attributs() + $attributs)->validate();
+
+                if ($existant === null) {
+                    $bien = $service->enregistrer($valides, $id)['bien'];
+                } else {
+                    $bien = $service->modifier($existant, $valides);
+                }
+
+                $sortie = in_array($data['status'] ?? 'en_service', ['cede', 'reforme'], true);
+
+                if ($sortie && $bien->status === 'en_service') {
+                    $v = validator([
+                        'cessionDate' => $data['disposal_date'] ?? null,
+                        'cessionStatus' => $data['status'],
+                        'cessionReason' => $data['disposal_reason'] ?? null,
+                    ], $service->reglesSortie($bien), \App\Services\ImmobilisationService::MESSAGES_SORTIE + MotifsRefusPush::messages(), \App\Services\ImmobilisationService::ATTRIBUTS_SORTIE)->validate();
+
+                    $service->sortir($bien, $v['cessionDate'], $v['cessionStatus'], $v['cessionReason']);
+                }
+
+                if (array_key_exists('is_active', $data) && filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+                    $service->archiver($bien);
+                }
+
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-3 — DEMANDES DE DOTATION aux amortissements (« Passer la Dotation »).
+     *
+     * ⚠️ Le poste n'envoie que la date d'arrêté : le montant est recalculé ICI par `RecordDepreciationEntryAction` (écart entre
+     * le cumul du registre et le grand livre), donc rejouer une demande ne double jamais la charge. « Rien à doter » est un
+     * succès, pas un refus. Exercice clos ou absent : refusé avec son motif.
+     */
+    private function pushDepreciationRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ImmobilisationService::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de passer une dotation aux amortissements.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'date_arrete' => ['required', 'date'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs() + ['date_arrete' => "date d'arrêté"])->validate();
+
+                $service->passerDotation(\Carbon\Carbon::parse($valides['date_arrete'])->format('Y-m-d'));
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\Throwable $e) {
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket CP-4 — DEMANDES DE CLÔTURE saisies au poste (« le poste doit le faire », décision du client).
+     *
+     * Un envoi = {id, kind, payload}. Chaque geste passe par `ClotureExerciceService`, le point de passage du web
+     * (`ClotureExercice`) : mêmes gardes, mêmes écritures, mêmes messages, mêmes audits. Le droit est celui
+     * du geste au web :
+     *  - `cloturer_periode`, `confirmer_etape1`, `solder_comptes_gestion`, `cloturer_exercice`, `ouvrir_exercice_suivant`
+     *    → `close-fiscal-year` ;
+     *  - `decloturer_periode`, `rouvrir_exercice` → `manage-modules` (l'administrateur) ;
+     *  - `ouvrir_exercice` (le premier exercice) → `manage-comptabilite`.
+     * Idempotence : l'UUID de la demande est consigné (`fiscal_closure_requests`) quand elle est ACCEPTÉE ; renvoyée, elle est
+     * acquittée sans être rejouée (une clôture renvoyée après une réouverture faite entre-temps ne reclôture pas). « Rien à
+     * solder » est un succès (l'état voulu est atteint). Une demande refusée n'écrit rien (transaction annulée).
+     */
+    private function pushFiscalClosureRequests(array $demandes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ClotureExerciceService::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+            $kind = $data['kind'] ?? null;
+            $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
+
+            $droit = match ($kind) {
+                'cloturer_periode', 'confirmer_etape1', 'solder_comptes_gestion', 'cloturer_exercice', 'ouvrir_exercice_suivant' => 'close-fiscal-year',
+                'decloturer_periode', 'rouvrir_exercice' => 'manage-modules',
+                'ouvrir_exercice' => 'manage-comptabilite',
+                default => null,
+            };
+
+            if ($droit === null || ! is_string($id) || ! Str::isUuid($id)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Demande de clôture illisible.'];
+
+                continue;
+            }
+
+            if (! $utilisateur || ! $utilisateur->can($droit)) {
+                $rejected[] = ['id' => $id, 'reason' => match ($droit) {
+                    'manage-modules' => "Cette action exceptionnelle est réservée à l'Administrateur.",
+                    'manage-comptabilite' => "Votre rôle ne permet pas d'ouvrir un exercice.",
+                    default => 'Votre rôle ne permet pas de clôturer une période ou un exercice.',
+                }];
+
+                continue;
+            }
+
+            if (\App\Models\FiscalClosureRequest::whereKey($id)->exists()) {
+                $accepted[] = $id;   // déjà jouée : acquittée sans être rejouée
+
+                continue;
+            }
+
+            try {
+                DB::transaction(function () use ($service, $kind, $payload, $id, $utilisateur) {
+                    $annee = isset($payload['year']) && is_numeric($payload['year']) ? (int) $payload['year'] : null;
+                    $exercice = fn () => $service->exercice($annee ?? 0);
+
+                    match ($kind) {
+                        'cloturer_periode' => $service->cloturerPeriode((string) ($payload['period'] ?? ''), $utilisateur->id),
+                        'decloturer_periode' => $service->decloturerPeriode(
+                            (isset($payload['closure_id']) && is_string($payload['closure_id'])
+                                ? \App\Models\PeriodicClosure::find($payload['closure_id'])
+                                : \App\Models\PeriodicClosure::where('period', (string) ($payload['period'] ?? ''))->first())
+                                ?? throw new \DomainException("Ce mois n'est pas clôturé."),
+                            $utilisateur->id,
+                        ),
+                        'confirmer_etape1' => $service->confirmerEtape1($exercice()),
+                        'solder_comptes_gestion' => $this->solderSiBesoin($service, $exercice()),
+                        'cloturer_exercice' => $service->cloturerExercice($exercice(), $utilisateur->id),
+                        'rouvrir_exercice' => $service->rouvrirExercice($exercice()),
+                        'ouvrir_exercice_suivant' => $service->ouvrirExerciceSuivant($annee ?? 0),
+                        'ouvrir_exercice' => $service->ouvrirPremierExercice($annee),
+                    };
+
+                    \App\Models\FiscalClosureRequest::create([
+                        'id' => $id, 'kind' => $kind, 'payload' => $payload, 'user_id' => $utilisateur->id, 'handled_at' => now(),
+                    ]);
+                });
+
+                $accepted[] = $id;
+            } catch (\DomainException $e) {
+                $rejected[] = ['id' => $id, 'reason' => $e->getMessage()];
+            } catch (\Throwable $e) {
+                $rejected[] = ['id' => $id, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /** Ticket CP-4 — l'étape 2 rejouée : « rien à solder » est un succès (l'état voulu est déjà atteint). */
+    private function solderSiBesoin(\App\Services\ClotureExerciceService $service, \App\Models\FiscalYear $exercice): void
+    {
+        try {
+            $service->soldeComptesGestion($exercice);
+        } catch (\DomainException $e) {
+            if ($e->getMessage() !== \App\Services\ClotureExerciceService::MOTIF_RIEN_A_SOLDER) {
+                throw $e;
+            }
+        }
+    }
+
+    /**
+     * Ticket CP-1 — COMPTES du plan comptable créés, modifiés ou archivés au poste.
+     *
+     * ⚠️ `PlanComptableService` — partagé avec `Comptabilite\PlanComptable` — porte les règles du web : numéro unique (un numéro
+     * déjà pris par un autre compte est REFUSÉ avec son motif), intitulé, classe 1 à 9, archivage refusé si le compte est utilisé
+     * par une écriture. `is_active: false` = archivage ; `true` ne réactive rien. Idempotence par l'UUID du poste.
+     */
+    private function pushChartOfAccounts(array $comptes, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\PlanComptableService::class);
+
+        foreach ($comptes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-comptabilite')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de modifier le plan comptable.'];
+
+                continue;
+            }
+
+            try {
+                if (! is_string($id) || ! Str::isUuid($id)) {
+                    throw ValidationException::withMessages(['id' => 'Identifiant de compte invalide.']);
+                }
+
+                $existant = \App\Models\ChartOfAccount::find($id);
+
+                $valides = validator(
+                    $data,
+                    $service->regles($existant?->id) + ['is_active' => ['nullable', 'boolean']],
+                    MotifsRefusPush::messages(),
+                    MotifsRefusPush::attributs() + ['class' => 'classe', 'label' => 'intitulé', 'code' => 'numéro de compte'],
+                )->validate();
+
+                $compte = $existant === null ? $service->creer($valides, $id) : $service->modifier($existant, $valides);
+
+                if (array_key_exists('is_active', $valides) && filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+                    $service->archiver($compte);
+                }
+
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket AC-1 — BONS DE COMMANDE saisis au poste (« Générer le Bon »).
+     *
+     * ⚠️ Le poste envoie le bon et ses lignes ; `SaisieBonCommandeAction` — partagée avec `BonsCommande::generateBc` du web —
+     * le crée au statut `envoye`. ⚠️ IDEMPOTENCE par l'UUID du poste : un bon déjà reçu est acquitté sans rien recréer.
+     * La RÉCEPTION d'un bon n'est pas envoyée ici : c'est un achat qui porte `purchase_order_id` (voir `pushPurchases`).
+     */
+    private function pushPurchaseOrders(array $bons, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(\App\Actions\SaisieBonCommandeAction::class);
+
+        foreach ($bons as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-achats')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de saisir un bon de commande.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'supplier_id' => ['required', 'uuid', 'exists:suppliers,id'],
+                    'expected_delivery_date' => ['nullable', 'date'],
+                    'lines' => ['required', 'array', 'min:1'],
+                    'lines.*.id' => ['nullable', 'uuid'],
+                    'lines.*.product_id' => ['required', 'uuid', 'exists:products,id'],
+                    'lines.*.qty' => ['required', 'numeric', 'min:1'],
+                    'lines.*.estimated_unit_price' => ['required', 'numeric', 'min:0'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $action->execute(
+                    $valides['supplier_id'],
+                    $valides['expected_delivery_date'] ?? null,
+                    $valides['lines'],
+                    $valides['id'],
+                );
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
      * Achats saisis hors ligne — ticket 14.78.
      *
      * ⚠️⚠️ CREATION SEULEMENT, JAMAIS DE MISE A JOUR. Un achat porte cinq
@@ -3493,7 +4546,9 @@ class SyncController extends Controller
                     'id' => ['required', 'uuid'],
                     'supplier_id' => ['required', 'uuid', 'exists:suppliers,id'],
                     'payment_mode' => ['required', 'in:especes,mobile_money,virement,credit'],
-                    'treasury_account_id' => ['required', 'uuid', 'exists:treasury_accounts,id'],
+                    // Ticket AC-1 — la réception d'un bon ne règle rien : pas de compte à désigner.
+                    'treasury_account_id' => ['required_without:purchase_order_id', 'nullable', 'uuid', 'exists:treasury_accounts,id'],
+                    'purchase_order_id' => ['nullable', 'uuid', 'exists:purchase_orders,id'],
                     'amount_paid' => ['nullable', 'numeric', 'min:0'],
                     // ⚠️ La date de l'achat vient du POSTE : une livraison recue
                     // mardi et synchronisee jeudi appartient a mardi.
@@ -3507,6 +4562,27 @@ class SyncController extends Controller
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 if (Purchase::find($validated['id']) !== null) {
+                    $accepted[] = $validated['id'];
+
+                    continue;
+                }
+
+                // Ticket AC-1 — RÉCEPTION D'UN BON DE COMMANDE : `ReceptionBonCommandeService`, celui de `BonsCommande` du web.
+                // Les lignes sont celles du BON, pas celles du poste ; un bon déjà reçu rejette CET achat avec son motif.
+                if (! empty($validated['purchase_order_id'])) {
+                    $recu = app(\App\Services\ReceptionBonCommandeService::class)->recevoir(
+                        $validated['purchase_order_id'],
+                        $validated['id'],
+                        $validated['purchase_date'] ?? null,
+                        $this->instantDeLAchat($validated),
+                    );
+
+                    if ($recu === null) {
+                        $rejected[] = ['id' => $validated['id'], 'reason' => 'Ce bon de commande est déjà reçu : une seule réception est possible.'];
+
+                        continue;
+                    }
+
                     $accepted[] = $validated['id'];
 
                     continue;
@@ -3642,7 +4718,9 @@ class SyncController extends Controller
 
                 $valides = validator(
                     $data,
-                    $service->regles((string) ($data['pricing_mode'] ?? ''), $existant === null),
+                    // Ticket ST-1 — `is_active: false` = archivage depuis le poste (règle propre à l'envoi : la page web, qui
+                    // valide ces mêmes règles sur ses propriétés, n'a pas ce champ).
+                    $service->regles((string) ($data['pricing_mode'] ?? ''), $existant === null) + ['is_active' => ['nullable', 'boolean']],
                     $service->messages() + MotifsRefusPush::messages(),
                     MotifsRefusPush::attributs(),
                 )->validate();
@@ -3655,9 +4733,15 @@ class SyncController extends Controller
                     continue;
                 }
 
-                $existant === null
+                $produit = $existant === null
                     ? $service->creer($valides, $id)
                     : $service->modifier($existant, $valides, false);
+
+                // Ticket ST-1 — ARCHIVAGE depuis le poste : la fiche revient avec `is_active: false`. Le produit est d'abord mis à
+                // jour (les autres champs de la fiche), puis archivé par le point de passage du web. `true` ne réactive rien.
+                if (array_key_exists('is_active', $valides) && filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+                    $service->archiver($produit);
+                }
 
                 $accepted[] = $id;
             } catch (ValidationException $e) {
@@ -4056,15 +5140,37 @@ class SyncController extends Controller
             }
 
             try {
+                // VC-4 : une ligne DÉJÀ CONNUE est une modification (client, montant, date) ou un
+                // archivage (`is_active: false`), jamais une réception rejouée ni une réactivation.
+                $connue = is_array($data) && is_string($id) && Str::isUuid($id)
+                    && CustomerAdvance::whereKey($id)->exists();
+
                 $valides = validator(is_array($data) ? $data : [], [
                     'id' => ['required', 'uuid'],
                     'customer_id' => ['required', 'uuid'],
-                    'treasury_account_id' => ['required', 'uuid'],
+                    'treasury_account_id' => [$connue ? 'nullable' : 'required', 'uuid'],
                     'amount' => ['required', 'numeric', 'min:1'],
                     'advance_date' => ['required', 'date'],
                     'payment_mode' => ['nullable', 'string', 'max:20'],
                     'motif' => ['nullable', 'string', 'max:255'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                if ($connue) {
+                    $service->appliquerDuPoste(
+                        $valides['id'],
+                        $valides['customer_id'],
+                        (float) $valides['amount'],
+                        \Carbon\Carbon::parse($valides['advance_date'])->format('Y-m-d'),
+                        ! $this->veutRetirer($data),
+                    );
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                if ($this->veutRetirer($data)) {
+                    throw ValidationException::withMessages(['advance' => "Avance inconnue du serveur : rien à archiver. Une avance jamais reçue par le serveur n'a pas d'écriture à retirer."]);
+                }
 
                 $service->recevoir(
                     $valides['customer_id'],
@@ -4221,6 +5327,131 @@ class SyncController extends Controller
     }
 
     /**
+     * Ticket VC-2 — RELANCES DE CLIENTS faites (WhatsApp, appel, courrier, e-mail déjà parti du SMTP du poste) ou DEMANDÉES (e-mail) au poste.
+     *
+     * ⚠️ Le poste envoie le fait « relance de ce client / cette créance, par ce canal, avec ce message, tel jour » ;
+     * `RelanceClientService` — partagé avec `RelancesClients` — fait l'envoi que le canal exige (e-mail non encore parti : le SERVEUR
+     * envoie) puis tient la trace. Un envoi refusé (client sans adresse ou sans numéro) est rendu AVEC SON MOTIF et ne
+     * laisse AUCUNE trace. ⚠️ Idempotence par l'UUID du poste : un rejeu ne renvoie aucun mail.
+     */
+    private function pushCustomerReminders(array $relances, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\RelanceClientService::class);
+
+        foreach ($relances as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas de relancer un client.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'customer_id' => ['required', 'uuid', 'exists:customers,id'],
+                    'receivable_id' => ['nullable', 'uuid', 'exists:receivables,id'],
+                    'channel' => ['required', 'in:'.implode(',', \App\Services\RelanceClientService::CANAUX)],
+                    'message' => ['required', 'string', 'max:5000'],
+                    'reminder_date' => ['required', 'date', 'before_or_equal:today'],
+                    // Ticket AUT-3 — l'e-mail est déjà parti du SMTP du poste : le serveur ne l'envoie pas une seconde fois.
+                    'already_sent' => ['nullable', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                if (\App\Models\CustomerReminder::find($valides['id']) !== null) {
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                $service->relancer(
+                    \App\Models\Customer::findOrFail($valides['customer_id']),
+                    isset($valides['receivable_id']) ? \App\Models\Receivable::find($valides['receivable_id']) : null,
+                    $valides['channel'],
+                    $valides['message'],
+                    $valides['reminder_date'],
+                    $valides['id'],
+                    (bool) ($valides['already_sent'] ?? false),
+                );
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket VC-1 — ENCAISSEMENTS DE CRÉANCES CLIENTS saisis au poste.
+     *
+     * ⚠️⚠️ LE POSTE N'ENVOIE QUE LE FAIT : « tel client a versé tel montant sur tel compte, tel jour » (et la créance visée,
+     * s'il y en a une). Ce qui entre en trésorerie, la créance soldée et l'écriture D 5xx / C 411 sont faits ICI, par
+     * `CustomerSettlementService`, partagé avec la page web, en une transaction.
+     *
+     * ⚠️ IDEMPOTENCE : `id` = UUID de l'encaissement ; un `id` déjà reçu est acquitté sans rien rejouer (un accusé perdu en
+     * route ferait encaisser deux fois). Un refus (droit, créance absente ou soldée, exercice clos) est rendu AVEC SON
+     * MOTIF et n'échoue que cet encaissement.
+     */
+    private function pushReceivablePayments(array $paiements, $utilisateur, ?string $deviceId): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\CustomerSettlementService::class);
+
+        foreach ($paiements as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'encaisser une créance client.'];
+
+                continue;
+            }
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'customer_id' => ['required', 'uuid', 'exists:customers,id'],
+                    'receivable_id' => ['nullable', 'uuid'],
+                    'treasury_account_id' => ['required', 'uuid', 'exists:treasury_accounts,id'],
+                    'amount' => ['required', 'numeric', 'min:1'],
+                    'payment_date' => ['required', 'date', 'before_or_equal:today'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                if (\App\Models\ReceivablePayment::find($valides['id']) !== null) {
+                    $accepted[] = $valides['id'];
+
+                    continue;
+                }
+
+                $service->encaisser(
+                    $valides['customer_id'],
+                    (float) $valides['amount'],
+                    $valides['treasury_account_id'],
+                    $valides['receivable_id'] ?? null,
+                    $valides['payment_date'],
+                    $valides['id'],
+                    $deviceId,
+                );
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException $e) {
+                $rejected[] = ['id' => $id, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
      * Identifiants (UUID du retour ET id de l'achat) des retours fournisseur du paquet - pour le garde-fou de
      * `pushStockAdjustments`.
      *
@@ -4303,7 +5534,7 @@ class SyncController extends Controller
      * ABSORBEUR STRICT (refus MOTIVÉ de CET avoir seul ; la transaction annulée ne laisse ni stock ni écriture) :
      * vente inconnue ou annulée, produit absent de la vente, quantité au-delà de « vendu − déjà retourné », montant
      * au-delà de « ligne − déjà crédité », date future ou antérieure à la vente, exercice absent ou clos, plan
-     * comptable incomplet, droit `manage-ventes`.
+     * comptable incomplet, droit `avoir-client` (`manage-ventes` OU `correct-invoices`, CONF-4).
      *
      * ⚠️ IDEMPOTENCE : `id` = UUID de l'avoir né sur le poste ; un `id` déjà reçu est acquitté sans rien rejouer. Un
      * avoir connu renvoyé au statut `traite` est marqué traité (« Marquer comme traité » du web), une seule fois.
@@ -4317,7 +5548,8 @@ class SyncController extends Controller
         foreach ($avoirs as $data) {
             $id = is_array($data) ? ($data['id'] ?? null) : null;
 
-            if (! $utilisateur || ! $utilisateur->can('manage-ventes')) {
+            // CONF-4 : `avoir-client` = `manage-ventes` OU `correct-invoices` (le comptable envoie ses avoirs, sans caisse).
+            if (! $utilisateur || ! $utilisateur->can('avoir-client')) {
                 $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::roleInsuffisant('credit_notes')];
 
                 continue;
@@ -4345,6 +5577,10 @@ class SyncController extends Controller
 
                 if (($valides['status'] ?? null) === 'traite') {
                     $service->marquerTraite($existant);
+                }
+
+                if ($existant->mecef_status !== \App\Support\MecefEtat::NORMALISEE) {
+                    $this->avoirsAFacturer[] = $existant->id;
                 }
 
                 $accepted[] = $valides['id'];
@@ -4478,6 +5714,245 @@ class SyncController extends Controller
         return ['accepted' => $accepted, 'rejected' => $rejected];
     }
 
+
+    /**
+     * Ticket RH-1 — EMPLOYÉS CRÉÉS, MODIFIÉS OU ARCHIVÉS AU POSTE, rejoués par `SaisieEmployeAction` (le point de
+     * passage de `RegistreEmployes`). Idempotent : une ligne identique à celle du serveur est acquittée sans rien
+     * écrire ; un archivage renvoyé ne fait rien. Un employé archivé ne se modifie plus (motif du web).
+     */
+    private function pushEmployees(array $employes): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieEmployeAction::class);
+
+        foreach ($employes as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, \App\Actions\SaisieEmployeAction::regles() + [
+                    'id' => ['required', 'uuid'],
+                    'is_active' => ['sometimes', 'boolean'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $archive = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+                $existant = Employee::find($valides['id']);
+
+                DB::transaction(function () use ($saisie, $valides, $archive, $existant) {
+                    if ($existant === null) {
+                        $saisie->creer($valides, $valides['id']);
+                        if ($archive) {
+                            $saisie->archiver($valides['id']);
+                        }
+
+                        return;
+                    }
+                    if ($archive) {
+                        $saisie->archiver($existant->id);
+
+                        return;
+                    }
+                    if ($existant->is_active && $saisie->identique($existant, $valides)) {
+                        return;
+                    }
+                    $saisie->modifier($existant->id, $valides);
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket UT-1 — COMPTES UTILISATEURS CRÉÉS, MODIFIÉS, ARCHIVÉS OU RÉACTIVÉS AU POSTE, rejoués par
+     * `SaisieUtilisateurAction` (`GestionUtilisateurs`). Le mot de passe voyage une fois (TLS), n'est ni journalisé ni
+     * renvoyé ; à la modification il est facultatif. Un compte connu et identique est acquitté sans écriture. Le propre
+     * compte de l'auteur ne s'archive pas (message du web). MDP-1 : `reset_password` vrai = RÉINITIALISATION par
+     * l'administrateur (`password` = mot de passe temporaire, drapeau `must_change_password`, jetons et sessions fermés,
+     * audit `user.password_reset`) ; refusée sur son propre compte et sur un compte archivé, même motif que le web.
+     *
+     * @param  array<int, mixed>  $comptes
+     * @return array{accepted: array<int, string>, rejected: array<int, array{id: string|null, reason: string}>}
+     */
+    private function pushUsers(array $comptes, ?User $auteur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieUtilisateurAction::class);
+
+        foreach ($comptes as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $id = is_string($data['id'] ?? null) ? $data['id'] : null;
+                $existant = $id === null ? null : User::with('roles')->find($id);
+                // MDP-1 : `reset_password` vrai = RÉINITIALISATION par l'administrateur du poste ; `password` est alors le mot
+                // de passe TEMPORAIRE (obligatoire, mêmes règles que la création), jamais un changement ordinaire.
+                $reinitialiser = filter_var($data['reset_password'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $regles = \App\Actions\SaisieUtilisateurAction::regles($existant?->id, $existant === null || $reinitialiser) + [
+                    'id' => ['required', 'uuid'],
+                    'is_active' => ['sometimes', 'boolean'],
+                    'reset_password' => ['sometimes', 'boolean'],
+                ];
+                $valides = validator($data, $regles, MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $actif = ! array_key_exists('is_active', $valides) || filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                DB::transaction(function () use ($saisie, $valides, $actif, $existant, $auteur, $reinitialiser) {
+                    $temporaire = $reinitialiser ? $valides['password'] : null;
+                    if ($reinitialiser) {
+                        $valides['password'] = null; // posé par `reinitialiserMotDePasse`, pas par `creer` / `modifier`
+                    }
+
+                    if ($existant === null) {
+                        // Création : le mot de passe de création est le temporaire (haché une seule fois, par la réinitialisation).
+                        $saisie->creer($reinitialiser ? array_merge($valides, ['password' => Str::random(40)]) : $valides, $valides['id']);
+                        if ($reinitialiser && $actif) {
+                            $saisie->reinitialiserMotDePasse($valides['id'], $temporaire, $auteur?->id);
+                        }
+                        if (! $actif) {
+                            $saisie->archiver($valides['id'], $auteur?->id);
+                        }
+
+                        return;
+                    }
+                    if (! $saisie->identique($existant, $valides)) {
+                        $saisie->modifier($existant->id, $valides);
+                    }
+                    if ($actif) {
+                        $saisie->reactiver($existant->id);
+                        if ($reinitialiser) {
+                            $saisie->reinitialiserMotDePasse($existant->id, $temporaire, $auteur?->id);
+                        }
+                    } else {
+                        $saisie->archiver($existant->id, $auteur?->id);
+                    }
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /** Ticket RH-2 — STAGIAIRES CRÉÉS OU MODIFIÉS AU POSTE, rejoués par `SaisieStagiaireAction` (`RegistreStagiaires`). */
+    private function pushInternships(array $stagiaires): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieStagiaireAction::class);
+
+        foreach ($stagiaires as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, \App\Actions\SaisieStagiaireAction::regles() + [
+                    'id' => ['required', 'uuid'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $existant = Internship::find($valides['id']);
+                if ($existant === null) {
+                    $saisie->creer($valides, $valides['id']);
+                } elseif (! $saisie->identique($existant, $valides)) {
+                    $saisie->modifier($existant->id, $valides);
+                }
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket RH-2 — ABSENCES DE STAGIAIRE NOTÉES OU ARCHIVÉES AU POSTE (`SaisieStagiaireAction::absence()` /
+     * `archiverAbsence()`). Une absence déjà connue est acquittée sans réécriture ; `is_active` faux l'archive.
+     */
+    private function pushInternshipAbsences(array $absences): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $saisie = app(\App\Actions\SaisieStagiaireAction::class);
+
+        foreach ($absences as $data) {
+            $data = is_array($data) ? $data : [];
+
+            try {
+                $valides = validator($data, \App\Actions\SaisieStagiaireAction::reglesAbsence() + [
+                    'id' => ['required', 'uuid'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $archive = array_key_exists('is_active', $valides) && ! filter_var($valides['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                DB::transaction(function () use ($saisie, $valides, $archive) {
+                    $saisie->absence($valides, $valides['id']);
+                    if ($archive) {
+                        $saisie->archiverAbsence($valides['id']);
+                    }
+                });
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $data['id'] ?? null, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket RH-4 — DEMANDES DE RÈGLEMENT DE PAIE DU POSTE, rejouées par `ReglementPaieService` (le point de passage de
+     * `GestionPaie::validerReglement`). ⚠️ Le poste n'envoie que la DEMANDE : employé, période (`AAAA-MM`), instant du
+     * clic. Montants, compte de trésorerie, écriture, audit : ICI. Idempotent : un bulletin déjà réglé pour (employé,
+     * période) est acquitté sans rien rejouer. Un refus (exercice clos, employé archivé) porte son motif.
+     */
+    private function pushPayslipRequests(array $demandes): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\ReglementPaieService::class);
+
+        foreach ($demandes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            try {
+                $valides = validator($data, [
+                    'id' => ['required', 'uuid'],
+                    'employee_id' => ['required', 'uuid', 'exists:employees,id'],
+                    'period_month' => ['required', 'date_format:Y-m'],
+                    'requested_at' => ['nullable', 'date'],
+                ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
+
+                $employe = Employee::findOrFail($valides['employee_id']);
+                $quand = isset($valides['requested_at']) ? Carbon::parse($valides['requested_at'])->setTimezone(config('app.timezone')) : now();
+                // Un instant du poste ne peut pas être dans le futur (horloge déréglée).
+                if ($quand->greaterThan(now())) {
+                    $quand = now();
+                }
+
+                $service->valider($employe, $valides['period_month'].'-01', $quand);
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            } catch (\App\Exceptions\NoOpenFiscalYearException|\App\Exceptions\ClosedFiscalYearException|\App\Exceptions\ReglementPaieRefuseException $e) {
+                $rejected[] = ['id' => $id, 'reason' => 'Règlement refusé : '.$e->getMessage()];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     private function pushAttendance(array $records): array
     {
         $accepted = [];
@@ -4492,21 +5967,28 @@ class SyncController extends Controller
                     'check_in' => ['nullable', 'date_format:H:i,H:i:s'],
                     'check_out' => ['nullable', 'date_format:H:i,H:i:s'],
                     'status' => ['required', 'in:present,absent,conge,maladie,retard'],
+                    // Ticket RH-3 — `false` : le pointage est ARCHIVÉ au poste (`FeuillePointage::archiveRecord`).
+                    'is_active' => ['sometimes', 'boolean'],
                 ], MotifsRefusPush::messages(), MotifsRefusPush::attributs())->validate();
 
                 $existant = AttendanceRecord::where('employee_id', $validated['employee_id'])
                     ->whereDate('attendance_date', $validated['attendance_date'])
                     ->first();
 
+                $actif = ! array_key_exists('is_active', $validated) || filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
                 $charge = [
                     'check_in' => $validated['check_in'] ?? null,
                     'check_out' => $validated['check_out'] ?? null,
                     'status' => $validated['status'],
-                    'is_active' => true,
+                    'is_active' => $actif,
                 ];
 
                 if ($existant) {
+                    $archiveMaintenant = $existant->is_active && ! $actif;
                     $existant->update($charge);
+                    if ($archiveMaintenant) {
+                        AuditLog::record('attendance.archived', 'rh', null, $existant);
+                    }
                 } else {
                     $pointage = new AttendanceRecord();
                     // ⚠️ MEME PIEGE QUE LES ACHATS (14.78) : `id` n'est pas
@@ -5029,6 +6511,129 @@ class SyncController extends Controller
         return ['accepted' => $accepted, 'rejected' => $rejected];
     }
 
+    /**
+     * Ticket EL-1 — TRANSFORMATIONS saisies au poste (« Bon d'Abattage & Transformation »).
+     *
+     * ⚠️ `SaisieTransformationAction` — partagée avec `Elevage\TransformationForm` — porte les règles du web : effectif
+     * disponible de la bande, bande et produit connus, exercice clos. Le poste n'envoie que le FAIT (bande, sujets, produit,
+     * quantité produite, jour) : l'effectif, la fiche du jour et le stock sont rejoués ICI. Idempotent par l'UUID du poste :
+     * une transformation déjà connue est acquittée sans rien rejouer.
+     */
+    private function pushTransformations(array $transformations, $utilisateur): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $action = app(\App\Actions\SaisieTransformationAction::class);
+
+        foreach ($transformations as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-elevage')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'enregistrer une transformation.'];
+
+                continue;
+            }
+
+            // Déjà connue (UUID du poste) : acquittée sans rien rejouer, même si la bande ou l'exercice ont changé depuis.
+            if (is_string($id) && Str::isUuid($id) && \App\Models\Transformation::whereKey($id)->exists()) {
+                $accepted[] = $id;
+
+                continue;
+            }
+
+            try {
+                // Sans messages sur mesure : ceux de `lang/fr/validation.php`, les mêmes que le formulaire web.
+                $valides = validator([
+                    'id' => $id,
+                    'lotId' => $data['lot_id'] ?? null,
+                    'qtyAnimals' => $data['qty_animals'] ?? null,
+                    'productId' => $data['product_id'] ?? null,
+                    'qtyProduced' => $data['qty_produced'] ?? null,
+                    'transformationDate' => $data['transformation_date'] ?? null,
+                ], ['id' => ['required', 'uuid']] + \App\Actions\SaisieTransformationAction::REGLES)->validate();
+
+                $action->enregistrer(Arr::except($valides, ['id']), $utilisateur->id, $valides['id']);
+
+                $accepted[] = $valides['id'];
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    /**
+     * Ticket RELEVES-1 — RELEVÉS DE TERRAIN DU POSTE, rejoués par `ReleveTerrainService` (le point de passage de
+     * `ParametresElevage`). Absorbeur STRICT : type connu, valeurs revalidées par les règles du web ; le statut envoyé
+     * est IGNORÉ — un envoi du poste est un enregistrement humain, donc « Validé » (validé par = le jeton, validé le =
+     * l'instant du serveur). Idempotent par l'UUID ; une ligne archivée n'est jamais rouverte ni modifiée.
+     */
+    private function pushFieldSurveyEntries(array $lignes, $utilisateur, ?string $poste): array
+    {
+        $accepted = [];
+        $rejected = [];
+        $service = app(\App\Services\Elevage\ReleveTerrainService::class);
+
+        foreach ($lignes as $data) {
+            $data = is_array($data) ? $data : [];
+            $id = $data['id'] ?? null;
+
+            if (! $utilisateur || ! $utilisateur->can('manage-elevage')) {
+                $rejected[] = ['id' => $id, 'reason' => 'Votre rôle ne permet pas d\'enregistrer un relevé de terrain.'];
+
+                continue;
+            }
+            if (! is_string($id) || ! Str::isUuid($id)) {
+                $rejected[] = ['id' => $id, 'reason' => 'Identifiant de relevé invalide.'];
+
+                continue;
+            }
+
+            try {
+                $saisie = ['label' => $data['label'] ?? null, 'species_code' => $data['species_code'] ?? null, 'data' => $data['data'] ?? []];
+                $type = (string) ($data['type'] ?? '');
+                $archive = array_key_exists('is_active', $data) && ! filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN);
+
+                DB::transaction(function () use ($service, $id, $type, $saisie, $archive, $utilisateur, $poste) {
+                    $existante = \App\Models\FieldSurveyEntry::find($id);
+                    if ($existante === null) {
+                        $ligne = $service->creer($type, $saisie, $utilisateur->id, $id, $poste);
+                        if ($archive) {
+                            $service->archiver($ligne, $utilisateur->id);
+                        }
+
+                        return;
+                    }
+                    if (! $existante->is_active || $existante->type !== $type) {
+                        return;   // archivée : jamais rouverte ni modifiée
+                    }
+                    if ($archive) {
+                        $service->archiver($existante, $utilisateur->id);
+
+                        return;
+                    }
+                    $identique = $existante->status === \App\Services\Elevage\ReleveTerrainService::VALIDE
+                        && $existante->label === trim((string) ($saisie['label'] ?? ''))
+                        && $service->normaliser($type, $saisie, $existante)['data'] == $existante->data;
+                    if ($identique) {
+                        return;   // rejeu : acquitté sans écriture ni nouvelle trace
+                    }
+                    $existante->estAValider()
+                        ? $service->valider($existante, $saisie, $utilisateur->id, $poste)
+                        : $service->modifier($existante, $saisie, $utilisateur->id, $poste);
+                });
+
+                $accepted[] = $id;
+            } catch (ValidationException $e) {
+                $rejected[] = ['id' => $id, 'reason' => MotifsRefusPush::motif($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
     /** Ticket S1 — champs d'une vente que le poste a le droit d'écrire (tous validés dans `pushSales`). */
     private const VENTE_CHAMPS_DU_POSTE = [
         'customer_id', 'payment_mode', 'subtotal', 'discount', 'total',
@@ -5114,6 +6719,11 @@ class SyncController extends Controller
 
                 $this->verifierCoherenceDuTotal($saleData);
 
+                // Choix « Facture simple » / « Facture normalisée » : le poste l'a écrit à la saisie et l'envoie avec la vente ; le
+                // serveur le REVALIDE (IFU de 13 chiffres s'il est présent, nom obligatoire pour une normalisée, AIB dans la
+                // liste) par le point de passage du web. Absent (poste ancien) = facture simple, jamais transmise. Refus motivé.
+                $choix = app(\App\Services\Mecef\ChoixFactureService::class)->valider($saleData);
+
                 // 🔴→✅ TICKET 15.30 — UNE VENTE DATÉE EST JUGÉE SUR SA DATE, AVANT TOUT EFFET.
                 // Futur, mois clôturé (verrou du Journal), exercice absent ou clos : refus MOTIVÉ,
                 // pour cette vente seule. Placé APRÈS la validation (`unique:sales,id`) : une vente
@@ -5124,7 +6734,7 @@ class SyncController extends Controller
                     app(VerifySaleDateAction::class)->execute($validated['sold_at']);
                 }
 
-                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler) {
+                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler, $choix) {
                     // ⚠️ Même contrainte que LivestockDailyEntry ci-dessus :
                     // 'id' n'est pas fillable sur Sale — assignation
                     // explicite pour préserver réellement l'UUID généré
@@ -5139,7 +6749,7 @@ class SyncController extends Controller
                         Arr::only($saleData, self::VENTE_CHAMPS_DU_POSTE),
                         fn ($valeur, $champ) => $champ !== 'status' || $valeur !== null,
                         ARRAY_FILTER_USE_BOTH,
-                    ));
+                    ) + $choix);
                     $sale->save();
 
                     foreach ($saleData['lines'] as $line) {
@@ -5262,6 +6872,11 @@ class SyncController extends Controller
                             $rejected[] = ['id' => $saleData['id'], 'reason' => 'Annulation refusée : '.$e->getMessage()];
 
                             continue;
+                        } catch (\App\Exceptions\FactureNormaliseeException $e) {
+                            // MECEF-1 — même refus et même message qu'au web.
+                            $rejected[] = ['id' => $saleData['id'], 'reason' => $e->getMessage()];
+
+                            continue;
                         }
                     }
                     $accepted[] = $saleData['id'];
@@ -5322,7 +6937,19 @@ class SyncController extends Controller
             if ($fiche === null) {
                 continue;
             }
+            // Ticket VOL-1 : la vente ventilée suit (volailles reproductrices : catégorie du produit de la ligne). Si la
+            // catégorie est INTROUVABLE (produit devenu sans catégorie depuis le tirage du poste), on ne devine pas : la fiche
+            // reçue n'est pas touchée (`vente` et `vente_*` restent la somme l'un de l'autre), la vente refusée est signalée.
+            $lotDeLaLigne = LivestockLot::with('species')->find($lot);
+            $emplacement = app(RecordSaleOnFicheElevageAction::class)->emplacementDeLaLigne($lotDeLaLigne, $ligne);
+            if ($lotDeLaLigne !== null && EffectifParCategorieService::estVolailles(EffectifParCategorieService::especeDuLot($lotDeLaLigne)) && $emplacement === null) {
+                continue;
+            }
             $fiche->vente = max(0, (int) $fiche->vente - $qte);
+            $colonneVente = $emplacement === null ? null : EffectifParCategorieService::colonne('vente', $emplacement);
+            if ($colonneVente !== null && $fiche->{$colonneVente} !== null) {
+                $fiche->{$colonneVente} = max(0, (int) $fiche->{$colonneVente} - $qte);
+            }
             $fiche->effectif_final = $fiche->effectifFinalDepuis($fiche->previousEffectif());
             $fiche->save();
             app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($lot, $jour);

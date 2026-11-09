@@ -1,7 +1,7 @@
 
 
 # PROMPT MASTER : DIRECTIVE TECHNIQUE D'AUDIT, DE REFONTE ET DE CERTIFICATION DE CONFORMITÉ
-## APPLICATION : AgriERP — FERME ÉCOLE OLOUWACHEGOUN (94 ÉCRANS BLADE / HTML)
+## APPLICATION : LogiAgriERP — FERME ÉCOLE OLOUWACHEGOUN (94 ÉCRANS BLADE / HTML)
 ### DESTINATAIRES : CLAUDE CODE, LEAD DEVELOPER & AUDITEURS TECHNIQUE
 
 ---
@@ -56,7 +56,7 @@ Le moteur de recherche globale en topbar (`Recherche globale ERP…`) doit être
 
 # SECTION 2 : CONTROLE ÉCRAN PAR ÉCRAN — ÉQUIVALENCE STRICTE BLADE VS HTML
 
-Pour chacun des **94 écrans** d'AgriERP, tu doit procéder à la vérification d'équivalence stricte entre le fichier Blade (`.blade.php`) et la maquette HTML source :
+Pour chacun des **94 écrans** d'LogiAgriERP, tu doit procéder à la vérification d'équivalence stricte entre le fichier Blade (`.blade.php`) et la maquette HTML source :
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -154,7 +154,7 @@ L'écran `rapports-exports.html` (et ses vues Blade associées) doit être rigou
 
 # SECTION 6 : SYNCHRONISATION LARAVEL API & SEEDERS GENERATED
 
-1. **Communication API Backend :** L'ensemble des formulaires et tables doit communiquer en HTTPS réactif avec les endpoints de l'API AgriERP (`agrierp.fermeolouwachegoun.com`).
+1. **Communication API Backend :** L'ensemble des formulaires et tables doit communiquer en HTTPS réactif avec les endpoints de l'API LogiAgriERP (`agrierp.fermeolouwachegoun.com`).
 2. **Gestion Hors-Ligne & Cache :** En cas de perte de connexion dans les bâtiments d'élevage, la donnée est enregistrée en cache local (`localStorage`) et synchronisée automatiquement dès le retour du réseau (Badge animé topbar `12 en attente`).
 3. **Seeders de Démonstration :** Génération de jeu de données réaliste par Seeder Laravel pour la **Ferme École OLOUWACHEGOUN** (Bandes réelles, historique de ponte, calendrier de prophylaxie, stock d'aliments en Kg, écritures comptables SYSCOHADA).
 

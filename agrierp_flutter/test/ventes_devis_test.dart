@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/features/ventes/avoirs_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
@@ -31,13 +33,15 @@ void main() {
 
   tearDown(() async => db.close());
 
-  Future<void> afficher(WidgetTester tester) async {
+  Future<void> afficher(WidgetTester tester, {bool peutGerer = true, bool peutCorriger = true}) async {
     tester.view.physicalSize = const Size(1600, 2000);
     tester.view.devicePixelRatio = 1;
 
     await tester.pumpWidget(
       MaterialApp(
         home: VentesDevisScreen(
+          peutGerer: peutGerer,
+          peutCorriger: peutCorriger,
           depot: depot,
           caisse: caisse,
           devis: DevisRepository(database: db, deviceId: 'poste-test'),
@@ -108,5 +112,59 @@ void main() {
 
     expect(find.text("Toutes les ventes enregistrées de l'entreprise."), findsOneWidget);
     expect(find.textContaining('Ventes encaissées sur ce poste'), findsNothing);
+  });
+
+  /// Ticket CONF-4 (DV-20) — le COMPTABLE lit les ventes et corrige par l'avoir : le hub s'ouvre sans la caisse.
+  group('CONF-4 : hub du comptable (lecture des ventes, avoirs, pas de caisse)', () {
+    testWidgets('⚠️ sans manage-ventes : trois onglets, aucun « Enregistrer Vente », ouverture sur « Devis Prestations »', (tester) async {
+      await afficher(tester, peutGerer: false);
+
+      expect(find.byKey(const Key('onglet-ventes-Enregistrer Vente')), findsNothing);
+      expect(find.text('Enregistrer Vente'), findsNothing);
+      for (final onglet in ['Devis Prestations', 'Historique des Ventes', 'Retours et Avoirs']) {
+        expect(find.byKey(Key('onglet-ventes-$onglet')), findsOneWidget, reason: onglet);
+      }
+      // Le premier onglet visible est monté (devis en lecture), jamais la caisse.
+      expect(find.text('Devis & Proforma'), findsOneWidget);
+      expect(find.byKey(const Key('devis-vide')), findsOneWidget);
+    });
+
+    testWidgets('⚠️ le lien « Nouvelle Vente » de l\'historique ramène au premier onglet VISIBLE, pas à la caisse', (tester) async {
+      await afficher(tester, peutGerer: false);
+      await ouvrir(tester, 'Historique des Ventes');
+      expect(find.text("Toutes les ventes enregistrées de l'entreprise."), findsOneWidget);
+      await tester.tap(find.text('Nouvelle Vente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Devis & Proforma'), findsOneWidget);
+      expect(find.text('Enregistrer Vente'), findsNothing);
+    });
+
+    testWidgets('⚠️ « Retours et Avoirs » reste ouvert au droit fin (correct-invoices) : « Nouveau Retour » ouvre la modale', (tester) async {
+      await afficher(tester, peutGerer: false, peutCorriger: true);
+      await ouvrir(tester, 'Retours et Avoirs');
+
+      await tester.tap(find.byKey(const Key('nouveau-retour')));
+      await tester.pumpAndSettle();
+      // La modale s'ouvre (le refus de droit ne survient qu'à l'enregistrement, quand il n'y a pas le droit).
+      expect(find.byKey(const Key('retour-vente')), findsOneWidget);
+    });
+
+    test('⚠️ garde des sources : l\'avoir suit `peutCorriger` (avoir-client), la caisse et l\'annulation `peutGerer` (manage-ventes seul)', () {
+      final hub = File('lib/features/ventes/ventes_devis_screen.dart').readAsStringSync();
+      expect(hub, contains('RetoursAvoirsOnglet(depot: widget.avoirs, peutGerer: widget.peutCorriger)'));
+      expect(hub, contains('HistoriqueVentesOnglet(\n                depot: widget.historique,\n                peutGerer: widget.peutGerer,'));
+      final main = File('lib/main.dart').readAsStringSync();
+      final appel = main.substring(main.indexOf('EcranPoste.ventesEtDevis => VentesDevisScreen('));
+      expect(appel.substring(0, appel.indexOf('EcranPoste.caisse =>')), allOf(
+        contains("peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),"),
+        contains('peutCorriger: PermissionsPoste.peutCorrigerParAvoir(_role),'),
+      ));
+    });
+
+    testWidgets('⚠️ avec manage-ventes : la caisse reste le premier onglet (caissier inchangé)', (tester) async {
+      await afficher(tester);
+      expect(find.byKey(const Key('onglet-ventes-Enregistrer Vente')), findsOneWidget);
+    });
   });
 }

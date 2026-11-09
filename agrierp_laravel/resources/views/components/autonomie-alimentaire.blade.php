@@ -22,7 +22,7 @@
                 <p>Le stock de {{ $a['product']->name }} est épuisé ({{ $a['stock_kg'] }} Kg) : approvisionnez-vous. La fiche s'enregistre quand même.</p>
             </div>
         </div>
-        <a href="/achats-commandes" class="flex-shrink-0 text-xs font-bold bg-error-red hover:bg-error-deep text-white px-md py-2 rounded-full whitespace-nowrap shadow-sm">Commander Stock</a>
+        <a wire:navigate href="/achats-commandes" class="flex-shrink-0 text-xs font-bold bg-error-red hover:bg-error-deep text-white px-md py-2 rounded-full whitespace-nowrap shadow-sm">Commander Stock</a>
     </div>
 @elseif($a['inconnu'] ?? false)
     <div class="bg-surface-zebra border border-outline-variant rounded-lg p-sm text-xs text-brand-forest">
@@ -37,7 +37,7 @@
                 <p>Le stock de {{ $a['product']->name }} ne couvre plus que {{ $a['autonomie_jours'] }} jours de consommation théorique du cheptel actif ! Approvisionnez-vous.</p>
             </div>
         </div>
-        <a href="/achats-commandes" class="flex-shrink-0 text-xs font-bold bg-error-red hover:bg-error-deep text-white px-md py-2 rounded-full whitespace-nowrap shadow-sm">Commander Stock</a>
+        <a wire:navigate href="/achats-commandes" class="flex-shrink-0 text-xs font-bold bg-error-red hover:bg-error-deep text-white px-md py-2 rounded-full whitespace-nowrap shadow-sm">Commander Stock</a>
     </div>
 @else
     <div class="bg-brand-emerald/5 border border-brand-emerald/20 rounded-lg p-sm text-xs text-brand-forest">

@@ -8,6 +8,7 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
 import 'caisse_repository.dart';
+import 'choix_facture.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/pos-interface.html` → Caisse (POS) Desktop.
@@ -41,6 +42,11 @@ import '../../core/theme/symboles_agri.dart';
 ///    Pièce »). Décision CLIENT du 14/10/2026 : un SEUL champ, au PANIER, sous
 ///    le client — exactement comme le POS web (15.32). Ce n'est pas une dérive
 ///    de portage : ne pas le « corriger » vers la maquette.
+/// 5. 🔴→✅ **« Type de Facture » (MECEF-3, demande du client du 07/11/2026)** — quand le module MeCeF est actif, la vente choisit
+///    « Facture simple » (défaut : jamais transmise à la DGI, pas de QR) ou « Facture normalisée » : cette dernière ouvre la
+///    fenêtre « Facture Normalisée » (`ModaleAgri`, comme `modal-facture-normalisee` du web : IFU du client — vide = client sans
+///    IFU —, nom et prénom *, taux AIB, 5 % par défaut). Mêmes libellés, même ordre, mêmes refus qu'au web
+///    ([ChoixFacture], parité exécutée). La livraison facturée (frais inclus dans le total) n'existe qu'au web : écart n° 3.
 class CaisseScreen extends StatefulWidget {
   const CaisseScreen({super.key, required this.depot});
 
@@ -78,6 +84,16 @@ class _CaisseScreenState extends State<CaisseScreen> {
   double? _especesRecues;
   bool _enCours = false;
 
+  /// MECEF-3 — le module MeCeF est-il actif ? Alors la vente propose le « Type de Facture » (`facturationNormaliseeDisponible`).
+  bool _mecefActif = false;
+  String _factureType = ChoixFacture.simple;
+  String _clientIfu = '';
+  String _clientNomFacture = '';
+  String _aibTaux = ChoixFacture.aibDefaut;
+
+  /// Le client dont la fenêtre a été préremplie : une saisie n'est pas écrasée tant que le client ne change pas.
+  String? _clientPrerempli;
+
   /// F0.89 — jour de la vente choisi au panier ; défaut aujourd'hui (horloge du dépôt).
   late DateTime _dateVente = widget.depot.aujourdhui();
 
@@ -108,8 +124,10 @@ class _CaisseScreenState extends State<CaisseScreen> {
     final produits = await widget.depot.catalogue();
     final categories = await widget.depot.categories();
     final clients = await widget.depot.clients();
+    final mecefActif = await widget.depot.mecefActif();
     if (mounted) {
       setState(() {
+        _mecefActif = mecefActif;
         _catalogue = produits;
         _categories = categories;
         _clients = clients;
@@ -228,6 +246,16 @@ class _CaisseScreenState extends State<CaisseScreen> {
               ),
             ),
             const SizedBox(height: AgriSpacing.sm),
+            // MECEF-3 — une facture normalisée est transmise par le serveur à la synchronisation : en attendant, on le dit.
+            if (vente.factureType == ChoixFacture.normalisee) ...[
+              const Text(
+                ChoixFacture.mentionEnAttente,
+                key: Key('facture-demandee'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
+            ],
             // ⚠️ La facture PDF est produite par le serveur : le poste ne
             // peut pas la fabriquer, et le dire évite de la chercher.
             const Text(
@@ -253,6 +281,19 @@ class _CaisseScreenState extends State<CaisseScreen> {
   Future<void> _valider() async {
     if (_panier.isEmpty || _enCours) return;
 
+    // MECEF-3 — le choix de facture est jugé AVANT tout effet (comme `validateSale` du web) : un refus rouvre la fenêtre
+    // « Facture Normalisée » avec son motif, le panier est gardé. Module inactif : toujours facture simple.
+    final type = _mecefActif ? _factureType : ChoixFacture.simple;
+    if (type == ChoixFacture.normalisee) {
+      try {
+        ChoixFacture.valider(type: type, ifu: _clientIfu, nom: _clientNomFacture, aib: _aibTaux);
+      } on ChoixFactureRefuse catch (e) {
+        _dire(e.message, erreur: true);
+        await _ouvrirFactureNormalisee(erreur: e);
+        return;
+      }
+    }
+
     setState(() {
       _enCours = true;
       _erreurClient = null;
@@ -266,6 +307,10 @@ class _CaisseScreenState extends State<CaisseScreen> {
         remise: _remise,
         especesRecues: _especesRecues,
         dateVente: _dateVente,
+        factureType: type,
+        clientIfu: _clientIfu,
+        clientNomFacture: _clientNomFacture,
+        aibTaux: _aibTaux,
       );
 
       if (!mounted) return;
@@ -280,6 +325,12 @@ class _CaisseScreenState extends State<CaisseScreen> {
         // antérieure ne doit jamais « coller » à la vente suivante.
         _dateVente = widget.depot.aujourdhui();
         _refusDate = null;
+        // Prochaine vente : facture simple, fenêtre vide (le choix ne se reporte jamais d'une vente à l'autre).
+        _factureType = ChoixFacture.simple;
+        _clientIfu = '';
+        _clientNomFacture = '';
+        _aibTaux = ChoixFacture.aibDefaut;
+        _clientPrerempli = null;
       });
 
       await _confirmerVente(vente);
@@ -307,6 +358,33 @@ class _CaisseScreenState extends State<CaisseScreen> {
     } finally {
       if (mounted) setState(() => _enCours = false);
     }
+  }
+
+  /// Choix « Facture normalisée » : la fenêtre s'ouvre, préremplie d'après le client de la vente (nom, et IFU de sa fiche s'il en
+  /// a un) ; un client qui n'a pas changé garde la saisie. Annuler la fenêtre ramène à la facture simple.
+  Future<void> _ouvrirFactureNormalisee({ChoixFactureRefuse? erreur}) async {
+    final client = _clients.where((c) => c.id == _clientId).firstOrNull;
+    if (_clientPrerempli != _clientId || (_clientNomFacture.isEmpty && _clientIfu.isEmpty)) {
+      _clientNomFacture = client?.name ?? '';
+      _clientIfu = client?.ifu ?? '';
+      _clientPrerempli = _clientId;
+    }
+
+    final choix = await afficherModale<ChoixValide>(
+      context: context,
+      constructeur: (contexte) => _DialogueFactureNormalisee(ifu: _clientIfu, nom: _clientNomFacture, aib: _aibTaux, erreurInitiale: erreur),
+    );
+    if (!mounted) return;
+    setState(() {
+      if (choix == null) {
+        _factureType = ChoixFacture.simple;
+      } else {
+        _factureType = ChoixFacture.normalisee;
+        _clientIfu = choix.ifu ?? '';
+        _clientNomFacture = choix.nom ?? '';
+        _aibTaux = choix.aib ?? ChoixFacture.aibDefaut;
+      }
+    });
   }
 
   void _dire(String message, {bool erreur = false}) {
@@ -552,21 +630,28 @@ class _CaisseScreenState extends State<CaisseScreen> {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(AgriSpacing.md),
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'CLIENT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.brandForest,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CLIENT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AgriColors.brandForest,
+                        ),
+                      ),
+                      const SizedBox(height: AgriSpacing.xs),
+                      _champClient(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: AgriSpacing.xs),
-                _champClient(),
-                const SizedBox(height: AgriSpacing.sm),
-                _champDateVente(),
+                const SizedBox(width: AgriSpacing.md),
+                Expanded(child: _champDateVente()),
               ],
             ),
           ),
@@ -822,70 +907,166 @@ class _CaisseScreenState extends State<CaisseScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ligneTotal('Sous-total', '${_nombre(_sousTotal)} FCFA'),
-          const SizedBox(height: AgriSpacing.xs),
+          // Ticket #47 (suite) : DEUX rangées de deux colonnes, comme le web —
+          // Sous-total + Remise, puis Total à Payer + Mode de Règlement.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Text(
-                  'Remise (FCFA)',
-                  style: TextStyle(
-                    fontSize: AgriTypography.xs,
-                    color: AgriColors.outline,
-                  ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sous-total',
+                      style: TextStyle(
+                        fontSize: AgriTypography.xs,
+                        color: AgriColors.outline,
+                      ),
+                    ),
+                    const SizedBox(height: AgriSpacing.xs),
+                    SizedBox(
+                      height: 36,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_nombre(_sousTotal)} FCFA',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: AgriTypography.sm,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(
-                width: 96,
-                child: TextField(
-                  key: const Key('remise'),
-                  textAlign: TextAlign.right,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(fontSize: AgriTypography.xs),
-                  onChanged: (v) =>
-                      setState(() => _remise = double.tryParse(v) ?? 0),
+              const SizedBox(width: AgriSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Remise (FCFA)',
+                      style: TextStyle(
+                        fontSize: AgriTypography.xs,
+                        color: AgriColors.outline,
+                      ),
+                    ),
+                    const SizedBox(height: AgriSpacing.xs),
+                    SizedBox(
+                      height: 36,
+                      child: TextField(
+                        key: const Key('remise'),
+                        textAlign: TextAlign.right,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: AgriTypography.xs),
+                        decoration: const InputDecoration(isDense: true),
+                        onChanged: (v) =>
+                            setState(() => _remise = double.tryParse(v) ?? 0),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           const Divider(),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Expanded(
-                child: Text(
-                  'Total à Payer',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AgriColors.brandForest,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Total à Payer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AgriColors.brandForest,
+                      ),
+                    ),
+                    const SizedBox(height: AgriSpacing.xs),
+                    SizedBox(
+                      height: 40,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${_nombre(_total)} FCFA',
+                            key: const Key('total-a-payer'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AgriColors.brandEmerald,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AgriSpacing.md),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: const Key('mode-reglement'),
+                  initialValue: _modePaiement,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Mode de Règlement'),
+                  style: const TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.onSurface,
+                  ),
+                  items: [
+                    for (final e in _modes.entries)
+                      DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  ],
+                  onChanged: (v) => setState(() => _modePaiement = v ?? 'especes'),
+                ),
+              ),
+            ],
+          ),
+          // MECEF-3 — « Type de Facture » (seulement module MeCeF actif) ; « Facture normalisée » ouvre la fenêtre.
+          if (_mecefActif) ...[
+            const SizedBox(height: AgriSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  // ⚠️ `DropdownButton` à valeur CONTRÔLÉE : le type revient à « Facture simple » par programme (fenêtre annulée,
+                  // vente enregistrée), ce que `initialValue` d'un `DropdownButtonFormField` ne suivrait pas.
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Type de Facture', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        key: const Key('type-facture'),
+                        value: _factureType,
+                        isExpanded: true,
+                        style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.onSurface),
+                        items: [
+                          for (final e in ChoixFacture.libellesTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _factureType = v ?? ChoixFacture.simple);
+                          if (_factureType == ChoixFacture.normalisee) _ouvrirFactureNormalisee();
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                '${_nombre(_total)} FCFA',
-                key: const Key('total-a-payer'),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AgriColors.brandEmerald,
+                const SizedBox(width: AgriSpacing.md),
+                Expanded(
+                  child: _factureType == ChoixFacture.normalisee
+                      ? OutlinedButton(
+                          key: const Key('facture-infos'),
+                          onPressed: () => _ouvrirFactureNormalisee(),
+                          child: const Text('Modifier les informations de facturation', textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5)),
+                        )
+                      : const SizedBox.shrink(),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AgriSpacing.sm),
-          DropdownButtonFormField<String>(
-            key: const Key('mode-reglement'),
-            initialValue: _modePaiement,
-            decoration: const InputDecoration(labelText: 'Mode de Règlement'),
-            style: const TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.onSurface,
+              ],
             ),
-            items: [
-              for (final e in _modes.entries)
-                DropdownMenuItem(value: e.key, child: Text(e.value)),
-            ],
-            onChanged: (v) => setState(() => _modePaiement = v ?? 'especes'),
-          ),
+          ],
           const SizedBox(height: AgriSpacing.sm),
           Row(
             children: [
@@ -949,29 +1130,6 @@ class _CaisseScreenState extends State<CaisseScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _ligneTotal(String libelle, String valeur) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            libelle,
-            style: const TextStyle(
-              fontSize: AgriTypography.xs,
-              color: AgriColors.outline,
-            ),
-          ),
-        ),
-        Text(
-          valeur,
-          style: const TextStyle(
-            fontSize: AgriTypography.xs,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
     );
   }
 
@@ -1049,6 +1207,91 @@ class _DialogueClientState extends State<_DialogueClient> {
       actions: [
         BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
         BoutonModalePrimaire(key: const Key('enregistrer-client'), libelle: 'Enregistrer', onPressed: _enCours ? null : _enregistrer),
+      ],
+    );
+  }
+}
+
+/// MECEF-3 — fenêtre « Facture Normalisée » (`modal-facture-normalisee` du web) : IFU du client (13 chiffres, facultatif : vide =
+/// client sans IFU), Nom et prénom du client *, Taux AIB (5 % par défaut). Mêmes libellés, même ordre, mêmes motifs ([ChoixFacture]).
+class _DialogueFactureNormalisee extends StatefulWidget {
+  const _DialogueFactureNormalisee({required this.ifu, required this.nom, required this.aib, this.erreurInitiale});
+
+  final String ifu;
+  final String nom;
+  final String aib;
+  final ChoixFactureRefuse? erreurInitiale;
+
+  @override
+  State<_DialogueFactureNormalisee> createState() => _DialogueFactureNormaliseeState();
+}
+
+class _DialogueFactureNormaliseeState extends State<_DialogueFactureNormalisee> {
+  late final _ifu = TextEditingController(text: widget.ifu);
+  late final _nom = TextEditingController(text: widget.nom);
+  late String _aib = widget.aib;
+  late Map<String, String> _erreurs = widget.erreurInitiale == null ? const {} : {widget.erreurInitiale!.champ: widget.erreurInitiale!.message};
+
+  @override
+  void dispose() {
+    _ifu.dispose();
+    _nom.dispose();
+    super.dispose();
+  }
+
+  void _valider() {
+    try {
+      final choix = ChoixFacture.valider(type: ChoixFacture.normalisee, ifu: _ifu.text, nom: _nom.text, aib: _aib);
+      Navigator.of(context).pop(choix);
+    } on ChoixFactureRefuse catch (e) {
+      setState(() => _erreurs = {e.champ: e.message});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ModaleAgri(
+      titre: 'Facture Normalisée',
+      largeur: LargeurModale.sm,
+      contenu: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const Key('facture-ifu'),
+            controller: _ifu,
+            keyboardType: TextInputType.number,
+            maxLength: 13,
+            decoration: InputDecoration(
+              labelText: 'IFU du client',
+              hintText: '13 chiffres',
+              helperText: 'Laissez vide pour un client sans IFU (client particulier).',
+              counterText: '',
+              errorText: _erreurs['client_ifu'],
+            ),
+          ),
+          const SizedBox(height: AgriSpacing.sm),
+          TextField(
+            key: const Key('facture-nom'),
+            controller: _nom,
+            decoration: InputDecoration(labelText: 'Nom et prénom du client *', errorText: _erreurs['client_nom_facture']),
+          ),
+          const SizedBox(height: AgriSpacing.sm),
+          DropdownButtonFormField<String>(
+            key: const Key('facture-aib'),
+            initialValue: _aib,
+            isExpanded: true,
+            decoration: InputDecoration(labelText: 'Taux AIB', helperText: "Le montant de l'AIB est calculé par la DGI.", errorText: _erreurs['aib_taux']),
+            items: [
+              for (final e in ChoixFacture.libellesAib.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
+            ],
+            onChanged: (v) => setState(() => _aib = v ?? ChoixFacture.aibDefaut),
+          ),
+        ],
+      ),
+      actions: [
+        BoutonModaleSecondaire(key: const Key('facture-annuler'), libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+        BoutonModalePrimaire(key: const Key('facture-valider'), libelle: 'Valider', onPressed: _valider),
       ],
     );
   }

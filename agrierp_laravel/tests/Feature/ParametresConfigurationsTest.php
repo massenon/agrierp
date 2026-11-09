@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Livewire\Parametres\DonneesEntreprise;
 use App\Livewire\Parametres\EmailSmtp;
-use App\Livewire\Parametres\Integrations;
 use App\Livewire\Parametres\PostesAppairage;
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
@@ -42,7 +41,7 @@ class ParametresConfigurationsTest extends TestCase
     {
         $u = User::create([
             'name' => ucfirst($role), 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);
 
@@ -235,13 +234,6 @@ class ParametresConfigurationsTest extends TestCase
         $donnees->set('companyName', 'Ferme École OLOUWACHEGOUN')->call('save')->assertHasNoErrors();
         $s = CompanySetting::current();
         $this->assertSame(['smtp.ferme.bj', 465, 'ssl', 'secret'], [$s->smtp_host, (int) $s->smtp_port, $s->smtp_security, $s->smtp_password_encrypted]);
-
-        Livewire::test(Integrations::class)
-            ->assertDontSee('wire:model="smtpPassword"', false)
-            ->assertDontSee('wire:model="smtpHost"', false)
-            ->assertSee(route('parametres.hub', ['tab' => 'email']), false)
-            ->assertSee('SMS — Fournisseur API');
-        $this->assertFalse(method_exists(Integrations::class, 'saveSmtp'));
     }
 
     // ── Postes & Appairage ──────────────────────────────────────────────────────

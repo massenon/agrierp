@@ -305,7 +305,10 @@ void main() {
       'lib/features/clients/clients_creances_screen.dart',
       'lib/features/clients/fiche_client_modales.dart',
     ],
-    'suivi-dettes.html': ['lib/features/clients/clients_creances_screen.dart'],
+    'suivi-dettes.html': [
+      'lib/features/clients/clients_creances_screen.dart',
+      'lib/features/clients/recouvrement_modale.dart',
+    ],
     'relances-clients.html': [
       'lib/features/clients/clients_creances_screen.dart',
     ],
@@ -328,7 +331,6 @@ void main() {
     // Ticket U10 — « Ajouter Stock » est porté (modale du Blade, envoi rejoué par le serveur) : exemption retirée.
     'Confirmer la Suppression ?': 'référentiel en lecture seule au poste',
     'Oui, Supprimer définitivement': 'référentiel en lecture seule au poste',
-    'Configurer un Seuil': 'référentiel en lecture seule au poste',
     '+ Configurer un Seuil': 'référentiel en lecture seule au poste',
 
     // ── Import / export : ni sélecteur de fichier, ni analyseur de tableur,
@@ -342,7 +344,6 @@ void main() {
     //    les 28 exemptions qui ne concernaient que `suivi-reproduction.html` (corrections de
     //    cycle, panneaux Volailles / Escargots, accordéon des KPI) sont retirées avec la page.
     //    « Enregistrer les Modifications » reste : d'autres pages portées la contiennent.
-    'Enregistrer les Modifications': 'correction de cycle réservée au web',
 
     // ── Accordéon des KPI : repli propre au mobile ; le poste est un écran de
     //    bureau, où le panneau est toujours déplié.
@@ -389,7 +390,6 @@ void main() {
     // ── Colonnes et libellés du détail d'une vente, non embarqué.
     // Ticket AV2 : « P.U » et « Désignation » (détail de la vente de la maquette) n'ont plus de page qui les attende :
     // `historique-ventes.html` est contrôlée contre son Blade ; exemptions globales retirées.
-    'Qté': 'module non embarqué au poste',
     'Modifier': 'référentiel en lecture seule au poste',
 
     // ── Hub Clients et Créances (ticket F0.43) : les fiches clients s'écrivent
@@ -397,23 +397,15 @@ void main() {
     //    ont été retirées (elles masquaient d'autres pages) — chaque page garde
     //    la sienne, voir `exemptionsParPage`.
 
-    // ── Un règlement décaisse ET passe son écriture SYSCOHADA : il ne peut
-    //    pas se faire hors ligne sans canal d'envoi, et `receivables` n'en a
-    //    pas. Encaisser reste une opération de la surface web.
-    'Ajouter un Recouvrement': 'encaissement non embarqué au poste',
-    'Valider le Décaissement': 'encaissement non embarqué au poste',
-    'Montant du Règlement (FCFA)': 'encaissement non embarqué au poste',
-    'Compte Débité': 'encaissement non embarqué au poste',
-    'Nouveau Solde Dû': 'encaissement non embarqué au poste',
+    // ── Ticket VC-1 : l'encaissement d'une créance s'écrit au poste (modale « Enregistrer un Recouvrement », le fait
+    //    seul part, le serveur solde et passe l'écriture) — les exemptions « encaissement non embarqué » sont levées.
+    //    Seuls « Valider le Décaissement » et « Compte Débité » (mots de la maquette) restent : le web dit
+    //    « Valider le Règlement » et « Compte de Trésorerie », portés tels quels.
+    'Valider le Décaissement': 'le web dit « Valider le Règlement » (VC-1)',
+    'Compte Débité': 'le web dit « Compte de Trésorerie » : un encaissement CRÉDITE le compte (VC-1)',
 
-    // ── Envoyer une relance suppose le réseau ET le canal mail du serveur ;
-    //    surtout, `customer_reminders` est en lecture seule : une relance
-    //    partie du poste ne serait inscrite nulle part, et le client serait
-    //    rappelé une seconde fois depuis le web le lendemain. Le motif est
-    //    affiché à l'écran, pas seulement ici.
-    'Relancer WhatsApp': 'envoi impossible hors ligne et non traçable au poste',
-    'Relancer par Mail': 'envoi impossible hors ligne et non traçable au poste',
-    'Exporter Courrier': "chaîne d'édition non embarquée",
+    // ── Ticket VC-2 : les relances se font (WhatsApp, courrier) ou se demandent (e-mail, SMS) au poste : les exemptions
+    //    « envoi impossible hors ligne » et « chaîne d'édition non embarquée » sont levées.
     // ⚠️ Aucune table de modèles n'existe — le web le documente aussi : son
     //    propre bouton n'y persiste rien. Un bouton qui annonce « sauvegardé »
     //    sans rien enregistrer est un mensonge d'interface.
@@ -499,20 +491,10 @@ void main() {
     'ACH-2026-099': 'valeur de démonstration de la maquette',
     'ACH-2026-098': 'valeur de démonstration de la maquette',
 
-    // ⚠️⚠️ SAISIR UN BON DE COMMANDE ENGAGE LA FERME auprès d'un fournisseur,
-    //    et le serveur sert les bons en LECTURE SEULE : un bon saisi au poste
-    //    serait effacé au tirage suivant — après que le fournisseur ait été
-    //    appelé. Le poste les affiche, il ne les crée pas.
-    'Bons de commande émis': 'bons servis en lecture seule au poste',
-    'Ajouter au bon de commande': 'bons servis en lecture seule au poste',
-    'Générer le Bon': 'bons servis en lecture seule au poste',
-    'Date de Livraison Attendue': 'bons servis en lecture seule au poste',
-    "Produit / Article d'Approvisionnement":
-        'bons servis en lecture seule au poste',
-    'Quantité': 'bons servis en lecture seule au poste',
-    'P.U Estimé (FCFA)': 'bons servis en lecture seule au poste',
-    'Valider la réception': 'réception de commande réservée au web',
-    'Confirmer la Réception': 'réception de commande réservée au web',
+    // Ticket AC-1 — la saisie d'un bon est PORTÉE au poste d'après le Blade (le maître) : « Produit / Article ». La maquette
+    //    dit « Produit / Article d'Approvisionnement » ; le web ne reprend pas ce libellé.
+    "Produit / Article d'Approvisionnement": "libellé de la maquette — le web dit « Produit / Article »",
+    'Quantité': 'libellé de la maquette — la page du bon porte « Quantité » en capitales dans le formulaire',
     'Exporter le Bon (PDF)': "chaîne d'édition non embarquée",
 
     // ── Hub Fournisseurs (ticket F0.46, révisé F0.71). Depuis F0.71 une fiche se
@@ -540,20 +522,11 @@ void main() {
     // ⚠️ Modifier une facture déjà transmise à la DGI romprait l'intégrité
     //    fiscale : le web ne le fait pas non plus.
     'Modifier — Facturation & MeCeF': 'intégrité fiscale — jamais modifiable',
-    // ── Hub Personnel & Stages (ticket F0.48). Les registres sont des
-    //    référentiels du serveur : embaucher, corriger un salaire ou
-    //    archiver une fiche depuis le poste donnerait une saisie effacée au
-    //    tirage suivant.
-    'Nouvel Employé': 'référentiel en lecture seule au poste',
-    '+ Nouvel Employé': 'référentiel en lecture seule au poste',
-    'Fonction *': 'référentiel en lecture seule au poste',
-    "Date d'embauche *": 'référentiel en lecture seule au poste',
-    'Salaire (FCFA) *': 'référentiel en lecture seule au poste',
-    'Nouveau Stagiaire': 'référentiel en lecture seule au poste',
-    "Établissement d'origine *": 'référentiel en lecture seule au poste',
-    'Date de début': 'référentiel en lecture seule au poste',
-    'Date de fin': 'référentiel en lecture seule au poste',
-    'Frais de stage (FCFA)': 'référentiel en lecture seule au poste',
+    // ── Hub Personnel & Stages : les registres s'écrivent au poste depuis RH-1 / RH-2 (27/10/2026). Le « + » de la
+    //    maquette est l'icône `add` du bouton ; le libellé porté est le texte (« Nouvel Employé », « Nouvel Utilisateur »).
+    '+ Nouvel Employé': "le « + » est l'icône du bouton ; « Nouvel Employé » est porté (RH-1)",
+    '+ Nouvel Utilisateur': "le « + » est l'icône du bouton ; « Nouvel Utilisateur » est porté (UT-1)",
+    'Salaire (FCFA) *': 'le web nomme le champ « Salaire de base (FCFA) », porté tel quel (RH-1)',
 
     // ⚠️⚠️ LES ABSENCES D'UN STAGIAIRE vivent dans `internship_absences`,
     //    que le poste ne reçoit pas — et la feuille de pointage ne les couvre
@@ -561,7 +534,6 @@ void main() {
     //    stagiaire n'est pas un employé dans le schéma.
     'Absences / Abandon': 'absences de stagiaire non embarquées',
     "Date de l'absence": 'absences de stagiaire non embarquées',
-    'Motif': 'absences de stagiaire non embarquées',
 
     // ⚠️ LE BOUTON DE LA MODALE DE POINTAGE porte le libellé court de la
     //    maquette (« Enregistrer un Pointage ») ; la variante préfixée « + »
@@ -595,7 +567,6 @@ void main() {
     //    ce qui garantit qu'aucun mouvement ne pese sur les comptes sans
     //    avoir pese sur le stock ou la caisse. Une saisie manuelle au poste
     //    romprait ce lien.
-    "Saisie d'Écriture": 'ecriture generee par une operation, jamais saisie',
     "+ Saisie d'Écriture": 'ecriture generee par une operation, jamais saisie',
     "Date de l'écriture *": 'ecriture generee par une operation, jamais saisie',
     'Compte à débiter *': 'ecriture generee par une operation, jamais saisie',
@@ -604,7 +575,6 @@ void main() {
     'Libellé *': 'ecriture generee par une operation, jamais saisie',
 
     // ⚠️ Le plan comptable est un referentiel du serveur.
-    'Nouveau Compte': 'référentiel en lecture seule au poste',
     '+ Nouveau Compte': 'référentiel en lecture seule au poste',
     'Numéro de compte *': 'référentiel en lecture seule au poste',
     'Intitulé *': 'référentiel en lecture seule au poste',
@@ -650,14 +620,8 @@ void main() {
     'Supprimer ce Rôle ?': 'définition des rôles réservée au web',
     'Supprimer Définitivement': 'définition des rôles réservée au web',
 
-    // ⚠️⚠️ NI MOT DE PASSE NI JETON NE DESCENDENT AU POSTE, et un compte ne
-    //    s'y crée donc pas : il faudrait choisir un mot de passe, c'est-à-dire
-    //    le faire transiter et le stocker sur la machine la plus exposée du
-    //    dispositif.
-    'Nouvel Utilisateur': "création de compte réservée au web",
-    '+ Nouvel Utilisateur': "création de compte réservée au web",
-    'Email *': "création de compte réservée au web",
-    'Rôle *': "création de compte réservée au web",
+    // Ticket UT-1 (27/10/2026) : les comptes se créent au poste (mot de passe au coffre du système jusqu'à l'envoi,
+    // jamais en base) — les exemptions « création de compte réservée au web » sont levées.
 
     // ⚠️⚠️ LE SERVEUR SMTP PORTE UN MOT DE PASSE. Le descendre ferait d'un
     //    poste volé une clé d'accès à la boîte mail de la ferme :
@@ -686,8 +650,6 @@ void main() {
     //    descendent pas davantage : ce sont les coordonnées bancaires de la
     //    ferme, et le poste n'a aucun besoin de les porter pour afficher un
     //    solde.
-    'Ajouter un Compte Bancaire': 'ouverture de compte réservée au web',
-    'Ajouter une Ligne Mobile Money': 'ouverture de compte réservée au web',
     'Banque *': 'ouverture de compte réservée au web',
     'Titulaire du Compte': 'coordonnées bancaires non descendues au poste',
     'RIB *': 'coordonnées bancaires non descendues au poste',
@@ -788,10 +750,6 @@ void main() {
     //    le motif vrai : le bouton existe dans la maquette, l'écran n'appelle
     //    pas encore ExportOfficiel.
     'seuils-alerte.html': {
-      "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
     'plan-comptable.html': {
@@ -807,13 +765,10 @@ void main() {
           "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
     },
     // grand-livre.html et balance-generale.html : plus d'exemption, « Exporter PDF » porté (F0.87).
+    // Ticket RH-3 : « Date * » et « Archiver » sont portés (modale de pointage avec date, archivage d'un pointage).
     'feuille-pointage.html': {
-      'Date *':
-          "ÉCART À ARBITRER (F0.81, 09/10/2026) : la maquette attend « Date * » dans la modale de pointage, l'écran ne le porte pas ; écran non modifié, décision client",
       "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
+          "la confirmation est la modale commune (ModaleConfirmation, « Archiver le pointage ») ; libellé propre à la maquette",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
     },
     // Ticket H9 : `parametres-elevage.html` est contrôlée contre le Blade — son exemption « Exporter PDF »
@@ -857,7 +812,7 @@ void main() {
     'registre-stagiaires.html': {
       // F0.72 : exemption globale « Nom complet * » retirée ; motif d'origine conservé,
       // à réexaminer avec l'écran Stagiaires.
-      'Nom complet *': 'référentiel en lecture seule au poste',
+      'Nom complet *': "scindé en « Prénom * » / « Nom * », comme le web (schéma `first_name` / `last_name`)",
       // La génération se fait depuis l'onglet « Attestations » du hub, où elle
       // est portée ; le registre, lui, reste une consultation.
       'Attestation de Stage': "génération faite depuis l'onglet Attestations",
@@ -870,7 +825,7 @@ void main() {
     //    le porte désormais. Retirée du global, gardée ici où elle est vraie.
     'suivi-dettes.html': {
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Enregistrer un Règlement': 'encaissement non embarqué au poste',
+      'Enregistrer un Règlement': 'le web titre la modale « Enregistrer un Recouvrement » (VC-1)',
     },
 
     // ── Ticket F0.71 — Fiche fournisseur écrite au poste ───────────────────
@@ -898,21 +853,18 @@ void main() {
 
     // ── Ticket F0.72 — « Nom complet * » n'est plus exempté partout : ces deux pages
     //    gardent le motif d'origine, à réexaminer avec leur écran.
+    // Ticket UT-1 : « Archiver » et « Nom complet * » sont portés (comptes créés, modifiés, archivés au poste).
     'gestion-utilisateurs.html': {
       "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
+          "la confirmation est la modale commune (ModaleConfirmation, « Archiver l'utilisateur ») ; libellé propre à la maquette",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Nom complet *': 'référentiel en lecture seule au poste',
     },
+    // Ticket RH-1 : « Archiver » est porté (archivage d'un employé).
     'registre-employes.html': {
       "Confirmer l'archivage":
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
-      'Archiver':
-          "absent de l'écran, constaté au ticket F0.81 (09/10/2026) ; migré de l'exemption globale « référentiel en lecture seule au poste » sans requalification page par page",
+          "la confirmation est la modale commune (ModaleConfirmation, « Archiver l'employé ») ; libellé propre à la maquette",
       'Exporter PDF': "écran qui n'appelle pas la chaîne d'édition (F0.52)",
-      'Nom complet *': 'référentiel en lecture seule au poste',
+      'Nom complet *': "scindé en « Prénom * » / « Nom * », comme le web (schéma `first_name` / `last_name`)",
     },
 
     // ── Ticket F0.72 — fiche client : la maquette dit « Détruire » avec mot de passe
@@ -1037,11 +989,6 @@ void main() {
     'bons-commande.html': {
       'Nouveau Fournisseur':
           'création à la volée non portée ici : elle se fait dans Fournisseurs',
-      // « Un bon engage la ferme auprès d'un fournisseur : le serveur le sert
-      // en LECTURE SEULE et ignore tout envoi le concernant. »
-      'Bon de Commande': 'saisie non portée — bon servi en lecture seule',
-      "Saisie d'un Bon de Commande":
-          'saisie non portée — bon servi en lecture seule',
       // ⚠️ F0.67 : l'exemption globale « référentiel en lecture seule » est
       // retirée — créer un produit EXISTE désormais, au Catalogue. Ce
       // formulaire-ci n'offre pas la création à la volée.
@@ -1160,7 +1107,11 @@ void main() {
   /// Gestion des Stocks (modale « Ajouter Stock » du Blade).
   /// AV2 (21/10/2026) : 207 → 197. Les dix couples masqués de `historique-ventes.html` sortent du compte avec la page
   /// (contrôlée contre le Blade, `historique_ventes_blade_test.dart`).
-  const plafondManquesMasques = 197;
+  /// RH-1 à RH-4 (27/10/2026) : 197 → 189. Les registres RH s'écrivent au poste : leurs libellés de modale sont portés.
+  /// VC-2 (28/10/2026) : 173 → 170 (relances portées).
+  /// VC-1 (28/10/2026) : 177 → 173 (modale « Enregistrer un Recouvrement » portée).
+  /// UT-1 (27/10/2026) : 189 → 177, les libellés de la modale « Nouvel Utilisateur » et « Établissement d'origine * » sont portés.
+  const plafondManquesMasques = 150;
 
   for (final entree in portages.entries) {
     final page = entree.key;

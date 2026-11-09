@@ -62,7 +62,9 @@ class SyncEssaiMultipostesTest extends TestCase
         }
         TreasuryAccount::create(['type' => 'caisse', 'label' => 'Caisse Principale', 'account_code' => '531', 'balance' => 0, 'is_active' => true]);
 
-        $espece = LivestockSpecies::create(['label' => 'Aviculture', 'code' => 'aviculture', 'is_active' => true]);
+        // VOL-2 : toute bande d'aviculture exige un départ par catégorie/stade ; ces tests portent sur la caisse et les envois (interblocage,
+        // plusieurs postes), pas sur l'effectif par catégorie — filière NEUTRE (sans chaîne), pas de contournement d'un refus.
+        $espece = LivestockSpecies::create(['label' => 'Héliciculture', 'code' => 'helico', 'is_active' => true]);
         $categorie = ProductCategory::create(['label' => 'Volailles', 'is_active' => true]);
         $this->poulet = Product::create([
             'sku' => 'AVI-001', 'name' => 'Poulet goliath', 'category_id' => $categorie->id,
@@ -70,7 +72,7 @@ class SyncEssaiMultipostesTest extends TestCase
             'price_min' => 3_000, 'price_max' => 4_000, 'tva_rate' => 0, 'stock_qty' => 50, 'is_active' => true,
         ]);
         $this->bande = LivestockLot::create([
-            'code' => 'ESSAI-A', 'species_id' => $espece->id, 'stage' => 'engraissement',
+            'code' => 'ESSAI-A', 'species_id' => $espece->id, 'stage' => 'ponte',
             'initial_quantity' => 300, 'current_quantity' => 300,
             'created_date' => '2026-10-01', 'status' => 'actif', 'is_active' => true,
         ]);
@@ -87,7 +89,7 @@ class SyncEssaiMultipostesTest extends TestCase
     {
         $u = User::create([
             'name' => ucfirst($role), 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);
 

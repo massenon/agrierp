@@ -26,6 +26,13 @@ class LivestockDailyEntry extends Model
         // jamais 0). `cat_eff_*` en sont DÉRIVÉS par EffectifParCategorieService.
         'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune',
         'passage_sevre_jeune', 'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune',
+        // Ticket VOL-1 — ventes PAR CATÉGORIE (volailles reproductrices : la catégorie du produit vendu). `vente` en
+        // reste la somme. null = non ventilé (autres espèces, fiche d'avant le ticket).
+        'vente_repro', 'vente_sevre', 'vente_jeune',
+        // Ticket VOL-2 — QUATRIÈME emplacement (Poussin ponte des volailles pondeuses, `cat_eff_4` existait déjà) et deux
+        // passages de plus : Poussin ponte → Poussin en croissance (`passage_4_sevre`), Poulette → Pondeuse
+        // (`passage_jeune_repro`) ; Poussin en croissance → Poulette reste `passage_sevre_jeune`.
+        'mort_4', 'don_4', 'vente_4', 'cat_depart_4', 'passage_4_sevre', 'passage_jeune_repro',
         'feed_qty_kg', 'feed_product_id', 'weight_sample_avg_g',
         'ponte_total', 'ponte_casses', 'treatment_product_id', 'treatment_dose',
         'symptomes', 'vente_sexe', 'vente_montant',
@@ -195,6 +202,14 @@ class LivestockDailyEntry extends Model
             'mort_repro' => $this->mort_repro, 'mort_sevre' => $this->mort_sevre, 'mort_jeune' => $this->mort_jeune,
             'don_repro' => $this->don_repro, 'don_sevre' => $this->don_sevre, 'don_jeune' => $this->don_jeune,
             'passage' => $this->passage_sevre_jeune,
+            // Ticket VOL-1 : ventes par catégorie (volailles). Ignorées par les lapins et les porcs (leur vente sort de
+            // la catégorie « jeune » via `vente`).
+            'vente_repro' => $this->vente_repro, 'vente_sevre' => $this->vente_sevre, 'vente_jeune' => $this->vente_jeune,
+            // Ticket VOL-2 : quatrième emplacement et passages des volailles pondeuses (ignorés par les autres chaînes).
+            'mort_4' => $this->mort_4, 'don_4' => $this->don_4, 'vente_4' => $this->vente_4,
+            'passage_4_sevre' => $this->passage_4_sevre, 'passage_jeune_repro' => $this->passage_jeune_repro,
+            'transfert_entree_4' => (int) ($this->transfert_entree_4 ?? 0),
+            'transfert_sortie_4' => (int) ($this->transfert_sortie_4 ?? 0),
             'transfert_entree_repro' => (int) ($this->transfert_entree_repro ?? 0),
             'transfert_entree_sevre' => (int) ($this->transfert_entree_sevre ?? 0),
             'transfert_entree_jeune' => (int) ($this->transfert_entree_jeune ?? 0),

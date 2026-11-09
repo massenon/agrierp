@@ -576,7 +576,7 @@ class CorbeilleArchivesTest extends TestCase
     public function test_un_non_administrateur_ne_peut_ni_voir_ni_restaurer_ni_supprimer(): void
     {
         $client = $this->client('Kossi Adjovi');
-        $caissier = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $caissier = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $caissier->assignRole('caissier');
         $this->actingAs($caissier);
 

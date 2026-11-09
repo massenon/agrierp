@@ -20,7 +20,7 @@
                             <button type="button" @click="view = 'grid'" :class="view === 'grid' ? 'bg-brand-emerald text-white' : 'text-outline hover:bg-surface-zebra'" class="px-sm py-2"><span class="material-symbols-outlined text-[18px]">grid_view</span></button>
                             <button type="button" @click="view = 'list'" :class="view === 'list' ? 'bg-brand-emerald text-white' : 'text-outline hover:bg-surface-zebra'" class="px-sm py-2"><span class="material-symbols-outlined text-[18px]">view_list</span></button>
                         </div>
-                        <a href="{{ route('stocks.produits.ajouter') }}" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                        <a wire:navigate href="{{ route('stocks.produits.ajouter') }}" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                             <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Produit
                         </a>
                     </div>
@@ -53,7 +53,7 @@
                             <div class="relative bg-white border border-outline-variant rounded-lg p-md hover:shadow-md transition-all">
                                 <span class="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded {{ $product->is_stock_low ? 'bg-error-red text-white' : 'bg-brand-emerald/90 text-white' }}">S: {{ rtrim(rtrim(number_format($product->stock_qty, 2, '.', ''), '0'), '.') }} {{ $product->unit }}</span>
                                 <div class="flex justify-end gap-1 mb-sm">
-                                    <a href="{{ route('stocks.produits.modifier', $product->id) }}" class="text-outline hover:text-brand-forest p-1"><span class="material-symbols-outlined text-[16px]">edit</span></a>
+                                    <a wire:navigate href="{{ route('stocks.produits.modifier', $product->id) }}" class="text-outline hover:text-brand-forest p-1"><span class="material-symbols-outlined text-[16px]">edit</span></a>
                                     <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-{{ $product->id }}' })" class="text-outline hover:text-error-deep p-1"><span class="material-symbols-outlined text-[16px]">archive</span></button>
                                 </div>
                                 <div class="flex flex-col items-center text-center gap-1 pt-sm">
@@ -90,7 +90,7 @@
                                             <td data-label="Stock" class="px-md py-sm text-xs text-right {{ $product->is_stock_low ? 'text-error-deep font-bold' : '' }}">{{ rtrim(rtrim(number_format($product->stock_qty, 2, '.', ''), '0'), '.') }} {{ $product->unit }}</td>
                                             <td data-label="Tarif" class="px-md py-sm text-xs text-right font-bold text-brand-emerald">{{ $product->price_display }}</td>
                                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
-                                                <a href="{{ route('stocks.produits.modifier', $product->id) }}" class="text-outline hover:text-brand-forest p-1 inline-block"><span class="material-symbols-outlined text-[16px]">edit</span></a>
+                                                <a wire:navigate href="{{ route('stocks.produits.modifier', $product->id) }}" class="text-outline hover:text-brand-forest p-1 inline-block"><span class="material-symbols-outlined text-[16px]">edit</span></a>
                                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-{{ $product->id }}' })" class="text-outline hover:text-error-deep p-1"><span class="material-symbols-outlined text-[16px]">archive</span></button>
                                             </td>
                                         </tr>

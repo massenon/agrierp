@@ -20,6 +20,7 @@ globalThis.document = {
     hidden: false,
     body: { classList: { toggle() {} } },
     addEventListener: (nom, f) => (ecouteursDocument[nom] ??= []).push(f),
+    removeEventListener: (nom, f) => { ecouteursDocument[nom] = (ecouteursDocument[nom] ?? []).filter((g) => g !== f); },
     getElementById: () => ({ toggleAttribute() {}, setAttribute() {} }),
 };
 globalThis.window = {
@@ -27,6 +28,7 @@ globalThis.window = {
     Livewire: { hook: (nom, f) => { hooks[nom] = f; } },
     localStorage: { getItem: (k) => stockage.get(k) ?? null, setItem: (k, v) => stockage.set(k, String(v)) },
     addEventListener: (nom, f) => (ecouteursFenetre[nom] ??= []).push(f),
+    removeEventListener: (nom, f) => { ecouteursFenetre[nom] = (ecouteursFenetre[nom] ?? []).filter((g) => g !== f); },
     setInterval: (f) => { intervalles.push(f); return intervalles.length; },
     clearInterval: () => {},
     location: { href: '', reload() { this.rechargee = true; } },

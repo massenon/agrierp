@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>{{ $reportTitle }} — AgriERP</title>
+    <title>{{ $reportTitle }} — LogiAgriERP</title>
     <style>
         /**
          * En-tête institutionnel — nuancier RÉSERVÉ aux documents imprimés
@@ -22,7 +22,7 @@
             color: #375623;
             font-family: 'Georgia', 'DejaVu Serif', serif;
             font-weight: bold;
-            font-size: 17px;
+            font-size: 26px;
             margin: 0 0 4px 0;
         }
         .header-box {

@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/agri_tokens.dart';
@@ -83,12 +85,11 @@ class TableauAgri extends StatelessWidget {
     enfant: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: largeur),
+        LayoutBuilder(
+          builder: (_, contraintes) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: SizedBox(
-              width: largeur,
+              width: max(largeur, contraintes.maxWidth),
               child: Column(
                 children: [
                   Container(

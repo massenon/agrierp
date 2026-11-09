@@ -1,4 +1,4 @@
-# AgriERP — Sprint 0 : Fondations — Paquet de Livraison
+# LogiAgriERP — Sprint 0 : Fondations — Paquet de Livraison
 
 ## ⚠️ Avertissement d'environnement (à lire avant tout)
 
@@ -12720,7 +12720,7 @@ bloque l'exploitation hors ligne serait contraire à la nature même de ce
 projet — c'est un arbitrage, pas un oubli.
 
 ⚠️ **LE MOT DE PASSE DE DÉMONSTRATION RESTE VALIDE.** Une politique qui
-invaliderait `AgriERP@2026` casserait la recette et la formation du personnel le
+invaliderait `LogiAgriERP@2026` casserait la recette et la formation du personnel le
 jour de sa mise en place. Un test le vérifie explicitement.
 
 ⚠️ **LA RÉINITIALISATION EST COUVERTE AUTANT QUE LA CRÉATION.** Protéger l'une
@@ -14508,7 +14508,7 @@ site en ligne (requêtes HTTP réelles, pas une supposition).
 | `/login` | 404 | 404 **du serveur web**, pas celui de Laravel |
 | `/index.php` | 404 | aucun front controller à la racine servie |
 | `/public/index.php` | 302 | **l'application fonctionne** |
-| `/public/index.php/login` | 200, `<title>AgriERP \| Connexion</title>` | Laravel répond correctement |
+| `/public/index.php/login` | 200, `<title>LogiAgriERP \| Connexion</title>` | Laravel répond correctement |
 | `/public/login` | 404 du serveur | **aucune réécriture d'URL** |
 | `/public/build/manifest.json` | 200 | `npm run build` a bien été fait |
 
@@ -14632,7 +14632,7 @@ rendues sans erreur), `AuditLiensEtRessourcesTest`, `PagesPubliquesTest` —
 
 ## Ticket 15.3 — MANUEL D'UTILISATION (PDF, 91 pages)
 
-Livrable client : `Manuel_Utilisation_AgriERP.pdf`, à la racine du dépôt de
+Livrable client : `Manuel_Utilisation_LogiAgriERP.pdf`, à la racine du dépôt de
 documentation. 91 pages A4, 56 figures annotées, 169 signets PDF.
 
 Sources reconstructibles dans `manuel/` (`src/part0..6.html`, `build.py`,
@@ -15045,7 +15045,7 @@ reconstruite et relancée (fenêtre active, PID vivant).
 ## Ticket 15.4 — POLICES SERVIES EN LOCAL + PWA INSTALLABLE
 
 Deux demandes client traitées ensemble : sortir Google Fonts de
-l'application, et rendre AgriERP installable comme une application, avec une
+l'application, et rendre LogiAgriERP installable comme une application, avec une
 invitation réductible en bas à gauche.
 
 ### 1. Inter n'est plus chargée depuis Google
@@ -15334,7 +15334,7 @@ propre nom**. Le tableau de bord clignoterait « dashboard », « inventory_2 »
 
 ### 3. La racine mène à `/login`
 
-`/` renvoyait le visiteur vers `/welcome`. AgriERP est un outil de travail :
+`/` renvoyait le visiteur vers `/welcome`. LogiAgriERP est un outil de travail :
 l'écrasante majorité des ouvertures vise la connexion. La racine y mène
 directement ; un utilisateur déjà connecté va toujours à son tableau de bord.
 
@@ -15369,7 +15369,7 @@ pas. **À corriger sur le serveur, puis `php artisan config:cache`.**
 
 **2. Contraste du logo — ARBITRAGE CLIENT.** `text-brand-maize` (#FFD55F) sur
 fond blanc donne un rapport de **1,4:1** ; WCAG AA en exige 4,5:1. C'est le
-« ERP » de « AgriERP » sur la page de connexion (`login.blade.php` l.30). La
+« ERP » de « LogiAgriERP » sur la page de connexion (`login.blade.php` l.30). La
 couleur vient du prototype — la corriger d'autorité serait harmoniser en
 silence une décision graphique validée. Trois issues possibles : garder le
 jaune sur fond sombre uniquement, foncer le jaune sur fond clair, ou assumer
@@ -15435,7 +15435,7 @@ qui valide un barème fiscal, jamais l'auteur du code. L'arbitrage est clos.
   Dr MASSENON Rhodes — août 2026 ».
 - **Bloc de fin de document** — les trois structures.
 - **Métadonnées PDF** — `subject` et `keywords` portent les trois noms.
-- **Nouvelle section 11.3 « Qui fait quoi autour d'AgriERP »** — un tableau
+- **Nouvelle section 11.3 « Qui fait quoi autour d'LogiAgriERP »** — un tableau
   des trois structures avec, pour chacune, ce pour quoi il faut la
   contacter. La règle donnée à l'utilisateur : *un écran qui se comporte mal
   relève de l'éditeur ; un chiffre réglementaire à valider relève du cabinet
@@ -15446,7 +15446,7 @@ la section 11.3 lui donne une utilité réelle pour le lecteur, qui saura à
 qui téléphoner.
 
 ### État
-`Manuel_Utilisation_AgriERP.pdf` — **92 pages** (91 avant), 56 figures,
+`Manuel_Utilisation_LogiAgriERP.pdf` — **92 pages** (91 avant), 56 figures,
 170 signets, 9,5 Mo. Occurrences vérifiées dans le texte extrait du PDF :
 PAEB 97, FAGUEZ 96, MASSENON 97. Couverture et section 11.3 relues sur la
 page rendue.
@@ -15546,7 +15546,7 @@ blanc donne **1,41:1**, quand WCAG AA exige 4,5:1.
 
 ### Ce que la vérification a ajouté au dossier
 
-L'audit ne signalait qu'un élément : le « ERP » de « AgriERP » sur la page de
+L'audit ne signalait qu'un élément : le « ERP » de « LogiAgriERP » sur la page de
 connexion. Le relevé de TOUS les emplois de la couleur en a montré un second,
 plus grave et invisible à l'audit :
 
@@ -16845,7 +16845,7 @@ le juillet 2026 figé des pages de démonstration.
 
 ### ⚠️ LE PIED DE PAGE DU PDF CRÉDITE TROIS STRUCTURES, LA MAQUETTE DEUX
 
-`pdf-export.js` écrit « AgriERP © {année} — Projet d'Appui à l'Entrepreneuriat
+`pdf-export.js` écrit « LogiAgriERP © {année} — Projet d'Appui à l'Entrepreneuriat
 au Bénin (PAEB) — Cabinet FAGUEZ SARL ». Il **précède les tickets 15.7 et
 15.8** : l'application crédite désormais les trois structures, et
 `CreditsProjetTest` l'y verrouille côté web.
@@ -18202,7 +18202,7 @@ pour toute la ferme).
 - **Aucun PDF réel n'a transité de bout en bout** : le serveur produit un vrai PDF
   (test : en-tête `%PDF`, nom de fichier, trace d'audit) et le poste reçoit des octets
   (test avec un faux document) — mais je n'ai pas ouvert le fichier rendu, ni vérifié sa
-  mise en page, ni essayé l'écriture dans `Documents\AgriERP` ni la boîte d'impression
+  mise en page, ni essayé l'écriture dans `Documents\LogiAgriERP` ni la boîte d'impression
   dans l'exécutable `release` (construit et lancé, migration v24 appliquée).
 - **La page web refactorisée n'a toujours pas de test Livewire** : `previewBody` et
   `generateAttestation` délèguent au service (testé), mais la page elle-même n'a jamais eu
@@ -18298,7 +18298,7 @@ désormais — sujets SORTIS compris : la fiche d'un animal vendu ou mort est so
 - **Le QR n'a pas été scanné** : on prouve ce qu'il ENCODE (la donnée, testée à part) et
   qu'il s'affiche (capture), pas qu'un lecteur le lit.
 - **Aucun PDF réel n'a été ouvert** : octets reçus et nom de fichier testés avec un faux
-  document ; mise en page, écriture dans `Documents\AgriERP` et impression non essayées
+  document ; mise en page, écriture dans `Documents\LogiAgriERP` et impression non essayées
   dans l'exécutable (construit et lancé, migration v25 appliquée).
 - **Aucun tirage de `animals` contre un serveur peuplé** : contrat vérifié des deux côtés
   séparément.
@@ -21792,7 +21792,7 @@ A2 (bandes « issues d'une bande » vraisemblablement comptées deux fois : aucu
 ### Corrections
 - `test/chemins_depot.dart` et `outils/chemins.py` : variable d'environnement (`AGRIERP_LARAVEL`, `AGRIERP_PROTOTYPE`), puis monorepo, puis ancien chemin Windows.
 - Le test qui lit la maquette se saute AVEC sa raison quand elle est absente (A8).
-- `build_windows.bat` : version `x.y.z` contrôlée, DLL VC++ manquante = échec, Inno Setup absent = échec sauf `--sans-installateur`, présence de `AgriERP-Setup-<version>.exe` vérifiée ; `agrierp.iss` estampille `VersionInfoVersion`.
+- `build_windows.bat` : version `x.y.z` contrôlée, DLL VC++ manquante = échec, Inno Setup absent = échec sauf `--sans-installateur`, présence de `LogiAgriERP-Setup-<version>.exe` vérifiée ; `agrierp.iss` estampille `VersionInfoVersion`.
 
 ### Mesures
 - Suite du poste : 2 010 verts, 16 sautés (maquette absente), 0 rouge. `flutter analyze` propre.
@@ -22516,3 +22516,9 @@ Décision client du 21/10/2026 : construire la conversion. Une facture EST une v
 **Contrat modifié.** `POST /api/sync/push`, clé `sales` : (1) `payment_mode` `credit` ou `avance` SANS `customer_id` est refusé pour cette vente seule (`rejected[].reason` = « Une vente à crédit exige un client. » / « Une vente sur avance exige un client. ») — avant, la vente passait avec une écriture D 411 et aucune créance ; (2) un `customer_id` inconnu du serveur est refusé avec « Client inconnu du serveur : cette vente porte un client qui n'a pas encore été envoyé (ou qu'il a refusé). Envoyez d'abord le client, puis relancez la vente. » au lieu du texte générique (`MotifsRefusPush::clientInconnu()`). Aucune clé ajoutée ; l'ordre de traitement (clients avant ventes) est inchangé. Le comptant sans client est et reste accepté.
 **Web.** `PosInterface::validateSale` : crédit ou avance sans client → erreur `customerId` (sous le champ) et toast, rien d'écrit. **Poste.** Champ « Client » actif, « Crédit / À terme » rétabli, « + » (client créé à la volée), erreurs inattendues dites à l'écran — voir `docs/PLAN_FINALISATION.md`, VTE-1.
 **Tests.** `VenteSansClientTest` (8). Poste : `vente_client_poste_test`, `ventes_sans_client_parite_php_test` (VRAI `SyncController`).
+
+### Ticket VOL-1 — Volailles Reproducteurs : effectif par catégorie calculé (04-05/11/2026), contrat `/api/sync/*` étendu
+
+**Contrat modifié.** `livestock_daily_entries` : trois colonnes nullables `vente_repro` / `vente_sevre` / `vente_jeune` (migration `2026_11_05_000001`) ; `products.categorie_effectif` (`reproducteur` | `jeune` | `poussin`, nullable, migration `2026_11_05_000002` qui pose la valeur par défaut d'après le nom) ; trois lignes « Reproducteur » (130), « Jeune » (80), « Poussin » (30 g/j, ❓ PROVISOIRES) au barème de l'aviculture (migration `2026_11_05_000003`, `FeedRationStandardsSeeder`). `POST /api/sync/push` : une fiche d'une bande de volailles reproductrices (aviculture hors `ponte`) SANS départ est refusée, un jour antérieur au départ aussi, les ventes se ventilent comme les morts et les dons ; une vente d'un produit sans catégorie, ou sur une bande sans départ, est refusée (`rejected[].reason` en français, `MotifsRefusPush`).
+**Web.** `EffectifParCategorieService::VOLAILLES`, `CategorieVolaille`, `FicheReproducteurs` (départ obligatoire, passage Poussin → Jeune, ventes par catégorie, rationnement par catégorie, autonomie alimentaire), `RecordSaleOnFicheElevageAction::refusDesLignes`, formulaire produit. **Poste.** Drift v82, `categorie_volaille.dart`, `FicheReproducteursScreen`, caisse, formulaire produit.
+**Tests.** `VolaillesEffectifParCategorieTest` (32), `VolaillesSynchronisationTest` (18) ; poste : `volailles_effectif_test` (parité PHP exécutée). Fixtures génériques adaptées (bandes « ponte »).

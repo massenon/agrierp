@@ -94,7 +94,10 @@ void main() {
         attendreLibelle(e, l);
       }
       for (final m in RegExp(r'placeholder="([^"]+)"').allMatches(b)) {
-        expect(e, contains(m[1]!.toLowerCase()), reason: 'indice ${m[1]}');
+        // Ticket #46 : l'indice du poids est une expression Blade (« ~X Kg (estimé) » calculé, sinon « ex : 85 ») ;
+        // l'indice STATIQUE du poste est le repli de l'expression.
+        final indice = m[1]!.contains('{{') ? RegExp(r"'([^']+)'\s*\}\}$").firstMatch(m[1]!)![1]! : m[1]!;
+        expect(e, contains(indice.toLowerCase()), reason: 'indice ${m[1]}');
       }
     }, skip: saut);
 

@@ -216,6 +216,9 @@ void main() {
           .insert(
             PurchaseOrdersCompanion.insert(
               id: uuid('bc1'),
+              deviceId: 'serveur',
+              updatedAt: DateTime.now(),
+              syncStatus: const Value(SyncStatus.synced),
               supplierId: Value(uuid('f1')),
               status: const Value('recu'),
               createdAt: Value(DateTime(2026, 7, 12)),

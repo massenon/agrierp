@@ -1,9 +1,9 @@
 @echo off
 rem ============================================================================
-rem  build_windows.bat - AgriERP Desktop (poste Windows offline-first)
+rem  build_windows.bat - LogiAgriERP Desktop (poste Windows offline-first)
 rem
 rem  Compile l'application Flutter en mode release puis genere l'installateur
-rem  AgriERP-Setup-<version>.exe avec Inno Setup.
+rem  LogiAgriERP-Setup-<version>.exe avec Inno Setup.
 rem
 rem  Prerequis sur le poste de compilation :
 rem    - Flutter SDK (stable, Dart >= 3.12.2) dans le PATH
@@ -27,7 +27,7 @@ rem      -demo (1.2.0-demo+3, 1.2.0-demo.2+3). Elle est REFUSEE en production :
 rem      un installateur de demonstration remis a la ferme enverrait ses saisies
 rem      de demonstration au vrai serveur. Tout autre suffixe est invalide.
 rem    - Hors production, le nom de l'installateur porte l'environnement :
-rem      AgriERP-Setup-<version>-<env>.exe.
+rem      LogiAgriERP-Setup-<version>-<env>.exe.
 rem ============================================================================
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
@@ -119,12 +119,30 @@ if "%DEMO%"=="1" if /i "%ENVIRONNEMENT%"=="production" (
   exit /b 1
 )
 
-set "NOM_INSTALLATEUR=AgriERP-Setup-%VERSION_COURTE%"
+set "NOM_INSTALLATEUR=LogiAgriERP-Setup-%VERSION_COURTE%"
 if /i not "%ENVIRONNEMENT%"=="production" set "NOM_INSTALLATEUR=%NOM_INSTALLATEUR%-%ENVIRONNEMENT%"
 
-echo === AgriERP Desktop %VERSION% - environnement %ENVIRONNEMENT% ===
+echo === LogiAgriERP Desktop %VERSION% - environnement %ENVIRONNEMENT% ===
 
 where flutter >nul 2>nul || (echo [ERREUR] Flutter introuvable dans le PATH. & exit /b 1)
+
+rem  Version de Flutter : .fvmrc (cle "flutter") fige la version stable avec laquelle le poste a ete compile et teste
+rem  (Dart 3.13 : une variable capturee par une fermeture n'est plus promue en non-nulle, voir sync_engine.dart).
+rem  AVERTISSEMENT seulement, jamais un echec : une autre version peut compiler, mais n'a pas ete eprouvee.
+set "FLUTTER_ATTENDU="
+set "FLUTTER_ACTUEL="
+if exist ".fvmrc" (
+  for /f "tokens=2 delims=:, " %%v in ('findstr /c:flutter ".fvmrc"') do set "FLUTTER_ATTENDU=%%~v"
+)
+call flutter --version --machine > "%TEMP%\agrierp_flutter_version.txt" 2>nul
+for /f "tokens=2 delims=:, " %%v in ('findstr /c:flutterVersion "%TEMP%\agrierp_flutter_version.txt"') do set "FLUTTER_ACTUEL=%%~v"
+del "%TEMP%\agrierp_flutter_version.txt" >nul 2>nul
+if not defined FLUTTER_ATTENDU echo [AVERTISSEMENT] .fvmrc absent ou illisible : version de Flutter non controlee.
+if defined FLUTTER_ATTENDU if not defined FLUTTER_ACTUEL echo [AVERTISSEMENT] Version de Flutter illisible ^(flutter --version --machine^) : attendue %FLUTTER_ATTENDU%.
+if defined FLUTTER_ATTENDU if defined FLUTTER_ACTUEL if not "%FLUTTER_ACTUEL%"=="%FLUTTER_ATTENDU%" (
+  echo [AVERTISSEMENT] Flutter %FLUTTER_ACTUEL% installe, %FLUTTER_ATTENDU% attendu ^(.fvmrc^) : la version eprouvee est %FLUTTER_ATTENDU%.
+  echo                 La construction continue ; en cas d'erreur de compilation, installez la version attendue ^(fvm use^).
+)
 
 rem  Ticket ENV1 : l'icone de l'application (exe, fenetre, barre des taches, raccourcis, installateur) est le logo
 rem  de la ferme, dans windows\runner\resources\app_icon.ico (Runner.rc l'embarque dans agrierp.exe, agrierp.iss

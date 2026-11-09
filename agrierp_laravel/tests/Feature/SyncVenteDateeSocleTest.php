@@ -43,7 +43,7 @@ class SyncVenteDateeSocleTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     private const VENTE_A = '11111111-1111-4111-8111-111111111111';
 
@@ -320,9 +320,15 @@ class SyncVenteDateeSocleTest extends TestCase
 
         foreach (['Http/Controllers/Api/SyncController.php', 'Livewire/Ventes/PosInterface.php', 'Actions/VerifySaleDateAction.php'] as $fichier) {
             $source = file_get_contents(app_path($fichier));
-            $this->assertStringNotContainsString("periodic_closures", $source, $fichier);
-            $this->assertStringNotContainsString('PeriodicClosure::where', $source, $fichier);
-            $this->assertStringNotContainsString('PeriodicClosure::query', $source, $fichier);
+            // CP-4 : le tirage SERT `periodic_closures` au poste (clé de réponse) ; ce qui reste interdit, c'est de LIRE la table
+            // pour juger un verrou (une seconde règle) : seule `PeriodicClosure::isDateLocked` le fait.
+            $this->assertDoesNotMatchRegularExpression("/table\\('periodic_closures'\\)|from\\s+periodic_closures/i", $source, $fichier);
+            // CP-4 : le contrôleur SERT les clôtures au tirage et retrouve celle qu'une demande de déclôture vise ; ces lectures ne
+            // jugent aucune date. Les deux autres fichiers, eux, ne lisent jamais la table.
+            if ($fichier !== 'Http/Controllers/Api/SyncController.php') {
+                $this->assertStringNotContainsString('PeriodicClosure::where', $source, $fichier);
+                $this->assertStringNotContainsString('PeriodicClosure::query', $source, $fichier);
+            }
         }
     }
 

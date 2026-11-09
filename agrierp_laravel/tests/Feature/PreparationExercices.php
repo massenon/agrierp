@@ -50,7 +50,7 @@ trait PreparationExercices
 
         $this->admin = User::create([
             'name' => 'Direction', 'username' => 'admin-ex', 'email' => 'admin-ex@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
         $this->actingAs($this->admin);
@@ -136,7 +136,7 @@ trait PreparationExercices
     protected function connecterLePoste(): void
     {
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => 'admin-ex', 'password' => 'AgriERP@2026', 'device_name' => 'poste-bureau',
+            'identifiant' => 'admin-ex', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-bureau',
         ])->assertOk()->json('token');
     }
 

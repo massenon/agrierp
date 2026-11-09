@@ -5,6 +5,7 @@ namespace App\Livewire\Comptabilite;
 use App\Services\FinancialReportService;
 use App\Support\ExerciceChoisi;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -67,6 +68,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Bilan extends Component
 {
+    /** Date d'arrêté ; lue dans l'adresse (`?asOfDate=`, depuis le Tableau de bord) puis ramenée dans l'exercice affiché. */
+    #[Url]
     public string $asOfDate = '';
 
     /**
@@ -91,7 +94,7 @@ class Bilan extends Component
         // Ticket EX7 (EF9) — arrêté à aujourd'hui, ramené dans l'exercice affiché (sa clôture pour 2026 consulté en
         // 2027, son premier jour pour un exercice à venir) : `ExerciceChoisi::dateArrete()`, la règle unique (EX8 :
         // `FinancialReportService::arreteDeLExercice` y renvoie).
-        $this->asOfDate = ExerciceChoisi::dateArrete();
+        $this->asOfDate = ExerciceChoisi::borner($this->asOfDate !== '' ? $this->asOfDate : ExerciceChoisi::dateArrete());
     }
 
     /** Ticket EX7 (EF9) — une date d'arrêté hors de l'exercice affiché est ramenée à sa borne. */

@@ -22,7 +22,7 @@ $d = RemoteWebDriver::create('http://localhost:9515', $c, 180000, 180000);
 
 $entete = '<div style="width:100%;font-family:Arial,sans-serif;font-size:7.5pt;color:#8d968f;'
     . 'padding:0 14mm;display:flex;justify-content:space-between;border-bottom:0.5pt solid #dfe5e1;padding-bottom:3pt;">'
-    . '<span style="font-weight:bold;color:#052e16;">AgriERP — Manuel d\'utilisation</span>'
+    . '<span style="font-weight:bold;color:#052e16;">LogiAgriERP — Manuel d\'utilisation</span>'
     . '<span>Ferme École Olouwachegoun</span></div>';
 
 $pied = '<div style="width:100%;font-family:Arial,sans-serif;font-size:7.5pt;color:#8d968f;'

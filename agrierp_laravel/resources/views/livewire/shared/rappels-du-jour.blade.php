@@ -79,7 +79,7 @@
                 @endforeach
 
                 <div class="flex flex-wrap items-center justify-between gap-sm pt-md border-t border-outline-variant">
-                    <a href="/soins-vaccins-hub" class="text-xs font-bold text-brand-emerald hover:text-brand-forest flex items-center gap-xs">Ouvrir Soins et vaccins<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+                    <a wire:navigate href="/soins-vaccins-hub" class="text-xs font-bold text-brand-emerald hover:text-brand-forest flex items-center gap-xs">Ouvrir Soins et vaccins<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
                     <div class="flex items-center gap-sm">
                         <button type="button" x-on:click="masquer()" class="text-xs font-semibold text-outline hover:text-on-surface">Ne plus afficher aujourd'hui</button>
                         <button type="button" wire:click="fermer" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-xs font-bold hover:bg-brand-forest">Plus tard</button>

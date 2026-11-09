@@ -154,7 +154,7 @@ class ClotureGardeeTest extends TestCase
     {
         $caissier = User::create([
             'name' => 'Caisse', 'username' => 'caisse-cl', 'email' => 'caisse-cl@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
 

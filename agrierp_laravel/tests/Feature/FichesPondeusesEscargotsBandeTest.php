@@ -33,7 +33,7 @@ class FichesPondeusesEscargotsBandeTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $compte = User::create([
             'name' => 'Animalier', 'username' => 'animalier', 'email' => 'animalier@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $compte->assignRole('animalier');
         $this->actingAs($compte);
@@ -64,6 +64,8 @@ class FichesPondeusesEscargotsBandeTest extends TestCase
             ->assertSet('bandeId', null)
             ->set('bandeId', $b->id)
             ->set('selectedDate', '2026-10-14')
+            // VOL-2 : le départ par stade de la bande choisie (50 : 10 / 10 / 10 / 20) est exigé avant la première journée.
+            ->set('departPoussinPonte', 10)->set('departPoussinCroissance', 10)->set('departPoulette', 10)->set('departPondeuse', 20)
             ->set('mortPoulette', 2)
             ->call('saveDay')
             ->assertHasNoErrors();
@@ -89,14 +91,18 @@ class FichesPondeusesEscargotsBandeTest extends TestCase
     {
         $poules = LivestockSpecies::create(['code' => 'aviculture', 'label' => 'Volailles', 'is_enabled' => true]);
         $a = $this->bande($poules, 'PON-A', 200, 'ponte');
+        // VOL-2 : la fiche porte son départ par stade et ses morts VENTILÉS (3 Pondeuses) : ils se rechargent par stade.
         LivestockDailyEntry::create([
             'lot_id' => $a->id, 'entry_date' => '2026-10-14',
             'achat' => 0, 'ne' => 0, 'mort' => 3, 'vente' => 0, 'don' => 0, 'effectif_final' => 197, 'ponte_total' => 150,
+            'cat_depart_repro' => 200, 'cat_depart_sevre' => 0, 'cat_depart_jeune' => 0, 'cat_depart_4' => 0,
+            'mort_repro' => 3, 'mort_sevre' => 0, 'mort_jeune' => 0, 'mort_4' => 0,
+            'don_repro' => 0, 'don_sevre' => 0, 'don_jeune' => 0, 'don_4' => 0,
         ]);
 
         Livewire::test(FichePondeuses::class)
-            ->assertSet('mortEnregistre', 3)
-            ->assertSee('3 mort(s) déjà enregistré(s) ce jour')
+            ->assertSet('mortPondeuse', 3)
+            ->assertSet('mortEnregistre', null)
             ->set('oeufsRecoltes', 160)
             ->call('saveDay');
 

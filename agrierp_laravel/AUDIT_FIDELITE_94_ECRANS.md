@@ -1,4 +1,4 @@
-# Audit de Fidélité — Les 94 Écrans du Prototype AgriERP
+# Audit de Fidélité — Les 94 Écrans du Prototype LogiAgriERP
 
 Document de référence unique, consolidant les ~12 passes d'audit menées
 dans cette session. Réponse directe à la question : *"la conformité et

@@ -31,7 +31,7 @@ class ClotureExerciceTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $comptable = \App\Models\User::create([
             'name' => 'Comptable', 'username' => 'compta-cloture', 'email' => 'compta-cloture@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');
         $this->actingAs($comptable);

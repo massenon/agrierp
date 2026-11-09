@@ -1,9 +1,9 @@
 ---
 name: plan
-description: Établit le plan d'implémentation d'un ticket AgriERP (web Laravel et/ou poste Flutter) avant d'écrire du code, ou met à jour docs/PLAN_FINALISATION.md. À utiliser quand on demande un plan, un découpage en tickets, « comment on s'y prend », ou avant tout ticket qui touche un écran, un calcul ou une donnée synchronisée.
+description: Établit le plan d'implémentation d'un ticket LogiAgriERP (web Laravel et/ou poste Flutter) avant d'écrire du code, ou met à jour docs/PLAN_FINALISATION.md. À utiliser quand on demande un plan, un découpage en tickets, « comment on s'y prend », ou avant tout ticket qui touche un écran, un calcul ou une donnée synchronisée.
 ---
 
-# Plan de ticket AgriERP
+# Plan de ticket LogiAgriERP
 
 Un ticket = une session. Le plan est annoncé **avant** tout code et validé par l'utilisateur quand il touche le schéma, la comptabilité ou une décision client.
 

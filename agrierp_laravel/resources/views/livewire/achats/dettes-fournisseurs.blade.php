@@ -43,6 +43,7 @@
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Montant Dû</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Échéance</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -60,9 +61,14 @@
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-blue-100 text-info-blue border-blue-300">À échoir</span>
                                 @endif
                             </td>
+                            <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @if($debt->display_status !== 'soldee')
+                                    <button type="button" wire:click="openPaymentModal('{{ $debt->supplier_id }}')" class="text-brand-emerald text-[11px] font-bold hover:underline">Régler</button>
+                                @endif
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="px-md py-lg text-center text-outline">Aucune dette fournisseur pour le moment.</td></tr>
+                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">Aucune dette fournisseur pour le moment.</td></tr>
                     @endforelse
                 </tbody>
             </table>

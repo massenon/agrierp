@@ -8,6 +8,8 @@ import '../../core/database/sync_columns.dart';
 import '../../core/export/pdf_recu.dart';
 import 'avoirs_repository.dart';
 import 'caisse_repository.dart';
+import 'facturation_repository.dart' show StatutMecef;
+import 'mode_paiement.dart';
 
 /// Les quatre cartes de `historique-ventes.blade.php`, calculées comme `HistoriqueVentes::getKpisProperty()`.
 class KpisHistorique {
@@ -55,6 +57,9 @@ class LigneVente {
 
   bool get annulee => vente.status == 'annulee';
 
+  /// MECEF-1 — facture normalisée : lecture seule, ni annulation ni modification (un avoir la corrige).
+  bool get normalisee => StatutMecef.depuis(vente.mecefStatus) == StatutMecef.transmise;
+
   /// `$sale->status === 'annulee' ? 0 : $sale->total - $reste`.
   double get paye => annulee ? 0 : vente.total - reste;
 
@@ -65,7 +70,7 @@ class LigneVente {
   String get statut => annulee ? 'Annulée' : (reste > 0 ? 'En attente' : 'Payée');
 
   /// `$modeLabels[$sale->payment_mode] ?? $sale->payment_mode`.
-  String get mode => HistoriqueVentesRepository.libellesModes[vente.paymentMode] ?? vente.paymentMode;
+  String get mode => ModePaiement.libelle(vente.paymentMode);
 }
 
 /// Une ligne du détail d'une vente (le tiroir).
@@ -307,7 +312,7 @@ class HistoriqueVentesRepository {
   static const libellesModes = {
     'especes': 'Espèces',
     'mobile_money': 'Mobile Money',
-    'virement': 'Virement',
+    'virement': 'Virement bancaire',
     'credit': 'Crédit client',
     'avance': 'Avance',
   };

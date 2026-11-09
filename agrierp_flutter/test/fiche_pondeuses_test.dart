@@ -253,17 +253,25 @@ void main() {
     expect(positions, equals(trie), reason: libelles.join(' → '));
   });
 
-  // 🔁 F0.99 — catégories des morts du WEB (`fiche-pondeuses.blade.php`), Dons sur les mêmes catégories (15.56).
-  testWidgets('les trois catégories du web portent les morts ET les dons', (
+  // 🔁 VOL-2 — les QUATRE stades du barème (libellés exacts) portent les morts ET les dons (et le départ demandé) ; les
+  // anciens libellés « Pondeuse / Repro », « Poulette », « Poussin » ne sont plus.
+  testWidgets('les quatre stades du barème portent les morts ET les dons', (
     tester,
   ) async {
     await afficher(tester);
 
-    for (final stade in ['PONDEUSE / REPRO', 'POULETTE', 'POUSSIN']) {
-      expect(find.text(stade), findsNWidgets(2), reason: '$stade : Morts et Dons');
+    for (final stade in [
+      'Poussin ponte (0 à 2 mois)',
+      'Poussin en croissance (2 à 4 mois)',
+      'Poulette (4 à 5.5 mois)',
+      'Pondeuse (6 à 18 mois)',
+    ]) {
+      expect(find.text(stade.toUpperCase()), findsAtLeastNWidgets(2), reason: '$stade : Morts, Dons (et départ)');
     }
     expect(find.text('DONS PAR CATÉGORIE'), findsOneWidget);
-    expect(find.text('POUSSIN PONTE'), findsNothing);
+    expect(find.text('PONDEUSE / REPRO'), findsNothing);
+    expect(find.text('POUSSIN'), findsNothing);
+    expect(find.text('REPRODUCTEUR'), findsNothing);
   });
 
   testWidgets('le bloc œufs recalcule à la saisie', (tester) async {
@@ -306,8 +314,8 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('champ-oeufs-pondus-0')), '435');
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('pas-mort-Poulette-1')));
-    await tester.tap(find.byKey(const Key('pas-mort-Poulette-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-jeune-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-jeune-1')));
     await tester.pumpAndSettle();
 
     expect(valeur('champ-taux-ponte'), '90,6 %');
@@ -321,8 +329,8 @@ void main() {
         .widget<Text>(find.byKey(const Key('effectif-final')))
         .data;
 
-    await tester.ensureVisible(find.byKey(const Key('pas-mort-Pondeuse / Repro-1')));
-    await tester.tap(find.byKey(const Key('pas-mort-Pondeuse / Repro-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-mort-repro-1')));
+    await tester.tap(find.byKey(const Key('pas-mort-repro-1')));
     await tester.pumpAndSettle();
 
     final apres = tester
@@ -346,6 +354,13 @@ void main() {
         find.byKey(const Key('champ-oeufs-casses-0')),
         '15',
       );
+      await tester.pumpAndSettle();
+
+      // VOL-2 : le départ par stade est obligatoire avant toute journée — la proposition d'après le stade (tous
+      // « Pondeuse ») est reprise d'un geste explicite.
+      final proposition = find.byKey(const Key('depart-proposition'));
+      await tester.ensureVisible(proposition);
+      await tester.tap(proposition);
       await tester.pumpAndSettle();
 
       final bouton = find.byKey(const Key('bouton-enregistrer'));
@@ -407,8 +422,8 @@ void main() {
     await afficher(tester);
 
     final avant = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
-    await tester.ensureVisible(find.byKey(const Key('pas-don-Poulette-1')));
-    await tester.tap(find.byKey(const Key('pas-don-Poulette-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-don-jeune-1')));
+    await tester.tap(find.byKey(const Key('pas-don-jeune-1')));
     await tester.pumpAndSettle();
     final apres = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
 

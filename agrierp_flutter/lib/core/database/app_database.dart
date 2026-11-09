@@ -1,12 +1,8 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../config/domaine_email.dart';
 import 'identifiant_ligne_depense.dart';
+import 'ouverture_base.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -60,6 +56,11 @@ class Products extends Table {
 
   /// Description libre, servie avec le produit (ticket F0.67). `null` : aucune.
   TextColumn get description => text().nullable()();
+
+  /// Ticket VOL-1 (schéma v82) — catégorie d'effectif d'un produit de l'aviculture : `reproducteur`, `jeune` ou
+  /// `poussin` (`null` pour tous les autres produits). La caisse range la vente de sujets vivants dans cette catégorie
+  /// de la fiche Volailles Reproducteurs ; une vente d'un produit SANS catégorie sur une bande à chaîne est refusée.
+  TextColumn get categorieEffectif => text().nullable()();
 
   /// ⚠️ **UN PRODUIT CRÉÉ OU MODIFIÉ AU POSTE EST `pending` JUSQU'À L'ACQUITTEMENT**
   /// (ticket F0.67). Défaut `synced` : tout ce qui descend du serveur l'est, et les
@@ -311,6 +312,32 @@ class FeedTypes extends Table with BaremeElevageSynchronisable {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket RELEVES-1 (schéma v86) — « RELEVÉS DE TERRAIN » de Paramètres Élevage, miroir de `field_survey_entries`.
+///
+/// Une ligne = un type (règle d'incubation, relevé de lot, règle du délai fournisseur, référentiel du technicien des
+/// poissons-chats) + un libellé + des valeurs (`data_json`) + un STATUT `a_valider` | `valide`. ⚠️ Table MIXTE de
+/// barème ([BaremeElevageSynchronisable]) : saisie au poste (`pending`, instant de saisie) ET tirée du serveur
+/// (`synced`) ; le tirage n'écrase JAMAIS une ligne `pending` / `conflict`. UN SEUL écrivain : `ReleveTerrainRepository`.
+/// ⚠️ Tout enregistrement humain pose `valide` ; seul le serveur sème des lignes `a_valider` (propositions).
+class FieldSurveyEntries extends Table with BaremeElevageSynchronisable {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get type => text()();
+  TextColumn get label => text()();
+  TextColumn get speciesCode => text().nullable()();
+
+  /// Valeurs du relevé, en JSON (objet) : mêmes clés que `data` du serveur.
+  TextColumn get dataJson => text().withDefault(const Constant('{}'))();
+
+  /// `a_valider` · `valide`.
+  TextColumn get status => text().withDefault(const Constant('a_valider'))();
+  TextColumn get validatedBy => text().nullable()();
+  TextColumn get validatedByName => text().nullable()();
+  DateTimeColumn get validatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Préfixes de numérotation des bandes et des sujets — table à UNE ligne.
 ///
 /// ⚠️⚠️ **CE SONT LES NOMS QUE LA FERME ÉCRIT SUR LES CAGES.** R1, T1,
@@ -473,6 +500,10 @@ class Customers extends Table {
   /// Adresse e-mail (ticket F0.72) : le tirage la sert désormais, le formulaire la saisit.
   TextColumn get email => text().nullable()();
 
+  /// MECEF-3 (schéma v85) — IFU du client, 13 chiffres, FACULTATIF (un client particulier n'en a pas) : saisi à la fiche du client
+  /// (web ET poste), envoyé avec elle, il préremplit la fenêtre « Facture normalisée » de la caisse.
+  TextColumn get ifu => text().nullable()();
+
   /// Plafond de crédit accordé, en FCFA. ⚠️ Jamais saisi ni envoyé par le poste.
   RealColumn get creditLimit => real().withDefault(const Constant(0))();
 
@@ -572,6 +603,21 @@ class AdvanceImputations extends Table with SyncColumns {
   DateTimeColumn get imputationDate => dateTime()();
 }
 
+/// Ticket VC-1 — encaissement d'une créance client saisi au poste.
+///
+/// ⚠️⚠️ **LE POSTE N'ENCAISSE RIEN** : il enregistre « tel client a versé tel montant sur tel compte, tel jour »
+/// (et la créance visée, nulle pour un versement global en FIFO) et ne touche NI `amount_paid` de la créance NI le
+/// solde du compte. Le serveur applique (`CustomerSettlementService`) : créance, trésorerie (deux livres), écriture
+/// D 5xx / C 411. Cette table ne descend pas du serveur.
+@DataClassName('EncaissementCreance')
+class ReceivablePayments extends Table with SyncColumns {
+  TextColumn get customerId => text().withLength(min: 36, max: 36)();
+  TextColumn get receivableId => text().nullable()();
+  TextColumn get treasuryAccountId => text().withLength(min: 36, max: 36)();
+  RealColumn get amount => real()();
+  DateTimeColumn get paymentDate => dateTime()();
+}
+
 /// Fournisseur de la ferme — référentiel servi par le serveur.
 ///
 /// ⚠️⚠️ **SANS LUI, LE POSTE N'ACHÈTE RIEN HORS LIGNE.** Même dépendance que
@@ -623,6 +669,28 @@ class CompanySettings extends Table {
   /// au tirage et réglé au poste comme au web (`ParametresElevage::saveRappelSoins()`). Nul tant que rien
   /// n'a été tiré : le poste ne connaît pas le réglage de la ferme.
   IntColumn get rappelSoinsJours => integer().nullable()();
+
+  // Ticket RH-4 — taux de paie (`PayrollCalculationService`), tirés, jamais envoyés. Nuls tant que rien n'a été tiré
+  // d'un serveur qui les sert : le calcul prend alors les défauts du web (3,6 / 4 / 6,4 / 9 / 2 %).
+  RealColumn get vpsRate => real().nullable()();
+  RealColumn get cnssEmployeeRate => real().nullable()();
+  RealColumn get cnssEmployerPensionRate => real().nullable()();
+  RealColumn get cnssEmployerFamilyRate => real().nullable()();
+  RealColumn get cnssEmployerRiskRate => real().nullable()();
+
+  /// Ticket PA-3 / PA-7 — le paramétrage de paie est-il arrêté (seul un administrateur le modifie alors) ? Tiré.
+  BoolColumn get payrollLocked => boolean().withDefault(const Constant(false))();
+
+  /// Instant de l'arrêt du paramétrage de paie, déjà formaté comme le web (`d/m/Y à H:i`), pour reproduire son message de refus.
+  TextColumn get payrollEditedAt => text().nullable()();
+
+  /// Ticket PA-8 — configuration SMS SANS SECRET (tirée pour les comptes qui gèrent les paramètres). Le jeton et le secret
+  /// ne quittent jamais le serveur ; `smsIdentifiantsPoses` dit seulement s'il en existe un.
+  TextColumn get smsProvider => text().nullable()();
+  TextColumn get twilioAccountSid => text().nullable()();
+  TextColumn get twilioFromNumber => text().nullable()();
+  TextColumn get vonageFromName => text().nullable()();
+  BoolColumn get smsIdentifiantsPoses => boolean().withDefault(const Constant(false))();
 
   /// Ticket H9b — ⚠️ NE PORTE QUE SUR [rappelSoinsJours], SEUL champ de l'entreprise que le poste envoie
   /// (clé `company_settings`). L'identité de la ferme reste un référentiel : le tirage la met toujours à jour.
@@ -680,13 +748,20 @@ class RolesApplicatifs extends Table {
 /// ⚠️ **NI MOT DE PASSE NI JETON** : la liste sert à savoir QUI travaille sur
 /// la ferme, jamais à s'authentifier. L'authentification du poste passe par
 /// `POST /api/auth/login`.
-class Utilisateurs extends Table {
+/// Ticket UT-1 — table MIXTE : les comptes se créent, se modifient, s'archivent et se réactivent au poste (`pending`),
+/// et descendent du serveur. ⚠️ Le mot de passe n'est JAMAIS en base : en attente d'envoi, il vit au coffre du
+/// système (`ParametresGenerauxRepository.cleMotDePasse`), effacé à l'acquit.
+class Utilisateurs extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get name => text()();
   TextColumn get username => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get role => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  /// Ticket MDP-1 — mot de passe TEMPORAIRE posé par un administrateur : le compte devra le changer à sa première
+  /// connexion. Le DRAPEAU descend du serveur (affichage de la liste) ; ⚠️ le mot de passe, lui, n'est jamais en base.
+  BoolColumn get mustChangePassword => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -765,6 +840,33 @@ class AttestationTemplates extends Table {
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get type => text()();
   TextColumn get bodyText => text()();
+  // ATT-1 : numéro de séquence annuel pour le référencement officiel (N°XX/ANNÉE/FEO/DG).
+  IntColumn get numeroSequence => integer().withDefault(const Constant(0))();
+  // ATT-1 : trois blocs de signature configurables (Examinateur, Président du Jury, DG).
+  TextColumn get sig1Titre => text().nullable()();
+  TextColumn get sig1Nom => text().nullable()();
+  TextColumn get sig2Titre => text().nullable()();
+  TextColumn get sig2Nom => text().nullable()();
+  TextColumn get sig3Titre => text().nullable()();
+  TextColumn get sig3Nom => text().nullable()();
+
+  // ATT-2 (v66) — SIGNATAIRES SELON LA DURÉE, PARAMÉTRABLES (serveur : migration 2026_10_27_000001).
+  // Position 1 = Directeur Général (le promoteur), 2 = Examinateur, 3 = Président du Jury — la numérotation du serveur.
+  // Jusqu'à `seuilSignatureMois` mois INCLUS : palier « court » (par défaut le promoteur seul) ; au-delà, palier « long »
+  // (par défaut les trois). Le serveur sert ces valeurs au tirage ; le poste les modifie par `PUT /api/attestation-templates`.
+  IntColumn get seuilSignatureMois => integer().withDefault(const Constant(12))();
+  TextColumn get sig1Fonction => text().nullable()();
+  TextColumn get sig2Fonction => text().nullable()();
+  TextColumn get sig3Fonction => text().nullable()();
+  BoolColumn get sig1Court => boolean().withDefault(const Constant(true))();
+  BoolColumn get sig2Court => boolean().withDefault(const Constant(false))();
+  BoolColumn get sig3Court => boolean().withDefault(const Constant(false))();
+  BoolColumn get sig1Long => boolean().withDefault(const Constant(true))();
+  BoolColumn get sig2Long => boolean().withDefault(const Constant(true))();
+  BoolColumn get sig3Long => boolean().withDefault(const Constant(true))();
+  // Phrase d'appréciation imprimée par défaut ; `null` = la phrase standard du modèle. `appreciationImprimee` faux : aucune.
+  TextColumn get appreciationText => text().nullable()();
+  BoolColumn get appreciationImprimee => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -833,13 +935,29 @@ class Animals extends Table {
 ///
 /// ⚠️ Sans lui, une ligne d'écriture n'a qu'un UUID à montrer : ni numéro de
 /// compte, ni intitulé, ni classe.
-class ChartOfAccounts extends Table {
+class ChartOfAccounts extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// Ticket CP-1 — DÉFAUTS du serveur : tout compte qui descend du serveur est `synced`, d'origine 'serveur' (comme `products`).
+  /// Un compte saisi au poste pose ses trois valeurs explicitement (`pending`, ce poste, l'instant de la saisie).
+  @override
+  TextColumn get deviceId => text().withLength(min: 1, max: 64).withDefault(const Constant('serveur'))();
+
+  @override
+  TextColumn get syncStatus => textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  @override
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   TextColumn get code => text()();
   TextColumn get label => text()();
 
   /// Classe SYSCOHADA — 1 à 9 (la classe 9, comptabilité analytique, figure au plan officiel).
   IntColumn get accountClass => integer().nullable()();
+
+  /// Ticket CP-1 — faux : compte archivé (au poste, en attente d'envoi). Le serveur ne sert que les comptes actifs.
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -858,6 +976,48 @@ class FiscalYears extends Table {
 
   /// `ouvert` · `cloture`.
   TextColumn get status => text().nullable()();
+
+  /// Ticket CP-4 — étape 1 de la clôture (« travaux d'inventaire terminés ») confirmée le… (tirée du serveur).
+  DateTimeColumn get step1ConfirmedAt => dateTime().nullable()();
+
+  /// Ticket CP-4 — date de clôture de l'exercice (tirée du serveur, jamais écrite ici).
+  DateTimeColumn get closedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-4 — DEMANDE de clôture saisie au poste : une ligne par geste (`kind` : `cloturer_periode`, `decloturer_periode`,
+/// `confirmer_etape1`, `solder_comptes_gestion`, `cloturer_exercice`, `rouvrir_exercice`, `ouvrir_exercice_suivant`,
+/// `ouvrir_exercice`), son contenu en JSON dans [payload] (`period`, `closure_id`, `year`…).
+///
+/// ⚠️ **LE POSTE N'ÉCRIT JAMAIS `fiscal_years` NI `periodic_closures`.** Une clôture est destructive et se juge au serveur : il
+/// rejoue la demande avec `ClotureExerciceService` (le point de passage du web), la consigne par son UUID (rejeu sans effet) et
+/// l'état redescend au tirage de confirmation. Refusée, la demande reste en conflit avec son motif.
+class FiscalClosureRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  TextColumn get kind => text()();
+
+  /// JSON du geste.
+  TextColumn get payload => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-4 — clôture de MOIS (clôture périodique), tirée du serveur (lecture seule au poste : une clôture se DEMANDE dans
+/// [FiscalClosureRequests]). Une ligne par mois, déclôtures comprises (`reopenedAt`).
+class PeriodicClosures extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// `AAAA-MM`.
+  TextColumn get period => text()();
+
+  DateTimeColumn get closedAt => dateTime().nullable()();
+
+  DateTimeColumn get reopenedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -909,6 +1069,144 @@ class AccountingEntryLines extends Table {
   TextColumn get costCenterId => text().nullable()();
   RealColumn get debit => real().withDefault(const Constant(0))();
   RealColumn get credit => real().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-2 — DEMANDE d'écriture manuelle (opération diverse) : « débiter tel compte, créditer tel compte, de tant, tel jour,
+/// avec ce libellé » — créer, modifier ou archiver une écriture existante.
+///
+/// ⚠️⚠️ **LE POSTE N'ÉCRIT JAMAIS UNE ÉCRITURE** : il écrit la DEMANDE (`pending`, puis envoyée). Le serveur
+/// (`SaisieEcritureManuelleAction`) la joue avec les refus du web, attribue le numéro `OD-AAAA-NNNN`, et l'écriture revient au
+/// tirage. Une demande refusée (`conflict`) garde le motif du serveur.
+class ManualEntryRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// `creer` · `modifier` · `archiver`.
+  TextColumn get action => text()();
+
+  /// L'écriture visée (modifier, archiver) ; nul pour une création.
+  TextColumn get entryId => text().nullable()();
+  DateTimeColumn get entryDate => dateTime().nullable()();
+  TextColumn get label => text().nullable()();
+  TextColumn get debitAccountId => text().nullable()();
+  TextColumn get creditAccountId => text().nullable()();
+  RealColumn get amount => real().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-3 — IMMOBILISATION du registre (mixte : tirée du serveur ET saisie au poste).
+///
+/// ⚠️ Les colonnes sont celles de `FixedAsset` : le poste calcule l'amortissement cumulé avec la même formule (prorata mensuel
+/// plafonné à la base amortissable, arrêt à la date de sortie), jamais avec un montant servi. `isCapitalized` n'est JAMAIS posé
+/// au poste : seul le serveur écrit l'acquisition au grand livre (`RecordAssetAcquisitionEntryAction`) et le rend au tirage.
+/// `counterpart` ne sert qu'à la création : '' (reprise d'antériorité), 'credit' ou l'UUID du compte de trésorerie qui paie.
+class FixedAssets extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  /// Défauts du serveur (comme `chart_of_accounts`) : tout bien qui descend du serveur est `synced`.
+  @override
+  TextColumn get deviceId => text().withLength(min: 1, max: 64).withDefault(const Constant('serveur'))();
+
+  @override
+  TextColumn get syncStatus => textEnum<SyncStatus>().withDefault(const Constant('synced'))();
+
+  @override
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  TextColumn get code => text()();
+  TextColumn get label => text()();
+  TextColumn get accountCode => text()();
+  DateTimeColumn get acquisitionDate => dateTime()();
+  RealColumn get acquisitionValue => real()();
+  RealColumn get residualValue => real().withDefault(const Constant(0))();
+  IntColumn get durationYears => integer()();
+
+  /// `en_service` · `cede` · `reforme`.
+  TextColumn get status => text().withDefault(const Constant('en_service'))();
+  DateTimeColumn get disposalDate => dateTime().nullable()();
+  TextColumn get disposalReason => text().nullable()();
+  BoolColumn get isCapitalized => boolean().withDefault(const Constant(false))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// Contrepartie de l'acquisition, à la création seulement (voir l'en-tête).
+  TextColumn get counterpart => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-3 — DEMANDE de dotation aux amortissements (« Passer la Dotation ») : la date d'arrêté seule. Le serveur recalcule
+/// l'écart entre le cumul du registre et le grand livre (`RecordDepreciationEntryAction`) : rejouer la demande ne double rien.
+class DepreciationRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  DateTimeColumn get dateArrete => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — DEMANDE de réglage de la ferme : une ligne par geste (`kind` : `entreprise`,
+/// `bareme_its`, `mode_paiement`, `role`, `sms`), son contenu en JSON dans [payload].
+///
+/// ⚠️ Le poste écrit la DEMANDE ; le serveur la joue avec les services du web (mêmes règles, mêmes verrous administrateur) et
+/// l'état redescend au tirage. Un secret (jeton SMS) n'est JAMAIS ici : il attend au coffre du système et part une fois.
+class SettingsRequests extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  TextColumn get kind => text()();
+
+  /// JSON du geste (sans secret).
+  TextColumn get payload => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket PA-2 — les droits existants (noms), tirés pour l'administrateur : la modale « Rôle » les liste.
+class PermissionsApplicatives extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-5 — ligne de relevé bancaire importée (rapprochement), tirée du serveur (lecture seule au poste : un relevé
+/// s'importe en DEMANDE, voir [BankStatementImports]).
+class BankStatementLines extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get accountId => text()();
+  DateTimeColumn get statementDate => dateTime()();
+  TextColumn get label => text()();
+  RealColumn get amount => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket CP-5 — DEMANDE d'import d'un relevé bancaire (CSV `date;libellé;montant`) : le texte du fichier et le compte visé.
+/// Le serveur lit le CSV (`BankReconciliationService::importCsv`, lignes illisibles ignorées), pose l'UUID de la demande sur
+/// chaque ligne (rejeu sans doublon) ; les lignes redescendent dans [BankStatementLines] au tirage de confirmation.
+class BankStatementImports extends Table with SyncColumns {
+  @override
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+
+  TextColumn get accountId => text()();
+
+  /// Nom du fichier choisi (affichage).
+  TextColumn get fileName => text().nullable()();
+
+  /// Contenu du fichier, tel quel.
+  TextColumn get content => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1033,8 +1331,11 @@ class ArchivedDocuments extends Table {
 /// ⚠️⚠️ **SANS LUI, IL N'Y A PERSONNE À POINTER.** Le pointage est l'acte de
 /// terrain par excellence : il se fait à 7 h à la ferme, là où le réseau n'est
 /// pas.
-class Employees extends Table {
-  TextColumn get id => text().withLength(min: 36, max: 36)();
+///
+/// Ticket RH-1 — TABLE MIXTE depuis le palier 67 : le poste crée, modifie et archive ses employés (`pending`), rejoués
+/// au serveur par `SaisieEmployeAction` (le point de passage de `RegistreEmployes`). `is_active` descend (archivés
+/// compris) ; l'écran n'affiche que les actifs, comme le web.
+class Employees extends Table with SyncColumns {
   TextColumn get firstName => text()();
   TextColumn get lastName => text()();
   TextColumn get position => text().nullable()();
@@ -1044,8 +1345,8 @@ class Employees extends Table {
   /// `actif` · `conge` · `suspendu`.
   TextColumn get status => text().nullable()();
 
-  @override
-  Set<Column> get primaryKey => {id};
+  /// Faux : archivé (web ou poste).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 /// Stagiaire accueilli par la ferme — référentiel servi par le serveur.
@@ -1054,8 +1355,10 @@ class Employees extends Table {
 /// relation vers `employees`. C'est aussi pourquoi la feuille de pointage ne
 /// le couvre pas — ses absences vivent dans `internship_absences`, que le
 /// poste ne reçoit pas.
-class Internships extends Table {
-  TextColumn get id => text().withLength(min: 36, max: 36)();
+///
+/// Ticket RH-2 — TABLE MIXTE depuis le palier 67 : le poste crée et modifie ses stagiaires (`pending`), rejoués au
+/// serveur par `SaisieStagiaireAction`. Ses absences vivent dans [InternshipAbsences], mixte aussi.
+class Internships extends Table with SyncColumns {
   TextColumn get firstName => text()();
   TextColumn get lastName => text()();
   TextColumn get school => text().nullable()();
@@ -1063,9 +1366,22 @@ class Internships extends Table {
   DateTimeColumn get endDate => dateTime().nullable()();
   RealColumn get monthlyFee => real().nullable()();
   BoolColumn get feePaid => boolean().withDefault(const Constant(false))();
+  // ATT-1 : date et lieu de naissance du stagiaire (identité pour l'attestation de formation).
+  DateTimeColumn get birthDate => dateTime().nullable()();
+  TextColumn get birthPlace => text().nullable()();
+  // ATT-1 : civilité (M. / Mme) — conditionne l'accord grammatical dans l'attestation.
+  TextColumn get civilite => text().withDefault(const Constant('M.'))();
+}
 
-  @override
-  Set<Column> get primaryKey => {id};
+/// Ticket RH-2 — absence d'un stagiaire (`internship_absences`), notée et archivée au poste comme au web
+/// (`RegistreStagiaires::saveAbsence` / `deleteAbsence` : archivage logique, jamais un effacement — 14.55).
+class InternshipAbsences extends Table with SyncColumns {
+  TextColumn get internshipId => text().withLength(min: 36, max: 36)();
+
+  /// Une DATE pure (minuit, heure murale).
+  DateTimeColumn get absenceDate => dateTime()();
+  TextColumn get reason => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 /// Dette fournisseur — ce qu'un achat à crédit laisse à régler.
@@ -1096,12 +1412,16 @@ class Payables extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Bon de commande — référentiel en lecture seule au poste.
+/// Bon de commande — saisi au poste (ticket AC-1) ou servi par le serveur.
 ///
-/// ⚠️ **LE MONTANT ESTIMÉ EST CALCULÉ PAR LE SERVEUR**, sur les lignes du bon
-/// (`estimated_unit_price`, pas `unit_price` — la commande n'est pas livrée).
-/// Le recomposer ici ferait afficher deux estimations pour un même bon.
-class PurchaseOrders extends Table {
+/// ⚠️ **LE MONTANT ESTIMÉ EST CALCULÉ**, sur les lignes du bon (`estimated_unit_price`, pas `unit_price` — la commande
+/// n'est pas livrée) : le serveur le sert pour les bons de la ferme, le poste le somme pour ceux qu'il vient de saisir.
+///
+/// Ticket AC-1 — table MIXTE : un bon généré au poste est `pending` jusqu'à l'acquittement ; le tirage ne l'écrase jamais.
+/// ⚠️ **LA RÉCEPTION N'ÉCRIT PAS SUR LE BON** : elle écrit un ACHAT qui porte `purchase_order_id` ; le statut `recu` ne
+/// vient que du serveur, qui seul reçoit un bon (`ReceptionBonCommandeService`).
+class PurchaseOrders extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get supplierId => text().nullable()();
   TextColumn get supplierName => text().nullable()();
@@ -1111,6 +1431,19 @@ class PurchaseOrders extends Table {
   TextColumn get status => text().nullable()();
   DateTimeColumn get createdAt => dateTime().nullable()();
   RealColumn get estimatedTotal => real().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket AC-1 — ligne d'un bon de commande (`purchase_order_lines`) : produit, quantité, PRIX ESTIMÉ.
+class PurchaseOrderLines extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get purchaseOrderId => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+  TextColumn get productName => text().nullable()();
+  RealColumn get qty => real()();
+  RealColumn get estimatedUnitPrice => real()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1127,13 +1460,20 @@ class PurchaseOrders extends Table {
 /// le réseau ET le canal mail du serveur (`CustomerReminderMail`) : un envoi
 /// tenté depuis le poste hors ligne ne serait enregistré nulle part, et le
 /// client serait rappelé une seconde fois le lendemain.
-class CustomerReminders extends Table {
+///
+/// Ticket VC-2 — table MIXTE : une relance se FAIT (WhatsApp, courrier) ou se DEMANDE (e-mail, SMS : c'est le serveur qui
+/// envoie) au poste, en `pending`, et se tient en un seul exemplaire (UUID du poste, rejeu sans double envoi).
+class CustomerReminders extends Table with SyncColumns {
+  @override
   TextColumn get id => text().withLength(min: 36, max: 36)();
   TextColumn get customerId => text().withLength(min: 36, max: 36)();
   TextColumn get receivableId => text().nullable()();
 
-  /// `whatsapp` · `email` · `sms` · `courrier`.
+  /// `whatsapp` · `email` · `appel` · `courrier` (`sms` : anciennes relances, jamais plus créées — ticket AUT-3).
   TextColumn get channel => text()();
+
+  /// Ticket AUT-3 — l'e-mail est DÉJÀ parti du SMTP du poste : le serveur n'en renvoie pas un second, il tient la trace.
+  BoolColumn get alreadySent => boolean().withDefault(const Constant(false))();
 
   DateTimeColumn get reminderDate => dateTime().nullable()();
   TextColumn get message => text().nullable()();
@@ -1157,11 +1497,28 @@ class LivestockTransfers extends Table with SyncColumns {
   DateTimeColumn get transferDate => dateTime()();
   IntColumn get quantity => integer()();
 
-  /// `repro` | `sevre` | `jeune` pour lapins et porcs ; null pour les autres espèces.
+  /// `repro` | `sevre` | `jeune` pour lapins, porcs et volailles reproductrices ; plus `quatre` (Poussin ponte) pour les
+  /// volailles pondeuses (VOL-2) ; null pour les autres espèces.
   TextColumn get categorie => text().nullable()();
   BoolColumn get constitution => boolean().withDefault(const Constant(false))();
   TextColumn get motif => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
+/// Ticket EL-1 (schéma v79) — TRANSFORMATION (« Bon d'Abattage & Transformation »), miroir de `transformations`.
+///
+/// Table MIXTE : saisie au poste (`pending`, UUID du poste) ET tirée du serveur (`synced`). Le poste n'écrit QUE LE FAIT
+/// (bande, sujets, produit, quantité produite, jour) : ni l'effectif de la bande, ni la fiche du jour, ni le stock du produit
+/// fini — le serveur les rejoue (`SaisieTransformationAction`) et le poste se recale au tirage. Jamais modifiée ni supprimée.
+class Transformations extends Table with SyncColumns {
+  TextColumn get lotId => text().withLength(min: 36, max: 36)();
+  TextColumn get productId => text().withLength(min: 36, max: 36)();
+  IntColumn get qtyAnimals => integer()();
+  RealColumn get qtyProduced => real()();
+
+  /// L'opérateur est celui du jeton qui envoie : `null` tant que la ligne n'est pas revenue du serveur.
+  TextColumn get operatorId => text().nullable()();
+  DateTimeColumn get transformationDate => dateTime()();
 }
 
 /// Fiche journalière d'élevage. Règle serveur : **dernier écrivain gagne**,
@@ -1209,6 +1566,26 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get catDepartRepro => integer().nullable()();
   IntColumn get catDepartSevre => integer().nullable()();
   IntColumn get catDepartJeune => integer().nullable()();
+
+  /// Ticket VOL-1 (schéma v82) — VENTES PAR CATÉGORIE des volailles reproductrices : la catégorie du PRODUIT vendu
+  /// (`products.categorie_effectif`). `vente` en reste la SOMME. Emplacements : `repro` = Reproducteur ; `sevre` =
+  /// Poussin ; `jeune` = Jeune (ex-« Poulet »). Nullables, sans défaut : `null` = non ventilé (autres espèces, fiche
+  /// d'avant le ticket), jamais 0. Posées par la caisse (et reçues du serveur), jamais saisies à la fiche.
+  IntColumn get venteRepro => integer().nullable()();
+  IntColumn get venteSevre => integer().nullable()();
+  IntColumn get venteJeune => integer().nullable()();
+
+  /// Ticket VOL-2 (schéma v83) — QUATRIÈME EMPLACEMENT et deux passages de plus, pour les volailles PONDEUSES (quatre stades :
+  /// Poussin ponte = `4`, Poussin en croissance = `sevre`, Poulette = `jeune`, Pondeuse = `repro`). Nullables, sans défaut :
+  /// `null` = non ventilé (autres espèces, fiche d'avant le ticket), jamais 0. `passage_4_sevre` = Poussin ponte → Poussin en
+  /// croissance ; `passage_sevre_jeune` (existant) = Poussin en croissance → Poulette ; `passage_jeune_repro` = Poulette →
+  /// Pondeuse. ⚠️ Noms explicites : la conversion automatique de `mort4` donnerait `mort4`, pas `mort_4`.
+  IntColumn get mort4 => integer().named('mort_4').nullable()();
+  IntColumn get don4 => integer().named('don_4').nullable()();
+  IntColumn get vente4 => integer().named('vente_4').nullable()();
+  IntColumn get catDepart4 => integer().named('cat_depart_4').nullable()();
+  IntColumn get passage4Sevre => integer().named('passage_4_sevre').nullable()();
+  IntColumn get passageJeuneRepro => integer().named('passage_jeune_repro').nullable()();
 
   /// Effectifs par catégorie DÉRIVÉS (fin de journée), comme `effectif_final` : le serveur les
   /// recalcule sur une bande à chaîne, le poste ne les ENVOIE JAMAIS.
@@ -1263,6 +1640,12 @@ class LivestockDailyEntries extends Table with SyncColumns {
   IntColumn get transfertSortieJeune =>
       integer().withDefault(const Constant(0))();
 
+  /// Ticket VOL-2 (schéma v83) — transferts du quatrième emplacement (Poussin ponte des pondeuses), dérivés comme les autres.
+  IntColumn get transfertEntree4 =>
+      integer().named('transfert_entree_4').withDefault(const Constant(0))();
+  IntColumn get transfertSortie4 =>
+      integer().named('transfert_sortie_4').withDefault(const Constant(0))();
+
   @override
   List<String> get customConstraints => ['UNIQUE (lot_id, entry_date)'];
 }
@@ -1300,6 +1683,33 @@ class Sales extends Table with SyncColumns {
 
   /// Référence portée par le QR de la facture normalisée (NIM + signature).
   TextColumn get mecefQrRef => text().nullable()();
+
+  /// MECEF-1 (schéma v84) — ce que la DGI a renvoyé de la facture NORMALISÉE, tiré du serveur et JAMAIS écrit par le poste
+  /// (comme `mecef_status`) : code MeCeF/DGI, NIM du dispositif, compteurs, instant de la normalisation, et le motif français
+  /// d'une transmission en attente ou refusée. Servent le statut de l'écran Facturation et les mentions de la facture PDF.
+  /// `mecef_status` garde ses clés d'avant : `transmise` = « Normalisée », `erreur` = « Refusée » ; `expiree` est nouvelle.
+  TextColumn get mecefCode => text().nullable()();
+  TextColumn get mecefNim => text().nullable()();
+  TextColumn get mecefCompteurs => text().nullable()();
+  DateTimeColumn get mecefNormaliseLe => dateTime().nullable()();
+  TextColumn get mecefMessage => text().nullable()();
+
+  /// MECEF-3 (schéma v85) — LE CHOIX FAIT À LA VENTE : `simple` (défaut : jamais transmise à la DGI, pas de QR) ou `normalisee`.
+  /// Le poste l'ÉCRIT à la saisie et l'envoie avec la vente ; le serveur le revalide. `client_ifu` (13 chiffres, vide = client sans
+  /// IFU), `client_nom_facture` (obligatoire si normalisée) et `aib_taux` (`5%`, `1%`, `N/A`) en sont l'identité fiscale de
+  /// l'ACHETEUR. NUL = vente d'avant ce choix : facture simple.
+  TextColumn get factureType => text().nullable()();
+  TextColumn get clientIfu => text().nullable()();
+  TextColumn get clientNomFacture => text().nullable()();
+  TextColumn get aibTaux => text().nullable()();
+
+  /// Montant d'AIB CALCULÉ PAR LA DGI, tiré du serveur et JAMAIS écrit par le poste (comme les `mecef_*`).
+  RealColumn get mecefAibMontant => real().nullable()();
+
+  /// Frais de livraison INCLUS dans la vente (web seulement : la caisse du poste ne saisit pas la livraison) — tirés pour que la
+  /// facture du poste montre sa ligne « Frais de livraison ». `delivery_in_total` faux = ventes d'avant, frais hors total.
+  RealColumn get deliveryFee => real().withDefault(const Constant(0))();
+  BoolColumn get deliveryInTotal => boolean().withDefault(const Constant(false))();
 }
 
 /// Achat saisi au poste, ou reçu du serveur.
@@ -1320,6 +1730,10 @@ class Purchases extends Table with SyncColumns {
   TextColumn get supplierName => text().nullable()();
   TextColumn get supplierCategory => text().nullable()();
 
+  /// Ticket AC-1 — bon de commande que cet achat RÉCEPTIONNE (`purchase_order_id`), nul pour un achat direct. Le serveur
+  /// reçoit alors le bon (lignes du bon, dette entière) ; le poste n'écrit jamais le statut du bon.
+  TextColumn get purchaseOrderId => text().nullable()();
+
   TextColumn get paymentMode => text()();
   TextColumn get treasuryAccountId => text().nullable()();
   RealColumn get total => real()();
@@ -1339,6 +1753,15 @@ class Purchases extends Table with SyncColumns {
   /// Part déjà payée devenue créance sur le fournisseur (`supplier_credit`, compte 409).
   /// Nulle tant que le serveur ne l'a pas servie : le poste ne la calcule pas.
   RealColumn get supplierCredit => real().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
+  /// S'ouvre en visionneuse Windows. `null` = aucun fichier joint. Ticket AC-3 : le fichier est ENVOYÉ au serveur une fois
+  /// l'enregistrement accepté (`POST /api/sync/receipts`) ; [receiptSent] dit si c'est fait.
+  TextColumn get receiptLocalPath => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket AC-3 : vrai quand le serveur a reçu le fichier de [receiptLocalPath]. Retombe à faux quand
+  /// le chemin change (nouveau fichier à envoyer).
+  BoolColumn get receiptSent => boolean().withDefault(const Constant(false))();
 }
 
 /// Pointage d'un employé, saisi au poste ou reçu du serveur.
@@ -1363,6 +1786,9 @@ class AttendanceRecords extends Table with SyncColumns {
 
   /// `present` · `absent` · `conge` · `maladie` · `retard`.
   TextColumn get status => text()();
+
+  /// Ticket RH-3 — faux : archivé (web ou poste) ; ne compte plus (cartes, absences de la paie).
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }
 
 class PurchaseLines extends Table {
@@ -1437,6 +1863,18 @@ class CreditNotes extends Table with SyncColumns {
 
   /// Le JOUR DU FAIT (heure du Bénin), pas celui de l'envoi : l'écriture inverse et le stock en portent la date.
   DateTimeColumn get createdAt => dateTime()();
+
+  /// MECEF-1 (schéma v84) — la facture d'avoir (`FA`) d'un avoir sur une vente NORMALISÉE : état, donnée du QR, code
+  /// MeCeF/DGI, NIM, compteurs, instant, motif. Nuls tant que la vente d'origine n'est pas normalisée. Tirés du serveur,
+  /// JAMAIS écrits par le poste. `mecef_uid` (identifiant DGI) reste au serveur : jamais servi, donc toujours nul ici.
+  TextColumn get mecefStatus => text().nullable()();
+  TextColumn get mecefUid => text().nullable()();
+  TextColumn get mecefQrRef => text().nullable()();
+  TextColumn get mecefCode => text().nullable()();
+  TextColumn get mecefNim => text().nullable()();
+  TextColumn get mecefCompteurs => text().nullable()();
+  DateTimeColumn get mecefNormaliseLe => dateTime().nullable()();
+  TextColumn get mecefMessage => text().nullable()();
 }
 
 /// La Corbeille servie par le serveur (`corbeille`) — INSTANTANÉ en lecture seule (ticket ARC3, PRD `docs/prd/archives.md`).
@@ -1664,6 +2102,15 @@ class TreasuryAccounts extends Table {
   TextColumn get type => text().nullable()();
   RealColumn get balance => real().withDefault(const Constant(0))();
 
+  /// Ticket PA-4 — coordonnées (tirées pour qui gère les paramètres seulement).
+  TextColumn get bankName => text().nullable()();
+  TextColumn get holderName => text().nullable()();
+  TextColumn get rib => text().nullable()();
+  TextColumn get iban => text().nullable()();
+  TextColumn get operatorName => text().nullable()();
+  TextColumn get phoneNumber => text().nullable()();
+  TextColumn get simSerial => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1745,6 +2192,15 @@ class Expenses extends Table with SyncColumns {
   /// serveur, mot pour mot (exercice clos, compte de trésorerie sans compte du plan…), tant que la saisie est `conflict`.
   /// Effacé quand la saisie est acquittée ou corrigée. Le web n'a pas de file d'envoi : il dit le refus tout de suite.
   TextColumn get ecritureRefus => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket #48 : chemin absolu du justificatif copié localement (JPG / PNG / PDF).
+  /// S'ouvre en visionneuse Windows. `null` = aucun fichier joint. Ticket AC-3 : le fichier est ENVOYÉ au serveur une fois
+  /// l'enregistrement accepté (`POST /api/sync/receipts`) ; [receiptSent] dit si c'est fait.
+  TextColumn get receiptLocalPath => text().nullable()();
+
+  /// ➕ PROPRE AU POSTE — ticket AC-3 : vrai quand le serveur a reçu le fichier de [receiptLocalPath]. Retombe à faux quand
+  /// le chemin change (nouveau fichier à envoyer).
+  BoolColumn get receiptSent => boolean().withDefault(const Constant(false))();
 }
 
 /// Ticket DEP4 — une LIGNE de dépense : libellé, COMPTE DE CHARGE du plan (classe 6) et montant. Elle suit son en-tête :
@@ -1838,8 +2294,43 @@ class Payslips extends Table {
   /// Instant du règlement (`created_at`), en HEURE MURALE du serveur (Bénin) : le jour du rapport est son jour.
   DateTimeColumn get createdAt => dateTime()();
 
+  // Ticket RH-4 — colonnes RH, servies aux seuls comptes `view-rh` (nulles sinon) : l'onglet « Gestion de la Paie »
+  // du poste montre les bulletins réglés comme le web (`GestionPaie::getRowsProperty`).
+  TextColumn get employeeId => text().nullable()();
+
+  /// Premier jour de la période payée (`period_month`), DATE pure.
+  DateTimeColumn get periodMonth => dateTime().nullable()();
+  RealColumn get grossSalary => real().nullable()();
+  RealColumn get absenceDeduction => real().nullable()();
+  RealColumn get cnssDeduction => real().nullable()();
+  RealColumn get itsDeduction => real().nullable()();
+  RealColumn get chargesPatronales => real().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Ticket RH-4 — tranche du barème ITS (`income_tax_brackets`, actives), référentiel servi aux comptes `view-rh`.
+/// Le poste calcule la paie comme `PayrollCalculationService` ; sans tranche, l'ITS vaut 0 et l'écran le dit.
+class IncomeTaxBrackets extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  RealColumn get fromAmount => real()();
+
+  /// `null` : dernière tranche, sans plafond.
+  RealColumn get toAmount => real().nullable()();
+  RealColumn get rate => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Ticket RH-4 — DEMANDE de règlement d'une paie faite au poste (« Valider le règlement ») : employé, période
+/// (`AAAA-MM`), instant du clic. Le serveur règle (`ReglementPaieService` : bulletin, trésorerie, écriture, audit) ; le
+/// bulletin redescend dans [Payslips]. ⚠️ Aucun montant ici : un net « vu au poste » ne fait jamais foi.
+class PayslipRequests extends Table with SyncColumns {
+  TextColumn get employeeId => text().withLength(min: 36, max: 36)();
+  TextColumn get periodMonth => text().withLength(min: 7, max: 7)();
+  DateTimeColumn get requestedAt => dateTime()();
 }
 
 class AppSettings extends Table {
@@ -1884,17 +2375,32 @@ class SyncState extends Table {
     CustomerReminders,
     FeedTypes,
     ElevageNumberingSettings,
+    FieldSurveyEntries,
     Suppliers,
     PurchaseOrders,
+    PurchaseOrderLines,
+    ManualEntryRequests,
+    FixedAssets,
+    DepreciationRequests,
+    Transformations,
+    SettingsRequests,
+    PermissionsApplicatives,
+    BankStatementLines,
+    BankStatementImports,
     Payables,
     Employees,
     Internships,
+    InternshipAbsences,
     AttendanceRecords,
+    IncomeTaxBrackets,
+    PayslipRequests,
     Mails,
     AdministrativeDocuments,
     ArchivedDocuments,
     ChartOfAccounts,
     FiscalYears,
+    FiscalClosureRequests,
+    PeriodicClosures,
     AccountingEntries,
     AccountingEntryLines,
     CompanySettings,
@@ -1908,6 +2414,7 @@ class SyncState extends Table {
     Animals,
     LivestockSpecies,
     SupplierPayments,
+    ReceivablePayments,
     PurchaseReturns,
     SupplierRefunds,
     SupplierCredits,
@@ -1940,7 +2447,7 @@ class SyncState extends Table {
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase() : super(ouvrirConnexionPoste());
 
   AppDatabase.forTesting(super.executor);
 
@@ -1956,7 +2463,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 63;
+  int get schemaVersion => 86;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -1977,6 +2484,12 @@ class AppDatabase extends _$AppDatabase {
     final existantes = await m.database
         .customSelect('PRAGMA table_info("${table.actualTableName}")')
         .get();
+    // Table ABSENTE (base d'une chaîne de paliers parallèle : `user_version` 60 sans la Corbeille du palier 58) : la créer
+    // au schéma courant pose aussi la colonne.
+    if (existantes.isEmpty) {
+      await m.createTable(table);
+      return;
+    }
     if (existantes.any((l) => l.read<String>('name') == colonne.name)) return;
     await m.addColumn(table, colonne);
   }
@@ -2543,8 +3056,337 @@ class AppDatabase extends _$AppDatabase {
       if (from < 63) {
         await _ajouterColonneSiAbsente(m, corbeilleElements, corbeilleElements.archivePar);
       }
+      if (from < 64) {
+        await _ajouterColonneSiAbsente(m, expenses, expenses.receiptLocalPath);
+        await _ajouterColonneSiAbsente(m, purchases, purchases.receiptLocalPath);
+      }
+      // v65 — ticket ATT-1 : date/lieu de naissance, civilité, colonnes signataires.
+      if (from < 65) {
+        await _ajouterColonneSiAbsente(m, internships, internships.birthDate);
+        await _ajouterColonneSiAbsente(m, internships, internships.birthPlace);
+        await _ajouterColonneSiAbsente(m, internships, internships.civilite);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.numeroSequence);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Titre);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Nom);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Titre);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Nom);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Titre);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Nom);
+      }
+      // v66 — ticket ATT-2 : règle de signature selon la durée (seuil, qui signe chaque palier), fonctions, appréciation.
+      if (from < 66) {
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.seuilSignatureMois);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Fonction);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Fonction);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Fonction);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Court);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Court);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Court);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig1Long);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig2Long);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.sig3Long);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.appreciationText);
+        await _ajouterColonneSiAbsente(
+            m, attestationTemplates, attestationTemplates.appreciationImprimee);
+      }
+
+      // v67 — tickets RH-1 à RH-4 : registres RH mixtes (colonnes de synchronisation, `is_active`), absences de
+      // stagiaire, `is_active` des pointages, colonnes RH des bulletins, barème ITS, taux de paie, demandes de règlement.
+      // ⚠️ Les lignes déjà là (tirées) reçoivent les défauts de [SyncColumns] : `device_id` = 'serveur', `synced`.
+      if (from < 67) {
+        await _registresRhMixtes(m);
+      }
+      // v68 — ticket UT-1 : `utilisateurs` devient MIXTE (colonnes de synchronisation posées par reconstruction).
+      if (from < 68) {
+        await _utilisateursMixtes(m);
+      }
+      // v69 — ticket VC-1 : encaissements de créances clients saisis au poste.
+      if (from < 69) {
+        if (!await _tableExiste(m, receivablePayments)) await m.createTable(receivablePayments);
+      }
+      // v70 — ticket VC-2 : `customer_reminders` devient MIXTE (colonnes de synchronisation posées par reconstruction).
+      if (from < 70) {
+        await _relancesMixtes(m);
+      }
+      // v71 — ticket AC-1 : `purchase_orders` devient MIXTE (reconstruction), `purchase_order_lines` est créée, `purchases`
+      // reçoit `purchase_order_id` (réconciliation finale).
+      if (from < 71) {
+        await _bonsCommandeMixtes(m);
+        if (!await _tableExiste(m, purchaseOrderLines)) await m.createTable(purchaseOrderLines);
+      }
+      // v73 — ticket CP-1 : `chart_of_accounts` devient MIXTE (reconstruction) et reçoit `is_active`. (v72 : `receipt_sent`, AC-3.)
+      if (from < 73) {
+        await _planComptableMixte(m);
+      }
+      // v74 — ticket CP-2 : demandes d'écriture manuelle saisies au poste.
+      if (from < 74) {
+        if (!await _tableExiste(m, manualEntryRequests)) await m.createTable(manualEntryRequests);
+      }
+      // v75 — ticket CP-3 : registre des immobilisations (mixte) et demandes de dotation aux amortissements.
+      if (from < 75) {
+        if (!await _tableExiste(m, fixedAssets)) await m.createTable(fixedAssets);
+        if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
+      }
+      // v86 — ticket RELEVES-1 : relevés de terrain (mixte : saisis au poste ET tirés du serveur).
+      if (from < 86) {
+        if (!await _tableExiste(m, fieldSurveyEntries)) await m.createTable(fieldSurveyEntries);
+      }
+      // v85 — ticket MECEF-3 : IFU du client, choix « facture simple / normalisée » de la vente, AIB, frais de livraison inclus.
+      if (from < 85) {
+        await _ajouterColonneSiAbsente(m, customers, customers.ifu);
+        for (final colonne in <GeneratedColumn>[
+          sales.factureType,
+          sales.clientIfu,
+          sales.clientNomFacture,
+          sales.aibTaux,
+          sales.mecefAibMontant,
+          sales.deliveryFee,
+          sales.deliveryInTotal,
+        ]) {
+          await _ajouterColonneSiAbsente(m, sales, colonne);
+        }
+      }
+      // v84 — ticket MECEF-1 : ce que la DGI renvoie d'une facture normalisée (vente `FV`, avoir `FA`), tiré du serveur.
+      if (from < 84) {
+        for (final colonne in <GeneratedColumn>[
+          sales.mecefCode,
+          sales.mecefNim,
+          sales.mecefCompteurs,
+          sales.mecefNormaliseLe,
+          sales.mecefMessage,
+        ]) {
+          await _ajouterColonneSiAbsente(m, sales, colonne);
+        }
+        for (final colonne in <GeneratedColumn>[
+          creditNotes.mecefStatus,
+          creditNotes.mecefUid,
+          creditNotes.mecefQrRef,
+          creditNotes.mecefCode,
+          creditNotes.mecefNim,
+          creditNotes.mecefCompteurs,
+          creditNotes.mecefNormaliseLe,
+          creditNotes.mecefMessage,
+        ]) {
+          await _ajouterColonneSiAbsente(m, creditNotes, colonne);
+        }
+      }
+      // v83 — ticket VOL-2 : quatrième emplacement (Poussin ponte) et passages des fiches de volailles pondeuses.
+      if (from < 83) {
+        for (final colonne in <GeneratedColumn>[
+          livestockDailyEntries.mort4,
+          livestockDailyEntries.don4,
+          livestockDailyEntries.vente4,
+          livestockDailyEntries.catDepart4,
+          livestockDailyEntries.passage4Sevre,
+          livestockDailyEntries.passageJeuneRepro,
+          livestockDailyEntries.transfertEntree4,
+          livestockDailyEntries.transfertSortie4,
+        ]) {
+          await _ajouterColonneSiAbsente(m, livestockDailyEntries, colonne);
+        }
+      }
+      // v82 — ticket VOL-1 : ventes par catégorie des fiches (volailles reproductrices) et catégorie d'effectif des produits.
+      if (from < 82) {
+        await _ajouterColonneSiAbsente(m, livestockDailyEntries, livestockDailyEntries.venteRepro);
+        await _ajouterColonneSiAbsente(m, livestockDailyEntries, livestockDailyEntries.venteSevre);
+        await _ajouterColonneSiAbsente(m, livestockDailyEntries, livestockDailyEntries.venteJeune);
+        await _ajouterColonneSiAbsente(m, products, products.categorieEffectif);
+      }
+      // v81 — ticket MDP-1 : `utilisateurs.must_change_password` (mot de passe temporaire à changer), tiré du serveur.
+      if (from < 81) {
+        await _ajouterColonneSiAbsente(m, utilisateurs, utilisateurs.mustChangePassword);
+      }
+      // v80 — ticket CP-4 : demandes de clôture, clôtures de mois tirées, étape 1 et date de clôture de l'exercice.
+      if (from < 80) {
+        if (!await _tableExiste(m, fiscalClosureRequests)) await m.createTable(fiscalClosureRequests);
+        if (!await _tableExiste(m, periodicClosures)) await m.createTable(periodicClosures);
+        await _ajouterColonneSiAbsente(m, fiscalYears, fiscalYears.step1ConfirmedAt);
+        await _ajouterColonneSiAbsente(m, fiscalYears, fiscalYears.closedAt);
+      }
+      // v79 — ticket EL-1 : transformations (mixte : saisies au poste ET tirées du serveur).
+      if (from < 79) {
+        if (!await _tableExiste(m, transformations)) await m.createTable(transformations);
+      }
+      // v78 — ticket AUT-3 : relance par e-mail partie du poste lui-même.
+      if (from < 78) {
+        await _ajouterColonneSiAbsente(m, customerReminders, customerReminders.alreadySent);
+      }
+      // v77 — ticket CP-5 : lignes de relevé bancaire tirées, demandes d'import de relevé.
+      if (from < 77) {
+        if (!await _tableExiste(m, bankStatementLines)) await m.createTable(bankStatementLines);
+        if (!await _tableExiste(m, bankStatementImports)) await m.createTable(bankStatementImports);
+      }
+      // v76 — tickets PA-2/3/4/7/8 : demandes de réglage, droits tirés, entreprise (verrou de paie, SMS), comptes de trésorerie.
+      if (from < 76) {
+        if (!await _tableExiste(m, settingsRequests)) await m.createTable(settingsRequests);
+        if (!await _tableExiste(m, permissionsApplicatives)) await m.createTable(permissionsApplicatives);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.payrollLocked);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.payrollEditedAt);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.smsProvider);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.twilioAccountSid);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.twilioFromNumber);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.vonageFromName);
+        await _ajouterColonneSiAbsente(m, companySettings, companySettings.smsIdentifiantsPoses);
+        for (final c in [treasuryAccounts.bankName, treasuryAccounts.holderName, treasuryAccounts.rib, treasuryAccounts.iban, treasuryAccounts.operatorName, treasuryAccounts.phoneNumber, treasuryAccounts.simSerial]) {
+          await _ajouterColonneSiAbsente(m, treasuryAccounts, c);
+        }
+      }
+
+      // 🔴 ⚠️⚠️ RÉCONCILIATION FINALE. Le numéro de version ne dit pas tout ce que la base contient : des paliers (57 à 59)
+      // ont été numérotés sur des branches parallèles, et une base posée par un poste d'une autre chaîne peut porter
+      // `user_version` 60 SANS les tables ni les colonnes des paliers 57, 58 et 59 (« no such table: corbeille_elements »).
+      // Après tous les paliers, ce qui manque encore par rapport au schéma courant est posé : tables absentes créées,
+      // colonnes absentes ajoutées. Sans effet sur une base complète.
+      if (from >= 59 && from < 66) {
+        await _depensesACreditEtCentreObligatoire(m);
+      }
+      await _reconcilierSchema(m);
     },
   );
+
+  /// Palier v67 — [Employees] et [Internships] deviennent des tables MIXTES : `device_id`, `sync_status`, `updated_at`
+  /// (obligatoires, sans défaut : SQLite ne sait pas les ajouter à une table pleine) → la table est RECONSTRUITE, chaque
+  /// ligne recopiée avec `'serveur'` / `synced` / l'instant courant — elles viennent toutes du serveur, le poste ne les
+  /// écrivait pas avant ce palier. `is_active` reçoit son défaut (vrai : le serveur ne servait que les actifs).
+  Future<void> _registresRhMixtes(Migrator m) async {
+    for (final table in <TableInfo<Table, dynamic>>[employees, internships]) {
+      final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${table.actualTableName}")').get()) c.read<String>('name')};
+      if (colonnes.contains('sync_status')) continue;
+      final nouvelles = [for (final c in table.$columns) if (!colonnes.contains(c.name)) c];
+      await m.alterTable(
+        TableMigration(
+          table,
+          newColumns: nouvelles,
+          columnTransformer: {
+            if (table == employees) ...{
+              employees.deviceId: const Constant<String>('serveur'),
+              employees.syncStatus: const Constant<String>('synced'),
+              employees.updatedAt: currentDateAndTime,
+            } else ...{
+              internships.deviceId: const Constant<String>('serveur'),
+              internships.syncStatus: const Constant<String>('synced'),
+              internships.updatedAt: currentDateAndTime,
+            },
+          },
+        ),
+      );
+    }
+    for (final table in <TableInfo<Table, dynamic>>[internshipAbsences, incomeTaxBrackets, payslipRequests]) {
+      if (!await _tableExiste(m, table)) await m.createTable(table);
+    }
+    await _ajouterColonneSiAbsente(m, attendanceRecords, attendanceRecords.isActive);
+    for (final c in [payslips.employeeId, payslips.periodMonth, payslips.grossSalary, payslips.absenceDeduction,
+        payslips.cnssDeduction, payslips.itsDeduction, payslips.chargesPatronales]) {
+      await _ajouterColonneSiAbsente(m, payslips, c);
+    }
+    for (final c in [companySettings.vpsRate, companySettings.cnssEmployeeRate, companySettings.cnssEmployerPensionRate,
+        companySettings.cnssEmployerFamilyRate, companySettings.cnssEmployerRiskRate]) {
+      await _ajouterColonneSiAbsente(m, companySettings, c);
+    }
+  }
+
+  /// Ticket UT-1 — `utilisateurs` reçoit [SyncColumns] par RECONSTRUCTION (`TableMigration`) : les comptes déjà tirés
+  /// sont `synced`, `device_id` = 'serveur'. Idempotent (une base qui a déjà `sync_status` n'est pas touchée).
+  Future<void> _utilisateursMixtes(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${utilisateurs.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        utilisateurs,
+        newColumns: [for (final c in utilisateurs.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          utilisateurs.deviceId: const Constant<String>('serveur'),
+          utilisateurs.syncStatus: const Constant<String>('synced'),
+          utilisateurs.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Ticket VC-2 — `customer_reminders` reçoit [SyncColumns] par RECONSTRUCTION (`TableMigration`) : les relances déjà
+  /// tirées sont `synced`, `device_id` = 'serveur'. Idempotent.
+  Future<void> _relancesMixtes(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${customerReminders.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        customerReminders,
+        newColumns: [for (final c in customerReminders.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          customerReminders.deviceId: const Constant<String>('serveur'),
+          customerReminders.syncStatus: const Constant<String>('synced'),
+          customerReminders.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Ticket AC-1 — `purchase_orders` reçoit [SyncColumns] par RECONSTRUCTION : les bons déjà tirés sont `synced`,
+  /// `device_id` = 'serveur'. Idempotent.
+  Future<void> _bonsCommandeMixtes(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${purchaseOrders.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        purchaseOrders,
+        newColumns: [for (final c in purchaseOrders.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          purchaseOrders.deviceId: const Constant<String>('serveur'),
+          purchaseOrders.syncStatus: const Constant<String>('synced'),
+          purchaseOrders.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Ticket CP-1 — `chart_of_accounts` reçoit [SyncColumns] et `is_active` par RECONSTRUCTION : les comptes déjà tirés sont
+  /// `synced`, `device_id` = 'serveur', actifs. Idempotent.
+  Future<void> _planComptableMixte(Migrator m) async {
+    final colonnes = {for (final c in await m.database.customSelect('PRAGMA table_info("${chartOfAccounts.actualTableName}")').get()) c.read<String>('name')};
+    if (colonnes.contains('sync_status')) return;
+    await m.alterTable(
+      TableMigration(
+        chartOfAccounts,
+        newColumns: [for (final c in chartOfAccounts.$columns) if (!colonnes.contains(c.name)) c],
+        columnTransformer: {
+          chartOfAccounts.deviceId: const Constant<String>('serveur'),
+          chartOfAccounts.syncStatus: const Constant<String>('synced'),
+          chartOfAccounts.updatedAt: currentDateAndTime,
+        },
+      ),
+    );
+  }
+
+  /// Pose ce qui manque, table par table et colonne par colonne, par rapport au schéma courant (voir `onUpgrade`).
+  Future<void> _reconcilierSchema(Migrator m) async {
+    for (final table in allTables) {
+      if (!await _tableExiste(m, table)) {
+        await m.createTable(table);
+        continue;
+      }
+      for (final colonne in table.$columns) {
+        await _ajouterColonneSiAbsente(m, table, colonne);
+      }
+    }
+  }
 
   /// Palier v59 (tickets DEP6 et DEP7) — deux changements d'un seul palier, tous deux sans perte :
   ///
@@ -2564,7 +3406,14 @@ class AppDatabase extends _$AppDatabase {
     );
 
     if (tresorerieObligatoire) {
-      await m.alterTable(TableMigration(expenses, newColumns: [if (!aOnCredit) expenses.onCredit]));
+      // 🔴 ⚠️⚠️ LA RECONSTRUCTION RECOPIE CHAQUE COLONNE DU SCHÉMA COURANT depuis l'ancienne table : toute colonne ajoutée
+      // APRÈS ce palier (`receipt_local_path`, v64…) n'existe pas encore dans une base ancienne, et la copie échouait
+      // (« no such column ») — le poste ne s'ouvrait plus. Les colonnes absentes de l'ancienne table sont donc déclarées
+      // NOUVELLES (remplies par leur défaut, ou NULL), quel que soit le palier qui les a posées.
+      final presentes = {for (final c in colonnes) c.read<String>('name')};
+      await m.alterTable(
+        TableMigration(expenses, newColumns: [for (final c in expenses.$columns) if (!presentes.contains(c.name)) c]),
+      );
     } else if (!aOnCredit) {
       await _ajouterColonneSiAbsente(m, expenses, expenses.onCredit);
     }
@@ -2772,11 +3621,37 @@ class AppDatabase extends _$AppDatabase {
     // Ticket DEV — devis saisis au poste.
     'quotes',
     'livestock_reproduction_events',
+    // Ticket CP-1 — comptes du plan comptable créés, modifiés ou archivés au poste (avant les dépenses et achats qui les citent).
+    'chart_of_accounts',
+    // Ticket CP-2 — demandes d'écriture manuelle (le serveur fait l'écriture et lui attribue son numéro).
+    'manual_entry_requests',
+    // Ticket CP-3 — immobilisations saisies au poste et demandes de dotation aux amortissements.
+    'fixed_assets',
+    'depreciation_requests',
+    // Tickets PA-2/3/4/7/8 — demandes de réglage de la ferme.
+    'settings_requests',
+    // Ticket CP-4 — demandes de clôture (périodes, exercice, ouverture) : jouées par le serveur.
+    'fiscal_closure_requests',
+    // Ticket CP-5 — relevés bancaires à importer (CSV).
+    'bank_statement_imports',
+    // Ticket AC-1 — bons de commande générés au poste (leurs lignes partent avec eux).
+    'purchase_orders',
     'purchases',
     'attendance_records',
+    // Tickets RH-1, RH-2, RH-4 — registres RH, absences de stagiaire, demandes de règlement de paie.
+    'employees',
+    'internships',
+    'internship_absences',
+    'payslip_requests',
+    // Ticket UT-1 — comptes utilisateurs (clé `users` du serveur ; la table Drift s'appelle `utilisateurs`).
+    'utilisateurs',
     'products',
     'suppliers',
     'supplier_payments',
+    // Ticket VC-1 — encaissements de créances clients (le fait seul : le serveur applique).
+    'receivable_payments',
+    // Ticket VC-2 — relances de clients (WhatsApp, courrier faits ; e-mail, SMS demandés).
+    'customer_reminders',
     'customers',
     'mails',
     'archived_documents',
@@ -2786,6 +3661,8 @@ class AppDatabase extends _$AppDatabase {
     'purchase_returns',
     'supplier_refunds',
     'livestock_transfers',
+    // Ticket EL-1 — transformations (le fait seul : le serveur sort les sujets et entre le stock).
+    'transformations',
     // Tickets AV1 / AV2 — retours et avoirs clients (demandes de retour, « marquer comme traité »).
     'credit_notes',
     // Ticket ARC3 — demandes de la Corbeille (restaurer, supprimer définitivement) : le serveur fait les effets.
@@ -2803,6 +3680,8 @@ class AppDatabase extends _$AppDatabase {
     'prophylaxis_schedule_standards',
     'feed_types',
     'elevage_numbering_settings',
+    // Ticket RELEVES-1 — relevés de terrain saisis, validés ou archivés au poste.
+    'field_survey_entries',
     'company_settings',
     // Ticket MOD1 — modules actifs basculés au poste (conservés par la purge, comme les autres réglages).
     'modules_config',
@@ -2845,18 +3724,26 @@ class AppDatabase extends _$AppDatabase {
   /// ajoutée ne soit pas oubliée sans bruit.
   static const tablesDActivite = [
     'livestock_lots', 'livestock_daily_entries', 'livestock_transfers',
+    'transformations', // EL-1
     'livestock_reproduction_events', 'veterinary_records', 'veterinary_withdrawal_periods',
     'infirmary_records', 'veterinary_calendar_events', // H8b
     'animals', 'lot_revenues',
     'customers', 'receivables', 'customer_advances', 'customer_reminders',
-    'advance_imputations', 'sales', 'sale_lines', 'credit_notes', // AV1
+    'advance_imputations', 'receivable_payments', 'sales', 'sale_lines', 'credit_notes', // AV1, VC-1
+    'manual_entry_requests', // CP-2
+    'depreciation_requests', // CP-3
+    'fiscal_closure_requests', 'periodic_closures', // CP-4
+    'settings_requests', // PA-*
+    'bank_statement_lines', 'bank_statement_imports', // CP-5
     'corbeille_elements', 'corbeille_demandes', // ARC3
-    'suppliers', 'purchase_orders', 'purchases', 'purchase_lines', 'purchase_returns',
+    'suppliers', 'purchase_orders', 'purchase_order_lines', 'purchases', 'purchase_lines', 'purchase_returns', // AC-1
     'payables', 'supplier_payments', 'supplier_refunds', 'supplier_credits',
     'expense_lines', 'expenses', 'stock_adjustments', 'stock_movements', // U9, DEP4
     'quotes', // DEV
     'payslips', // U13
     'employees', 'internships', 'attendance_records',
+    // Tickets RH-2 / RH-4 — absences de stagiaire et demandes de règlement de paie.
+    'internship_absences', 'payslip_requests',
     'accounting_entries', 'accounting_entry_lines',
     'mails', 'administrative_documents', 'archived_documents', 'notifications',
     'sync_conflicts',
@@ -2866,10 +3753,12 @@ class AppDatabase extends _$AppDatabase {
   /// connexion hors ligne survive à une purge suivie d'un tirage interrompu).
   static const tablesConservees = [
     'product_categories', 'products', 'feed_ration_standards', 'growth_standards', 'feed_types',
-    'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings',
-    'chart_of_accounts', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers',
+    'prophylaxis_schedule_standards', 'livestock_species', 'elevage_numbering_settings', 'field_survey_entries', // RELEVES-1
+    'chart_of_accounts', 'fixed_assets', 'fiscal_years', 'treasury_accounts', 'expense_categories', 'cost_centers', // CP-3 : fixed_assets
     'company_settings', 'modules_config', 'attestation_templates',
-    'roles_applicatifs', 'utilisateurs', 'audit_logs',
+    // Ticket RH-4 — barème ITS (référentiel, préservé au serveur).
+    'income_tax_brackets',
+    'roles_applicatifs', 'permissions_applicatives', 'utilisateurs', 'audit_logs',
     'app_settings', 'sync_state',
   ];
 
@@ -2897,17 +3786,4 @@ class AppDatabase extends _$AppDatabase {
     });
     return perdus;
   }
-}
-
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dossier = await getApplicationSupportDirectory();
-    final fichier = File(p.join(dossier.path, 'agrierp.sqlite'));
-
-    // ⚠️ `NativeDatabase.createInBackground` SEUL sur Windows Desktop. Ne
-    // JAMAIS réintroduire `open.overrideFor(OperatingSystem.windows, ...)` :
-    // ce motif a déjà cassé une compilation dans ce projet et n'apporte rien
-    // ici, `sqlite3_flutter_libs` fournissant déjà la bibliothèque.
-    return NativeDatabase.createInBackground(fichier);
-  });
 }

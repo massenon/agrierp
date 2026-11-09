@@ -44,6 +44,8 @@ class FusionReferentiels {
       ('customer_reminders', 'customer_id'),
       // Ticket DEV — le client d'un devis du poste.
       ('quotes', 'customer_id'),
+      // Ticket VC-1 — le client d'un encaissement de créance du poste.
+      ('receivable_payments', 'customer_id'),
     ],
     'suppliers': [
       ('purchases', 'supplier_id'),
@@ -58,9 +60,13 @@ class FusionReferentiels {
     'products': [
       ('sale_lines', 'product_id'),
       ('purchase_lines', 'product_id'),
+      // Ticket AC-1 — le produit d'une ligne de bon de commande (saisi au poste, avant l'envoi).
+      ('purchase_order_lines', 'product_id'),
       ('stock_adjustments', 'product_id'),
       ('stock_movements', 'product_id'),
       ('livestock_lots', 'product_id'),
+      // Ticket EL-1 — le produit fini d'une transformation saisie au poste (avant l'envoi).
+      ('transformations', 'product_id'),
       ('lot_revenues', 'product_id'),
       // Tickets AV1 / AV2 — un avoir en attente désigne son produit.
       ('credit_notes', 'product_id'),

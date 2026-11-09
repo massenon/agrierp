@@ -19,6 +19,14 @@ use App\Models\Supplier;
  */
 class SupplierCatalogService
 {
+    /**
+     * Catégories proposées par le formulaire « Nouveau Fournisseur » du web (maquette), du poste (`categoriesFournisseur`) et
+     * par le modèle de l'importation en masse (IMPORT-1) : UNE liste. La règle `category` du service reste `required|string`.
+     *
+     * @var array<int, string>
+     */
+    public const CATEGORIES = ['Aliments', 'Produits vétérinaires', 'Intrants agricoles', 'Matériel', 'Autre'];
+
     /** @return array<string, array<int, string>> */
     public function regles(): array
     {

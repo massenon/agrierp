@@ -4,9 +4,14 @@ namespace App\Actions;
 
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
+use App\Models\Product;
 use App\Services\EffectifParCategorieService;
+use App\Support\CategorieVolaille;
+use App\Support\MotifsRefusPush;
+use App\Support\StadePondeuse;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Ticket 14.53 (Sprint 14) — LA VENTE SE RÉPERCUTE SUR LA FICHE D'ÉLEVAGE.
@@ -51,10 +56,22 @@ class RecordSaleOnFicheElevageAction
      *                          n'est PAS incrémenté une seconde fois (2N) ; la bande, elle, suit
      *                          quand même l'effectif de la fiche.
      * @return int  nombre de bandes réellement mises à jour
+     *
+     * 🔁 TICKET VOL-1 — VOLAILLES REPRODUCTRICES : une ligne peut porter `product_id` (ou `categorie_effectif`, qui
+     * l'emporte : la transformation range les sujets abattus dans les Jeunes). Sur une bande de volailles reproductrices
+     * la vente sort de la catégorie du PRODUIT (`vente_repro` / `vente_sevre` / `vente_jeune`, `vente` en reste la somme).
+     * Une vente sans catégorie, ou sur une bande dont le départ n'est pas saisi, est REFUSÉE (`ValidationException`, motif
+     * français) avant toute écriture — jamais rangée au hasard.
+     * @throws ValidationException
      */
     public function execute(array $lignes, ?string $date = null, array $fichesPortantDejaLaVente = []): int
     {
         $jour = $date ?: now()->format('Y-m-d');
+
+        if (($refus = $this->refusDesLignes($lignes, $jour)) !== null) {
+            throw ValidationException::withMessages(['lines' => $refus]);
+        }
+
         $bandesTouchees = 0;
 
         foreach ($lignes as $ligne) {
@@ -72,9 +89,12 @@ class RecordSaleOnFicheElevageAction
             // la ventilation l'est aussi), faute de quoi des `null` « inconnu » rendraient ses catégories
             // inconnues. Bande SANS chaîne : valeurs par défaut STRICTEMENT inchangées (colonnes à null).
             $defauts = ['achat' => 0, 'ne' => 0, 'mort' => 0, 'vente' => 0, 'don' => 0, 'effectif_final' => 0];
-            if (app(EffectifParCategorieService::class)->aUneChaine($lotId)) {
-                $defauts += EffectifParCategorieService::MOUVEMENTS_CONNUS_A_ZERO;
+            $lot = LivestockLot::with('species')->find($lotId);
+            if ($lot !== null && app(EffectifParCategorieService::class)->aUneChaine($lotId)) {
+                // Ticket VOL-1 : pour les volailles, les ventes ventilées naissent connues à zéro elles aussi.
+                $defauts += EffectifParCategorieService::mouvementsConnusAZeroPour($lot);
             }
+            $emplacement = $this->emplacementDeLaLigne($lot, $ligne);
 
             $entry = $this->ficheDuJour($lotId, $jour, $defauts);
 
@@ -87,6 +107,10 @@ class RecordSaleOnFicheElevageAction
                 // sérialise tout : invisible dans la suite Feature, d'où le garde-fou qui lit ce code.)
                 $entry = LivestockDailyEntry::query()->whereKey($entry->getKey())->lockForUpdate()->first() ?? $entry;
                 $entry->vente = (int) $entry->vente + $qty;
+                if ($emplacement !== null) {
+                    $colonneVente = EffectifParCategorieService::colonne('vente', $emplacement);
+                    $entry->{$colonneVente} = (int) $entry->{$colonneVente} + $qty;
+                }
                 $entry->effectif_final = $entry->effectifFinalDepuis($entry->previousEffectif());
                 $entry->save();
             }
@@ -103,6 +127,74 @@ class RecordSaleOnFicheElevageAction
         }
 
         return $bandesTouchees;
+    }
+
+    /**
+     * Ticket VOL-1 / VOL-2 — emplacement (`repro` / `sevre` / `jeune`, plus `quatre` pour les pondeuses) où la ligne range ses
+     * sujets vendus, ou null si la bande n'est pas une bande de volailles (la vente ne se ventile alors pas) ou si la
+     * catégorie du produit n'appartient pas à la famille de la bande (un « Reproducteur » ne se vend pas sur une bande de
+     * pondeuses, ni une « Poulette » sur une bande de reproducteurs).
+     *
+     * @param  array<string, mixed>  $ligne
+     */
+    public function emplacementDeLaLigne(?LivestockLot $lot, array $ligne): ?string
+    {
+        $espece = $lot === null ? null : EffectifParCategorieService::especeDuLot($lot->loadMissing('species'));
+        if (! EffectifParCategorieService::estVolailles($espece)) {
+            return null;
+        }
+
+        $cle = $ligne['categorie_effectif'] ?? (isset($ligne['product_id']) ? Product::find($ligne['product_id'])?->categorie_effectif : null);
+
+        return $espece === EffectifParCategorieService::VOLAILLES_PONTE
+            ? StadePondeuse::emplacement($cle)
+            : CategorieVolaille::emplacement($cle);
+    }
+
+    /**
+     * Ticket VOL-1 — motif français du refus d'un jeu de lignes de vente, ou null. Aucune écriture : appelable AVANT une
+     * transaction (la caisse web) comme à l'intérieur (`execute`). Refuse, sur une bande de volailles reproductrices :
+     * (a) un départ par catégorie non saisi ; (b) un produit sans catégorie d'effectif valide.
+     *
+     * (c) une vente datée AVANT le départ de la bande (le jour n'est pas dans la chaîne).
+     *
+     * @param  array<int, array<string, mixed>>  $lignes
+     * @param  ?string  $jour  jour de la vente (AAAA-MM-JJ), aujourd'hui par défaut
+     */
+    public function refusDesLignes(array $lignes, ?string $jour = null): ?string
+    {
+        foreach ($lignes as $ligne) {
+            $lotId = $ligne['lot_id'] ?? null;
+            if (empty($lotId) || (int) ($ligne['qty'] ?? 0) <= 0) {
+                continue;
+            }
+
+            $lot = LivestockLot::with('species')->find($lotId);
+            $espece = $lot === null ? null : EffectifParCategorieService::especeDuLot($lot);
+            if (! EffectifParCategorieService::estVolailles($espece)) {
+                continue;
+            }
+            $ponte = $espece === EffectifParCategorieService::VOLAILLES_PONTE;
+
+            $tete = app(EffectifParCategorieService::class)->teteDeChaine($lotId);
+            if ($tete === null) {
+                return $ponte ? MotifsRefusPush::venteSansDepartPondeuses($lot->code) : MotifsRefusPush::venteSansDepart($lot->code);
+            }
+            $jourDeLaVente = $jour ?: now()->format('Y-m-d');
+            if ($jourDeLaVente < $tete->entry_date->format('Y-m-d')) {
+                return MotifsRefusPush::venteAvantLeDepart(\Carbon\Carbon::parse($jourDeLaVente)->format('d/m/Y'), $tete->entry_date->format('d/m/Y'));
+            }
+
+            if ($this->emplacementDeLaLigne($lot, $ligne) === null) {
+                $produit = isset($ligne['product_id']) ? Product::find($ligne['product_id']) : null;
+
+                return $ponte
+                    ? MotifsRefusPush::venteSansStade($produit?->name ?? 'sans nom')
+                    : MotifsRefusPush::venteSansCategorie($produit?->name ?? 'sans nom');
+            }
+        }
+
+        return null;
     }
 
     /**

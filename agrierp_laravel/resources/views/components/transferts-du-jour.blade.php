@@ -10,7 +10,7 @@
             @if(($transferts['transfert_entree'] ?? 0) > 0 && ($transferts['transfert_sortie'] ?? 0) > 0) ; @endif
             @if(($transferts['transfert_sortie'] ?? 0) > 0)<strong>−{{ $transferts['transfert_sortie'] }}</strong> sorti(s)@endif
             — compris dans l'effectif final. Ils se modifient depuis l'écran
-            <a href="/transferts-bandes" class="font-bold underline">Transferts entre Bandes</a>.
+            <a wire:navigate href="/transferts-bandes" class="font-bold underline">Transferts entre Bandes</a>.
         </span>
     </div>
 @endif

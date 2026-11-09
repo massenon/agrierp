@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/sync/emissions_attestation.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/rh/attestations_repository.dart';
@@ -17,9 +19,9 @@ import 'cartes_attendues.dart';
 
 /// Ticket F0.64 — ATTESTATIONS (`rh-attestations.html`).
 ///
-/// ⚠️⚠️ **LE PDF EST PRODUIT ET COMPTÉ PAR LE SERVEUR.** L'aperçu est calculé au
-/// poste avec les mêmes règles ; le document officiel, lui, vient du serveur, qui
-/// en garde la trace d'audit. Hors ligne, rien n'est produit en cachette.
+/// ⚠️⚠️ **LE POSTE FABRIQUE LUI-MÊME LE PDF** (ATT-3) ; le serveur attribue le numéro et garde la trace d'audit
+/// (`POST /api/attestations/emissions`). Hors ligne, l'attestation est produite quand même, son numéro vide, et son
+/// émission attend dans la file.
 const _modeleEmploye =
     'Nous soussigné, Ferme École OLOUWACHEGOUN, attestons que [NOM], est '
     'employé(e) au sein de notre structure en qualité de [POSTE] sous contrat '
@@ -121,6 +123,9 @@ void main() {
       .insert(
         EmployeesCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           firstName: prenom,
           lastName: nom,
           position: Value(poste),
@@ -140,6 +145,9 @@ void main() {
       .insert(
         InternshipsCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           firstName: prenom,
           lastName: nom,
           school: Value(ecole),
@@ -148,26 +156,39 @@ void main() {
         ),
       );
 
+  /// Un modèle tel que le serveur le sert au tirage : texte, règle de signature et signataires du modèle officiel
+  /// (`ReglageSignature.defaut`). ⚠️ Sans eux, aucun signataire ne s'imprimerait : un modèle sans nom ne signe rien.
+  AttestationTemplatesCompanion modeleServeur(String cle, String type, String texte) {
+    final r = ReglageSignature.defaut;
+    SignataireModele sig(int n) => r.signataires[n]!;
+
+    return AttestationTemplatesCompanion.insert(
+      id: uuid(cle),
+      type: type,
+      bodyText: texte,
+      seuilSignatureMois: Value(r.seuilMois),
+      sig1Titre: Value(sig(1).titre),
+      sig1Nom: Value(sig(1).nom),
+      sig1Fonction: Value(sig(1).fonction),
+      sig2Titre: Value(sig(2).titre),
+      sig2Nom: Value(sig(2).nom),
+      sig2Fonction: Value(sig(2).fonction),
+      sig3Titre: Value(sig(3).titre),
+      sig3Nom: Value(sig(3).nom),
+      sig3Fonction: Value(sig(3).fonction),
+      sig1Court: Value(sig(1).court),
+      sig2Court: Value(sig(2).court),
+      sig3Court: Value(sig(3).court),
+      sig1Long: Value(sig(1).long),
+      sig2Long: Value(sig(2).long),
+      sig3Long: Value(sig(3).long),
+    );
+  }
+
   Future<void> modeles({bool stagiaires = true}) async {
-    await db
-        .into(db.attestationTemplates)
-        .insert(
-          AttestationTemplatesCompanion.insert(
-            id: uuid('m-employe'),
-            type: 'employe',
-            bodyText: _modeleEmploye,
-          ),
-        );
+    await db.into(db.attestationTemplates).insert(modeleServeur('m-employe', 'employe', _modeleEmploye));
     if (stagiaires) {
-      await db
-          .into(db.attestationTemplates)
-          .insert(
-            AttestationTemplatesCompanion.insert(
-              id: uuid('m-stagiaire'),
-              type: 'stagiaire',
-              bodyText: _modeleStagiaire,
-            ),
-          );
+      await db.into(db.attestationTemplates).insert(modeleServeur('m-stagiaire', 'stagiaire', _modeleStagiaire));
     }
   }
 
@@ -374,6 +395,8 @@ void main() {
           // ⚠️ `Y-m-d` : un ISO complet décalerait d'un jour selon le fuseau.
           'start_date': '2024-03-01',
           'note': 'Sérieux',
+          // ATT-1 : la civilité part toujours (accord grammatical du texte).
+          'civilite': 'M.',
         });
         expect(String.fromCharCodes(pdf.octets), startsWith('%PDF'));
         expect(pdf.fichier, 'attestation-agossou-jean.pdf');
@@ -399,6 +422,7 @@ void main() {
           'person_id': 'x',
           'start_date': '2026-02-01',
           'end_date': '2026-05-31',
+          'civilite': 'M.',
         });
       },
     );
@@ -632,7 +656,7 @@ void main() {
                     enregistrer ??
                     (pdf) async {
                       livrees.add(pdf);
-                      return r'C:\Documents\AgriERP\attestation.pdf';
+                      return r'C:\Documents\LogiAgriERP\attestation.pdf';
                     },
                 imprimer: (pdf) async => imprimees.add(pdf),
               ),
@@ -762,9 +786,10 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('att-apercu-corps'))).data,
         contains('sous contrat CDD'),
       );
-      expect(find.byKey(const Key('att-apercu-note')), findsOneWidget);
+      // ATT-2 : la saisie de l'émetteur EST l'appréciation imprimée (elle remplace la phrase standard du modèle).
+      expect(find.byKey(const Key('att-apercu-appreciation')), findsOneWidget);
       expect(
-        tester.widget<Text>(find.byKey(const Key('att-apercu-note'))).data,
+        tester.widget<Text>(find.byKey(const Key('att-apercu-appreciation'))).data,
         'Très assidu',
       );
     });
@@ -785,7 +810,7 @@ void main() {
         expect(contenu(tester, 'att-fin'), '31/05/2026');
         expect(
           tester.widget<Text>(find.byKey(const Key('att-apercu-titre'))).data,
-          'ATTESTATION DE STAGE',
+          'ATTESTATION DE FORMATION',
         );
         expect(
           tester.widget<Text>(find.byKey(const Key('att-apercu-corps'))).data,
@@ -801,9 +826,15 @@ void main() {
       await afficher(tester);
 
       expect(find.text('FERME ÉCOLE OLOUWACHEGOUN'), findsOneWidget);
-      expect(find.text('RCCM : RB/PNO/22 A 33870'), findsOneWidget);
-      expect(find.text('M. Olouchègoun'), findsOneWidget);
-      expect(find.text('Fait à Ikpinlè, le 28/07/2026.'), findsOneWidget);
+      expect(find.textContaining('RCCM : RB/PNO/22 A 33870'), findsOneWidget);
+      // ATT-2 : le LOGO RÉEL de la ferme (en-tête et filigrane), plus une icône générique.
+      expect(find.byKey(const Key('att-apercu-logo')), findsOneWidget);
+      expect(find.byKey(const Key('att-apercu-filigrane')), findsOneWidget);
+      expect(find.text('ATTAN - ÉWÉ, le 28 juillet 2026'), findsOneWidget);
+      // Sans durée connue : le promoteur seul signe, avec la fonction du modèle.
+      expect(find.byKey(const Key('att-apercu-sig-1')), findsOneWidget);
+      expect(find.text('Hassimiyou O. OLOUKOUNLE'), findsOneWidget);
+      expect(find.text('Directeur de la Ferme ÉCOLE OLOUWACHEGOUN'), findsOneWidget);
       // L'IFU de démonstration du prototype n'est PAS repris.
       expect(find.textContaining('3202601234567'), findsNothing);
     });
@@ -843,24 +874,38 @@ void main() {
       expect(serveur.requetes, isEmpty);
     });
 
+    const emission = {'numero': 'N°04/2026/FEO/DG', 'deja_enregistree': false};
+
+    Future<void> generer(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('att-generer')));
+      // ⚠️ Le PDF se fabrique en lisant les polices et images du bundle (disque réel) : hors du temps simulé.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
+      await tester.pumpAndSettle();
+    }
+
     testWidgets(
-      '⚠️⚠️ une génération réussie écrit le PDF et propose l\'impression',
+      '⚠️⚠️ une génération réussie déclare l\'émission, fabrique le PDF au poste et propose l\'impression',
       (tester) async {
         await donnees();
-        await afficher(tester);
+        await afficher(tester, faux: _ServeurFeint(corps: emission));
         await choisirPersonne(tester, 'AGOSSOU Jean');
 
-        await tester.tap(find.byKey(const Key('att-generer')));
-        await tester.pumpAndSettle();
+        await generer(tester);
 
-        expect(serveur.requetes, hasLength(1));
+        final r = serveur.requetes.single;
+        expect(r.path, '/api/attestations/emissions');
+        expect(r.method, 'POST');
+        expect((r.data as Map)['type'], 'employe');
+        expect((r.data as Map)['id'], hasLength(36));
+        expect((r.data as Map)['issued_at'], endsWith('Z'));
         expect(livrees, hasLength(1));
         expect(livrees.single.fichier, 'attestation-agossou-jean.pdf');
+        // ⚠️ Un VRAI PDF, fabriqué ici : pas la réponse du serveur.
+        expect(String.fromCharCodes(livrees.single.octets.take(5)), '%PDF-');
         expect(find.byKey(const Key('att-reussi')), findsOneWidget);
-        expect(
-          find.textContaining(r'C:\Documents\AgriERP\attestation.pdf'),
-          findsOneWidget,
-        );
+        expect(find.textContaining(r'C:\Documents\LogiAgriERP\attestation.pdf'), findsOneWidget);
+        expect(find.textContaining('N°04/2026/FEO/DG'), findsWidgets);
+        expect(await FileEmissionsAttestation(db).lire(), isEmpty);
 
         await tester.tap(find.byKey(const Key('att-imprimer')));
         await tester.pumpAndSettle();
@@ -869,24 +914,60 @@ void main() {
     );
 
     testWidgets(
-      '⚠️⚠️ hors ligne : échec visible, aucun fichier, aucun succès',
+      '⚠️⚠️ hors ligne : l\'attestation est PRODUITE quand même, numéro vide, émission en file',
       (tester) async {
         await donnees();
         await afficher(tester, faux: _ServeurFeint(horsLigne: true));
         await choisirPersonne(tester, 'AGOSSOU Jean');
 
-        await tester.tap(find.byKey(const Key('att-generer')));
-        await tester.pumpAndSettle();
+        await generer(tester);
 
-        expect(find.byKey(const Key('att-echec')), findsOneWidget);
-        expect(find.byKey(const Key('att-reussi')), findsNothing);
-        expect(find.textContaining('nécessite le réseau'), findsOneWidget);
-        expect(livrees, isEmpty);
-        expect(find.byKey(const Key('att-imprimer')), findsNothing);
+        expect(find.byKey(const Key('att-reussi')), findsOneWidget);
+        expect(find.byKey(const Key('att-echec')), findsNothing);
+        expect(find.textContaining('numéro à attribuer'), findsOneWidget);
+        expect(livrees, hasLength(1));
+        expect(String.fromCharCodes(livrees.single.octets.take(5)), '%PDF-');
+        expect(find.byKey(const Key('att-imprimer')), findsOneWidget);
+
+        final file = await FileEmissionsAttestation(db).lire();
+        expect(file, hasLength(1));
+        expect(file.single.type, 'employe');
       },
     );
 
-    testWidgets('un refus de rôle affiche le message du serveur', (
+    testWidgets('sans session : produite aussi, émission en file', (tester) async {
+      await donnees();
+      await tester.pumpWidget(const SizedBox());
+      tester.view.physicalSize = const Size(1600, 2600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: AttestationsVue(
+                depot: depot(),
+                maintenant: jour,
+                enregistrer: (pdf) async {
+                  livrees.add(pdf);
+                  return 'x.pdf';
+                },
+                imprimer: (pdf) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await choisirPersonne(tester, 'AGOSSOU Jean');
+
+      await generer(tester);
+
+      expect(livrees, hasLength(1));
+      expect(await FileEmissionsAttestation(db).lire(), hasLength(1));
+    });
+
+    testWidgets('⚠️ un refus de rôle : rien n\'est produit, rien n\'est mis en file', (
       tester,
     ) async {
       await donnees();
@@ -901,11 +982,11 @@ void main() {
       );
       await choisirPersonne(tester, 'AGOSSOU Jean');
 
-      await tester.tap(find.byKey(const Key('att-generer')));
-      await tester.pumpAndSettle();
+      await generer(tester);
 
       expect(find.textContaining('Votre rôle ne permet pas'), findsOneWidget);
       expect(livrees, isEmpty);
+      expect(await FileEmissionsAttestation(db).lire(), isEmpty);
     });
 
     testWidgets('une écriture de fichier qui échoue est dite, pas avalée', (
@@ -914,12 +995,12 @@ void main() {
       await donnees();
       await afficher(
         tester,
+        faux: _ServeurFeint(corps: emission),
         enregistrer: (_) async => throw const FileSystemExceptionFeinte(),
       );
       await choisirPersonne(tester, 'AGOSSOU Jean');
 
-      await tester.tap(find.byKey(const Key('att-generer')));
-      await tester.pumpAndSettle();
+      await generer(tester);
 
       expect(find.byKey(const Key('att-echec')), findsOneWidget);
       expect(
@@ -942,9 +1023,7 @@ void main() {
       expect(contenu(tester, 'att-texte-employe'), _modeleEmploye);
       expect(contenu(tester, 'att-texte-stagiaire'), _modeleStagiaire);
       expect(
-        find.text(
-          'Balises disponibles : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]',
-        ),
+        find.textContaining('Balises : [NOM], [POSTE], [CONTRAT], [DATE_DEBUT], [DATE_FIN]'),
         findsOneWidget,
       );
       expect(find.text('ENREGISTRER CE MODÈLE'), findsNothing);

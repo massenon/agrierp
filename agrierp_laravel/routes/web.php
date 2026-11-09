@@ -44,13 +44,12 @@ use Illuminate\Support\Facades\Route;
  */
 
 Route::get('/up', function () {
-    return response()->json(['status' => 'ok', 'app' => 'AgriERP', 'sprint' => 0]);
+    return response()->json(['status' => 'ok', 'app' => 'LogiAgriERP', 'sprint' => 0]);
 })->name('health-check');
 
 // Ticket 1.1 (Sprint 1) — login.html → Livewire\Auth\Login
 Route::middleware('guest')->group(function () {
     Route::get('/login', \App\Livewire\Auth\Login::class)->name('login');
-    Route::get('/reset-password/{token}', \App\Livewire\Auth\ResetPassword::class)->name('password.reset');
 });
 
 // Sprint 14, ticket 14.15 : welcome.html + landing-page.html → pages publiques
@@ -91,6 +90,12 @@ Route::post('/logout', \App\Http\Controllers\Auth\LogoutController::class)
     ->name('logout')
     ->middleware('auth');
 
+// MDP-1 — changement de mot de passe OBLIGATOIRE (mot de passe temporaire posé par un administrateur). `auth` seul :
+// `ChangementMotDePasseObligatoire` (groupe web) ne laisse passer que cette page tant que le drapeau est vrai.
+Route::get('/changer-mot-de-passe', \App\Livewire\Auth\ChangementMotDePasseObligatoire::class)
+    ->name('mot-de-passe.obligatoire')
+    ->middleware('auth');
+
 // Sprint VW — verrou de session web (PRD docs/prd/verrou-web.md). Routes `auth` seul, comme /mon-profil : le verrou
 // protège la session de tout compte connecté. `SessionVerrouillee` (groupe web) les laisse passer verrouillées.
 Route::post('/verrouiller', [\App\Http\Controllers\Auth\VerrouSessionController::class, 'verrouiller'])
@@ -112,6 +117,11 @@ Route::get('/dashboard', \App\Livewire\Dashboard\Index::class)
 Route::get('/mon-profil', \App\Livewire\Profil\MonProfil::class)
     ->name('profil.index')
     ->middleware('auth');
+
+// PWA-1 (08/11/2026) : « Activer le mode hors ligne » — appairage de ce navigateur comme un poste (caisse hors ligne).
+Route::get('/mode-hors-ligne', \App\Livewire\Profil\ModeHorsLigne::class)
+    ->name('profil.mode-hors-ligne')
+    ->middleware(['auth', 'can:manage-ventes']);
 
 // Sprint 1, ticket 1.5 : aide-a-propos.html → page statique
 Route::get('/aide-a-propos', \App\Livewire\Aide\Index::class)
@@ -235,11 +245,15 @@ Route::get('/clients/{customer}/profil', \App\Livewire\Ventes\ProfileClient::cla
     ->name('ventes.profile-client')
     ->middleware(['auth', 'can:view-ventes']);
 
-// Correction ticket 4.7 : Paramètres > Intégrations & Notifications (SMTP + SMS réels)
-// Pas un écran du prototype — construit suite à une demande explicite, admin uniquement.
-Route::get('/parametres-integrations', \App\Livewire\Parametres\Integrations::class)
-    ->name('parametres.integrations')
-    ->middleware(['auth', 'can:view-parametres']);
+// Ticket AC-3 — LECTURE d'une pièce justificative (achat ou dépense), sur le disque privé : jamais d'URL publique.
+Route::get('/justificatifs/{type}/{id}', function (string $type, string $id) {
+    abort_unless(in_array($type, ['achat', 'depense'], true), 404);
+
+    $reponse = app(\App\Services\JustificatifService::class)->lire($type, $id);
+    abort_if($reponse === null, 404, 'Aucune pièce justificative pour cet enregistrement.');
+
+    return $reponse;
+})->name('justificatifs.show')->middleware(['auth', 'can:view-achats']);
 
 // Sprint 5, ticket 5.2 : achats-commandes.html → Livewire\Achats\AchatsCommandesHub
 Route::get('/achats-commandes', \App\Livewire\Achats\AchatsCommandesHub::class)
@@ -274,8 +288,14 @@ Route::get('/seuils-alerte', \App\Livewire\Stocks\SeuilsAlerte::class)
     ->name('stocks.seuils')
     ->middleware(['auth', 'can:view-stocks']);
 
+// Ticket IMPORT-1 : « Importation en masse » (tableur xlsx, modèle à télécharger) → Livewire\Stocks\ImportationMasse.
+// `can:importation-masse` (Gate de AppServiceProvider) = au moins un des droits manage-stocks / manage-ventes / manage-achats.
+Route::get('/importation-masse', \App\Livewire\Stocks\ImportationMasse::class)
+    ->name('stocks.importation')
+    ->middleware(['auth', 'can:importation-masse']);
+
 // Sprint 7, ticket 7.1 : facturation.html → Livewire\Facturation\Facturation
-Route::get('/facturation', \App\Livewire\Facturation\Facturation::class)
+Route::get('/facturation',\App\Livewire\Facturation\Facturation::class)
     ->name('facturation.index')
     ->middleware(['auth', 'can:view-facturation']);
 

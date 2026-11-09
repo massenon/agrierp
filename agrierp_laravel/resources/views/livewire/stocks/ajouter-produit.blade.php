@@ -27,7 +27,7 @@
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Filière d'élevage <span class="text-outline normal-case font-normal">(si applicable)</span></label>
-                    <select wire:model="species_id" class="w-full h-11 px-md border border-outline-variant rounded-lg bg-white text-sm focus:ring-2 focus:ring-brand-emerald outline-none">
+                    <select wire:model.live="species_id" class="w-full h-11 px-md border border-outline-variant rounded-lg bg-white text-sm focus:ring-2 focus:ring-brand-emerald outline-none">
                         <option value="">-- Aucune --</option>
                         @foreach($this->speciesOptions as $sp)
                             <option value="{{ $sp->id }}">{{ $sp->label }}</option>
@@ -35,6 +35,25 @@
                     </select>
                 </div>
             </div>
+
+            @if($this->estAviculture)
+                {{-- Ticket VOL-1 : la caisse range la vente de sujets vivants dans la catégorie d'effectif du produit. --}}
+                <div>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Catégorie d'effectif <span class="text-outline normal-case font-normal">(volailles)</span></label>
+                    <select wire:model="categorie_effectif" class="w-full sm:max-w-[260px] h-11 px-md border rounded-lg bg-white text-sm focus:ring-2 focus:ring-brand-emerald outline-none {{ $errors->has('categorie_effectif') ? 'is-invalid' : 'border-outline-variant' }}">
+                        <option value="">-- Aucune --</option>
+                        @foreach($this->categoriesEffectif as $groupe => $categories)
+                            <optgroup label="{{ $groupe }}">
+                                @foreach($categories as $cle => $libelle)
+                                    <option value="{{ $cle }}">{{ $libelle }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                    <p class="text-[10px] text-outline mt-xs">La vente de ce produit sort de cette catégorie (fiche Volailles Reproducteurs) ou de ce stade (fiche Pondeuses) : une catégorie de reproducteurs ne se vend que sur une bande de reproducteurs, un stade de pondeuses que sur une bande de pondeuses. Sans elle, la vente sur une bande de volailles est refusée.</p>
+                    @error('categorie_effectif') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                </div>
+            @endif
 
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase tracking-wider mb-xs">Unité de comptage *</label>
@@ -94,7 +113,7 @@
             </div>
 
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
-                <a href="/catalogue-produits" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</a>
+                <a wire:navigate href="/catalogue-produits" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</a>
                 <button type="submit" wire:loading.attr="disabled" wire:target="save" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest disabled:opacity-50">
                     {{ $productId ? 'Enregistrer les modifications' : 'Enregistrer' }}
                 </button>

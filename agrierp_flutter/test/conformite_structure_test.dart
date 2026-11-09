@@ -142,6 +142,15 @@ void main() {
   /// poste gardés par décision client, à leur place), au lieu de celle de la maquette. Les colonnes du Blade
   /// sont en outre LUES dans le Blade par `test/soins_infirmerie_calendrier_test.dart`.
   const bladeFaitFoi = <String, List<List<String>>>{
+    // Tickets #41 / #42 (client, 26/10/2026) : le Blade de la liste d'achats porte trois colonnes de plus que la maquette
+    // (« Montant Payé » | « Montant Total » | « Dette » à la place du seul « Montant Total »). Le web est le maître ;
+    // la suite attendue est celle du Blade, lue aussi par `liste_achats_detail_test.dart`.
+    'liste-achats.html': [
+      [
+        'Référence Achat', 'Date', 'Fournisseur', 'Catégorie', 'Montant Payé', 'Montant Total', 'Dette', 'Statut',
+        'Actions',
+      ],
+    ],
     // Blade : six colonnes, sans le « Statut » de la maquette ; « Statut » du poste gardé APRÈS elles.
     'vms-registre.html': [
       ['Date', 'Lot / Espèce', "Type d'action", 'Produit', 'Dose', 'Actions', 'Statut'],

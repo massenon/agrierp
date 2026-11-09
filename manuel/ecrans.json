@@ -14,10 +14,10 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP"
+            "LogiAgriERP"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Connexion",
+        "title": "LogiAgriERP | Connexion",
         "url": "/login"
     },
     "01-dashboard": {
@@ -72,11 +72,11 @@
             "Marge"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Bienvenue, M. OLOUKOUNLE Olouchègoun Hassimiyou 👋"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/dashboard"
     },
     "02-notifications": {
@@ -123,11 +123,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "notifications Centre de Notifications"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/notifications"
     },
     "03-mon-profil": {
@@ -175,11 +175,11 @@
             "IP"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "person Mon Profil"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/mon-profil"
     },
     "10-elevage-gestion": {
@@ -217,11 +217,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "pets Gestion Élevage"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/gestion-elevage"
     },
     "11-elevage-bandes": {
@@ -273,11 +273,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "layers Bandes & Sujets"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/gestion-bandes"
     },
     "12-elevage-sujets": {
@@ -322,11 +322,11 @@
             "QUANTITÉ"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "pets Enregistrer des Sujets"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/enregistrer-sujets"
     },
     "13-fiche-pondeuses": {
@@ -396,11 +396,11 @@
             "Stock Final"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "egg Fiches Pondeuses - Aviculture"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fiche-volailles-pondeuses"
     },
     "14-fiche-lapins": {
@@ -478,11 +478,11 @@
             "Total"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "cruelty_free Fiches Lapins - Cuniculture"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fiche-lapins"
     },
     "15-fiche-porcs": {
@@ -561,11 +561,11 @@
             "Total"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "pets Fiches Porcs - Porciculture"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fiche-porcs"
     },
     "16-fiche-reproducteurs": {
@@ -605,11 +605,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "grid_view Fiches Volailles - Reproducteurs, Poussins & Goliath"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fiche-volailles-reproducteurs"
     },
     "17-fiche-escargots": {
@@ -648,11 +648,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Module Héliciculture non activé"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fiche-escargots"
     },
     "18-reproduction": {
@@ -706,11 +706,11 @@
             "ACTION"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "cruelty_free Suivi Reproduction — Cuniculture (Lapins)"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/suivi-reproduction"
     },
     "19-soins-suivi": {
@@ -759,11 +759,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "monitor_heart Suivi Sanitaire"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/soins-vaccins-hub?tab=suivi"
     },
     "20-soins-calendrier": {
@@ -822,11 +822,11 @@
             "2/9"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "event Calendrier Vétérinaire"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/soins-vaccins-hub?tab=calendrier"
     },
     "21-soins-registre": {
@@ -876,11 +876,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "vaccines Registre Vétérinaire"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/soins-vaccins-hub?tab=registre"
     },
     "22-transformation": {
@@ -933,11 +933,11 @@
             "STATUT"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "restaurant Bon d'Abattage & Transformation"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/transformation"
     },
     "23-elevage-dashboard": {
@@ -981,10 +981,10 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP"
+            "LogiAgriERP"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/elevage-dashboard"
     },
     "24-bilan-technico": {
@@ -1022,11 +1022,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "account_balance_wallet Bilan Technico-Économique de Lot"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/bilan-technico-economique"
     },
     "25-analyse-croissance": {
@@ -1074,11 +1074,11 @@
             "STATUT VS OBJECTIF"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "monitoring Analyse des Croissances — GMQ"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/analyse-croissance"
     },
     "26-registre-reproducteurs": {
@@ -1141,11 +1141,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "pets Registre des Reproducteurs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/registre-reproducteurs"
     },
     "27-animal-details": {
@@ -1193,11 +1193,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Sujet #LAP-R001"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/sujets/01a01169-0864-700f-ba5b-6c921df97cd9"
     },
     "28-parametres-elevage": {
@@ -1247,11 +1247,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "restaurant Fiche de Rationnement des Animaux"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-elevage"
     },
     "30-pos": {
@@ -1310,10 +1310,10 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP"
+            "LogiAgriERP"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/ventes-devis?tab=vente"
     },
     "31-devis": {
@@ -1371,11 +1371,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "request_quote Devis & Proforma"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/ventes-devis?tab=devis"
     },
     "32-historique-ventes": {
@@ -1434,11 +1434,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "receipt_long Historique des Ventes"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/ventes-devis?tab=historique"
     },
     "33-retours-avoirs": {
@@ -1492,11 +1492,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "assignment_return Retours et Avoirs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/ventes-devis?tab=retours"
     },
     "34-clients-liste": {
@@ -1558,11 +1558,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "groups Liste des Clients"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/creances-clients?tab=liste"
     },
     "35-clients-dettes": {
@@ -1622,11 +1622,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "request_quote Suivi des Dettes Clients"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/creances-clients?tab=dettes"
     },
     "36-clients-relances": {
@@ -1683,11 +1683,11 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "campaign Relances & Recouvrement"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/creances-clients?tab=relances"
     },
     "37-clients-avances": {
@@ -1745,11 +1745,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "savings Historique des Avances"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/creances-clients?tab=avances"
     },
     "38-client-profil": {
@@ -1800,11 +1800,11 @@
             "Statut"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Profil Client"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/clients/01a01168-8b88-7332-837e-f503dec0ab71/profil"
     },
     "40-achat-enregistrer": {
@@ -1865,11 +1865,11 @@
             "MONTANT"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Enregistrer un Achat"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/achats-commandes?tab=enregistrer"
     },
     "41-achat-liste": {
@@ -1923,11 +1923,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "list_alt Liste d'Achats"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/achats-commandes?tab=liste"
     },
     "42-achat-bons": {
@@ -1986,11 +1986,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Bons de Commande"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/achats-commandes?tab=bons"
     },
     "43-fournisseurs-fiches": {
@@ -2046,11 +2046,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "contact_page Fiches Fournisseurs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fournisseurs?tab=fiches"
     },
     "44-fournisseurs-ajouter": {
@@ -2100,11 +2100,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "person_add Fournisseurs — Ajout"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fournisseurs?tab=ajouter"
     },
     "45-fournisseurs-dettes": {
@@ -2152,11 +2152,11 @@
             "STATUT"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "account_balance_wallet Dettes Fournisseurs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fournisseurs?tab=dettes"
     },
     "46-fournisseur-profil": {
@@ -2205,11 +2205,11 @@
             "Statut"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "Profil Fournisseur"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/fournisseurs/01a01168-8b63-713a-affc-94eb80de5082/profil"
     },
     "47-saisie-depenses": {
@@ -2265,11 +2265,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "request_page Saisie des Dépenses"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/saisie-depenses"
     },
     "50-stocks-tableau": {
@@ -2323,11 +2323,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "inventory_2 Gestion des Stocks"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/gestion-stocks?tab=tableau"
     },
     "51-stocks-mouvements": {
@@ -2377,11 +2377,11 @@
             "VALEUR"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "inventory_2 Gestion des Stocks"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/gestion-stocks?tab=mouvements"
     },
     "52-stocks-ajustements": {
@@ -2429,11 +2429,11 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "inventory_2 Gestion des Stocks"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/gestion-stocks?tab=ajustements"
     },
     "53-catalogue-produits": {
@@ -2487,11 +2487,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "storefront Catalogue Produits"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/catalogue-produits"
     },
     "54-ajouter-produit": {
@@ -2545,11 +2545,11 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "add_box Ajouter un Produit"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/produits/ajouter"
     },
     "55-seuils-alerte": {
@@ -2594,11 +2594,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "notification_important Seuils d'Alerte"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/seuils-alerte"
     },
     "60-facturation": {
@@ -2645,11 +2645,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "receipt_long Facturation & MeCeF"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/facturation"
     },
     "65-rh-employes": {
@@ -2703,11 +2703,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "badge Registre des Employés"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/personnel-stages?tab=employes"
     },
     "66-rh-pointage": {
@@ -2761,11 +2761,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "schedule Feuille de Pointage"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/personnel-stages?tab=pointage"
     },
     "67-rh-paie": {
@@ -2823,11 +2823,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "payments Gestion de la Paie"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/personnel-stages?tab=paie"
     },
     "68-rh-stagiaires": {
@@ -2881,11 +2881,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "school Registre des Stagiaires"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/personnel-stages?tab=stagiaires"
     },
     "69-rh-attestations": {
@@ -2930,11 +2930,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "workspace_premium Attestations de Travail & de Stage"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/personnel-stages?tab=attestations"
     },
     "70-compta-hub": {
@@ -2972,11 +2972,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "account_balance Comptabilité"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/comptabilite-hub"
     },
     "71-plan-comptable": {
@@ -3023,11 +3023,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "menu_book Plan Comptable SYSCOHADA"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/plan-comptable"
     },
     "72-journal": {
@@ -3077,11 +3077,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "account_balance Journal Comptable"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/journal-comptable"
     },
     "73-grand-livre": {
@@ -3129,11 +3129,11 @@
             "SOLDE PROGRESSIF"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "import_contacts Grand Livre"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/grand-livre"
     },
     "74-balance-generale": {
@@ -3182,11 +3182,11 @@
             "CRÉDIT"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "balance Balance Générale"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/balance-generale"
     },
     "75-balance-agee": {
@@ -3235,11 +3235,11 @@
             "TOTAL"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "schedule Balance Âgée"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/balance-agee"
     },
     "76-bilan": {
@@ -3277,11 +3277,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "balance Bilan Simplifié de l'Entreprise"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapport-bilan"
     },
     "77-etats-financiers": {
@@ -3324,11 +3324,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "description États Financiers"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/etats-financiers"
     },
     "78-declaration-tva": {
@@ -3381,11 +3381,11 @@
             "FOURNISSEUR"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "receipt_long Déclaration TVA"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/declaration-tva"
     },
     "79-rapprochement": {
@@ -3432,11 +3432,11 @@
             "STATUT"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "sync_alt Rapprochement Bancaire"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapprochement-bancaire"
     },
     "80-immobilisations": {
@@ -3499,11 +3499,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "domain Immobilisations"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/immobilisations"
     },
     "81-analytique": {
@@ -3548,11 +3548,11 @@
             "TAUX"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "insights Comptabilité Analytique"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/comptabilite-analytique"
     },
     "82-cloture": {
@@ -3602,11 +3602,11 @@
             "ACTION (ADMIN)"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "event_repeat Bascule & Clôture d'Exercice Comptable"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/cloture-exercice"
     },
     "85-rapport-mensuel": {
@@ -3651,11 +3651,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "summarize Rapport Mensuel de Synthèse"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapport-mensuel"
     },
     "86-rapports-tresorerie": {
@@ -3707,11 +3707,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "bar_chart Rapports & Exports"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapports-exports?tab=tresorerie"
     },
     "87-rapports-recettes": {
@@ -3761,11 +3761,11 @@
             "Montant"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "bar_chart Rapports & Exports"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapports-exports?tab=recettes-depenses"
     },
     "88-rapports-creances": {
@@ -3816,11 +3816,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "bar_chart Rapports & Exports"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapports-exports?tab=creances"
     },
     "89-rapports-stocks": {
@@ -3871,11 +3871,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "bar_chart Rapports & Exports"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapports-exports?tab=stocks-synth"
     },
     "90-rapports-elevage": {
@@ -3935,11 +3935,11 @@
             "EFFECTIF FINAL"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "bar_chart Rapports & Exports"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/rapports-exports?tab=elevage-synth"
     },
     "92-param-entreprise": {
@@ -4006,11 +4006,11 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "domain Données de l'Entreprise"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=entreprise"
     },
     "93-param-utilisateurs": {
@@ -4067,11 +4067,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "manage_accounts Gestion des Utilisateurs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=utilisateurs"
     },
     "94-param-roles": {
@@ -4139,11 +4139,11 @@
             "Actions"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "admin_panel_settings Rôles & Permissions"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=roles"
     },
     "95-param-modules": {
@@ -4190,11 +4190,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "tune Modules Actifs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=modules"
     },
     "96-param-sauvegardes": {
@@ -4252,11 +4252,11 @@
             "ACTION"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "database Sauvegardes de la Base de Données"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=sauvegardes"
     },
     "97-param-restauration": {
@@ -4309,11 +4309,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "restore_from_trash Restauration"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=restauration"
     },
     "98-param-audit": {
@@ -4367,11 +4367,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "security Audit Logs & Sécurité"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=audit"
     },
     "99-param-paiement": {
@@ -4421,11 +4421,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "account_balance_wallet Modes de Paiement"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-hub?tab=paiement"
     },
     "A0-bareme-its": {
@@ -4473,11 +4473,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "functions Barème IR-PTS / ITS"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/bareme-its"
     },
     "A1-integrations": {
@@ -4526,11 +4526,11 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "settings_input_antenna Intégrations & Notifications"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/parametres-integrations"
     },
     "A2-admin-documents": {
@@ -4581,11 +4581,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "description Documents Administratifs"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/administration?tab=documents"
     },
     "A3-admin-courriers": {
@@ -4636,11 +4636,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "mail Gestion des Courriers"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/administration?tab=courriers"
     },
     "A4-admin-archivage": {
@@ -4691,11 +4691,11 @@
             "ACTIONS"
         ],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "archive Archivage des Documents"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/administration?tab=archivage"
     },
     "A5-aide": {
@@ -4736,11 +4736,11 @@
         "champs": [],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "help Aide & À Propos"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/aide-a-propos"
     },
     "A6-contact": {
@@ -4785,11 +4785,11 @@
         ],
         "colonnes": [],
         "h1": [
-            "AgriERP",
+            "LogiAgriERP",
             "support_agent Contactez l'Éditeur"
         ],
         "hauteur": 841,
-        "title": "AgriERP | Ferme École Olouwachegoun",
+        "title": "LogiAgriERP | Ferme École Olouwachegoun",
         "url": "/contact-editeur"
     }
 }

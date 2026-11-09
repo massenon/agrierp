@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             FeedRationStandardsSeeder::class,
             ProphylaxisScheduleStandardsSeeder::class,
             FeedTypesSeeder::class,
+            ReleveTerrainSeeder::class,   // ticket RELEVES-1
             CostCentersSeeder::class,
             IncomeTaxBracketsSeeder::class,   // ticket 14.38 — bareme ITS
             FixedAssetsSeeder::class,   // ticket 14.26

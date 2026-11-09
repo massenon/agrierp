@@ -67,7 +67,7 @@ class SyncJournalComptableImportTest extends TestCase
         Role::findOrCreate('admin', 'web')->givePermissionTo($permissions);
         $this->admin = User::create([
             'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
         $this->actingAs($this->admin);

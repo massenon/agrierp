@@ -28,6 +28,8 @@ void main() {
       ('Dashboard Élevage', EcranPoste.dashboardElevage),
       ('Suivi Reproduction', EcranPoste.suiviReproduction),
       ('Soins et vaccins', EcranPoste.soinsEtVaccins),
+      // Ticket EL-1 — l'entrée « Transformation » du menu WEB (`layouts/app.blade.php`), absente de la maquette.
+      ('Transformation', EcranPoste.transformation),
       ('Paramètres Élevage', EcranPoste.parametresElevage),
     ],
     'VENTES FERME': [
@@ -49,6 +51,8 @@ void main() {
     ],
     'ADMINISTRATION': [
       ('Administration & Document', EcranPoste.administrationEtDocument),
+      // Ticket IMPORT-1 : entrée du menu web (groupe ADMINISTRATION), hors maquette.
+      ('Importation en masse', EcranPoste.importationMasse),
     ],
     'COMPTABILITÉ & ADMIN': [
       ('Comptabilité', EcranPoste.comptabilite),
@@ -102,8 +106,8 @@ void main() {
 
     expect(
       entrees.length,
-      19,
-      reason: 'la barre de la maquette en porte dix-neuf',
+      21,
+      reason: 'la barre de la maquette en porte dix-neuf entrées, plus « Transformation » du menu web (EL-1) et « Importation en masse » (IMPORT-1)',
     );
 
     // Quelques repères que le client a nommés explicitement.

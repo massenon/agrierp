@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\LivestockLot;
 use App\Models\LivestockTransfer;
 use App\Services\EffectifParCategorieService;
+use App\Support\StadePondeuse;
 use App\Support\ExerciceChoisi;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -80,6 +81,15 @@ class TransfertsBandes extends Component
         return match ($espece) {
             EffectifParCategorieService::LAPINS => ['repro' => 'Reproducteur', 'sevre' => 'Sous-mères', 'jeune' => 'Jeune'],
             EffectifParCategorieService::PORCS => ['repro' => 'Reproducteur', 'sevre' => 'Porcelet', 'jeune' => 'Porc Marchand'],
+            // Ticket VOL-1 : volailles reproductrices — Reproducteur / Poussin / Jeune.
+            EffectifParCategorieService::VOLAILLES_REPRO => ['repro' => 'Reproducteur', 'sevre' => 'Poussin', 'jeune' => 'Jeune'],
+            // Ticket VOL-2 : volailles pondeuses — les quatre libellés du barème, dans l'ordre de la chaîne.
+            EffectifParCategorieService::VOLAILLES_PONTE => [
+                'quatre' => StadePondeuse::LIBELLES[StadePondeuse::POUSSIN_PONTE],
+                'sevre' => StadePondeuse::LIBELLES[StadePondeuse::POUSSIN_CROISSANCE],
+                'jeune' => StadePondeuse::LIBELLES[StadePondeuse::POULETTE],
+                'repro' => StadePondeuse::LIBELLES[StadePondeuse::PONDEUSE],
+            ],
             default => [],
         };
     }
@@ -181,7 +191,7 @@ class TransfertsBandes extends Component
         $this->constitution = true;
         $this->quantity = (int) $lot->initial_quantity;
         $this->transfer_date = $lot->created_date->format('Y-m-d');
-        $this->categorie = EffectifParCategorieService::categorieDuStade($lot->stage) ?? '';
+        $this->categorie = EffectifParCategorieService::categorieDeLaBande($lot->loadMissing('species')) ?? '';
         $this->dispatch('open-modal', name: 'modal-transfert');
     }
 

@@ -41,7 +41,7 @@ class SyncFichesElevageValidationTest extends TestCase
         $this->utilisateur = User::create([
             'name' => 'Animalier', 'username' => 'elevage',
             'email' => 'elevage@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
 
         // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.

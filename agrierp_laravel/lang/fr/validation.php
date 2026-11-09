@@ -172,7 +172,25 @@ return [
     | Messages propres à un champ et à une règle (« champ.règle »). Vide : chaque écran passe ses
     | messages particuliers à `validate()`, au plus près de la règle.
     */
-    'custom' => [],
+    /*
+    | Ticket CONF-1 — logo et icône de l'entreprise : MÊMES messages au web (`DonneesEntreprise`), à l'API (demande `entreprise`
+    | du poste) et au poste (`FichiersEntreprise`, qui les recopie mot pour mot : garde `fichiers_entreprise_test`).
+    */
+    'fichiers_entreprise' => [
+        'logo' => [
+            'format' => 'Le logo doit être une image PNG, JPG ou WEBP.',
+            'taille' => 'Le logo ne doit pas dépasser 2 Mo.',
+        ],
+        'favicon' => [
+            'format' => "L'icône du site doit être un fichier ICO ou PNG.",
+            'taille' => "L'icône du site ne doit pas dépasser 500 Ko.",
+        ],
+    ],
+
+    'custom' => [
+        // Fiche client : l'IFU, facultatif, compte 13 chiffres (client des factures normalisées).
+        'ifu' => ['regex' => "L'IFU du client doit comporter 13 chiffres (laissez-le vide pour un client sans IFU)."],
+    ],
 
     /*
     | Libellés français des champs validés par les écrans du web (propriétés des composants
@@ -195,6 +213,8 @@ return [
         'address' => 'adresse',
         'adjPhysical' => 'stock physique constaté',
         'adjProductId' => 'produit',
+        // Ticket VC-4 — « Modifier l'Avance » (Historique des Avances) : la date de l'avance.
+        'advanceDate' => 'date',
         'amount' => 'montant',
         'amountPaid' => 'montant payé',
         'articlesDescription' => 'description des articles',
@@ -241,6 +261,7 @@ return [
         'employee_id' => 'employé',
         'employeeId' => 'employé',
         'end_date' => 'date de fin',
+        'dateAttestation' => "date de l'attestation",
         'endDate' => 'date de fin',
         'entry_date' => 'date d\'entrée',
         'entryDate' => 'date d\'entrée',
@@ -254,9 +275,10 @@ return [
         'exportPeriod' => 'période d\'export',
         'faviconFile' => 'icône du site',
         'file' => 'fichier',
+        // Ticket AC-3 — `POST /api/sync/receipts`.
+        'table' => 'table',
         'first_name' => 'prénom',
         'firstName' => 'prénom',
-        'forgotEmail' => 'adresse e-mail',
         'fromEmail' => 'adresse d\'expédition',
         // Ticket CFG-1 — onglet « Email (SMTP) » de Paramètres.
         'fromAddress' => 'adresse d\'expédition',
@@ -316,6 +338,8 @@ return [
         'origine' => 'origine',
         'page' => 'page',
         'password' => 'mot de passe',
+        // MDP-1 — fenêtre « Réinitialiser le mot de passe » de Gestion des Utilisateurs.
+        'motDePasseTemporaire' => 'mot de passe temporaire',
         'password_confirmation' => 'confirmation du mot de passe',
         'payment_mode' => 'mode de règlement',
         'paymentAmount' => 'montant du règlement',
@@ -325,6 +349,9 @@ return [
         'paymentTreasuryAccountId' => 'compte de trésorerie',
         'paymentTreasuryId' => 'compte de trésorerie',
         'person_id' => 'personne',
+        // ATT-3 : émission d'une attestation fabriquée au poste.
+        'issued_at' => "date d'émission",
+        'id' => 'identifiant',
         'personId' => 'personne',
         'phone' => 'téléphone',
         'phoneNumber' => 'numéro de téléphone',
@@ -346,6 +373,7 @@ return [
         'provende_price_kg' => 'prix au kg',
         'provende_species_id' => 'espèce',
         'purchase_date' => 'date de l\'achat',
+        'purchaseDate' => 'date de l\'achat',
         'qty' => 'quantité',
         'qtyAnimals' => 'nombre d\'animaux',
         'qtyProduced' => 'quantité produite',

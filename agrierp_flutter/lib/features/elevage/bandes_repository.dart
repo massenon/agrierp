@@ -201,8 +201,13 @@ class BandesRepository {
 
   /// `LivestockLot::stadesPourEspece()` : Reproducteur / Jeune / Sous-mères pour les lapins (décision client du
   /// 17/10/2026), les quatre stades génériques sinon. Valeur STOCKÉE => libellé.
+  ///
+  /// 🔁 TICKET VOL-1 (04/11/2026) — volailles : les stades sont les catégories de la fiche Reproducteurs
+  /// (Reproducteur / Poussin / Jeune) ; « Ponte » reste celui des Pondeuses (ticket suivant).
   static Map<String, String> stadesPourEspece(String? codeEspece) => codeEspece == 'cuniculture'
       ? const {'reproduction': 'Reproducteur', 'engraissement': 'Jeune', 'croissance': 'Sous-mères'}
+      : codeEspece == 'aviculture'
+      ? const {'reproduction': 'Reproducteur', 'croissance': 'Poussin', 'engraissement': 'Jeune', 'ponte': 'Ponte'}
       : const {
           'reproduction': 'Reproduction',
           'croissance': 'Croissance',
@@ -584,9 +589,9 @@ class BandesRepository {
             targetLotId: id,
             jour: date,
             quantite: quantite,
-            // Lapins et porcs : la catégorie du stade ; les autres espèces n'en ont pas.
-            categorie: EffectifParCategorie.especeDuCode(espece.code) != null
-                ? EffectifParCategorie.categorieDuStade(f.stage)
+            // Lapins, porcs et volailles reproductrices : la catégorie du stade ; les autres espèces n'en ont pas.
+            categorie: EffectifParCategorie.especeDuCode(espece.code, stade: f.stage) != null
+                ? EffectifParCategorie.categorieDeLaBande(espece.code, f.stage)
                 : null,
             constitution: true,
             motif: 'Constitution de la bande ${f.code.trim()}',

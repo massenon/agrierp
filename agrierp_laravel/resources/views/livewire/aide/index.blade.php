@@ -9,9 +9,9 @@
     <div class="bg-white border border-outline-variant rounded-lg p-lg mb-lg flex flex-col md:flex-row items-center gap-lg">
         <span class="material-symbols-outlined text-brand-emerald flex-shrink-0" style="font-size:64px;">agriculture</span>
         <div>
-            <p class="font-black text-brand-forest text-lg">AgriERP <span class="text-outline text-xs font-normal">v1.0.0</span></p>
+            <p class="font-black text-brand-forest text-lg">LogiAgriERP <span class="text-outline text-xs font-normal">v1.0.0</span></p>
             <p class="text-xs text-outline mt-xs">Logiciel de gestion intégrée pour la Ferme École OLOUWACHEGOUN (Attan-Ewé, Ikpinlè, Adja-Ouèrè, Bénin), développé dans le cadre du Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB), avec l'accompagnement du Cabinet FAGUEZ SARL. Édité par Dr MASSENON Rhodes, Docteur en Génie Logiciel et IA.</p>
-            <p class="text-xs text-outline mt-xs">AgriERP couvre l'ensemble du cycle d'exploitation : élevage (cuniculture, aviculture, porciculture), ventes et POS, stocks, comptabilité SYSCOHADA, ressources humaines et facturation normalisée MeCeF.</p>
+            <p class="text-xs text-outline mt-xs">LogiAgriERP couvre l'ensemble du cycle d'exploitation : élevage (cuniculture, aviculture, porciculture), ventes et POS, stocks, comptabilité SYSCOHADA, ressources humaines et facturation normalisée MeCeF.</p>
         </div>
     </div>
 
@@ -60,7 +60,7 @@
     </div>
 
     <div class="mt-xl text-center">
-        <a href="/contact-editeur" class="inline-flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline">
+        <a wire:navigate href="/contact-editeur" class="inline-flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline">
             <span class="material-symbols-outlined text-[18px]">support_agent</span>Vous ne trouvez pas de réponse ? Contactez l'éditeur
         </a>
     </div>

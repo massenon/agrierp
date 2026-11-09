@@ -193,7 +193,7 @@ void main() {
             .widget<Text>(find.byKey(const Key('aide-version')))
             .textSpan!
             .toPlainText(),
-        'AgriERP v1.0.0',
+        'LogiAgriERP v1.0.0',
       );
       expect(find.text('MODULES DU LOGICIEL'), findsOneWidget);
       expect(find.text('FOIRE AUX QUESTIONS'), findsOneWidget);

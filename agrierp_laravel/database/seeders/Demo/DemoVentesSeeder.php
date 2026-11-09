@@ -166,8 +166,6 @@ class DemoVentesSeeder extends Seeder
             'change_due' => $mode === 'especes' ? 0 : null,
             'delivery_fee' => 0,
             'status' => 'validee',
-            'mecef_status' => 'transmise',
-            'mecef_qr_ref' => 'MECEF-'.strtoupper(substr(md5($jour->timestamp.$total), 0, 12)),
             'created_at' => $jour->addHours($this->ctx->entre(8, 17)),
             'updated_at' => $jour,
         ]);
@@ -194,6 +192,15 @@ class DemoVentesSeeder extends Seeder
                 $l['produit'], -$l['qty'], 'sale', $vente->id, $jour->toDateTime()
             );
         }
+
+        // MECEF-1 : la démonstration montre des factures déjà normalisées ; le verrou veut que les lignes soient posées avant.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $vente->id)->update([
+            'mecef_status' => 'transmise',
+            // Ces ventes de démonstration sont des factures NORMALISÉES (MECEF-3 : sinon la Déclaration TVA resterait vide).
+            'facture_type' => 'normalisee',
+            'mecef_qr_ref' => 'MECEF-'.strtoupper(substr(md5($jour->timestamp.$total), 0, 12)),
+        ]);
+        $vente->refresh();
 
         app(CreditTreasuryForSaleAction::class)->execute($vente);
 

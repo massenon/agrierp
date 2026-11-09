@@ -40,7 +40,7 @@ class PosInterfaceStaleTotalsTest extends TestCase
         $user = User::create([
             'name' => 'Caissière Test',
             'email' => 'caisse.test@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'),
+            'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole($role);
 

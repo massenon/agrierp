@@ -42,6 +42,65 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    /**
+     * Les états du sélecteur « Choisir un état / rapport » (libellé → adresse), liste blanche de `ouvrirEtat()`. Les
+     * `<option>` du Blade en sont la copie littérale — le poste les lit là (`tableau_de_bord_blade_test`), et
+     * `TableauDeBordPeriodeTest` prouve l'égalité des deux.
+     */
+    public const ETATS = [
+        'État des Recettes' => '/rapports-exports?tab=recettes-depenses',
+        'État des Dépenses' => '/rapports-exports?tab=recettes-depenses',
+        'État de Trésorerie' => '/rapports-exports?tab=tresorerie',
+        'Bilan Simplifié' => '/rapport-bilan',
+        'État des Créances' => '/rapports-exports?tab=creances',
+        'État des Dettes' => '/rapports-exports?tab=dettes',
+        'Rapport Élevage' => '/rapports-exports?tab=elevage-synth',
+        'Rapport de Stocks' => '/rapports-exports?tab=stocks-synth',
+    ];
+
+    /** Période proposée à l'ouverture : du 1er du mois à aujourd'hui, ramenée dans l'exercice affiché. */
+    public string $periodeDu = '';
+
+    public string $periodeAu = '';
+
+    public function mount(): void
+    {
+        [$this->periodeDu, $this->periodeAu] = \App\Support\ExerciceChoisi::periodeParDefaut(
+            now()->startOfMonth()->format('Y-m-d'),
+            now()->format('Y-m-d'),
+        );
+    }
+
+    /**
+     * Bouton « PDF » : ouvre l'ÉTAT choisi avec la période choisie (l'impression se fait depuis l'écran de l'état, qui
+     * affiche cette période : `exportReport(format, startDate, endDate)`). Rapports & Exports lit `startDate` / `endDate`
+     * dans l'adresse ; le Bilan simplifié, sa date d'arrêté `asOfDate` (la fin de période). Bornes de l'exercice affiché.
+     */
+    public function ouvrirEtat(string $cible, string $du, string $au)
+    {
+        $valide = fn (string $d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1 && checkdate((int) substr($d, 5, 2), (int) substr($d, 8, 2), (int) substr($d, 0, 4));
+
+        if (! in_array($cible, self::ETATS, true)) {
+            $this->dispatch('toast', message: 'Choisissez un état à ouvrir.', type: 'warning');
+
+            return;
+        }
+
+        if (! $valide($du) || ! $valide($au) || $du > $au) {
+            $this->dispatch('toast', message: 'Période invalide : la date de début doit précéder la date de fin.', type: 'warning');
+
+            return;
+        }
+
+        [$du, $au] = \App\Support\ExerciceChoisi::bornerPeriode($du, $au);
+
+        $url = $cible === '/rapport-bilan'
+            ? $cible.'?asOfDate='.$au
+            : $cible.'&startDate='.$du.'&endDate='.$au;
+
+        return $this->redirect($url, navigate: true);
+    }
+
     public function getKpisProperty(): array
     {
         $monthStart = now()->startOfMonth();

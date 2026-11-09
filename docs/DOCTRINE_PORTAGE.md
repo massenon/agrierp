@@ -1,6 +1,6 @@
 # DOCTRINE DE PORTAGE FIDÈLE (Laravel → Flutter)
 
-**Projet AgriERP — Ferme École OLOUWACHEGOUN (Ikpinlè, Adja-Ouèrè, Bénin)**
+**Projet LogiAgriERP — Ferme École OLOUWACHEGOUN (Ikpinlè, Adja-Ouèrè, Bénin)**
 
 Objectif : une fidélité de **100 %** entre l'application web (`agrierp_laravel/`) et le poste Windows hors ligne (`agrierp_flutter/`). Ce document s'applique à **tout** ticket qui touche un écran, un calcul ou une donnée synchronisée. Il complète les `CLAUDE.md` des deux projets, il ne les remplace pas.
 

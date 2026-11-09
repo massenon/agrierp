@@ -1,9 +1,9 @@
 ---
 name: prd
-description: Rédige le PRD (document d'exigences produit) d'une fonctionnalité AgriERP, en français, avant tout code. À utiliser quand on demande un PRD, un cahier des charges, une spécification ou « définir » une fonctionnalité (ex. clôture de caisse, transfert entre bandes, synchronisation automatique).
+description: Rédige le PRD (document d'exigences produit) d'une fonctionnalité LogiAgriERP, en français, avant tout code. À utiliser quand on demande un PRD, un cahier des charges, une spécification ou « définir » une fonctionnalité (ex. clôture de caisse, transfert entre bandes, synchronisation automatique).
 ---
 
-# PRD AgriERP
+# PRD LogiAgriERP
 
 Produit un fichier `docs/prd/<slug>.md` à la racine du monorepo. Tout est en français.
 

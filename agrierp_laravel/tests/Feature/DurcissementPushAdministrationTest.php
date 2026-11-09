@@ -38,7 +38,7 @@ class DurcissementPushAdministrationTest extends TestCase
         Role::findOrCreate('secretaire', 'web')->givePermissionTo('manage-administration');
         $this->secretaire = User::create([
             'name' => 'Secretaire', 'username' => 'secretaire', 'email' => 'secretaire@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->secretaire->assignRole('secretaire');
     }
@@ -223,7 +223,7 @@ class DurcissementPushAdministrationTest extends TestCase
         Role::findOrCreate('directeur', 'web')->givePermissionTo('manage-parametres');
         $directeur = User::create([
             'name' => 'Directeur', 'username' => 'directeur', 'email' => 'directeur@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $directeur->assignRole('directeur');
         $this->assertTrue(app(CorbeilleService::class)->tenterRestauration('documents', $d['id'], null, $directeur)['ok']);

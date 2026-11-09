@@ -76,13 +76,15 @@ class TvaActivableTest extends TestCase
         $vente = Sale::create([
             'payment_mode' => 'especes', 'subtotal' => $montant, 'discount' => 0,
             'total' => $montant, 'delivery_fee' => 0, 'status' => 'validee',
-            'mecef_status' => 'transmise',
         ]);
 
         SaleLine::create([
             'sale_id' => $vente->id, 'product_id' => $this->produit->id,
             'qty' => 2, 'unit_price' => $montant / 2, 'manual_total_amount' => $montant,
         ]);
+
+        // MECEF-1 : une facture normalisée est figée — ses lignes se posent AVANT la normalisation du fixture.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $vente->id)->update(['mecef_status' => 'transmise']);
 
         app(RecordSaleAccountingEntryAction::class)->execute($vente->fresh('lines'));
 

@@ -131,7 +131,7 @@ void main() {
 
     expect(find.byKey(const Key('catalogue-lecture-seule')), findsOneWidget);
     expect(
-      find.textContaining('référentiels tenus par le serveur'),
+      find.textContaining('référentiel tenu par le serveur'),
       findsOneWidget,
     );
 

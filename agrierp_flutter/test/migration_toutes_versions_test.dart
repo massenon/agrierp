@@ -76,6 +76,26 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   56: [d.expenseLines, d.costCenters],
   // Ticket ARC3 — la Corbeille : instantané du serveur et demandes. ⚠️ 57, 59 et 60 sont réservés à d'autres branches.
   58: [d.corbeilleElements, d.corbeilleDemandes],
+  // Tickets RH-2 / RH-4 — absences de stagiaire, barème ITS, demandes de règlement de paie.
+  67: [d.internshipAbsences, d.incomeTaxBrackets, d.payslipRequests],
+  // Ticket VC-1 — encaissements de créances clients saisis au poste.
+  69: [d.receivablePayments],
+  // Ticket AC-1 — lignes des bons de commande saisis au poste.
+  71: [d.purchaseOrderLines],
+  // Ticket CP-2 — demandes d'écriture manuelle saisies au poste.
+  74: [d.manualEntryRequests],
+  // v75 — ticket CP-3 : registre des immobilisations (mixte) et demandes de dotation aux amortissements.
+  75: [d.fixedAssets, d.depreciationRequests],
+  // v76 — tickets PA-2/3/4/7/8 : demandes de réglage, droits tirés, entreprise (verrou de paie, SMS), comptes de trésorerie.
+  76: [d.settingsRequests, d.permissionsApplicatives],
+  // v77 — ticket CP-5 : lignes de relevé bancaire tirées, demandes d'import de relevé.
+  77: [d.bankStatementLines, d.bankStatementImports],
+  // v79 — ticket EL-1 : transformations (mixte : saisies au poste ET tirées du serveur).
+  79: [d.transformations],
+  // v80 — ticket CP-4 : demandes de clôture saisies au poste, clôtures de mois tirées.
+  80: [d.fiscalClosureRequests, d.periodicClosures],
+  // v86 — ticket RELEVES-1 : relevés de terrain (mixte : saisis au poste ET tirés du serveur).
+  86: [d.fieldSurveyEntries],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -264,6 +284,164 @@ Map<int, List<(TableInfo, GeneratedColumn)>> _colonnesAjoutees(
   // Ticket ARC-Q2 — « Archivé par » : le nom de qui a archivé, servi par le serveur dans l'instantané de la Corbeille.
   // ⚠️ 61 (ventes) et 62 (rappels) sont réservés à d'autres branches.
   63: [(d.corbeilleElements, d.corbeilleElements.archivePar)],
+  // v64 — ticket #48 : justificatifs copiés sur le poste (chemin local, jamais synchronisé).
+  64: [
+    (d.expenses, d.expenses.receiptLocalPath),
+    (d.purchases, d.purchases.receiptLocalPath),
+  ],
+  // v65 — ticket ATT-1 : naissance et civilité du stagiaire, numéro de séquence et trois signataires du modèle.
+  65: [
+    (d.internships, d.internships.birthDate),
+    (d.internships, d.internships.birthPlace),
+    (d.internships, d.internships.civilite),
+    (d.attestationTemplates, d.attestationTemplates.numeroSequence),
+    (d.attestationTemplates, d.attestationTemplates.sig1Titre),
+    (d.attestationTemplates, d.attestationTemplates.sig1Nom),
+    (d.attestationTemplates, d.attestationTemplates.sig2Titre),
+    (d.attestationTemplates, d.attestationTemplates.sig2Nom),
+    (d.attestationTemplates, d.attestationTemplates.sig3Titre),
+    (d.attestationTemplates, d.attestationTemplates.sig3Nom),
+  ],
+  // v66 — ticket ATT-2 : règle de signature selon la durée, fonctions des signataires, appréciation.
+  66: [
+    (d.attestationTemplates, d.attestationTemplates.seuilSignatureMois),
+    (d.attestationTemplates, d.attestationTemplates.sig1Fonction),
+    (d.attestationTemplates, d.attestationTemplates.sig2Fonction),
+    (d.attestationTemplates, d.attestationTemplates.sig3Fonction),
+    (d.attestationTemplates, d.attestationTemplates.sig1Court),
+    (d.attestationTemplates, d.attestationTemplates.sig2Court),
+    (d.attestationTemplates, d.attestationTemplates.sig3Court),
+    (d.attestationTemplates, d.attestationTemplates.sig1Long),
+    (d.attestationTemplates, d.attestationTemplates.sig2Long),
+    (d.attestationTemplates, d.attestationTemplates.sig3Long),
+    (d.attestationTemplates, d.attestationTemplates.appreciationText),
+    (d.attestationTemplates, d.attestationTemplates.appreciationImprimee),
+  ],
+  // v67 — tickets RH-1 à RH-4 : registres RH mixtes (colonnes de synchronisation, posées par RECONSTRUCTION de la
+  // table : `_registresRhMixtes`), `is_active` des pointages, colonnes RH des bulletins, taux de paie.
+  67: [
+    (d.employees, d.employees.deviceId),
+    (d.employees, d.employees.syncStatus),
+    (d.employees, d.employees.updatedAt),
+    (d.employees, d.employees.isActive),
+    (d.internships, d.internships.deviceId),
+    (d.internships, d.internships.syncStatus),
+    (d.internships, d.internships.updatedAt),
+    (d.attendanceRecords, d.attendanceRecords.isActive),
+    (d.payslips, d.payslips.employeeId),
+    (d.payslips, d.payslips.periodMonth),
+    (d.payslips, d.payslips.grossSalary),
+    (d.payslips, d.payslips.absenceDeduction),
+    (d.payslips, d.payslips.cnssDeduction),
+    (d.payslips, d.payslips.itsDeduction),
+    (d.payslips, d.payslips.chargesPatronales),
+    (d.companySettings, d.companySettings.vpsRate),
+    (d.companySettings, d.companySettings.cnssEmployeeRate),
+    (d.companySettings, d.companySettings.cnssEmployerPensionRate),
+    (d.companySettings, d.companySettings.cnssEmployerFamilyRate),
+    (d.companySettings, d.companySettings.cnssEmployerRiskRate),
+  ],
+  // v68 — ticket UT-1 : `utilisateurs` MIXTE (colonnes de synchronisation posées par reconstruction : `_utilisateursMixtes`).
+  68: [
+    (d.utilisateurs, d.utilisateurs.deviceId),
+    (d.utilisateurs, d.utilisateurs.syncStatus),
+    (d.utilisateurs, d.utilisateurs.updatedAt),
+  ],
+  // v70 — ticket VC-2 : `customer_reminders` MIXTE (colonnes de synchronisation posées par reconstruction : `_relancesMixtes`).
+  70: [
+    (d.customerReminders, d.customerReminders.deviceId),
+    (d.customerReminders, d.customerReminders.syncStatus),
+    (d.customerReminders, d.customerReminders.updatedAt),
+  ],
+  // v71 — ticket AC-1 : `purchase_orders` MIXTE (reconstruction : `_bonsCommandeMixtes`) et `purchases.purchase_order_id`.
+  71: [
+    (d.purchaseOrders, d.purchaseOrders.deviceId),
+    (d.purchaseOrders, d.purchaseOrders.syncStatus),
+    (d.purchaseOrders, d.purchaseOrders.updatedAt),
+    (d.purchases, d.purchases.purchaseOrderId),
+  ],
+  // v72 — ticket AC-3 : le justificatif local est ENVOYÉ au serveur ; `receipt_sent` dit si c'est fait.
+  72: [
+    (d.expenses, d.expenses.receiptSent),
+    (d.purchases, d.purchases.receiptSent),
+  ],
+  // v73 — ticket CP-1 : `chart_of_accounts` MIXTE (reconstruction : `_planComptableMixte`) et `is_active`.
+  73: [
+    (d.chartOfAccounts, d.chartOfAccounts.deviceId),
+    (d.chartOfAccounts, d.chartOfAccounts.syncStatus),
+    (d.chartOfAccounts, d.chartOfAccounts.updatedAt),
+    (d.chartOfAccounts, d.chartOfAccounts.isActive),
+  ],
+  // v78 — ticket AUT-3 : la relance par e-mail partie du SMTP du poste.
+  78: [(d.customerReminders, d.customerReminders.alreadySent)],
+  // v81 — ticket MDP-1 : le drapeau « mot de passe temporaire à changer » des comptes, tiré du serveur.
+  81: [(d.utilisateurs, d.utilisateurs.mustChangePassword)],
+  // MECEF-1 : ce que la DGI renvoie d'une facture normalisée (vente FV, avoir FA), tiré du serveur.
+  84: [
+    (d.sales, d.sales.mecefCode),
+    (d.sales, d.sales.mecefNim),
+    (d.sales, d.sales.mecefCompteurs),
+    (d.sales, d.sales.mecefNormaliseLe),
+    (d.sales, d.sales.mecefMessage),
+    (d.creditNotes, d.creditNotes.mecefStatus),
+    (d.creditNotes, d.creditNotes.mecefUid),
+    (d.creditNotes, d.creditNotes.mecefQrRef),
+    (d.creditNotes, d.creditNotes.mecefCode),
+    (d.creditNotes, d.creditNotes.mecefNim),
+    (d.creditNotes, d.creditNotes.mecefCompteurs),
+    (d.creditNotes, d.creditNotes.mecefNormaliseLe),
+    (d.creditNotes, d.creditNotes.mecefMessage),
+  ],
+  // MECEF-3 : IFU du client, choix « facture simple / normalisée » de la vente (identité fiscale de l'acheteur, AIB), montant d'AIB
+  // calculé par la DGI, frais de livraison inclus dans la vente.
+  85: [
+    (d.customers, d.customers.ifu),
+    (d.sales, d.sales.factureType),
+    (d.sales, d.sales.clientIfu),
+    (d.sales, d.sales.clientNomFacture),
+    (d.sales, d.sales.aibTaux),
+    (d.sales, d.sales.mecefAibMontant),
+    (d.sales, d.sales.deliveryFee),
+    (d.sales, d.sales.deliveryInTotal),
+  ],
+  // VOL-2 : quatrième emplacement (Poussin ponte), passages supplémentaires et transferts du quatrième emplacement des
+  // fiches de volailles pondeuses.
+  83: [
+    (d.livestockDailyEntries, d.livestockDailyEntries.mort4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.don4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.vente4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.catDepart4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.passage4Sevre),
+    (d.livestockDailyEntries, d.livestockDailyEntries.passageJeuneRepro),
+    (d.livestockDailyEntries, d.livestockDailyEntries.transfertEntree4),
+    (d.livestockDailyEntries, d.livestockDailyEntries.transfertSortie4),
+  ],
+  // VOL-1 : ventes ventilées des fiches de volailles reproductrices et catégorie d'effectif des produits.
+  82: [
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteRepro),
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteSevre),
+    (d.livestockDailyEntries, d.livestockDailyEntries.venteJeune),
+    (d.products, d.products.categorieEffectif),
+  ],
+  // v80 — ticket CP-4 : l'étape 1 de la clôture et la date de clôture de l'exercice, tirées du serveur.
+  80: [(d.fiscalYears, d.fiscalYears.step1ConfirmedAt), (d.fiscalYears, d.fiscalYears.closedAt)],
+  // v76 — tickets PA-* : verrou de paie et SMS sans secret (entreprise), coordonnées des comptes de trésorerie.
+  76: [
+    (d.companySettings, d.companySettings.payrollLocked),
+    (d.companySettings, d.companySettings.payrollEditedAt),
+    (d.companySettings, d.companySettings.smsProvider),
+    (d.companySettings, d.companySettings.twilioAccountSid),
+    (d.companySettings, d.companySettings.twilioFromNumber),
+    (d.companySettings, d.companySettings.vonageFromName),
+    (d.companySettings, d.companySettings.smsIdentifiantsPoses),
+    (d.treasuryAccounts, d.treasuryAccounts.bankName),
+    (d.treasuryAccounts, d.treasuryAccounts.holderName),
+    (d.treasuryAccounts, d.treasuryAccounts.rib),
+    (d.treasuryAccounts, d.treasuryAccounts.iban),
+    (d.treasuryAccounts, d.treasuryAccounts.operatorName),
+    (d.treasuryAccounts, d.treasuryAccounts.phoneNumber),
+    (d.treasuryAccounts, d.treasuryAccounts.simSerial),
+  ],
 };
 
 /// Description du schéma réel lue dans SQLite, indépendante de l'ordre des colonnes
@@ -361,7 +539,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 63, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches');
+    expect(d.schemaVersion, 86, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1, 82 = VOL-1, 83 = VOL-2, 84 = MECEF-1, 85 = MECEF-3 (IFU du client, choix de facture, AIB, livraison incluse), 86 = RELEVES-1 (relevés de terrain)');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

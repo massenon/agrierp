@@ -1,16 +1,13 @@
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
+
+import '../systeme/fichiers_poste.dart';
+import '../systeme/plateforme_poste.dart';
 import '../temps/heure_benin.dart';
 
-/// Un PDF produit PAR LE SERVEUR et reçu en octets.
-///
-/// ⚠️ **LE POSTE NE LE FABRIQUE PAS** : une attestation, une fiche sujet portent
-/// l'en-tête officiel de la ferme, et leur génération laisse une trace d'audit
-/// côté serveur. Le poste ne fait que le recevoir, l'écrire et l'imprimer.
+/// Un PDF en octets : reçu du serveur (fiche sujet) ou fabriqué au poste (attestation, ATT-3 : l'émission est alors
+/// déclarée au serveur, qui en attribue le numéro et garde la trace d'audit). Le poste l'écrit et l'imprime.
 class PdfRecu {
   const PdfRecu({required this.octets, required this.fichier});
 
@@ -29,7 +26,7 @@ class PdfRecu {
   }
 }
 
-/// Ce que le poste fait d'un [PdfRecu] : l'écrire dans `Documents\AgriERP`, ou
+/// Ce que le poste fait d'un [PdfRecu] : l'écrire dans `Documents\LogiAgriERP`, ou
 /// ouvrir la boîte d'impression de Windows (qui sait aussi « Enregistrer au
 /// format PDF »). Injectés dans les écrans : les tests n'ont ni disque ni
 /// imprimante.
@@ -42,23 +39,17 @@ class LivraisonPdf {
   /// même jour (une correction) sont un cas normal, et la seconde ne doit pas
   /// écraser la première sans rien demander.
   static Future<String> enregistrer(PdfRecu pdf, {DateTime? maintenant}) async {
-    final racine = await getApplicationDocumentsDirectory();
-    final dossier = Directory(p.join(racine.path, 'AgriERP'));
-    if (!dossier.existsSync()) dossier.createSync(recursive: true);
-
     final h = maintenant ?? HeureBenin.maintenant();
     String d(int n) => n.toString().padLeft(2, '0');
     final base = pdf.fichier.replaceAll(
       RegExp(r'\.pdf$', caseSensitive: false),
       '',
     );
-    final chemin = p.join(
-      dossier.path,
-      '$base-${h.year}${d(h.month)}${d(h.day)}-${d(h.hour)}${d(h.minute)}.pdf',
-    );
+    final nom = '$base-${h.year}${d(h.month)}${d(h.day)}-${d(h.hour)}${d(h.minute)}.pdf';
 
-    File(chemin).writeAsBytesSync(pdf.octets);
-    return chemin;
+    // PWA-2 : le navigateur n'a pas de dossier Documents : le PDF est TÉLÉCHARGÉ.
+    if (PlateformePoste.navigateur) return PlateformePoste.livreurNavigateur(nom, pdf.octets);
+    return livrerFichier(nom, pdf.octets);
   }
 
   static Future<void> imprimer(PdfRecu pdf) =>

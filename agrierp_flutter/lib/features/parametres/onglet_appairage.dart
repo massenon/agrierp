@@ -216,7 +216,7 @@ class _OngletAppairageState extends State<OngletAppairage> {
               style: const TextStyle(fontSize: AgriTypography.xs),
               decoration: const InputDecoration(
                 hintText: 'https://agrierp.fermeolouwachegoun.com',
-                helperText: "Adresse de l'espace web AgriERP.",
+                helperText: "Adresse de l'espace web LogiAgriERP.",
                 helperMaxLines: 2,
               ),
             ),

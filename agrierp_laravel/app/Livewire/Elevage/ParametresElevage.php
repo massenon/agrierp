@@ -3,6 +3,7 @@
 namespace App\Livewire\Elevage;
 
 use App\Models\AuditLog;
+use App\Models\FieldSurveyEntry;
 use App\Models\CompanySetting;
 use App\Models\ElevageNumberingSetting;
 use App\Models\FeedRationStandard;
@@ -10,6 +11,8 @@ use App\Models\FeedType;
 use App\Models\LivestockSpecies;
 use App\Models\ProphylaxisScheduleStandard;
 use App\Services\AlertesElevageService;
+use App\Services\Elevage\ReleveTerrainService;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -89,6 +92,17 @@ class ParametresElevage extends Component
 
     /** Règle R-SOINS-01 — délai du rappel des soins planifiés (jours). */
     public int $rappelSoinsJours = AlertesElevageService::JOURS_RAPPEL_SOINS;
+
+    // --- Onglet « Relevés de terrain » (RELEVES-1) ---
+    /** Sous-onglet : incubation | provende | technicien. */
+    public string $releveFamille = 'incubation';
+
+    public ?string $releveId = null;
+
+    public string $releveType = ReleveTerrainService::INCUBATION_REGLE;
+
+    /** @var array{label: string, species_code: ?string, data: array} */
+    public array $releveForm = ['label' => '', 'species_code' => null, 'data' => []];
 
     public function mount(): void
     {
@@ -316,6 +330,133 @@ class ParametresElevage extends Component
         $provende->update(['is_active' => false]);
         AuditLog::record('feed_type.archived', 'elevage', null, $provende);
         $this->dispatch('toast', message: 'Paramètre archivé — restaurable depuis Paramètres > Restauration.', type: 'warning');
+    }
+
+    // ===================== RELEVÉS DE TERRAIN (RELEVES-1) =====================
+    // Point de passage unique : `ReleveTerrainService` (aussi appelé par `SyncController`). Tout enregistrement
+    // humain — modifier puis enregistrer, ou « Valider » de la modale — fait passer la ligne à « Validé ».
+
+    public function getRelevesProperty()
+    {
+        return app(ReleveTerrainService::class)->lignes($this->releveFamille);
+    }
+
+    public function getDelaisFournisseursProperty(): array
+    {
+        return ReleveTerrainService::delaisFournisseurs();
+    }
+
+    public function getRegleDelaiProperty(): array
+    {
+        return ReleveTerrainService::regleEnVigueur();
+    }
+
+    public function getRelevesAValiderProperty(): int
+    {
+        return app(ReleveTerrainService::class)->nombreAValider();
+    }
+
+    public function setReleveFamille(string $famille): void
+    {
+        $this->releveFamille = in_array($famille, ['incubation', 'provende', 'technicien'], true) ? $famille : 'incubation';
+    }
+
+    private function chargerReleve(FieldSurveyEntry $l): void
+    {
+        $this->releveId = $l->id;
+        $this->releveType = $l->type;
+        $d = $l->data ?? [];
+        if (isset($d['mirages']) && is_array($d['mirages'])) {
+            $d['mirages'] = implode(', ', $d['mirages']);
+        }
+        $this->releveForm = ['label' => $l->label, 'species_code' => $l->species_code, 'data' => $d];
+    }
+
+    public function newReleve(string $type): void
+    {
+        $this->authorize('manage-elevage');
+        abort_unless(isset(ReleveTerrainService::FAMILLES[$type]), 404);
+
+        $this->resetErrorBag();
+        $this->releveId = null;
+        $this->releveType = $type;
+        $this->releveForm = ['label' => '', 'species_code' => null, 'data' => match ($type) {
+            ReleveTerrainService::INCUBATION_REGLE => ['mode' => 'couveuse_artificielle', 'mirages' => '7, 14', 'conservation_max_jours' => 10],
+            ReleveTerrainService::INCUBATION_LOT => ['mode' => 'couveuse_artificielle'],
+            ReleveTerrainService::DELAI_REGLE => ['mode' => 'constate', 'marge_jours' => 4, 'critique_jours' => 3, 'alerte_jours' => 7],
+            default => [],
+        }];
+        $this->dispatch('open-modal', name: 'modal-releve');
+    }
+
+    public function editReleve(string $id): void
+    {
+        $this->resetErrorBag();
+        $this->chargerReleve(FieldSurveyEntry::where('is_active', true)->findOrFail($id));
+        $this->dispatch('open-modal', name: 'modal-releve');
+    }
+
+    /** Bouton « Valider » d'une ligne « À valider » : ouvre la modale de mise à jour (valeurs corrigeables, statut). */
+    public function ouvrirValidation(string $id): void
+    {
+        $this->resetErrorBag();
+        $this->chargerReleve(FieldSurveyEntry::where('is_active', true)->findOrFail($id));
+        $this->dispatch('open-modal', name: 'modal-valider-releve');
+    }
+
+    private function saisieReleve(): array
+    {
+        return ['label' => $this->releveForm['label'] ?? '', 'species_code' => $this->releveForm['species_code'] ?? null, 'data' => $this->releveForm['data'] ?? []];
+    }
+
+    /** Les erreurs du service portent des clés `label` / `species_code` / `data.x` : on les rattache au formulaire. */
+    private function refuserReleve(ValidationException $e): never
+    {
+        throw ValidationException::withMessages(collect($e->errors())->mapWithKeys(fn ($m, $k) => ['releveForm.'.$k => $m])->all());
+    }
+
+    public function saveReleve(): void
+    {
+        $this->authorize('manage-elevage');
+
+        $service = app(ReleveTerrainService::class);
+        try {
+            if ($this->releveId) {
+                $service->modifier(FieldSurveyEntry::where('is_active', true)->findOrFail($this->releveId), $this->saisieReleve(), auth()->id());
+            } else {
+                $service->creer($this->releveType, $this->saisieReleve(), auth()->id());
+            }
+        } catch (ValidationException $e) {
+            $this->refuserReleve($e);
+        }
+
+        $this->dispatch('close-modal', name: 'modal-releve');
+        $this->dispatch('toast', message: 'Relevé enregistré et validé.', type: 'success');
+        $this->reset('releveId');
+    }
+
+    /** Modale « Valider » : la ligne passe de « À valider » à « Validé » (validé par, validé le, audit `releve.valide`). */
+    public function validerReleve(): void
+    {
+        $this->authorize('manage-elevage');
+
+        try {
+            app(ReleveTerrainService::class)->valider(FieldSurveyEntry::where('is_active', true)->findOrFail($this->releveId), $this->saisieReleve(), auth()->id());
+        } catch (ValidationException $e) {
+            $this->refuserReleve($e);
+        }
+
+        $this->dispatch('close-modal', name: 'modal-valider-releve');
+        $this->dispatch('toast', message: 'Relevé validé.', type: 'success');
+        $this->reset('releveId');
+    }
+
+    public function archiveReleve(string $id): void
+    {
+        $this->authorize('manage-elevage');
+
+        app(ReleveTerrainService::class)->archiver(FieldSurveyEntry::findOrFail($id), auth()->id());
+        $this->dispatch('toast', message: 'Relevé archivé.', type: 'warning');
     }
 
     // ===================== NUMÉROTATION =====================

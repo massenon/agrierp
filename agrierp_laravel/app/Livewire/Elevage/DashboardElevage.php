@@ -471,6 +471,12 @@ class DashboardElevage extends Component
         return round($prevision['ordonnee'] + $prevision['pente'] * ($prevision['dernier_jour'] + $jours));
     }
 
+    /** Ticket RELEVES-1 — bloc « Relevés de terrain » : la synthèse du service unique (le poste la calcule à l'identique). */
+    public function getSyntheseRelevesProperty(): array
+    {
+        return app(\App\Services\Elevage\ReleveTerrainService::class)->synthese();
+    }
+
     public function render()
     {
         // Ticket H11 — le sélecteur du navigateur montre la bande réellement projetée (la première, faute de choix).

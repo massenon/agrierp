@@ -68,7 +68,7 @@
                 <tbody>
                     @forelse($this->debts as $i => $debt)
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
-                            <td data-label="Débiteur" class="px-md py-sm text-xs"><a href="{{ route('ventes.profile-client', $debt->customer) }}" class="text-brand-forest hover:text-brand-emerald hover:underline font-bold">{{ $debt->customer?->name }}</a></td>
+                            <td data-label="Débiteur" class="px-md py-sm text-xs"><a wire:navigate href="{{ route('ventes.profile-client', $debt->customer) }}" class="text-brand-forest hover:text-brand-emerald hover:underline font-bold">{{ $debt->customer?->name }}</a></td>
                             <td data-label="Facture" class="px-md py-sm text-xs font-mono">{{ strtoupper(substr($debt->sale_id ?? $debt->id, 0, 8)) }}</td>
                             <td data-label="Échéance" class="px-md py-sm text-xs">{{ $debt->due_date?->format('d/m/Y') ?? '—' }} @if($debt->days_overdue > 0)<span class="text-error-deep font-bold">({{ $debt->days_overdue }}j)</span>@endif</td>
                             <td data-label="Total Facturé" class="px-md py-sm text-xs text-right">{{ number_format($debt->amount, 0, ',', ' ') }} FCFA</td>

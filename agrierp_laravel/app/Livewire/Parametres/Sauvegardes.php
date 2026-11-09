@@ -26,6 +26,12 @@ use Livewire\Component;
  */
 class Sauvegardes extends Component
 {
+    public function mount(): void
+    {
+        // CONF-1 : jamais d'ouverture sans le droit de l'onglet (même garde que `EmailSmtp::mount`).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-parametres'), 403);
+    }
+
     public string $moduleAExporter = '';
 
     public function getFichiersProperty(): array

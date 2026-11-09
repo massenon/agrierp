@@ -28,6 +28,21 @@
                 </label>
             </div>
         @endforeach
+
+        <div class="bg-white border border-outline-variant rounded-lg p-md flex items-center justify-between">
+            <div class="flex items-center gap-sm">
+                <span class="material-symbols-outlined {{ $this->assistantActif ? 'text-brand-emerald' : 'text-outline' }} text-[24px]">checklist</span>
+                <div>
+                    <p class="font-bold text-sm text-brand-forest">Assistant de démarrage</p>
+                    <p class="text-[10px] text-outline">Guide la mise en route de la ferme — désactivé par défaut</p>
+                </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" wire:click="toggleAssistant" {{ $this->assistantActif ? 'checked' : '' }} class="sr-only peer" aria-label="Assistant de démarrage">
+                <div class="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:bg-brand-emerald transition-all"></div>
+                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+            </label>
+        </div>
     </div>
 
     <div class="mt-lg max-w-2xl bg-info-blue/10 border border-info-blue/30 rounded-lg p-md text-xs text-brand-forest flex items-start gap-xs">

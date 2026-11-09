@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Actions\AdjustStockAction;
 use App\Models\AuditLog;
+use App\Models\LivestockSpecies;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Support\CategorieVolaille;
+use App\Support\StadePondeuse;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,6 +43,8 @@ class ProductCatalogService
             'pricing_mode' => ['required', 'in:fourchette,quote'],
             'tva_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'alert_threshold' => ['required', 'numeric', 'min:0'],
+            // Ticket VOL-1 : catégorie d'effectif des produits de l'aviculture (Reproducteur / Jeune / Poussin).
+            'categorie_effectif' => ['nullable', 'in:'.implode(',', array_merge(CategorieVolaille::CLES, StadePondeuse::CLES))],
         ];
 
         if ($avecStock) {
@@ -62,6 +67,7 @@ class ProductCatalogService
     {
         return [
             'price_max.gte' => 'Le prix maximum doit être supérieur ou égal au prix minimum.',
+            'categorie_effectif.in' => "La catégorie d'effectif doit être Reproducteur, Jeune ou Poussin (reproducteurs), ou l'un des quatre stades des pondeuses (Poussin ponte, Poussin en croissance, Poulette, Pondeuse).",
         ];
     }
 
@@ -88,6 +94,14 @@ class ProductCatalogService
 
         if ($avecStock) {
             $payload['stock_qty'] = $v['stock_qty'];
+        }
+
+        // Ticket VOL-1 : la catégorie d'effectif n'a de sens que pour un produit de l'aviculture ; ailleurs elle est
+        // toujours vide. Clé ABSENTE (poste ancien) : la valeur du serveur n'est pas touchée.
+        if (array_key_exists('categorie_effectif', $v)) {
+            $aviculture = ! empty($v['species_id'])
+                && LivestockSpecies::whereKey($v['species_id'])->where('code', 'aviculture')->exists();
+            $payload['categorie_effectif'] = $aviculture ? (($v['categorie_effectif'] ?? null) ?: null) : null;
         }
 
         return $payload;
@@ -132,6 +146,24 @@ class ProductCatalogService
 
             return $produit->fresh();
         });
+    }
+
+    /**
+     * Ticket ST-1 — ARCHIVER un produit (`is_active = false`, rien n'est supprimé). Point de passage unique de
+     * `CatalogueProduits::archive` (le web) ET de l'envoi du poste (`is_active: false` dans `pushProducts`).
+     * Idempotent : un produit déjà archivé n'est ni retouché ni retracé.
+     */
+    public function archiver(Product $produit): Product
+    {
+        if (! $produit->is_active) {
+            return $produit;
+        }
+
+        $produit->update(['is_active' => false]);
+
+        AuditLog::record('product.archived', 'stocks', null, $produit);
+
+        return $produit->fresh();
     }
 
     /** @param array<string, mixed> $v */

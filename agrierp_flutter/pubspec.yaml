@@ -1,5 +1,5 @@
 name: agrierp
-description: "AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin). Client Windows offline-first, synchronisé avec la surface web Laravel."
+description: "LogiAgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin). Client Windows offline-first, synchronisé avec la surface web Laravel."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -64,6 +64,12 @@ dependencies:
   excel: ^4.0.6
   # Ticket CFG-2 — « Envoyer un e-mail de test » RÉEL depuis l'onglet Email (SMTP) du poste.
   mailer: ^7.2.0
+  file_picker: ^11.0.3
+  desktop_drop: ^0.8.4
+  # CONF-2 : décode l'ICO du favicon pour l'aperçu (déjà au verrou comme dépendance de `pdf`, version 4.3.0).
+  image: ^4.3.0
+  drift_flutter: ^0.3.1
+  web: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -96,6 +102,8 @@ flutter:
     - assets/images/image_login.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+    # ATT-3 — l'attestation est fabriquée AU POSTE (hors ligne) : logo, filigrane, décor et polices libres du modèle officiel.
+    - assets/attestation/
 
   # Ticket H1 — LES ICÔNES DU WEB : Material Symbols Outlined (style `material-symbols-outlined`, FILL 0), et
   # non les Material Icons pleines de Flutter. Sous-ensemble tiré de la fonte complète du web par

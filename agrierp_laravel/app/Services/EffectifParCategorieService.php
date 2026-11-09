@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Support\EffectifCategoriesJour;
+use App\Support\StadePondeuse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -44,12 +45,40 @@ use InvalidArgumentException;
  * départ saisi n'a PAS de chaîne : rien n'est calculé ni écrit (comportement antérieur inchangé).
  *
  * Les fonctions de calcul (`calculerJour`, `verifierDepart`) sont PURES : aucun accès base.
+ *
+ * 🔁 TICKET VOL-1 (décision client du 04/11/2026) — VOLAILLES REPRODUCTRICES (aviculture, bandes hors stade « ponte »).
+ *   VOLAILLES_REPRO  R = max(0, Rv − vente_R − mort_R − don_R)
+ *              J = max(0, Jv + achat − vente_J − mort_J − don_J + p)        (les ACHATS vont aux Jeunes)
+ *              P = max(0, Pv + éclosions − vente_P − mort_P − don_P − p)    (les poussins nés vont aux Poussins)
+ *   Emplacements : `repro` = Reproducteur ; `sevre` = Poussin ; `jeune` = Jeune (ex-« Poulet »). `p` = passage Poussin →
+ *   Jeune (`passage_sevre_jeune`), transfert total inchangé, refusé au-delà de la catégorie source (règle D3).
+ *   ⚠️ DIFFÉRENCE AVEC LES LAPINS ET LES PORCS, voulue par le client : AUCUNE catégorie « inconnue » (jamais de null) —
+ *   une mouvement absent y vaut 0, et la bande doit avoir son DÉPART saisi (par catégorie) AVANT toute journée : la fiche
+ *   le demande, l'envoi d'un poste sans départ est refusé. Les ventes sont ventilées (`vente_repro/sevre/jeune`, la
+ *   catégorie du PRODUIT vendu) ; `vente` en reste la somme.
+ *
+ * 🔁 TICKET VOL-2 (décision client du 05/11/2026) — VOLAILLES PONDEUSES (aviculture, bandes au stade « ponte »), QUATRE stades :
+ *   PP = Poussin ponte, PC = Poussin en croissance, PL = Poulette, PO = Pondeuse ; v = veille ; p1, p2, p3 = passages
+ *   PP → PC, PC → PL, PL → PO (colonnes `passage_4_sevre`, `passage_sevre_jeune`, `passage_jeune_repro`).
+ *   PP = max(0, PPv + éclosions − vente_PP − mort_PP − don_PP − p1)
+ *   PC = max(0, PCv − vente_PC − mort_PC − don_PC + p1 − p2)
+ *   PL = max(0, PLv + achat − vente_PL − mort_PL − don_PL + p2 − p3)         (les ACHATS vont à Poulette)
+ *   PO = max(0, POv − vente_PO − mort_PO − don_PO + p3)
+ *   Emplacements : `quatre` = Poussin ponte (colonnes `*_4`), `sevre` = Poussin en croissance, `jeune` = Poulette, `repro` =
+ *   Pondeuse. Chaque passage est un transfert (total inchangé), refusé au-delà de son stade source APRÈS les autres mouvements
+ *   du jour, passage entrant compris (règle D3). Comme chez les reproducteurs : AUCUN stade « inconnu », départ obligatoire.
  */
 class EffectifParCategorieService
 {
     public const LAPINS = 'lapins';
 
     public const PORCS = 'porcs';
+
+    /** Ticket VOL-1 — volailles reproductrices (aviculture hors stade « ponte »). VOL-2 : renommé pour le distinguer des pondeuses. */
+    public const VOLAILLES_REPRO = 'volailles_repro';
+
+    /** Ticket VOL-2 — volailles pondeuses (aviculture, stade « ponte »), quatre stades. */
+    public const VOLAILLES_PONTE = 'volailles_ponte';
 
     /** Code d'espèce de la base → espèce prise en charge. */
     private const ESPECES = ['cuniculture' => self::LAPINS, 'porciculture' => self::PORCS];
@@ -60,6 +89,47 @@ class EffectifParCategorieService
         'don_repro' => 0, 'don_sevre' => 0, 'don_jeune' => 0,
         'passage_sevre_jeune' => 0,
     ];
+
+    /** Ticket VOL-1 — ventes ventilées « connues à zéro » (volailles uniquement). */
+    public const VENTES_CONNUES_A_ZERO = ['vente_repro' => 0, 'vente_sevre' => 0, 'vente_jeune' => 0];
+
+    /**
+     * Ticket VOL-1 — mouvements « connus à zéro » d'une fiche NOUVELLE sur une bande à chaîne : la ventilation des morts,
+     * des dons et du passage, plus, pour les volailles, celle des ventes.
+     *
+     * @return array<string, int>
+     */
+    public static function mouvementsConnusAZeroPour(LivestockLot $lot): array
+    {
+        $espece = self::especeDuLot($lot);
+
+        return self::MOUVEMENTS_CONNUS_A_ZERO
+            + (self::estVolailles($espece) ? self::VENTES_CONNUES_A_ZERO : [])
+            + ($espece === self::VOLAILLES_PONTE ? self::MOUVEMENTS_PONTE_CONNUS_A_ZERO : []);
+    }
+
+    /** Ticket VOL-2 — mouvements du quatrième emplacement et passages supplémentaires des pondeuses, « connus à zéro ». */
+    public const MOUVEMENTS_PONTE_CONNUS_A_ZERO = [
+        'mort_4' => 0, 'don_4' => 0, 'vente_4' => 0, 'passage_4_sevre' => 0, 'passage_jeune_repro' => 0,
+    ];
+
+    /** Ticket VOL-2 — l'espèce est-elle l'une des deux familles de volailles ? */
+    public static function estVolailles(?string $espece): bool
+    {
+        return $espece === self::VOLAILLES_REPRO || $espece === self::VOLAILLES_PONTE;
+    }
+
+    /** Ticket VOL-2 — emplacements de catégorie d'une espèce : trois, quatre pour les volailles pondeuses. */
+    public static function emplacementsDe(?string $espece): array
+    {
+        return $espece === self::VOLAILLES_PONTE ? ['repro', 'sevre', 'jeune', 'quatre'] : ['repro', 'sevre', 'jeune'];
+    }
+
+    /** Ticket VOL-2 — nom de colonne d'un mouvement pour un emplacement (`quatre` → `*_4`). */
+    public static function colonne(string $prefixe, string $emplacement): string
+    {
+        return $prefixe.'_'.($emplacement === 'quatre' ? '4' : $emplacement);
+    }
 
     // ====================================================================== FONCTIONS PURES
 
@@ -74,8 +144,14 @@ class EffectifParCategorieService
      */
     public static function calculerJour(string $espece, array $veille, array $mouvements, ?int $totalFinal = null): EffectifCategoriesJour
     {
-        if (! in_array($espece, [self::LAPINS, self::PORCS], true)) {
+        if (! in_array($espece, [self::LAPINS, self::PORCS, self::VOLAILLES_REPRO, self::VOLAILLES_PONTE], true)) {
             throw new InvalidArgumentException("Espèce non prise en charge : {$espece}.");
+        }
+        if ($espece === self::VOLAILLES_REPRO) {
+            return self::calculerJourVolailles($veille, $mouvements, $totalFinal);
+        }
+        if ($espece === self::VOLAILLES_PONTE) {
+            return self::calculerJourPondeuses($veille, $mouvements, $totalFinal);
         }
         $lapins = $espece === self::LAPINS;
         $m = fn (string $cle): ?int => $mouvements[$cle] ?? null;
@@ -125,13 +201,115 @@ class EffectifParCategorieService
     }
 
     /**
-     * Contrôle du départ saisi (D4) : trois catégories renseignées dont la somme égale l'effectif
-     * total au début du jour de départ. Retourne le motif du refus, ou null si le départ est valide.
+     * Ticket VOL-1 — effectifs par catégorie d'UNE journée de volailles reproductrices (formules en tête de classe).
      *
-     * @param  array{repro: ?int, sevre: ?int, jeune: ?int}  $depart
+     * Aucune catégorie n'est jamais inconnue : une clé absente ou nulle vaut 0 (la bande a un départ saisi, et l'envoi d'un
+     * poste dont la ventilation est incomplète est refusé en amont). Une veille inconnue (`null`) reste lue comme 0 : la
+     * chaîne des volailles ne contient que des valeurs connues.
+     *
+     * @param  array{repro: ?int, sevre: ?int, jeune: ?int}  $veille
+     * @param  array<string, ?int>  $mouvements  achat, ne, vente_repro/sevre/jeune, mort_*, don_*, passage + transferts
+     */
+    private static function calculerJourVolailles(array $veille, array $mouvements, ?int $totalFinal): EffectifCategoriesJour
+    {
+        $m = fn (string $cle): int => (int) ($mouvements[$cle] ?? 0);
+        $v = fn (string $cle): int => (int) ($veille[$cle] ?? 0);
+
+        $repro = max(0, $v('repro') + $m('transfert_entree_repro')
+            - $m('vente_repro') - $m('mort_repro') - $m('don_repro') - $m('transfert_sortie_repro'));
+
+        // Poussins avant passage : les éclosions entrent, les ventes, morts et dons sortent.
+        $avant = $v('sevre') + $m('ne') + $m('transfert_entree_sevre')
+            - $m('vente_sevre') - $m('mort_sevre') - $m('don_sevre') - $m('transfert_sortie_sevre');
+
+        $passage = $m('passage');
+        $refus = null;
+        $passageApplique = $passage;
+        if ($passage > max(0, $avant)) {
+            $source = max(0, $avant);
+            $passageApplique = $source;
+            $refus = "Passage de stade refusé : {$passage} sujet(s) à faire passer, mais la catégorie source n'en compte que {$source}.";
+        }
+
+        $poussin = max(0, $avant - $passageApplique);
+        // Les ACHATS vont aux Jeunes.
+        $jeune = max(0, $v('jeune') + $m('achat') + $passageApplique + $m('transfert_entree_jeune')
+            - $m('vente_jeune') - $m('mort_jeune') - $m('don_jeune') - $m('transfert_sortie_jeune'));
+
+        $sommeDifferente = $totalFinal === null ? null : (($repro + $poussin + $jeune) !== $totalFinal);
+
+        return new EffectifCategoriesJour($repro, $poussin, $jeune, $sommeDifferente, $refus, $passageApplique);
+    }
+
+    /**
+     * Ticket VOL-2 — effectifs par stade d'UNE journée de volailles pondeuses (formules en tête de classe). Aucun stade
+     * n'est jamais inconnu (clé absente ou nulle = 0). Les trois passages se traitent dans l'ordre de la chaîne : chacun est
+     * borné à son stade source APRÈS ses autres mouvements du jour, passage entrant compris.
+     *
+     * @param  array{repro: ?int, sevre: ?int, jeune: ?int, quatre: ?int}  $veille
+     * @param  array<string, ?int>  $mouvements  achat, ne, vente_*, mort_*, don_*, passage_4_sevre, passage (sevre → jeune),
+     *                                           passage_jeune_repro + transferts (`*_repro/sevre/jeune/4`)
+     */
+    private static function calculerJourPondeuses(array $veille, array $mouvements, ?int $totalFinal): EffectifCategoriesJour
+    {
+        $m = fn (string $cle): int => (int) ($mouvements[$cle] ?? 0);
+        $v = fn (string $cle): int => (int) ($veille[$cle] ?? 0);
+        $refus = [];
+        $borne = function (int $demande, int $avant, string $source, string $cible) use (&$refus): int {
+            $disponible = max(0, $avant);
+            if ($demande > $disponible) {
+                $refus[] = "Passage de stade refusé ({$source} vers {$cible}) : {$demande} sujet(s) à faire passer, mais le stade source n'en compte que {$disponible}.";
+
+                return $disponible;
+            }
+
+            return $demande;
+        };
+        $l = fn (string $cle): string => StadePondeuse::LIBELLES[$cle];
+
+        // Poussin ponte : les éclosions entrent ; p1 part vers Poussin en croissance.
+        $avantPP = $v('quatre') + $m('ne') + $m('transfert_entree_4')
+            - $m('vente_4') - $m('mort_4') - $m('don_4') - $m('transfert_sortie_4');
+        $p1 = $borne($m('passage_4_sevre'), $avantPP, $l(StadePondeuse::POUSSIN_PONTE), $l(StadePondeuse::POUSSIN_CROISSANCE));
+        $pp = max(0, $avantPP - $p1);
+
+        // Poussin en croissance : reçoit p1, envoie p2 vers Poulette.
+        $avantPC = $v('sevre') + $p1 + $m('transfert_entree_sevre')
+            - $m('vente_sevre') - $m('mort_sevre') - $m('don_sevre') - $m('transfert_sortie_sevre');
+        $p2 = $borne($m('passage'), $avantPC, $l(StadePondeuse::POUSSIN_CROISSANCE), $l(StadePondeuse::POULETTE));
+        $pc = max(0, $avantPC - $p2);
+
+        // Poulette : les ACHATS entrent ici, reçoit p2, envoie p3 vers Pondeuse.
+        $avantPL = $v('jeune') + $m('achat') + $p2 + $m('transfert_entree_jeune')
+            - $m('vente_jeune') - $m('mort_jeune') - $m('don_jeune') - $m('transfert_sortie_jeune');
+        $p3 = $borne($m('passage_jeune_repro'), $avantPL, $l(StadePondeuse::POULETTE), $l(StadePondeuse::PONDEUSE));
+        $pl = max(0, $avantPL - $p3);
+
+        // Pondeuse : reçoit p3.
+        $po = max(0, $v('repro') + $p3 + $m('transfert_entree_repro')
+            - $m('vente_repro') - $m('mort_repro') - $m('don_repro') - $m('transfert_sortie_repro'));
+
+        $sommeDifferente = $totalFinal === null ? null : (($pp + $pc + $pl + $po) !== $totalFinal);
+
+        return new EffectifCategoriesJour(
+            $po, $pc, $pl, $sommeDifferente, $refus === [] ? null : implode(' ', $refus), $p2, $pp,
+            ['passage_4_sevre' => $p1, 'passage_sevre_jeune' => $p2, 'passage_jeune_repro' => $p3],
+        );
+    }
+
+    /**
+     * Contrôle du départ saisi (D4) : trois catégories renseignées (QUATRE stades pour les volailles pondeuses : clé
+     * `quatre` présente) dont la somme égale l'effectif total au début du jour de départ. Retourne le motif du refus, ou
+     * null si le départ est valide.
+     *
+     * @param  array{repro: ?int, sevre: ?int, jeune: ?int, quatre?: ?int}  $depart
      */
     public static function verifierDepart(array $depart, ?int $totalDepart): ?string
     {
+        if (array_key_exists('quatre', $depart)) {
+            return self::verifierDepartPondeuses($depart, $totalDepart);
+        }
+
         $r = $depart['repro'] ?? null;
         $s = $depart['sevre'] ?? null;
         $j = $depart['jeune'] ?? null;
@@ -146,6 +324,25 @@ class EffectifParCategorieService
             $somme = $r + $s + $j;
 
             return "La somme des catégories de départ ({$somme}) ne correspond pas à l'effectif total au début du jour de départ ({$totalDepart}).";
+        }
+
+        return null;
+    }
+
+    /** Ticket VOL-2 — départ des quatre stades : tous renseignés, somme = effectif total au début du jour de départ. */
+    private static function verifierDepartPondeuses(array $depart, ?int $totalDepart): ?string
+    {
+        $valeurs = array_map(fn ($c) => $depart[$c] ?? null, ['quatre', 'sevre', 'jeune', 'repro']);
+
+        if (in_array(null, $valeurs, true)) {
+            return 'Effectif de départ incomplet : les quatre stades doivent être renseignés (0 si le stade est vide).';
+        }
+        $somme = array_sum($valeurs);
+        if ($totalDepart === null) {
+            return "Effectif total de départ inconnu : la somme des stades ({$valeurs[0]} + {$valeurs[1]} + {$valeurs[2]} + {$valeurs[3]}) ne peut pas être contrôlée.";
+        }
+        if ($somme !== $totalDepart) {
+            return "La somme des stades de départ ({$somme}) ne correspond pas à l'effectif total au début du jour de départ ({$totalDepart}).";
         }
 
         return null;
@@ -186,10 +383,18 @@ class EffectifParCategorieService
      * autres valent 0. La somme vaut donc toujours l'effectif total au début du jour (contrôle de
      * `verifierDepart` respecté). Null : espèce sans catégories ou stade sans catégorie (ponte).
      *
-     * @return array{repro: int, sevre: int, jeune: int}|null
+     * Ticket VOL-2 : une bande de volailles pondeuses (stade `ponte`) propose « Pondeuse » pour tout l'effectif (les trois
+     * autres stades à 0, clé `quatre` comprise) — une PROPOSITION que l'éleveur reprend ou corrige (une bande de poulettes
+     * doit répartir son départ).
+     *
+     * @return array{repro: int, sevre: int, jeune: int, quatre?: int}|null
      */
     public static function departDepuisStade(LivestockLot $lot, int $totalDebutJour): ?array
     {
+        if (self::especeDuLot($lot) === self::VOLAILLES_PONTE) {
+            return ['repro' => max(0, $totalDebutJour), 'sevre' => 0, 'jeune' => 0, 'quatre' => 0];
+        }
+
         $emplacement = self::STADE_VERS_CATEGORIE[$lot->stage] ?? null;
 
         if (self::especeDuLot($lot) === null || $emplacement === null) {
@@ -205,9 +410,27 @@ class EffectifParCategorieService
         return self::STADE_VERS_CATEGORIE[$stade] ?? null;
     }
 
+    /**
+     * Ticket VOL-2 — catégorie proposée pour les sujets d'une bande (constitution d'une bande, rattachement) : celle de son
+     * stade ; une bande de volailles pondeuses (stade `ponte`) propose « Pondeuse » (`repro`), l'éleveur pouvant la corriger
+     * à l'écran des transferts.
+     */
+    public static function categorieDeLaBande(LivestockLot $lot): ?string
+    {
+        return self::especeDuLot($lot) === self::VOLAILLES_PONTE ? 'repro' : self::categorieDuStade($lot->stage);
+    }
+
     public static function especeDuLot(LivestockLot $lot): ?string
     {
-        return self::ESPECES[$lot->species?->code] ?? null;
+        $code = $lot->species?->code;
+
+        // Ticket VOL-1 / VOL-2 : l'aviculture se partage entre la fiche Pondeuses (stade « ponte » : quatre stades) et la
+        // fiche Reproducteurs (tous les autres stades : trois catégories). Les deux ont l'effectif calculé.
+        if ($code === 'aviculture') {
+            return $lot->stage === 'ponte' ? self::VOLAILLES_PONTE : self::VOLAILLES_REPRO;
+        }
+
+        return self::ESPECES[$code] ?? null;
     }
 
     /** Une bande a une chaîne exploitable si une de ses fiches porte un départ COMPLET (3 catégories). */
@@ -217,9 +440,38 @@ class EffectifParCategorieService
 
         return $lot !== null
             && self::especeDuLot($lot) !== null
-            && LivestockDailyEntry::where('lot_id', $lotId)
-                ->whereNotNull('cat_depart_repro')->whereNotNull('cat_depart_sevre')->whereNotNull('cat_depart_jeune')
-                ->exists();
+            && $this->requeteDesDeparts($lotId, self::especeDuLot($lot) === self::VOLAILLES_PONTE)->exists();
+    }
+
+    /** Fiches de la bande portant un départ COMPLET (quatre colonnes pour les volailles pondeuses, trois ailleurs). */
+    private function requeteDesDeparts(string $lotId, bool $ponte)
+    {
+        return LivestockDailyEntry::where('lot_id', $lotId)
+            ->whereNotNull('cat_depart_repro')->whereNotNull('cat_depart_sevre')->whereNotNull('cat_depart_jeune')
+            ->when($ponte, fn ($q) => $q->whereNotNull('cat_depart_4'));
+    }
+
+    /** Ticket VOL-2 — départ complet d'une fiche (null s'il manque une colonne), avec `quatre` pour les pondeuses. */
+    public static function departDeLaFiche(LivestockDailyEntry $f, bool $ponte): ?array
+    {
+        $depart = ['repro' => $f->cat_depart_repro, 'sevre' => $f->cat_depart_sevre, 'jeune' => $f->cat_depart_jeune]
+            + ($ponte ? ['quatre' => $f->cat_depart_4] : []);
+
+        return in_array(null, $depart, true) ? null : array_map('intval', $depart);
+    }
+
+    /** Ticket VOL-2 — catégories de fin de journée d'un résultat, avec `quatre` pour les pondeuses. */
+    private static function veilleDuResultat(EffectifCategoriesJour $r): array
+    {
+        return ['repro' => $r->repro, 'sevre' => $r->sevre, 'jeune' => $r->jeune]
+            + ($r->quatre === null ? [] : ['quatre' => $r->quatre]);
+    }
+
+    private function estUnePonte(string $lotId): bool
+    {
+        $lot = LivestockLot::with('species')->find($lotId);
+
+        return $lot !== null && self::especeDuLot($lot) === self::VOLAILLES_PONTE;
     }
 
     /**
@@ -279,9 +531,7 @@ class EffectifParCategorieService
      */
     public function teteDeChaine(string $lotId): ?LivestockDailyEntry
     {
-        return LivestockDailyEntry::where('lot_id', $lotId)
-            ->whereNotNull('cat_depart_repro')->whereNotNull('cat_depart_sevre')->whereNotNull('cat_depart_jeune')
-            ->orderBy('entry_date')->first();
+        return $this->requeteDesDeparts($lotId, $this->estUnePonte($lotId))->orderBy('entry_date')->first();
     }
 
     /**
@@ -311,8 +561,9 @@ class EffectifParCategorieService
             return $sortie;
         }
 
+        $ponte = self::especeDuLot($lot) === self::VOLAILLES_PONTE;
         $dateTete = $tete->entry_date->format('Y-m-d');
-        $depart = ['repro' => (int) $tete->cat_depart_repro, 'sevre' => (int) $tete->cat_depart_sevre, 'jeune' => (int) $tete->cat_depart_jeune];
+        $depart = self::departDeLaFiche($tete, $ponte);
         $sortie['depart_date'] = $dateTete;
         $sortie['depart'] = $depart;
 
@@ -350,7 +601,7 @@ class EffectifParCategorieService
             'repro' => $precedente?->cat_eff_repro === null ? null : (int) $precedente->cat_eff_repro,
             'sevre' => $precedente?->cat_eff_sevre === null ? null : (int) $precedente->cat_eff_sevre,
             'jeune' => $precedente?->cat_eff_jeune === null ? null : (int) $precedente->cat_eff_jeune,
-        ];
+        ] + ($ponte ? ['quatre' => $precedente?->cat_eff_4 === null ? null : (int) $precedente->cat_eff_4] : []);
 
         return $sortie;
     }
@@ -373,20 +624,20 @@ class EffectifParCategorieService
             ->push($proposee)
             ->sortBy(fn (LivestockDailyEntry $f) => $f->entry_date->format('Y-m-d'))->values();
 
-        $indexTete = $fiches->search(fn ($f) => $f->cat_depart_repro !== null && $f->cat_depart_sevre !== null && $f->cat_depart_jeune !== null);
+        $ponte = $espece === self::VOLAILLES_PONTE;
+        $indexTete = $fiches->search(fn ($f) => self::departDeLaFiche($f, $ponte) !== null);
         if ($indexTete === false) {
             return null;
         }
 
-        $tete = $fiches[$indexTete];
-        $veille = ['repro' => (int) $tete->cat_depart_repro, 'sevre' => (int) $tete->cat_depart_sevre, 'jeune' => (int) $tete->cat_depart_jeune];
+        $veille = self::departDeLaFiche($fiches[$indexTete], $ponte);
 
         foreach ($fiches->slice($indexTete)->values() as $f) {
             $r = self::calculerJour($espece, $veille, $f->mouvementsParCategorie());
             if ($f->id === $proposee->id) {
                 return $r->refus;
             }
-            $veille = ['repro' => $r->repro, 'sevre' => $r->sevre, 'jeune' => $r->jeune];
+            $veille = self::veilleDuResultat($r);
         }
 
         return null;
@@ -499,11 +750,12 @@ class EffectifParCategorieService
         /** @var Collection<int, LivestockDailyEntry> $fiches */
         $fiches = LivestockDailyEntry::where('lot_id', $lot->id)->orderBy('entry_date')->get()->values();
 
-        $indexTete = $fiches->search(fn ($f) => $f->cat_depart_repro !== null && $f->cat_depart_sevre !== null && $f->cat_depart_jeune !== null);
+        $ponte = $espece === self::VOLAILLES_PONTE;
+        $indexTete = $fiches->search(fn ($f) => self::departDeLaFiche($f, $ponte) !== null);
 
         if ($indexTete !== false) {
             $tete = $fiches[$indexTete];
-            $depart = ['repro' => (int) $tete->cat_depart_repro, 'sevre' => (int) $tete->cat_depart_sevre, 'jeune' => (int) $tete->cat_depart_jeune];
+            $depart = self::departDeLaFiche($tete, $ponte);
             $totalDepart = $indexTete > 0 ? (int) $fiches[$indexTete - 1]->effectif_final : (int) $lot->initial_quantity;
 
             $sortie['mode'] = 'explicite';
@@ -516,7 +768,7 @@ class EffectifParCategorieService
             $veille = $depart;
             $suite = $fiches->slice($indexTete)->values();
             foreach ($suite as $i => $f) {
-                if ($i > 0 && ($f->cat_depart_repro !== null || $f->cat_depart_sevre !== null || $f->cat_depart_jeune !== null)) {
+                if ($i > 0 && ($f->cat_depart_repro !== null || $f->cat_depart_sevre !== null || $f->cat_depart_jeune !== null || ($ponte && $f->cat_depart_4 !== null))) {
                     $sortie['avertissements'][] = "Fiche du {$f->entry_date->format('d/m/Y')} : un départ y est saisi alors que la chaîne démarre déjà le {$tete->entry_date->format('d/m/Y')} ; il est ignoré.";
                 }
                 $veille = $this->jour($espece, $f, $veille, $sortie);
@@ -557,6 +809,6 @@ class EffectifParCategorieService
         }
         $sortie['resultats'][$f->id] = $r;
 
-        return ['repro' => $r->repro, 'sevre' => $r->sevre, 'jeune' => $r->jeune];
+        return self::veilleDuResultat($r);
     }
 }

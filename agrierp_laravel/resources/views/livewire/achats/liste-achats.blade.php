@@ -41,7 +41,9 @@
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Date</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Fournisseur</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Catégorie</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Montant Payé</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Montant Total</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Dette</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
                     </tr>
@@ -53,7 +55,10 @@
                             <td data-label="Date" class="px-md py-sm text-xs">{{ $purchase->purchase_date->format('d/m/Y') }}</td>
                             <td data-label="Fournisseur" class="px-md py-sm text-xs font-bold text-brand-forest">{{ $purchase->supplier?->name }}</td>
                             <td data-label="Catégorie" class="px-md py-sm text-xs">{{ $purchase->categorie }}</td>
-                            <td data-label="Montant" class="px-md py-sm text-xs text-right font-bold">{{ number_format($purchase->total, 0, ',', ' ') }} FCFA</td>
+                            @php $dette = $purchase->payable ? max(0, $purchase->payable->balance) : 0; @endphp
+                            <td data-label="Montant Payé" class="px-md py-sm text-xs text-right font-bold">{{ number_format($purchase->total - $dette, 0, ',', ' ') }} FCFA</td>
+                            <td data-label="Montant Total" class="px-md py-sm text-xs text-right font-bold">{{ number_format($purchase->total, 0, ',', ' ') }} FCFA</td>
+                            <td data-label="Dette" class="px-md py-sm text-xs text-right font-bold {{ $dette > 0 ? 'text-error-deep' : '' }}">{{ $dette > 0 ? number_format($dette, 0, ',', ' ').' FCFA' : '0' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($purchase->returned_at)
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">RETOURNÉ</span>
@@ -65,13 +70,17 @@
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 <button type="button" wire:click="view('{{ $purchase->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Voir"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+                                @if($purchase->receipt_path)
+                                    {{-- Ticket AC-3 — la pièce justificative (rattachée par le web ou envoyée par le poste). --}}
+                                    <a href="{{ route('justificatifs.show', ['type' => 'achat', 'id' => $purchase->id]) }}" target="_blank" rel="noopener" class="text-brand-emerald hover:text-brand-forest p-1 inline-block align-middle" title="Pièce justificative"><span class="material-symbols-outlined text-[18px]">attach_file</span></a>
+                                @endif
                                 @unless($purchase->returned_at)
                                     <button @lectureSeule type="button" wire:click="openReturnModal('{{ $purchase->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Retour fournisseur"><span class="material-symbols-outlined text-[18px]">cancel</span></button>
                                 @endunless
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-md py-lg text-center text-outline">Aucun achat pour le moment.</td></tr>
+                        <tr><td colspan="9" class="px-md py-lg text-center text-outline">Aucun achat pour le moment.</td></tr>
                     @endforelse
                 </tbody>
             </table>

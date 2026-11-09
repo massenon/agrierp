@@ -47,13 +47,13 @@
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Registre du Commerce (RCCM)</label>
                     <input wire:model="rccm" type="text" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                 </div>
-                <div class="bg-info-blue/10 border border-info-blue/20 rounded-lg p-sm text-[10px] text-brand-forest">Ces informations apparaissent sur toutes les factures normalisées MeCeF et les documents officiels générés par AgriERP.</div>
+                <div class="bg-info-blue/10 border border-info-blue/20 rounded-lg p-sm text-[10px] text-brand-forest">Ces informations apparaissent sur toutes les factures normalisées MeCeF et les documents officiels générés par LogiAgriERP.</div>
             </div>
 
             {{-- Ticket CFG-1 — la configuration SMTP a UNE seule saisie : l'onglet « Email (SMTP) » de ce hub. --}}
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md lg:col-span-2">
                 <p class="text-xs font-bold text-brand-forest uppercase flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">mail</span>Configuration Email (SMTP)</p>
-                <a href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-sm p-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
+                <a wire:navigate href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-sm p-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
                     <span class="material-symbols-outlined text-brand-emerald text-[22px]">settings_input_antenna</span>
                     <span class="flex-1">
                         <span class="block text-xs font-bold text-brand-forest">Serveur d'envoi, mot de passe et e-mail de test</span>
@@ -64,11 +64,22 @@
             </div>
 
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md">
-                <p class="text-xs font-bold text-brand-forest uppercase">Logo de l'Entreprise</p>
-                <label class="border-2 border-dashed border-outline-variant rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
-                    <input wire:model="logoFile" type="file" accept="image/*" class="hidden">
+                <div class="flex items-center justify-between gap-sm">
+                    <p class="text-xs font-bold text-brand-forest uppercase">Logo de l'Entreprise</p>
                     @if($this->settings->logo_path)
-                        <img src="{{ asset('storage/'.$this->settings->logo_path) }}" class="h-12 mx-auto mb-xs object-contain" alt="Logo actuel">
+                        <button type="button" wire:click="supprimerFichier('logo')" wire:confirm="Supprimer le logo de l'entreprise ? Le fichier sera effacé." class="h-8 px-sm border border-error-deep/40 text-error-deep rounded-lg text-[11px] font-bold hover:bg-error-bg flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">delete</span>Supprimer</button>
+                    @endif
+                </div>
+                {{-- CONF-1 : glisser-déposer par directives Alpine `x-on:` posées dans la vue (aucun script à part) ; un fichier déposé passe par le même `<input>` que le clic. --}}
+                <label x-data="{ survol: false, apercu: null, deposer(e) { if (e.dataTransfer.files.length) { $refs.entree.files = e.dataTransfer.files; $refs.entree.dispatchEvent(new Event('change', { bubbles: true })); } } }"
+                    x-on:dragover.prevent="survol = true" x-on:dragleave.prevent="survol = false" x-on:drop.prevent="survol = false; deposer($event)"
+                    :class="survol ? 'border-brand-emerald bg-surface-zebra' : 'border-outline-variant'"
+                    class="border-2 border-dashed rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
+                    <input x-ref="entree" x-on:change="apercu = $event.target.files.length ? URL.createObjectURL($event.target.files[0]) : null" wire:model="logoFile" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="hidden">
+                    @if($logoFile)
+                        <img x-show="apercu" :src="apercu" class="h-12 mx-auto mb-xs object-contain" alt="Aperçu du fichier choisi">
+                    @elseif($this->settings->logo_path)
+                        <img src="{{ \App\Support\IdentiteVisuelle::logoUrl() }}" class="h-12 mx-auto mb-xs object-contain" alt="Logo actuel">
                     @endif
                     <span class="material-symbols-outlined text-outline-variant" style="font-size:40px;">add_photo_alternate</span>
                     <p class="text-xs text-outline mt-xs font-semibold">{{ $logoFile ? $logoFile->getClientOriginalName() : 'Glisser-déposer ou cliquer pour choisir un logo' }}</p>
@@ -77,11 +88,22 @@
                 @error('logoFile') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md">
-                <p class="text-xs font-bold text-brand-forest uppercase">Favicon (Icône d'Onglet)</p>
-                <label class="border-2 border-dashed border-outline-variant rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
-                    <input wire:model="faviconFile" type="file" accept="image/*" class="hidden">
+                <div class="flex items-center justify-between gap-sm">
+                    <p class="text-xs font-bold text-brand-forest uppercase">Favicon (Icône d'Onglet)</p>
                     @if($this->settings->favicon_path)
-                        <img src="{{ asset('storage/'.$this->settings->favicon_path) }}" class="h-8 mx-auto mb-xs object-contain" alt="Favicon actuel">
+                        <button type="button" wire:click="supprimerFichier('favicon')" wire:confirm="Supprimer l'icône du site de l'entreprise ? Le fichier sera effacé." class="h-8 px-sm border border-error-deep/40 text-error-deep rounded-lg text-[11px] font-bold hover:bg-error-bg flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">delete</span>Supprimer</button>
+                    @endif
+                </div>
+                {{-- CONF-1 : glisser-déposer par directives Alpine `x-on:` posées dans la vue (aucun script à part) ; un fichier déposé passe par le même `<input>` que le clic. --}}
+                <label x-data="{ survol: false, apercu: null, deposer(e) { if (e.dataTransfer.files.length) { $refs.entree.files = e.dataTransfer.files; $refs.entree.dispatchEvent(new Event('change', { bubbles: true })); } } }"
+                    x-on:dragover.prevent="survol = true" x-on:dragleave.prevent="survol = false" x-on:drop.prevent="survol = false; deposer($event)"
+                    :class="survol ? 'border-brand-emerald bg-surface-zebra' : 'border-outline-variant'"
+                    class="border-2 border-dashed rounded-lg p-lg text-center hover:border-brand-emerald transition-colors cursor-pointer block">
+                    <input x-ref="entree" x-on:change="apercu = $event.target.files.length ? URL.createObjectURL($event.target.files[0]) : null" wire:model="faviconFile" type="file" accept=".ico,.png,image/png,image/x-icon,image/vnd.microsoft.icon" class="hidden">
+                    @if($faviconFile)
+                        <img x-show="apercu" :src="apercu" class="h-8 mx-auto mb-xs object-contain" alt="Aperçu du fichier choisi">
+                    @elseif($this->settings->favicon_path)
+                        <img src="{{ \App\Support\IdentiteVisuelle::faviconUrl() }}" class="h-8 mx-auto mb-xs object-contain" alt="Favicon actuel">
                     @endif
                     <span class="material-symbols-outlined text-outline-variant" style="font-size:40px;">web</span>
                     <p class="text-xs text-outline mt-xs font-semibold">{{ $faviconFile ? $faviconFile->getClientOriginalName() : 'Glisser-déposer ou cliquer pour choisir un favicon' }}</p>
@@ -89,6 +111,10 @@
                 </label>
                 @error('faviconFile') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
+        </div>
+
+        <div class="bg-info-blue/10 border border-info-blue/20 rounded-lg p-sm mt-lg text-[11px] text-brand-forest" id="facturation-mecef">
+            Le mode de facturation normalisée, le jeton et l'adresse de l'API e-MECeF se règlent dans l'onglet <a wire:navigate href="{{ route('parametres.hub', ['tab' => 'facturation']) }}" class="font-bold underline">Facturation normalisée (e-MECeF)</a>.
         </div>
 
         <div class="bg-white border border-outline-variant rounded-lg p-md mt-lg">
@@ -118,7 +144,7 @@
                 (versées en plus par l'employeur, sans toucher au net).
             </p>
 
-            <a href="{{ route('parametres.bareme-its') }}" class="flex items-center gap-sm p-md mb-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
+            <a wire:navigate href="{{ route('parametres.bareme-its') }}" class="flex items-center gap-sm p-md mb-md rounded-lg border border-outline-variant hover:border-brand-emerald transition-all group">
                 <span class="material-symbols-outlined text-brand-emerald text-[22px]">functions</span>
                 <span class="flex-1">
                     <span class="block text-xs font-bold text-brand-forest">Barème IR-PTS / ITS — tranches d'imposition</span>

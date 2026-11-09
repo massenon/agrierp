@@ -84,7 +84,7 @@ class ConversionDevisWebTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-web', 'email' => $role.'-web@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         if ($droitsEnPlus !== []) {
@@ -110,26 +110,30 @@ class ConversionDevisWebTest extends TestCase
         $this->assertSame(1, Receivable::count());
     }
 
-    public function test_la_facture_est_transmise_par_le_circuit_normal(): void
+    public function test_la_facture_d_un_devis_est_une_facture_simple_jamais_transmise(): void
     {
         $this->devis();
 
-        Livewire::test(Devis::class)->call('convertToInvoice', self::DEVIS);
+        $composant = Livewire::test(Devis::class)->call('convertToInvoice', self::DEVIS);
 
-        $this->assertSame(['transmise', 'NIM-TEST|SIG'], [Sale::firstOrFail()->mecef_status, Sale::firstOrFail()->mecef_qr_ref]);
+        // Aucun choix « Facture normalisée » à la conversion (et un devis n'a aucune ligne à déclarer) : facture SIMPLE,
+        // jamais transmise, sans alerte de transmission.
+        $vente = Sale::firstOrFail();
+        $this->assertSame(['simple', 'en_attente', null], [$vente->typeFacture(), $vente->mecef_status, $vente->mecef_qr_ref]);
+        $composant->assertNotDispatched('toast', type: 'warning');
     }
 
-    public function test_un_echec_du_dispositif_ne_defait_pas_la_facture_et_avertit(): void
+    public function test_un_dispositif_en_panne_ne_concerne_pas_une_facture_de_devis_simple(): void
     {
         $this->devis();
         $this->dispositif(false);
 
         $composant = Livewire::test(Devis::class)->call('convertToInvoice', self::DEVIS);
 
+        // La facture simple ne touche jamais le dispositif : la panne n'a aucun effet et n'avertit pas.
         $vente = Sale::firstOrFail();
-        $numero = 'FV-2026-'.strtoupper(substr($vente->id, 0, 6));
-        $this->assertSame(['erreur', 'facture'], [$vente->mecef_status, Quote::findOrFail(self::DEVIS)->status]);
-        $composant->assertDispatched('toast', message: "Facture {$numero} créée — ATTENTION : facture normalisée MeCeF non transmise (Dispositif injoignable (essai).). La facture reste à transmettre : retransmettez-la depuis Facturation & MeCeF.", type: 'warning');
+        $this->assertSame(['en_attente', 'facture'], [$vente->mecef_status, Quote::findOrFail(self::DEVIS)->status]);
+        $composant->assertNotDispatched('toast', type: 'warning');
     }
 
     public function test_un_second_clic_ne_cree_pas_de_seconde_facture(): void
@@ -228,6 +232,8 @@ class ConversionDevisWebTest extends TestCase
     {
         $this->devis();
         Livewire::test(Devis::class)->call('convertToInvoice', self::DEVIS);
+        // La déclaration ne retient que les ventes NORMALISÉES (règle M14) : on normalise la facture du devis pour ce calcul.
+        \Illuminate\Support\Facades\DB::table('sales')->update(['mecef_status' => 'transmise', 'facture_type' => 'normalisee']);
 
         $declaration = app(\App\Services\VatDeclarationService::class)->tvaCollectee('2026-10-01', '2026-10-31');
 

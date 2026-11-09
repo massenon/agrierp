@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiAgriERP | Caisse hors ligne</title>
+    <meta name="theme-color" content="#052e16">
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="/assets/hors-ligne/caisse-style.css">
+    <!--
+        PAGE STATIQUE : elle ne contient AUCUNE donnée de la ferme, d'un utilisateur ni d'une vente. Tout (catalogue, clients,
+        ventes, jeton) est lu dans IndexedDB, chiffré, après saisie du PIN. C'est ce qui permet au service worker de la garder
+        en cache sans jamais mettre de HTML authentifié en cache. Les libellés reprennent ceux de la caisse du web
+        (`livewire/ventes/pos-interface.blade.php`, la vue Blade est le maître) ; `CaisseHorsLigneStatiqueTest` les compare.
+    -->
+</head>
+<body>
+
+<div id="ecran-verrou" class="verrou" hidden>
+    <div class="boite">
+        <span class="material-symbols-outlined" style="font-size:40px;color:#065f46">lock</span>
+        <h2 id="verrou-titre">Application verrouillée</h2>
+        <p id="verrou-texte">Saisissez votre PIN pour ouvrir la caisse hors ligne.</p>
+        <form id="form-pin" autocomplete="off">
+            <label class="champ" for="champ-pin" style="text-align:left">PIN</label>
+            <input id="champ-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="4 à 6 chiffres">
+            <div id="erreur-pin" class="erreur-champ" role="alert"></div>
+            <button type="submit" class="btn plein" style="width:100%;justify-content:center;margin-top:14px">DÉVERROUILLER</button>
+        </form>
+    </div>
+</div>
+
+<div id="ecran-inactif" class="verrou" hidden>
+    <div class="boite">
+        <span class="material-symbols-outlined" style="font-size:40px;color:#065f46">cloud_off</span>
+        <h2 id="inactif-titre">Mode hors ligne non activé</h2>
+        <p id="inactif-texte">Cet appareil n'est pas encore activé. Connectez-vous à LogiAgriERP EN LIGNE, ouvrez « Mode hors ligne » dans le menu de votre profil, puis choisissez un PIN.</p>
+        <a class="btn plein" href="/mode-hors-ligne" style="justify-content:center">Activer le mode hors ligne</a>
+    </div>
+</div>
+
+<header class="barre">
+    <h1><span class="material-symbols-outlined">point_of_sale</span> Caisse hors ligne <span id="nom-utilisateur" class="muted" style="font-weight:500"></span></h1>
+    <div class="groupe">
+        <span id="etat-synchro" class="pastille neutre" role="status" aria-live="polite">Hors ligne</span>
+        <button id="btn-synchroniser" type="button" class="btn"><span class="material-symbols-outlined">sync</span>Synchroniser maintenant</button>
+        <button id="btn-verrouiller" type="button" class="btn"><span class="material-symbols-outlined">lock</span>Verrouiller</button>
+        <button id="btn-deconnecter" type="button" class="btn danger"><span class="material-symbols-outlined">logout</span>Déconnecter cet appareil</button>
+    </div>
+</header>
+
+<div id="avis" class="bandeau neutre" role="status" hidden></div>
+<div id="avis-onglet" class="bandeau avert" role="alert" hidden>Cet appareil est déjà ouvert dans un autre onglet : celui-ci est en lecture seule.</div>
+<div id="bandeau-prix" class="bandeau avert" role="status" hidden></div>
+<div id="avis-maj" class="bandeau avert" role="status" hidden>Mise à jour disponible — terminez la saisie en cours puis rechargez la page.</div>
+
+<main id="contenu" hidden>
+    <section>
+        <div class="carte">
+            <h2><span class="material-symbols-outlined">inventory_2</span>Produits</h2>
+            <div class="groupe" style="align-items:stretch">
+                <input id="recherche" type="text" placeholder="Rechercher un produit..." style="flex:1;min-width:160px">
+                <select id="categorie" style="max-width:200px"><option value="">Tous</option></select>
+            </div>
+            <div id="produits" class="grille-produits"></div>
+            <p id="produits-vide" class="muted" hidden>Aucun produit trouvé.</p>
+            <p id="age-tirage" class="muted" style="margin:10px 0 0;font-size:11px"></p>
+        </div>
+
+        <div class="carte" style="margin-top:16px">
+            <h2><span class="material-symbols-outlined">receipt_long</span>Ventes de cet appareil</h2>
+            <table class="rtable" id="table-ventes">
+                <thead><tr><th>Heure</th><th class="num">Total</th><th>Statut</th><th>Motif</th><th></th></tr></thead>
+                <tbody id="corps-ventes"></tbody>
+            </table>
+            <p id="ventes-vide" class="muted">Aucune vente sur cet appareil.</p>
+        </div>
+    </section>
+
+    <aside>
+        <div class="carte">
+            <h2><span class="material-symbols-outlined">shopping_cart</span>Panier de Vente</h2>
+            <p id="panier-vide" class="muted">Sélectionnez un produit pour commencer.</p>
+            <table class="rtable" id="table-panier" hidden>
+                <thead><tr><th>Produit</th><th class="num">Qté</th><th class="num">Montant</th><th></th></tr></thead>
+                <tbody id="corps-panier"></tbody>
+            </table>
+
+            <label class="champ" for="client">Client</label>
+            <select id="client"><option value="">Client Anonyme</option></select>
+
+            <label class="champ" for="mode">Mode de Règlement</label>
+            <select id="mode">
+                <option value="especes">Espèces</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="virement">Virement bancaire</option>
+                <option value="credit">Crédit / À terme</option>
+            </select>
+            <div id="erreur-client" class="erreur-champ" role="alert"></div>
+
+            <div id="bloc-facture" hidden>
+                <label class="champ" for="facture-type">Type de Facture</label>
+                <div class="groupe" style="flex-wrap:nowrap">
+                    <select id="facture-type"><option value="simple">Facture simple</option><option value="normalisee">Facture normalisée</option></select>
+                    <button id="btn-facture" type="button" class="btn" hidden>Modifier les informations de facturation</button>
+                </div>
+                <p id="aide-facture" class="muted" style="font-size:11px;margin:6px 0 0">Facture normalisée demandée — en attente : elle sera transmise à la DGI par le serveur à la synchronisation.</p>
+            </div>
+
+            <label class="champ" for="remise">Remise (FCFA)</label>
+            <input id="remise" type="number" min="0" step="1" value="0" inputmode="numeric">
+            <div id="bloc-especes">
+                <label class="champ" for="recu">Montant Reçu</label>
+                <input id="recu" type="number" min="0" step="1" placeholder="0" inputmode="numeric">
+            </div>
+            <div class="totaux">
+                <div><span>Sous-total</span><b id="sous-total">0 FCFA</b></div>
+                <div id="ligne-tva" class="muted"><span>dont TVA (indicatif)</span><span id="tva">0 FCFA</span></div>
+                <div id="ligne-monnaie"><span>Monnaie à Rendre</span><b id="monnaie">0 FCFA</b></div>
+                <div class="total"><span>Total à Payer</span><span id="total">0 FCFA</span></div>
+            </div>
+            <div id="erreur-vente" class="erreur-champ" role="alert"></div>
+            <button id="btn-valider" type="button" class="btn plein" style="width:100%;justify-content:center;margin-top:12px;height:42px">Valider</button>
+            <p class="muted" style="font-size:11px;margin:8px 0 0">La vente est enregistrée sur cet appareil, pas encore envoyée : elle partira au retour du réseau.</p>
+        </div>
+    </aside>
+</main>
+
+<dialog id="dlg-piece">
+    <h3>Vente à la Pièce</h3>
+    <p id="piece-produit" class="muted"></p>
+    <label class="champ" for="piece-qte">Nombre de sujets / Quantité</label>
+    <input id="piece-qte" type="number" step="1" min="1" placeholder="ex : 2" inputmode="numeric">
+    <label class="champ" for="piece-montant">Montant Global de la Vente (FCFA)</label>
+    <input id="piece-montant" type="number" min="0" step="1" placeholder="ex : 8000" inputmode="numeric">
+    <div id="piece-erreur" class="erreur-champ" role="alert"></div>
+    <div class="pied-dialog">
+        <button type="button" class="btn" data-fermer="dlg-piece">Annuler</button>
+        <button type="button" id="piece-ajouter" class="btn plein">Ajouter au panier</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-facture">
+    <h3>Facture Normalisée</h3>
+    <label class="champ" for="facture-nom">Nom et prénom du client *</label>
+    <input id="facture-nom" type="text" maxlength="150">
+    <div class="erreur-champ" id="erreur-facture-nom" role="alert"></div>
+    <label class="champ" for="facture-ifu">IFU du client</label>
+    <input id="facture-ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres">
+    <p class="muted" style="font-size:11px;margin:4px 0 0">Laissez vide pour un client sans IFU (client particulier).</p>
+    <div class="erreur-champ" id="erreur-facture-ifu" role="alert"></div>
+    <label class="champ" for="facture-aib">Taux AIB</label>
+    <select id="facture-aib"><option value="5%">5 %</option><option value="1%">1 %</option><option value="N/A">Aucun (N/A)</option></select>
+    <p class="muted" style="font-size:11px;margin:4px 0 0">Le montant de l'AIB est calculé par la DGI.</p>
+    <div class="erreur-champ" id="erreur-facture-aib" role="alert"></div>
+    <div class="pied-dialog">
+        <button type="button" class="btn" id="facture-annuler">Annuler</button>
+        <button type="button" class="btn plein" id="facture-valider">Enregistrer</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-deconnexion">
+    <h3>Déconnecter cet appareil</h3>
+    <p id="deco-texte"></p>
+    <div id="deco-abandon" hidden>
+        <label class="champ" for="deco-n">Pour abandonner ces ventes, saisissez leur nombre</label>
+        <input id="deco-n" type="number" min="0" step="1" inputmode="numeric">
+    </div>
+    <div id="deco-erreur" class="erreur-champ" role="alert"></div>
+    <div class="pied-dialog">
+        <button type="button" class="btn" data-fermer="dlg-deconnexion">Annuler</button>
+        <button type="button" class="btn" id="deco-envoyer" hidden>Envoyer d'abord</button>
+        <button type="button" class="btn danger" id="deco-confirmer">Déconnecter</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-prix-perimes">
+    <h3>Prix peut-être périmés</h3>
+    <p id="prix-perimes-texte"></p>
+    <div class="pied-dialog">
+        <button type="button" class="btn" id="prix-perimes-annuler">Annuler</button>
+        <button type="button" class="btn danger" id="prix-perimes-confirmer">Confirmer quand même</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-abandon">
+    <h3>Abandonner cette vente ?</h3>
+    <p id="abandon-texte"></p>
+    <div class="pied-dialog">
+        <button type="button" class="btn" data-fermer="dlg-abandon">Annuler</button>
+        <button type="button" class="btn danger" id="abandon-confirmer">Abandonner</button>
+    </div>
+</dialog>
+
+<script type="module" src="/assets/hors-ligne/caisse.js"></script>
+</body>
+</html>

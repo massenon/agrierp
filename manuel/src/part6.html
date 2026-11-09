@@ -48,7 +48,7 @@
     <li>Cliquez sur <span class="btn">Nouvel Utilisateur</span>.</li>
     <li>Saisissez le <span class="champ">Nom complet</span>.</li>
     <li>Saisissez le <span class="champ">Nom d'utilisateur</span> — l'identifiant court de connexion (par exemple <em>caisse</em>).</li>
-    <li>Saisissez l'<span class="champ">Email</span> : il sert à la réinitialisation du mot de passe.</li>
+    <li>Saisissez l'<span class="champ">Email</span> : adresse de contact du compte (il peut aussi servir à se connecter).</li>
     <li>Choisissez le <span class="champ">Rôle</span> : <em>Admin</em>, <em>Animalier</em>, <em>Caissier</em> ou <em>Comptable</em>.</li>
     <li>Saisissez un <span class="champ">Mot de passe</span> provisoire (8 caractères minimum, avec lettre, chiffre et symbole).</li>
     <li>Cliquez sur <span class="btn">Enregistrer</span>.</li>
@@ -113,7 +113,7 @@
   <p><span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Restauration</span></p>
   <p>Tout ce qui a été archivé dans le logiciel se retrouve ici : <strong>Type, Élément, Module, Archivé le</strong>. L'action de restauration remet l'élément en service.</p>
 
-  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un client, un produit, un fournisseur ou une bande archivés par erreur se récupèrent en un clic. C'est la raison pour laquelle AgriERP <strong>archive au lieu de supprimer</strong>.</p></div></div>
+  <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Un client, un produit, un fournisseur ou une bande archivés par erreur se récupèrent en un clic. C'est la raison pour laquelle LogiAgriERP <strong>archive au lieu de supprimer</strong>.</p></div></div>
 
   <div class="note attention"><span class="ico">⚠️</span><div><b>Attention</b><p>Les <strong>écritures comptables ne figurent pas</strong> dans la corbeille, et c'est volontaire : une écriture ne se restaure pas, elle se <strong>contre-passe</strong>. La faire réapparaître dans un exercice éventuellement clos déséquilibrerait le grand livre.</p></div></div>
 
@@ -246,7 +246,7 @@
 
   <div class="note info"><span class="ico">ℹ️</span><div><b>Information</b><p>Le formulaire envoie un <strong>e-mail réel</strong>. Il suppose donc que la configuration d'envoi a été faite : <span class="chemin">Paramètres</span> <span class="fleche">➔</span> <span class="chemin">Données de l'Entreprise</span>, bloc SMTP. Si l'envoi échoue, utilisez directement les adresses ci-dessus.</p></div></div>
 
-  <h2>11.3 Qui fait quoi autour d'AgriERP</h2>
+  <h2>11.3 Qui fait quoi autour d'LogiAgriERP</h2>
   <p>Trois structures interviennent sur ce logiciel, avec des rôles distincts. Savoir à qui s'adresser fait gagner du temps.</p>
 
   <table>
@@ -265,7 +265,7 @@
       <tr>
         <td><strong>Dr MASSENON Rhodes</strong><br><span style="font-size:9pt;color:var(--muted)">Docteur en Génie Logiciel et IA</span></td>
         <td>Éditeur du logiciel</td>
-        <td>Tout ce qui touche au fonctionnement d'AgriERP : anomalie, question d'utilisation, évolution (section 11.2).</td>
+        <td>Tout ce qui touche au fonctionnement d'LogiAgriERP : anomalie, question d'utilisation, évolution (section 11.2).</td>
       </tr>
     </tbody>
   </table>
@@ -322,7 +322,7 @@
   <table>
     <thead><tr><th style="width:38%">Situation</th><th>Ce qu'il faut faire</th></tr></thead>
     <tbody>
-      <tr><td><strong>Je n'arrive pas à me connecter</strong></td><td>Vérifiez la casse du mot de passe et la touche Verr. Maj. Utilisez <em>Mot de passe oublié ?</em>. Après plusieurs échecs, contactez l'administrateur : le compte peut avoir été désactivé.</td></tr>
+      <tr><td><strong>Je n'arrive pas à me connecter</strong></td><td>Vérifiez la casse du mot de passe et la touche Verr. Maj. Si vous avez oublié votre mot de passe, contactez l'administrateur : il le réinitialise avec un mot de passe temporaire (icône <em>Réinitialiser le mot de passe</em> de Gestion des Utilisateurs). Après plusieurs échecs, contactez aussi l'administrateur : le compte peut avoir été désactivé.</td></tr>
       <tr><td><strong>Un écran n'apparaît pas dans mon menu</strong></td><td>Votre rôle ne l'autorise pas (annexe A). Ce n'est pas une panne.</td></tr>
       <tr><td><strong>« Vente interdite — rémanence vétérinaire »</strong></td><td>La bande est sous délai d'attente après un traitement. Retirez l'article du panier et prévenez le chef d'élevage.</td></tr>
       <tr><td><strong>« Stock insuffisant »</strong></td><td>La vente reste possible. Signalez l'écart pour un ajustement d'inventaire (section 5.3).</td></tr>
@@ -462,7 +462,7 @@
   <div class="note astuce"><span class="ico">✅</span><div><b>Astuce</b><p>Pour signaler un problème utilement, indiquez trois choses : <strong>l'écran</strong> où vous étiez, <strong>ce que vous veniez de faire</strong>, et <strong>le message exact</strong> affiché. Un signalement précis se traite en quelques minutes ; un « ça ne marche pas » demande une journée d'enquête.</p></div></div>
 
   <div style="margin-top:22pt;border-top:2.5pt solid var(--forest);padding-top:9pt;font-size:9pt;color:var(--muted);text-align:center">
-    <strong style="color:var(--forest)">AgriERP — Manuel d'utilisation</strong><br>
+    <strong style="color:var(--forest)">LogiAgriERP — Manuel d'utilisation</strong><br>
     Ferme École OLOUWACHEGOUN — Ikpinlè, Bénin<br>
     Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB)<br>
     Accompagnement des PME : Cabinet FAGUEZ SARL<br>

@@ -174,7 +174,15 @@ class HistoriqueVentes extends Component
         $this->authorize('manage-ventes');
         $sale = Sale::with('lines')->findOrFail($this->cancellingSaleId);
 
-        if (! app(AnnulerVenteAction::class)->execute($sale)) {
+        try {
+            if (! app(AnnulerVenteAction::class)->execute($sale)) {
+                return;
+            }
+        } catch (\App\Exceptions\FactureNormaliseeException $e) {
+            // MECEF-1 — facture normalisée : jamais annulée, un avoir la corrige.
+            $this->dispatch('close-modal', name: 'modal-cancel-sale');
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
             return;
         }
 

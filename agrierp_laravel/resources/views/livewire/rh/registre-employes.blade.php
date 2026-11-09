@@ -32,6 +32,8 @@
                 <option value="Actif">Actif</option>
                 <option value="Congé">Congé</option>
                 <option value="Suspendu">Suspendu</option>
+                {{-- RH-Q1 — les employés archivés, en lecture. --}}
+                <option value="Archivé">Archivé</option>
             </select>
         </div>
         <div class="overflow-x-auto">
@@ -54,7 +56,9 @@
                             <td data-label="Date d'embauche" class="px-md py-sm text-xs">{{ $employee->hire_date?->format('d/m/Y') ?? '—' }}</td>
                             <td data-label="Salaire" class="px-md py-sm text-xs">{{ $employee->base_salary ? number_format($employee->base_salary, 0, ',', ' ') : '—' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
-                                @if($employee->status === 'actif')
+                                @if(! $employee->is_active)
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">Archivé</span>
+                                @elseif($employee->status === 'actif')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>
                                 @elseif($employee->status === 'conge')
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">Congé</span>
@@ -63,11 +67,17 @@
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @if($employee->is_active)
                                 <button type="button" wire:click="editEmployee('{{ $employee->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-employee-{{ $employee->id }}' })" class="text-error-deep hover:text-red-800 p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">archive</span></button>
+                                @else
+                                <span class="text-outline text-[10px] italic">Lecture seule</span>
+                                @endif
                             </td>
                         </tr>
+                        @if($employee->is_active)
                         <x-modal-confirm-delete :name="'archive-employee-'.$employee->id" :item-label="$employee->last_name.' '.$employee->first_name" :action="'archiveEmployee(\''.$employee->id.'\')'" />
+                        @endif
                     @empty
                         <tr><td colspan="6" class="px-md py-lg text-center text-outline">Aucun employé pour le moment.</td></tr>
                     @endforelse

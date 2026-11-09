@@ -7,7 +7,7 @@ use App\Models\AuditLog;
 use App\Models\CompanySetting;
 use App\Models\CustomerReminder;
 use App\Models\Receivable;
-use App\Services\SmsService;
+use App\Services\RelanceClientService;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 
@@ -29,7 +29,7 @@ use Livewire\Component;
  *   avec le message pré-rempli. Le clic est capturé côté serveur
  *   (traçabilité `CustomerReminder` réelle) puis l'ouverture du lien est
  *   déclenchée côté client via `$this->js()`.
- * - SMS : réel via `App\Services\SmsService`, appel direct aux API REST
+ * - Appel : lien `tel:` (ticket AUT-3, remplace le SMS) ; la relance est journalisée.
  *   Twilio/Vonage (pas de SDK Composer — packagist.org non accessible
  *   dans ce sandbox de développement ; fonctionnera normalement en
  *   déploiement réel). Fournisseur et clés API configurés en
@@ -154,31 +154,25 @@ class RelancesClients extends Component
 
     public function sendMailReminder(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
 
-        if (! $receivable->customer?->email) {
-            $this->dispatch('toast', message: "Ce client n'a pas d'adresse email enregistrée.", type: 'error');
+        try {
+            app(RelanceClientService::class)->relancer($receivable->customer, $receivable, 'email', $this->renderTemplate($receivable));
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
 
             return;
         }
 
-        $message = $this->renderTemplate($receivable);
-
-        CompanySetting::current()->applyMailConfig();
-        Mail::to($receivable->customer->email)->send(new CustomerReminderMail($receivable->customer->name, $message));
-
-        $this->logReminder($receivable, 'email', $message);
         $this->dispatch('toast', message: 'Relance envoyée par email avec succès.', type: 'success');
     }
 
-    /**
-     * WhatsApp réel via lien `wa.me` — le numéro doit être au format
-     * international (chiffres uniquement, sans "+" ni espaces, ex :
-     * 22996456789). Le clic est journalisé côté serveur (CustomerReminder
-     * réelle) puis l'ouverture du lien wa.me est déclenchée côté client.
-     */
     public function sendWhatsappReminder(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
         $phone = preg_replace('/[^0-9]/', '', (string) $receivable->customer?->phone);
 
@@ -196,37 +190,30 @@ class RelancesClients extends Component
         $this->js("window.open(".json_encode($url).", '_blank')");
     }
 
-    public function sendSmsReminder(string $receivableId): void
+    /**
+     * Ticket AUT-3 (remplace le SMS) — « Appeler » : le numéro est composé depuis l'appareil par le lien `tel:` de la vue ;
+     * ici, la trace de la relance. Même refus que WhatsApp : un client sans numéro ne s'appelle pas.
+     */
+    public function callReminder(string $receivableId): void
     {
+        $this->authorize('manage-ventes');
+
         $receivable = Receivable::with('customer')->findOrFail($receivableId);
 
-        if (! $receivable->customer?->phone) {
-            $this->dispatch('toast', message: "Ce client n'a pas de numéro de téléphone enregistré.", type: 'error');
+        try {
+            app(RelanceClientService::class)->relancer($receivable->customer, $receivable, 'appel', $this->renderTemplate($receivable));
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
 
             return;
         }
 
-        $message = $this->renderTemplate($receivable);
-        $result = app(SmsService::class)->send($receivable->customer->phone, $message);
-
-        if ($result['success']) {
-            $this->logReminder($receivable, 'sms', $message);
-        }
-
-        $this->dispatch('toast', message: $result['message'], type: $result['success'] ? 'success' : 'error');
+        $this->dispatch('toast', message: 'Appel enregistré dans l\'historique des relances.', type: 'success');
     }
 
     private function logReminder(Receivable $receivable, string $channel, string $message): void
     {
-        CustomerReminder::create([
-            'customer_id' => $receivable->customer_id,
-            'receivable_id' => $receivable->id,
-            'channel' => $channel,
-            'reminder_date' => now()->format('Y-m-d'),
-            'message' => $message,
-        ]);
-
-        AuditLog::record('customer_reminder.sent_'.$channel, 'ventes');
+        app(RelanceClientService::class)->journaliser($receivable->customer, $receivable, $channel, $message);
     }
 
     private function renderTemplate(Receivable $receivable): string

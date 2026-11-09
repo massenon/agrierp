@@ -1,4 +1,4 @@
-# Runbook de Déploiement cPanel — AgriERP (spécifique à ce projet)
+# Runbook de Déploiement cPanel — LogiAgriERP (spécifique à ce projet)
 
 Ticket 13.3 (Sprint 13), Document 08 Partie B. Ce document ne remplace
 pas `CPANEL_DEPLOYMENT.md` (déjà fourni, référence générique) — il le
@@ -87,10 +87,10 @@ php artisan db:seed --force --class=Database\\Seeders\\DatabaseSeeder
 
 | Rôle | Email | Mot de passe démo |
 |---|---|---|
-| admin | dg@fermeolouwachegoun.com | AgriERP@2026 |
-| comptable | compta@fermeolouwachegoun.com | AgriERP@2026 |
-| caissier | caisse@fermeolouwachegoun.com | AgriERP@2026 |
-| animalier | elevage@fermeolouwachegoun.com | AgriERP@2026 |
+| admin | dg@fermeolouwachegoun.com | LogiAgriERP@2026 |
+| comptable | compta@fermeolouwachegoun.com | LogiAgriERP@2026 |
+| caissier | caisse@fermeolouwachegoun.com | LogiAgriERP@2026 |
+| animalier | elevage@fermeolouwachegoun.com | LogiAgriERP@2026 |
 
 **Dès la mise en donnée réelle** : changer ces 4 mots de passe depuis
 l'écran Mon Profil de chaque compte, ou via `php artisan tinker` en SSH

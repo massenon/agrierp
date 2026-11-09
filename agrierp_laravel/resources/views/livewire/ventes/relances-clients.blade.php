@@ -6,8 +6,8 @@
             </h2>
             <p class="text-xs text-outline mt-xs">Moteur de relance des créances clients échues.</p>
         </div>
-        <a href="{{ route('parametres.integrations') }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
-            <span class="material-symbols-outlined text-[16px]">settings_input_antenna</span>Configurer Email &amp; SMS
+        <a wire:navigate href="{{ route('parametres.hub', ['tab' => 'email']) }}" class="flex items-center gap-xs text-xs font-bold text-brand-forest hover:text-brand-emerald">
+            <span class="material-symbols-outlined text-[16px]">mail</span>Configurer l'Email (SMTP)
         </a>
     </div>
 
@@ -50,14 +50,22 @@
                     <div class="bg-white border border-outline-variant rounded-lg p-md flex flex-col sm:flex-row sm:items-center gap-sm">
                         <div class="w-10 h-10 rounded-full bg-brand-emerald text-white flex items-center justify-center font-bold text-sm flex-shrink-0">{{ strtoupper($initials) }}</div>
                         <div class="flex-1 min-w-0">
-                            <a href="{{ route('ventes.profile-client', $receivable->customer) }}" class="text-brand-forest font-bold text-sm hover:underline hover:text-brand-emerald">{{ $receivable->customer?->name }}</a>
+                            <a wire:navigate href="{{ route('ventes.profile-client', $receivable->customer) }}" class="text-brand-forest font-bold text-sm hover:underline hover:text-brand-emerald">{{ $receivable->customer?->name }}</a>
                             <p class="text-xs"><span class="text-error-deep font-bold">{{ number_format($receivable->balance, 0, ',', ' ') }} FCFA</span> <span class="text-outline">— {{ $receivable->days_overdue }} jours de retard</span></p>
                         </div>
                         <div class="flex items-center gap-xs flex-shrink-0 flex-wrap">
+                            @can('manage-ventes')
                             <button type="button" wire:click="sendWhatsappReminder('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 bg-brand-emerald hover:bg-brand-forest text-white text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">chat</span>Relancer WhatsApp</button>
                             <button type="button" wire:click="sendMailReminder('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 bg-info-blue hover:bg-blue-800 text-white text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">mail</span>Relancer par Mail</button>
+                            @endcan
                             <button type="button" wire:click="exportCourrierPdf('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">picture_as_pdf</span>Exporter Courrier</button>
-                            <button type="button" wire:click="sendSmsReminder('{{ $receivable->id }}')" wire:loading.attr="disabled" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full disabled:opacity-50"><span class="material-symbols-outlined text-[14px]">sms</span>Relancer par SMS</button>
+                            @can('manage-ventes')
+                            @if($receivable->customer?->phone)
+                                <a href="tel:{{ preg_replace('/[^0-9+]/', '', $receivable->customer->phone) }}" wire:click="callReminder('{{ $receivable->id }}')" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full"><span class="material-symbols-outlined text-[14px]">call</span>Appeler</a>
+                            @else
+                                <button type="button" wire:click="callReminder('{{ $receivable->id }}')" class="flex items-center gap-1 border border-outline-variant hover:bg-surface-zebra text-brand-forest text-[11px] font-bold px-sm py-1.5 rounded-full"><span class="material-symbols-outlined text-[14px]">call</span>Appeler</button>
+                            @endif
+                            @endcan
                         </div>
                     </div>
                 @empty

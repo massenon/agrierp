@@ -73,7 +73,7 @@ class DemarrageService
                 'cle' => 'modules',
                 'titre' => 'Modules d\'élevage',
                 'detail' => 'Activez les espèces élevées à la ferme : leurs fiches journalières n\'apparaissent qu\'ensuite.',
-                'fait' => ModuleConfig::where('is_enabled', true)->exists(),
+                'fait' => ModuleConfig::where('is_enabled', true)->where('species_code', '!=', ModuleConfig::ASSISTANT_DEMARRAGE)->exists(),
                 'obligatoire' => true,
                 'lien' => route('parametres.hub', ['tab' => 'modules']),
             ],

@@ -45,7 +45,7 @@ class SyncFichesVentilationTest extends TestCase
 
         $this->utilisateur = User::create([
             'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
 
         // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.
@@ -556,13 +556,14 @@ class SyncFichesVentilationTest extends TestCase
 
     public function test_depart_refuse_sur_une_espece_non_prise_en_charge(): void
     {
-        $avi = LivestockSpecies::create(['label' => 'Aviculture', 'code' => 'aviculture', 'is_active' => true]);
-        $poulets = $this->creerBande($avi, 'AVI-2026-01', 60);
-        $f = $this->fiche('2026-10-10', ['cat_depart_repro' => 10, 'cat_depart_sevre' => 20, 'cat_depart_jeune' => 30], $poulets, 1);
+        // VOL-2 : l'aviculture (reproductrices ET pondeuses) est désormais prise en charge ; une filière sans catégories ne l'est pas.
+        $escargots = LivestockSpecies::create(['label' => 'Héliciculture', 'code' => 'helico', 'is_active' => true]);
+        $bande = $this->creerBande($escargots, 'ESC-2026-01', 60);
+        $f = $this->fiche('2026-10-10', ['cat_depart_repro' => 10, 'cat_depart_sevre' => 20, 'cat_depart_jeune' => 30], $bande, 1);
         $reponse = $this->pousser([$f])->assertOk();
 
         $this->assertSame([], $reponse->json('livestock_daily_entries.accepted'));
-        $this->assertStringContainsString('lapins et les porcs', $this->motif($reponse));
+        $this->assertStringContainsString('lapins, les porcs et les volailles', $this->motif($reponse));
     }
 
     public function test_depart_des_porcs_est_accepte_et_calcule(): void

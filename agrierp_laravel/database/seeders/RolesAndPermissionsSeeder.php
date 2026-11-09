@@ -26,6 +26,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // d'exprimer « peut modifier la facturation », alors que l'ecran
             // ecrit. Meme situation pour les parametres ci-dessous.
             'view-facturation', 'manage-facturation',
+            // CONF-4 (DV-20) — droit FIN du comptable : créer un avoir et retransmettre une facture au MeCeF, SANS ouvrir la caisse.
+            // Avant, l'avoir et l'annulation passaient par `manage-ventes`, le même droit que l'encaissement : le donner au
+            // comptable lui aurait ouvert le POS. L'annulation d'une vente et la caisse restent à `manage-ventes` SEUL.
+            'correct-invoices',
             'view-rh', 'manage-rh',
             'view-administration', 'manage-administration',
             'view-comptabilite', 'manage-comptabilite', 'close-fiscal-year',
@@ -48,10 +52,18 @@ class RolesAndPermissionsSeeder extends Seeder
         Role::findByName('comptable')->givePermissionTo([
             'view-comptabilite', 'manage-comptabilite', 'close-fiscal-year',
             'view-rapports', 'export-rapports',
+            // CONF-4 (DV-20) — LECTURE des ventes, achats et stocks ; consulter la facturation ; corriger par avoir.
+            // Jamais `manage-ventes` (caisse, annulation), `manage-achats`, `manage-stocks`, `manage-elevage`, `manage-users`,
+            // `manage-parametres` ni `manage-facturation` (conversion de devis en facture).
+            'view-ventes', 'view-achats', 'view-stocks',
+            'view-facturation', 'correct-invoices',
         ]);
 
         Role::findByName('caissier')->givePermissionTo([
             'view-ventes', 'manage-ventes', 'export-ventes',
+            // CONF-5 (DV-06) — le caissier CONSULTE et RÉIMPRIME ses factures : `view-facturation` seul. Jamais
+            // `manage-facturation` (conversion de devis), `correct-invoices` (avoir fiscal) ni la retransmission.
+            'view-facturation',
         ]);
 
         Role::findByName('animalier')->givePermissionTo([

@@ -244,6 +244,31 @@ void main() {
     );
   });
 
+  /// Ticket #47 (suite) — le panier tient en DEUX rangées de deux colonnes, comme le web :
+  /// Sous-total + Remise sur une rangée, Total à Payer + Mode de Règlement sur la suivante ;
+  /// et « Client » et « Date de la vente » ne se touchent pas.
+  testWidgets('⚠️ le panier range Sous-total / Remise puis Total / Mode de règlement', (tester) async {
+    await afficher(tester);
+
+    // Le haut, pas le centre : la police des tests (Ahem) fait passer « Remise (FCFA) » sur deux lignes.
+    double haut(Finder f) => tester.getRect(f).top;
+    final sousTotal = find.text('Sous-total');
+    final remise = find.text('Remise (FCFA)');
+    final total = find.text('Total à Payer');
+    final mode = find.byKey(const Key('mode-reglement'));
+
+    expect((haut(sousTotal) - haut(remise)).abs(), lessThan(2), reason: 'Sous-total et Remise sur une même rangée');
+    expect((tester.getRect(total).top - tester.getRect(mode).top).abs(), lessThan(30),
+        reason: 'Total à Payer et Mode de Règlement sur une même rangée');
+    expect(haut(total), greaterThan(haut(sousTotal)), reason: 'la rangée du total vient après celle du sous-total');
+    expect(tester.getRect(sousTotal).right, lessThan(tester.getRect(remise).left));
+    expect(tester.getRect(total).right, lessThan(tester.getRect(mode).left));
+
+    final client = tester.getRect(find.byKey(const Key('client-vente')));
+    final date = tester.getRect(find.byKey(const Key('date-vente')));
+    expect(date.left - client.right, greaterThanOrEqualTo(8), reason: 'écart franc entre Client et Date');
+  });
+
   /// Le bouton reste inerte tant que le panier est vide.
   testWidgets('on ne valide pas un panier vide', (tester) async {
     await afficher(tester);

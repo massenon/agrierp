@@ -38,7 +38,7 @@ class FicheReproducteursEclosionTest extends TestCase
         $admin = User::create([
             'name' => 'Directeur', 'username' => 'admin',
             'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');
         $this->actingAs($admin);
@@ -94,10 +94,30 @@ class FicheReproducteursEclosionTest extends TestCase
     }
 
     /**
-     * 🔴 Ticket 15.55 — les morts d'un jour rechargé sont conservés. `loadDay` ne les rechargeait pas : ré-enregistrer
-     * le jour les remettait à zéro (ou y mettait ceux d'un autre jour affiché).
+     * 🔴 Ticket 15.55 (repris par VOL-1) — les morts d'un jour rechargé sont conservés : désormais PAR CATÉGORIE
+     * (`mort_*`), plus seulement en total. Ré-enregistrer le jour ne les remet pas à zéro.
      */
     public function test_les_morts_du_jour_recharge_sont_conserves_au_reenregistrement(): void
+    {
+        $bande = LivestockLot::where('code', 'AVI-REP-01')->sole();
+
+        Livewire::test(\App\Livewire\Elevage\FicheReproducteurs::class)
+            ->set('departRepro', 60)->set('departJeune', 0)->set('departSevre', 0)
+            ->set('mortRepro', 3)->set('mortPoussin', 1)
+            ->call('saveDay');
+
+        Livewire::test(\App\Livewire\Elevage\FicheReproducteurs::class)
+            ->call('loadDay', now()->toDateString())
+            ->assertSet('mortRepro', 3)->assertSet('mortPoussin', 1)->assertSet('mortPoulet', 0)->assertSet('mortEnregistre', null)
+            ->call('saveDay');
+
+        $fiche = \App\Models\LivestockDailyEntry::where('lot_id', $bande->id)->sole();
+        // Recalcul indépendant : 60 − 4.
+        $this->assertSame([4, 56], [(int) $fiche->mort, (int) $fiche->effectif_final]);
+    }
+
+    /** Un total ancien (avant VOL-1) non ventilé se signale ; il doit être ventilé avant d'enregistrer. */
+    public function test_un_total_ancien_non_ventile_doit_etre_ventile(): void
     {
         $bande = LivestockLot::where('code', 'AVI-REP-01')->sole();
         \App\Models\LivestockDailyEntry::create([
@@ -109,23 +129,7 @@ class FicheReproducteursEclosionTest extends TestCase
             ->call('loadDay', now()->toDateString())
             ->assertSet('mortEnregistre', 4)
             ->assertSee('4 mort(s) déjà enregistré(s) ce jour')
-            ->call('saveDay');
-
-        $fiche = \App\Models\LivestockDailyEntry::where('lot_id', $bande->id)->sole();
-        // Recalcul indépendant : 60 − 4.
-        $this->assertSame([4, 56], [(int) $fiche->mort, (int) $fiche->effectif_final]);
-    }
-
-    public function test_une_repartition_saisie_remplace_le_total_enregistre(): void
-    {
-        $bande = LivestockLot::where('code', 'AVI-REP-01')->sole();
-        \App\Models\LivestockDailyEntry::create([
-            'lot_id' => $bande->id, 'entry_date' => now()->toDateString(),
-            'achat' => 0, 'ne' => 0, 'mort' => 4, 'vente' => 0, 'effectif_final' => 56,
-        ]);
-
-        Livewire::test(\App\Livewire\Elevage\FicheReproducteurs::class)
-            ->call('loadDay', now()->toDateString())
+            ->set('departRepro', 60)->set('departJeune', 0)->set('departSevre', 0)
             ->set('mortRepro', 1)->set('mortPoussin', 1)
             ->call('saveDay');
 

@@ -82,7 +82,7 @@ class SyncTiragePagineTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => 'Compte '.$role, 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
 
@@ -211,12 +211,17 @@ class SyncTiragePagineTest extends TestCase
             // Tickets DEV et AV1 — `quotes` (Devis Prestations) et `credit_notes` (Retours et Avoirs) : `view-ventes`.
             'caissier' => [...self::BASE, 'feed_ration_standards', 'veterinary_withdrawal_periods', 'customer_advances',
                 'customer_reminders', 'quotes', 'credit_notes'],
-            'animalier' => [...self::BASE, 'livestock_transfers', 'feed_ration_standards', 'growth_standards',
+            'animalier' => [...self::BASE, 'livestock_transfers', 'transformations', 'field_survey_entries', 'feed_ration_standards', 'growth_standards',
                 'veterinary_withdrawal_periods', 'prophylaxis_schedule_standards', 'veterinary_records', 'infirmary_records',
                 'veterinary_calendar_events', 'feed_types', 'elevage_numbering', 'lot_revenues', 'animals',
                 'livestock_species', 'stock_movements'],
-            'comptable' => [...self::BASE, 'suppliers', 'chart_of_accounts', 'accounting_entries', 'accounting_entry_lines',
-                'accounting_entry_ids', 'stock_movements', 'payslips', 'cost_centers'],
+            // CONF-4 (DV-20) — le comptable LIT les ventes (`view-ventes` : barème, rémanence, avances, relances, devis, avoirs),
+            // les achats (`view-achats` : crédits fournisseurs, bons de commande, catégories de dépense) et les stocks
+            // (`view-stocks` : filières, mouvements) : il reçoit ces tables EN PLUS de la comptabilité et des rapports.
+            'comptable' => [...self::BASE, 'suppliers', 'chart_of_accounts', 'fixed_assets', 'periodic_closures', 'bank_statement_lines', 'accounting_entries', 'accounting_entry_lines',
+                'accounting_entry_ids', 'stock_movements', 'payslips', 'cost_centers',
+                'feed_ration_standards', 'veterinary_withdrawal_periods', 'customer_advances', 'customer_reminders', 'quotes', 'credit_notes',
+                'supplier_credits', 'purchase_orders', 'expense_categories', 'livestock_species'],
             'admin' => array_keys(SyncController::PERMISSIONS_DE_TIRAGE),
         ];
 

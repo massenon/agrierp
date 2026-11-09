@@ -37,6 +37,10 @@ class BandesSujetsPosteTest extends TestCase
         parent::setUp();
 
         $this->preparerDecor('2026-10-21 09:00:00');
+        // VOL-2 : toute bande d'aviculture exige un départ par catégorie/stade avant toute fiche. Ce test porte sur les bandes et les
+        // entrées de sujets (BS1, BS2), pas sur l'effectif par catégorie : la bande du décor passe en filière NEUTRE (sans
+        // catégories) plutôt que de contourner un refus. Les règles des volailles sont dans PondeusesSynchronisationTest.
+        \App\Models\LivestockSpecies::whereKey($this->pondeuses->species_id)->update(['code' => 'helico', 'label' => 'Escargots']);
         $this->exercice(2025, 'cloture');
         $this->exercice(2026);
     }
@@ -67,13 +71,13 @@ class BandesSujetsPosteTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-bs', 'email' => $role.'-bs@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         // `actingAs` du décor (l'administrateur du web) primerait sur le jeton : on le retire, le poste parle seul.
         $this->app['auth']->forgetGuards();
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => $role.'-bs', 'password' => 'AgriERP@2026', 'device_name' => 'poste-'.$role,
+            'identifiant' => $role.'-bs', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-'.$role,
         ])->assertOk()->json('token');
     }
 
@@ -171,14 +175,15 @@ class BandesSujetsPosteTest extends TestCase
 
     public function test_une_bande_videe_par_une_fiche_du_poste_peut_ensuite_etre_archivee(): void
     {
-        $this->pousserBandes($this->bande())->assertOk();
+        // VOL-1 : bande « ponte » (hors chaîne des reproducteurs, qui exige un départ avant toute fiche).
+        $this->pousserBandes($this->bande(['stage' => 'ponte']))->assertOk();
         $this->envoyer(['livestock_daily_entries' => [[
             'id' => self::FICHE, 'lot_id' => self::LOT, 'entry_date' => '2026-10-20',
             'achat' => 0, 'ne' => 0, 'mort' => 10, 'vente' => 20, 'don' => 10, 'effectif_final' => 0,
         ]]])->assertJsonPath('livestock_daily_entries.accepted', [self::FICHE]);
         $this->assertSame(0, (int) LivestockLot::findOrFail(self::LOT)->current_quantity);
 
-        $this->pousserBandes($this->bande(['is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
+        $this->pousserBandes($this->bande(['stage' => 'ponte', 'is_active' => false]))->assertJsonPath('livestock_lots.accepted', [self::LOT]);
 
         $this->assertFalse((bool) LivestockLot::findOrFail(self::LOT)->is_active);
     }
@@ -347,7 +352,7 @@ class BandesSujetsPosteTest extends TestCase
     public function test_la_bande_et_sa_fiche_du_meme_envoi_sont_acceptees_dans_l_ordre(): void
     {
         $paquet = [
-            'livestock_lots' => [$this->bande()],
+            'livestock_lots' => [$this->bande(['stage' => 'ponte'])],   // VOL-1 : hors chaîne des reproducteurs
             'livestock_daily_entries' => [[
                 'id' => self::FICHE, 'lot_id' => self::LOT, 'entry_date' => '2026-10-20',
                 'achat' => 0, 'ne' => 6, 'mort' => 0, 'vente' => 0, 'don' => 0, 'effectif_final' => 46,

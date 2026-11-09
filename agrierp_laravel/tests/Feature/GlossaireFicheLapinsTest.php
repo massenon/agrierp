@@ -53,7 +53,7 @@ class GlossaireFicheLapinsTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $compte = \App\Models\User::create([
             'name' => 'Animalier', 'username' => 'animalier-test',
-            'email' => 'animalier-test@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'email' => 'animalier-test@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $compte->assignRole('animalier');
         $this->actingAs($compte);
@@ -306,7 +306,8 @@ class GlossaireFicheLapinsTest extends TestCase
         $apres2 = DB::table('feed_ration_standards')->orderBy('stage_label')->get(['stage_label', 'ration_g_per_day'])->toArray();
 
         $this->assertEquals($apres1, $apres2);
-        $this->assertSame(3, DB::table('feed_ration_standards')->count());
+        // Lapins seulement : la migration VOL-1 a semé trois lignes d'aviculture, hors sujet ici.
+        $this->assertSame(3, DB::table('feed_ration_standards')->where('species_code', 'cuniculture')->count());
     }
 
     public function test_la_migration_ne_renomme_pas_si_le_nouveau_libelle_existe_deja(): void
@@ -427,7 +428,7 @@ class GlossaireFicheLapinsTest extends TestCase
 
         $this->migration()->down();
 
-        $this->assertSame(31, (int) DB::table('feed_ration_standards')->where('stage_label', 'Jeune')->value('ration_g_per_day'));
+        $this->assertSame(31, (int) DB::table('feed_ration_standards')->where('species_code', 'cuniculture')->where('stage_label', 'Jeune')->value('ration_g_per_day'));
         $this->assertSame(2, DB::table('feed_ration_standards')->where('species_code', 'cuniculture')->count());
     }
 

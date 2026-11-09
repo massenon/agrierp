@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Feature\Concerns\AvecDepartPondeuses;
 use Tests\TestCase;
 
 /**
@@ -23,6 +24,7 @@ use Tests\TestCase;
  */
 class EnregistrerSujetsActionsTest extends TestCase
 {
+    use AvecDepartPondeuses;
     use PreparationExercices;
     use RefreshDatabase;
 
@@ -33,6 +35,8 @@ class EnregistrerSujetsActionsTest extends TestCase
         $this->preparerDecor('2026-10-21 09:00:00');
         $this->exercice(2025, 'cloture');
         $this->exercice(2026);
+        // VOL-2 : une bande de pondeuses exige son départ par stade avant toute entrée de sujets.
+        $this->departPondeuses($this->pondeuses, '2026-10-01');
     }
 
     protected function tearDown(): void
@@ -182,7 +186,7 @@ class EnregistrerSujetsActionsTest extends TestCase
         $clos = "L'exercice 2025 est clôturé : aucune saisie ne peut être datée du 20/12/2025.";
 
         $this->assertErreurSousLeChamp($this->ajouter('Achat', 5, '2025-12-20'), 'entry_date', $clos);
-        $this->assertSame(0, LivestockDailyEntry::count());
+        $this->assertSame(1, LivestockDailyEntry::count());
 
         // Une entrée d'un exercice clos (posée directement : le décor), ni modifiable ni archivable.
         $ancienne = LivestockDailyEntry::create([
@@ -221,7 +225,7 @@ class EnregistrerSujetsActionsTest extends TestCase
 
         $caissier = User::create([
             'name' => 'Caisse', 'username' => 'caisse-bs2', 'email' => 'caisse-bs2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
         $this->actingAs($caissier);
@@ -234,7 +238,7 @@ class EnregistrerSujetsActionsTest extends TestCase
         // Un compte qui saisit sans pouvoir archiver : modifier oui, archiver non.
         $saisisseur = User::create([
             'name' => 'Saisie', 'username' => 'saisie-bs2', 'email' => 'saisie-bs2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $saisisseur->givePermissionTo(['view-elevage', 'manage-elevage']);
         $this->actingAs($saisisseur);
@@ -254,7 +258,7 @@ class EnregistrerSujetsActionsTest extends TestCase
 
         $lecteur = User::create([
             'name' => 'Lecteur', 'username' => 'lecteur-bs2', 'email' => 'lecteur-bs2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $lecteur->givePermissionTo('view-elevage');
         $this->actingAs($lecteur);

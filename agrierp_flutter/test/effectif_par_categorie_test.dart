@@ -382,7 +382,11 @@ void main() {
         ).chaine,
         isFalse,
       );
-      expect(EffectifParCategorie.especeDuCode('aviculture'), isNull);
+      // VOL-1 / VOL-2 : l'aviculture hors « ponte » est la famille des volailles reproductrices ; « ponte » (Pondeuses) est
+      // l'autre famille de volailles, à quatre stades ; une filière sans catégories n'est pas suivie.
+      expect(EffectifParCategorie.especeDuCode('aviculture'), EffectifParCategorie.volaillesRepro);
+      expect(EffectifParCategorie.especeDuCode('aviculture', stade: 'ponte'), EffectifParCategorie.volaillesPonte);
+      expect(EffectifParCategorie.especeDuCode('helico', stade: 'ponte'), isNull);
       expect(EffectifParCategorie.especeDuCode('cuniculture'), lap);
       expect(EffectifParCategorie.especeDuCode('porciculture'), por);
       expect(
@@ -455,7 +459,7 @@ void main() {
 
     test('espèce non prise en charge : refus franc', () {
       expect(
-        () => EffectifParCategorie.calculerJour('volailles', _e(1, 1, 1), _mv0),
+        () => EffectifParCategorie.calculerJour('escargots', _e(1, 1, 1), _mv0),
         throwsArgumentError,
       );
     });
@@ -686,7 +690,7 @@ echo json_encode($s);
           final s = scenarios[i];
           final php = sortie[i] as Map<String, dynamic>;
           final fiches = s.fichesChaine();
-          final espece = EffectifParCategorie.especeDuCode(s.especeCode);
+          final espece = EffectifParCategorie.especeDuCode(s.especeCode, stade: s.stade);
 
           // (1) État d'un jour — lu AVANT tout recalcul, comme au serveur.
           final etats = php['etats'] as List;
@@ -776,7 +780,7 @@ foreach ($entree as $i => $sc) {
         $especes[$code] = App\Models\LivestockSpecies::create(['label' => $code, 'code' => $code, 'is_active' => true]);
     }
     $lot = App\Models\LivestockLot::create([
-        'code' => 'S'.$i, 'species_id' => $especes[$code]->id, 'stage' => 'croissance',
+        'code' => 'S'.$i, 'species_id' => $especes[$code]->id, 'stage' => $sc['stade'],
         'initial_quantity' => $sc['initial'], 'current_quantity' => $sc['initial'],
         'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true,
     ]);
@@ -829,9 +833,13 @@ class Scenario {
     required this.proposee,
     this.type = 'chaine',
     this.depuis,
+    this.stade = 'croissance',
   });
 
   final String especeCode;
+
+  /// Stade de la bande : « ponte » écarte les volailles de la chaîne (VOL-1).
+  final String stade;
   final int initial;
 
   /// Fiches (colonnes du serveur, `entry_date` en `Y-m-d`), dans l'ordre des jours.
@@ -845,6 +853,7 @@ class Scenario {
 
   Map<String, Object?> versJson() => {
     'espece': especeCode,
+    'stade': stade,
     'initial': initial,
     'fiches': fiches,
     'etats': [for (final d in etats) _iso(d)],
@@ -869,6 +878,9 @@ class Scenario {
       donSevre: f['don_sevre'] as int?,
       donJeune: f['don_jeune'] as int?,
       passage: f['passage_sevre_jeune'] as int?,
+      venteRepro: f['vente_repro'] as int?,
+      venteSevre: f['vente_sevre'] as int?,
+      venteJeune: f['vente_jeune'] as int?,
       departRepro: f['cat_depart_repro'] as int?,
       departSevre: f['cat_depart_sevre'] as int?,
       departJeune: f['cat_depart_jeune'] as int?,
@@ -904,6 +916,8 @@ Scenario scenarioAuHasard(Random h, int i, {String type = 'chaine'}) {
     < 5 => 'cuniculture',
     _ => 'porciculture',
   };
+  // VOL-1 : un quart des bandes d'aviculture sont au stade « ponte » (Pondeuses : hors chaîne).
+  final stade = especeCode == 'aviculture' && h.nextInt(4) == 0 ? 'ponte' : 'croissance';
   final initial = 20 + h.nextInt(90);
   final nb = 1 + h.nextInt(6);
   final teteVoulue = h.nextInt(100) < 85 ? h.nextInt(nb) : -1;
@@ -935,6 +949,13 @@ Scenario scenarioAuHasard(Random h, int i, {String type = 'chaine'}) {
     ].fold<int>(0, (t, x) => t + ((x as int?) ?? 0));
     f['mort'] = somme('mort');
     f['don'] = somme('don');
+    if (especeCode == 'aviculture') {
+      // VOL-1 : les ventes des volailles sont ventilées par catégorie ; `vente` en est la somme.
+      f['vente_repro'] = n(2);
+      f['vente_sevre'] = n(6);
+      f['vente_jeune'] = n(4);
+      f['vente'] = somme('vente');
+    }
 
     if (k == teteVoulue) {
       // Départ = effectif au DÉBUT du jour (fin de la fiche précédente, sinon l'initial).
@@ -1029,6 +1050,7 @@ Scenario scenarioAuHasard(Random h, int i, {String type = 'chaine'}) {
 
   return Scenario(
     especeCode: especeCode,
+    stade: stade,
     initial: initial,
     fiches: fiches,
     etats: etats,

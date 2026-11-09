@@ -27,7 +27,7 @@ class ApiAuthentificationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     private User $comptable;
 
@@ -186,6 +186,9 @@ class ApiAuthentificationTest extends TestCase
      */
     public function test_the_pull_serves_the_ration_standards(): void
     {
+        // La migration VOL-1 pose les trois lignes des volailles reproductrices : on part d'un barème vide.
+        \App\Models\FeedRationStandard::query()->delete();
+
         \App\Models\FeedRationStandard::create([
             'species_code' => 'cuniculture',
             'stage_label' => 'Lapine Mère / Reproducteur',
@@ -208,6 +211,8 @@ class ApiAuthentificationTest extends TestCase
      */
     public function test_the_rations_are_served_even_with_a_recent_since(): void
     {
+        \App\Models\FeedRationStandard::query()->delete();
+
         \App\Models\FeedRationStandard::create([
             'species_code' => 'cuniculture',
             'stage_label' => 'Lapin Sevré',

@@ -45,7 +45,7 @@ class SyncParametresGenerauxTest extends TestCase
         $this->administrateur = User::create([
             'name' => 'M. Olouchègoun', 'username' => 'admin',
             'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
 
         // Ticket S3 : le journal d'audit ne descend qu'aux comptes qui gèrent les utilisateurs. Permission

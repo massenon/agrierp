@@ -41,9 +41,10 @@
                 <span class="material-symbols-outlined text-[16px] flex-shrink-0">help</span>
                 <span>Protocole non calculable — {{ $protocole->motifIndetermine }} Consultez le registre avant toute administration.</span>
             </p>
-        @elseif($protocole->traitements->isEmpty())
+        @endif
+        @if($protocole->traitements->isEmpty() && $protocole->determinable())
             <p class="text-xs text-outline italic py-1">— Aucun traitement récurrent programmé pour ce jour —</p>
-        @else
+        @elseif(! $protocole->traitements->isEmpty())
             @foreach($protocole->traitements as $ligne)
                 @php
                     $standard = $ligne['standard'];
@@ -70,7 +71,7 @@
         <p class="text-[10px] text-outline">{{ $protocole->calendairesNonEvalues }} entrée(s) du protocole sans jour de cycle (calendaires, ex. « Le 1er du mois ») ne sont pas évaluées ici.</p>
     @endif
 
-    @if($protocole->determinable() && $protocole->enAttente() > 0)
+    @if($protocole->enAttente() > 0)
         <div class="space-y-xs">
             <p class="text-[10px] text-error-deep">Valider un traitement rémanent bloque la vente de cette bande jusqu'à la fin du délai d'attente.</p>
             <button type="button" wire:click="validerTraitements" wire:loading.attr="disabled" wire:target="validerTraitements" class="w-full flex items-center justify-center gap-xs px-md py-2 rounded-lg bg-brand-emerald hover:bg-brand-forest text-white text-xs font-bold shadow-sm disabled:opacity-50">
@@ -79,7 +80,7 @@
         </div>
     @endif
 
-    @if($protocole->determinable() && $protocole->traitements->isNotEmpty())
+    @if($protocole->traitements->isNotEmpty())
         <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full {{ $protocole->enAttente() > 0 ? 'text-error-deep bg-error-bg' : 'text-brand-emerald bg-brand-emerald/10' }}">Indice Rouge : {{ $protocole->enAttente() }} soin(s) en attente</span>
     @endif
 </div>

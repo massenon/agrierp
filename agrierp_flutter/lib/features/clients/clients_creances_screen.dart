@@ -1,13 +1,20 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
-import '../../core/database/app_database.dart' show Customer;
+import '../../core/auth/refus_droit.dart';
+import '../../core/database/app_database.dart' show Customer, CustomerReminder;
+import '../../core/systeme/ouvreur_url.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/toast_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import 'avances_modales.dart';
 import 'clients_creances_repository.dart';
 import 'fiche_client_modales.dart';
+import 'profil_client_page.dart';
+import 'recouvrement_modale.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/creances-clients.html` → Clients et Créances.
@@ -26,16 +33,26 @@ import '../../core/theme/symboles_agri.dart';
 /// Avance » et « Imputer » écrivent le FAIT en local, `pending` ; le serveur fait entrer
 /// l'argent en trésorerie, passe D 5xx / C 419 puis D 419 / C 411. Le poste ne modifie
 /// aucun solde : il AFFICHE les soldes nets de ce qu'il a saisi et que le serveur n'a pas
-/// encore appliqué. Pas de « Modifier » (D4) ni d'archivage au poste (D5).
+/// encore appliqué. **VC-4 (décision du client : « OUI LE POSTE DOIT LE FAIRE »)** : « Modifier » (crayon) et « Archiver » sont
+/// au poste comme au web, mêmes règles (`CustomerAdvanceService::modifier` / `archiver` : montant et client figés pour une avance
+/// entamée ou comptabilisée, pas d'archivage tant qu'il reste un reste), écrits en local `pending` puis envoyés.
 class ClientsCreancesScreen extends StatefulWidget {
   const ClientsCreancesScreen({
     super.key,
     required this.depot,
+    this.peutGerer = true,
     this.imprimer,
     this.maintenant = HeureBenin.maintenant,
+    this.ouvrirUrl = ouvrirUrlSysteme,
   });
 
   final ClientsCreancesRepository depot;
+
+  /// Ticket CONF-5 (DV-06 / DV-20) — `manage-ventes` du web : SANS lui (le COMPTABLE lit « Clients et Créances » avec
+  /// `view-ventes`), les boutons d'écriture ne sont pas montrés (le web les masque par `@can('manage-ventes')`) et chaque
+  /// geste est refusé AVANT d'ouvrir une modale ou d'écrire (`RefusDroit`, « Votre rôle ne permet pas cette action. »).
+  /// Consulter (soldes, profil, historique) reste ouvert.
+  final bool peutGerer;
 
   /// Éditeur injecté — `EditeursRapports.imprimer` en production, un espion en test.
   /// Absent, ni le reçu d'acompte ni « Exporter » n'impriment : l'avance est tout de
@@ -44,6 +61,9 @@ class ClientsCreancesScreen extends StatefulWidget {
 
   /// Horloge injectée (date des documents).
   final DateTime Function() maintenant;
+
+  /// Ticket VC-2 — ouvre le lien `wa.me` de « Relancer WhatsApp » ; le système en production, un espion en test.
+  final OuvreurUrl ouvrirUrl;
 
   @override
   State<ClientsCreancesScreen> createState() => _ClientsCreancesScreenState();
@@ -73,34 +93,31 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     ('3', 'Niveau 3 : Mise en demeure'),
   ];
 
-  /// Les trois textes de la maquette, au caractère près (l.331-335).
-  static const modelesRelance = <String, String>{
-    '1':
-        'Bonjour [NOM], nous vous rappelons amicalement que votre facture '
-        "[FACTURE] d'un montant de [MONTANT_DU] arrive à échéance le "
-        '[DATE_ECHEANCE]. Merci de régulariser votre situation. Ferme École '
-        'OLOUWACHEGOUN.',
-    '2':
-        'Bonjour [NOM], votre facture [FACTURE] de [MONTANT_DU] est en retard '
-        'de paiement depuis le [DATE_ECHEANCE]. Merci de procéder au règlement '
-        'dans les meilleurs délais. Ferme École OLOUWACHEGOUN.',
-    '3':
-        'Madame, Monsieur [NOM], malgré nos relances précédentes, votre '
-        "facture [FACTURE] d'un montant de [MONTANT_DU] demeure impayée depuis "
-        'le [DATE_ECHEANCE]. Nous vous mettons en demeure de régulariser sous '
-        '8 jours. Ferme École OLOUWACHEGOUN.',
-  };
+  /// Ticket VC-2 — les trois textes sont ceux du WEB (`RelancesClients::defaultTemplates`), le maître.
+  static const modelesRelance = ClientsCreancesRepository.modelesRelance;
 
   /// Niveau sélectionné — `<select id="tpl-level">` de la maquette, dont
   /// l'option 2 porte `selected` (l.162).
   String _niveauRelance = '2';
 
+  /// Ticket VC-2 — le texte du modèle, MODIFIABLE comme au web (`templateText`) ; il s'applique à l'envoi en cours.
+  late final TextEditingController _texteModele = TextEditingController(text: modelesRelance['2']);
+
   DonneesClients? _donnees;
+
+  /// Ticket VC-3 — client dont « Profil Client » est ouvert (sous-page, bouton « Retour »).
+  String? _profilId;
 
   @override
   void initState() {
     super.initState();
     _charger();
+  }
+
+  @override
+  void dispose() {
+    _texteModele.dispose();
+    super.dispose();
   }
 
   Future<void> _charger() async {
@@ -128,6 +145,18 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_profilId != null)
+                        ProfilClientPage(
+                          key: ValueKey('profil-$_profilId'),
+                          depot: widget.depot,
+                          peutGerer: widget.peutGerer,
+                          clientId: _profilId!,
+                          onRetour: (modifie) {
+                            setState(() => _profilId = null);
+                            if (modifie) _charger();
+                          },
+                        )
+                      else ...[
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.lg),
                       switch (_onglet) {
@@ -136,6 +165,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                         'Historique Avances' => _ongletAvances(d, large),
                         _ => _ongletClients(d, large),
                       },
+                      ],
                     ],
                   ),
                 );
@@ -239,6 +269,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           large,
         ),
         const SizedBox(height: AgriSpacing.md),
+        if (widget.peutGerer)
         Align(
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
@@ -288,7 +319,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ),
         ]),
         const SizedBox(height: AgriSpacing.md),
-        if (_selection.isNotEmpty) ...[
+        if (widget.peutGerer && _selection.isNotEmpty) ...[
           _barreSelection(d),
           const SizedBox(height: AgriSpacing.md),
         ],
@@ -317,7 +348,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         const SizedBox(height: AgriSpacing.md),
         _tableau(
           largeur: 1040,
-          teteSelection: Checkbox(
+          teteSelection: !widget.peutGerer ? null : Checkbox(
             key: const Key('clients-tout-selectionner'),
             value: toutChoisi,
             onChanged: (v) => setState(() {
@@ -374,7 +405,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   (_statutClient(lignes[i]), 3),
                   (_actionsClient(lignes[i].client), 3),
                 ],
-                teteSelection: Checkbox(
+                teteSelection: !widget.peutGerer ? null : Checkbox(
                   key: Key('client-case-${lignes[i].client.id}'),
                   value: _selection.contains(lignes[i].client.id),
                   onChanged: (v) => setState(() {
@@ -399,6 +430,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _ouvrirFiche(Customer? existant) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirFicheClient(
       context: context,
       depot: widget.depot,
@@ -408,6 +440,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _archiver(List<Customer> clients) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ok = await confirmerArchivageClients(
       context: context,
       depot: widget.depot,
@@ -528,6 +561,16 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     mainAxisSize: MainAxisSize.min,
     children: [
       IconButton(
+        key: Key('profil-client-${c.id}'),
+        tooltip: 'Profil client',
+        onPressed: () => setState(() => _profilId = c.id),
+        icon: const Icon(SymbolesAgri.visibility, size: 16),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(),
+        color: AgriColors.brandEmerald,
+      ),
+      if (widget.peutGerer)
+      IconButton(
         key: Key('modifier-client-${c.id}'),
         tooltip: 'Modifier',
         onPressed: () => _ouvrirFiche(c),
@@ -536,6 +579,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         constraints: const BoxConstraints(),
         color: AgriColors.infoBlue,
       ),
+      if (widget.peutGerer)
       IconButton(
         key: Key('archiver-client-${c.id}'),
         tooltip: 'Archiver',
@@ -567,6 +611,19 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           SymbolesAgri.request_quote,
           'Encours, échéances et recouvrement.',
           large,
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        // Ticket VC-1 — « Ajouter un Recouvrement » (en-tête du Blade) : l'encaissement d'une créance, écrit en local.
+        if (widget.peutGerer)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            key: const Key('ajouter-recouvrement'),
+            onPressed: () => _encaisser(d, null),
+            icon: const Icon(SymbolesAgri.add_circle, size: 18),
+            style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
+            label: const Text('Ajouter un Recouvrement', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+          ),
         ),
         const SizedBox(height: AgriSpacing.md),
         _grilleKpis(large, [
@@ -653,12 +710,70 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   ),
                   3,
                 ),
-                (_actionInerte(), 2),
+                (
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.peutGerer)
+                        IconButton(
+                          key: Key('creance-encaisser-$i'),
+                          tooltip: 'Enregistrer un règlement',
+                          onPressed: lignes[i].resteDu > 0 ? () => _encaisser(d, lignes[i]) : null,
+                          icon: const Icon(SymbolesAgri.credit_card, size: 18),
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                          color: AgriColors.brandEmerald,
+                        ),
+                        // Ticket VC-2 — « Relancer » (`SuiviDettes::sendReminder`) : trace WhatsApp du solde dû.
+                        if (widget.peutGerer)
+                        IconButton(
+                          key: Key('creance-relancer-$i'),
+                          tooltip: 'Relancer',
+                          onPressed: () => _relancerRapide(lignes[i]),
+                          icon: const Icon(SymbolesAgri.chat, size: 18),
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                          color: AgriColors.infoBlue,
+                        ),
+                      ],
+                    ),
+                  ),
+                  2,
+                ),
               ]),
           ],
         ),
       ],
     );
+  }
+
+  /// Ticket VC-2 — « Relancer » de la ligne (`SuiviDettes::sendReminder`) : le web TIENT LA TRACE d'une relance WhatsApp au
+  /// message « Relance — solde dû N FCFA. », sans ouvrir WhatsApp ; le poste fait de même.
+  Future<void> _relancerRapide(LigneCreance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    try {
+      await widget.depot.relancer(
+        creanceId: l.creance.id,
+        canal: 'whatsapp',
+        message: 'Relance — solde dû ${DocumentsAvances.formaterMontant(l.resteDu)} FCFA.',
+      );
+    } on SaisieRefusee catch (e) {
+      _annoncer(e.motif);
+      return;
+    }
+    await _charger();
+    _annoncer('Relance enregistrée pour ${l.nomClient} — elle partira à la prochaine synchronisation.');
+  }
+
+  /// Ticket VC-1 — « Enregistrer un Recouvrement » : écrit le FAIT en local, le serveur solde et passe l'écriture.
+  Future<void> _encaisser(DonneesClients d, LigneCreance? depart) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    final ecrit = await ouvrirRecouvrement(context: context, depot: widget.depot, donnees: d, depart: depart);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer('Règlement enregistré — il sera appliqué à la prochaine synchronisation.');
   }
 
   /// Échéance, colorée par son retard.
@@ -742,7 +857,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             libelle: 'Relances Effectuées',
             valeur: '${d.relancesDuMois(jour)}',
             unite: 'env.',
-            legende: 'WhatsApp, SMS & Mail',
+            legende: 'WhatsApp, Appel & Mail',
             couleurLisere: AgriColors.infoBlue,
             icone: SymbolesAgri.campaign,
             couleurIcone: AgriColors.infoBlue,
@@ -834,9 +949,8 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             const SizedBox(height: AgriSpacing.sm),
           ],
         _mentionPoste(
-          'Les envois — WhatsApp, mail, courrier — partent de la surface web : '
-          "ils demandent le réseau, et une relance faite d'ici ne serait "
-          'inscrite nulle part. Le client serait rappelé deux fois.',
+          'WhatsApp, l\'appel et le courrier se font ici, tout de suite ; l\'e-mail part du SMTP de ce poste '
+          '(Paramètres > Email (SMTP)) et demande le réseau.',
         ),
       ],
     ),
@@ -902,12 +1016,90 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: AgriSpacing.xs),
+              // Ticket VC-2 / AUT-3 — les quatre canaux du Blade : WhatsApp, e-mail, courrier, appel (remplace le SMS).
+              Wrap(
+                spacing: AgriSpacing.xs,
+                runSpacing: AgriSpacing.xs,
+                children: [
+                  if (widget.peutGerer) ...[
+                  _boutonRelance('relancer-whatsapp', l, 'whatsapp', 'Relancer WhatsApp', SymbolesAgri.chat, rempli: AgriColors.brandEmerald),
+                  _boutonRelance('relancer-email', l, 'email', 'Relancer par Mail', SymbolesAgri.mail, rempli: AgriColors.infoBlue),
+                  _boutonRelance('exporter-courrier', l, 'courrier', 'Exporter Courrier', SymbolesAgri.picture_as_pdf),
+                  _boutonRelance('relancer-appel', l, 'appel', 'Appeler', SymbolesAgri.call),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
       ],
     ),
   );
+
+  /// Un bouton de relance du Blade (`relances-clients.blade.php`) : plein pour WhatsApp et Mail, à contour pour le reste.
+  Widget _boutonRelance(String cle, LigneCreance l, String canal, String libelle, IconData icone, {Color? rempli}) {
+    final etiquette = Text(libelle, style: TextStyle(fontSize: 11, fontWeight: AgriTypography.gras, color: rempli == null ? AgriColors.brandForest : Colors.white));
+    return rempli != null
+        ? FilledButton.icon(
+            key: Key('$cle-${l.creance.id}'),
+            onPressed: () => _relancer(l, canal),
+            icon: Icon(icone, size: 14),
+            style: FilledButton.styleFrom(backgroundColor: rempli, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            label: etiquette,
+          )
+        : OutlinedButton.icon(
+            key: Key('$cle-${l.creance.id}'),
+            onPressed: () => _relancer(l, canal),
+            icon: Icon(icone, size: 14, color: AgriColors.brandForest),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            label: etiquette,
+          );
+  }
+
+  /// Ticket VC-2 — écrit la relance en local, PUIS fait ce que l'appareil peut faire : ouvrir WhatsApp, éditer la lettre.
+  /// L'e-mail part du SMTP du poste (sans SMTP, c'est une DEMANDE : le serveur l'envoie à la synchronisation) ; l'appel est composé par `tel:`.
+  Future<void> _relancer(LigneCreance l, String canal, {String? message}) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    final texte = message ?? ClientsCreancesRepository.rendreModele(_texteModele.text, l);
+    final CustomerReminder relance;
+    try {
+      relance = await widget.depot.relancer(creanceId: l.creance.id, canal: canal, message: texte);
+    } on SaisieRefusee catch (e) {
+      _annoncer(e.motif);
+      return;
+    }
+    await _charger();
+
+    switch (canal) {
+      case 'whatsapp':
+        final telephone = await widget.depot.telephoneDe(relance.customerId);
+        _annoncer('Ouverture de WhatsApp...');
+        await widget.ouvrirUrl(ClientsCreancesRepository.lienWhatsapp(telephone ?? '', texte));
+      case 'courrier':
+        final editeur = widget.imprimer;
+        if (editeur == null) {
+          _annoncer('Relance enregistrée — elle partira à la prochaine synchronisation.');
+          return;
+        }
+        final client = await widget.depot.clientDe(relance.customerId);
+        final erreur = await editeur(
+          ClientsCreancesRepository.lettreRelance(client: l.nomClient, ville: client?.city, date: widget.maintenant(), message: texte),
+          widget.maintenant(),
+        );
+        _annoncer(erreur ?? 'Lettre de relance éditée — la relance partira à la prochaine synchronisation.');
+      case 'appel':
+        final telephone = await widget.depot.telephoneDe(relance.customerId);
+        _annoncer('Appel en cours — numérotation par l\'application téléphone du poste.');
+        await widget.ouvrirUrl('tel:${ClientsCreancesRepository.lienAppel(telephone ?? '')}');
+      default:
+        _annoncer(
+          relance.alreadySent
+              ? 'E-mail envoyé au client.'
+              : 'Relance par e-mail demandée — le serveur l\'envoie à la prochaine synchronisation.',
+        );
+    }
+  }
 
   /// Panneau droit — `relances-clients.html` l.157-181.
   ///
@@ -961,8 +1153,11 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
             for (final n in niveauxRelance)
               DropdownMenuItem(value: n.$1, child: Text(n.$2)),
           ],
-          onChanged: (v) =>
-              setState(() => _niveauRelance = v ?? _niveauRelance),
+          onChanged: (v) => setState(() {
+            _niveauRelance = v ?? _niveauRelance;
+            // Comme `RelancesClients::loadTemplate()` : changer de niveau recharge le texte du niveau.
+            _texteModele.text = modelesRelance[_niveauRelance] ?? '';
+          }),
         ),
         const SizedBox(height: AgriSpacing.md),
         const Text(
@@ -974,24 +1169,32 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ),
         ),
         const SizedBox(height: AgriSpacing.xs),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AgriSpacing.md,
-            vertical: AgriSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            border: Border.all(color: AgriColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AgriRadius.lg),
-          ),
-          child: Text(
-            modelesRelance[_niveauRelance] ?? '',
-            style: const TextStyle(
-              fontSize: AgriTypography.xs,
-              height: AgriTypography.xsInterligne / AgriTypography.xs,
-              color: AgriColors.onSurface,
-            ),
-          ),
+        TextField(
+          key: const Key('modele-texte'),
+          controller: _texteModele,
+          minLines: 8,
+          maxLines: 12,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.onSurface),
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        Wrap(
+          spacing: AgriSpacing.xs,
+          runSpacing: AgriSpacing.xs,
+          children: [
+            for (final balise in const ['[NOM]', '[FACTURE]', '[MONTANT_DU]', '[DATE_ECHEANCE]'])
+              OutlinedButton(
+                key: Key('balise-$balise'),
+                onPressed: () => _texteModele.text = '${_texteModele.text}$balise',
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                child: Text(balise, style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.outline)),
+              ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          "Ce modèle s'applique à l'envoi en cours — la sauvegarde durable des modèles arrive avec Paramètres (aucune table dédiée pour l'instant).",
+          style: TextStyle(fontSize: 10, color: AgriColors.outline),
         ),
       ],
     ),
@@ -1039,6 +1242,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                 shape: const StadiumBorder(),
               ),
             ),
+            if (widget.peutGerer)
             ElevatedButton.icon(
               key: const Key('nouvelle-avance'),
               onPressed: () => _nouvelAcompte(d),
@@ -1096,7 +1300,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ('Solde Restant', 3),
           ('Date', 3),
           ('Statut', 4),
-          ('Actions', 2),
+          ('Actions', 3),
         ],
         vide: '— Aucune avance en cours —',
         lignes: [
@@ -1120,7 +1324,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
                 3,
               ),
               (_statutAvance(d.avances[i]), 4),
-              (_actionsAvance(d, d.avances[i]), 2),
+              (_actionsAvance(d, d.avances[i]), 3),
             ]),
         ],
       ),
@@ -1129,8 +1333,9 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         'Les soldes sont NETS des imputations saisies sur ce poste et pas encore '
         'envoyées : le poste ne modifie jamais le solde d\'une avance ni d\'une '
         'créance, le serveur les applique à la synchronisation. Une avance '
-        '« En attente » n\'est pas encore reçue par la ferme : ni la trésorerie ni '
-        'la comptabilité n\'ont bougé.',
+        '« En attente » n\'est pas encore reçue par la ferme (ou sa modification, son '
+        'archivage, n\'est pas encore appliqué) : ni la trésorerie ni la '
+        'comptabilité n\'ont bougé.',
       ),
     ],
   );
@@ -1219,9 +1424,9 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
     ],
   );
 
-  /// ⚠️ **PAS DE « MODIFIER » NI D'« ARCHIVER »** (D4, D5) : le montant d'une avance
-  /// entamée ou comptabilisée est figé, et une avance qui a un reste ne s'archive pas.
-  /// L'œil de la maquette reste inerte ; « Imputer » ouvre « Imputer un Acompte ».
+  /// Les actions du Blade `historique-avances`, dans son ordre : « Modifier » (crayon `edit`), « Imputer » (`sync`, tant qu'il y a un
+  /// reste) et « Archiver » (`archive`) — VC-4. Les règles qui les refusent sont celles du web, rendues AVANT d'écrire.
+  /// ⚠️ L'œil de la maquette n'existe pas au Blade (le web est le maître) : il reste inerte, comme avant.
   Widget _actionsAvance(DonneesClients d, LigneAvance l) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
@@ -1229,7 +1434,17 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
         opacity: 0.4,
         child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
       ),
-      if (!l.soldee && !l.refusee)
+      if (widget.peutGerer)
+      IconButton(
+        key: Key('modifier-avance-${l.avance.id}'),
+        tooltip: 'Modifier',
+        onPressed: () => _modifierAvance(d, l),
+        icon: const Icon(SymbolesAgri.edit, size: 16),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(),
+        color: AgriColors.brandEmerald,
+      ),
+      if (widget.peutGerer && !l.soldee && !l.refusee)
         IconButton(
           key: Key('imputer-avance-${l.avance.id}'),
           tooltip: 'Imputer',
@@ -1239,10 +1454,47 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           constraints: const BoxConstraints(),
           color: AgriColors.brandForest,
         ),
+      if (widget.peutGerer)
+      IconButton(
+        key: Key('archiver-avance-${l.avance.id}'),
+        tooltip: 'Archiver',
+        onPressed: () => _archiverAvance(l),
+        icon: const Icon(SymbolesAgri.archive, size: 16),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(),
+        color: AgriColors.outline,
+      ),
     ],
   );
 
+  /// `editAdvance` + `saveAdvance` : la modale « Modifier l'Avance » ; succès = « Avance modifiée avec succès. ».
+  Future<void> _modifierAvance(DonneesClients d, LigneAvance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    final ecrit = await ouvrirModificationAvance(context: context, depot: widget.depot, donnees: d, ligne: l);
+    if (!ecrit) return;
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, 'Avance modifiée avec succès.');
+  }
+
+  /// `archiveAdvance` : confirmation, puis l'archivage ; un refus (reste à imputer) est un toast d'erreur, comme au web.
+  Future<void> _archiverAvance(LigneAvance l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    if (!await confirmerArchivageAvance(context: context, ligne: l)) return;
+    try {
+      await widget.depot.archiverAvance(l.avance.id);
+    } on SaisieAvanceRefusee catch (e) {
+      if (!mounted) return;
+      ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      return;
+    }
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, 'Avance archivée avec succès.', type: TypeToast.avertissement);
+  }
+
   Future<void> _nouvelAcompte(DonneesClients d) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final saisi = await ouvrirNouvelAcompte(
       context: context,
       depot: widget.depot,
@@ -1285,6 +1537,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
   }
 
   Future<void> _imputer(DonneesClients d, LigneAvance depart) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirImputation(
       context: context,
       depot: widget.depot,
@@ -1318,6 +1571,8 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
 
   void _annoncer(String message) {
     if (!mounted) return;
+    // Le dernier message l'emporte : deux gestes de suite ne font pas attendre le second derrière le premier.
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -1399,22 +1654,23 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  if (teteSelection != null)
-                    SizedBox(width: 32, child: teteSelection),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    if (teteSelection != null)
+                      SizedBox(width: 32, child: teteSelection),
                   for (final (libelle, flex) in colonnes)
                     Expanded(
                       flex: flex,
@@ -1439,6 +1695,7 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 
@@ -1482,17 +1739,6 @@ class _ClientsCreancesScreenState extends State<ClientsCreancesScreen> {
           color: couleur,
         ),
       ),
-    ),
-  );
-
-  /// ⚠️ Les actions de la maquette — fiche client, relance, encaissement —
-  /// modifient des référentiels du serveur. La colonne reste, l'action est
-  /// inerte.
-  Widget _actionInerte() => const Opacity(
-    opacity: 0.4,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 

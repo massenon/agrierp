@@ -49,7 +49,7 @@ class GrandLivreOeufsTest extends TestCase
 
         $user = User::create([
             'name' => 'DG', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

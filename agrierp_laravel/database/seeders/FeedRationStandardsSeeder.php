@@ -48,6 +48,11 @@ class FeedRationStandardsSeeder extends Seeder
             ['species_code' => 'aviculture', 'stage_label' => 'Poussin en croissance (2 à 4 mois)', 'ration_g_per_day' => 60],
             ['species_code' => 'aviculture', 'stage_label' => 'Poulette (4 à 5.5 mois)', 'ration_g_per_day' => 80],
             ['species_code' => 'aviculture', 'stage_label' => 'Pondeuse (6 à 18 mois)', 'ration_g_per_day' => 110],
+            // Ticket VOL-1 (04/11/2026) — fiche « Volailles Reproducteurs » : trois catégories (CategorieVolaille).
+            // ⚠️ VALEURS PROVISOIRES À CONFIRMER AVEC LE CLIENT (130 / 80 / 30 g/j), modifiables dans Paramètres Élevage.
+            ['species_code' => 'aviculture', 'stage_label' => 'Reproducteur', 'ration_g_per_day' => 130],
+            ['species_code' => 'aviculture', 'stage_label' => 'Jeune', 'ration_g_per_day' => 80],
+            ['species_code' => 'aviculture', 'stage_label' => 'Poussin', 'ration_g_per_day' => 30],
             ['species_code' => 'cuniculture', 'stage_label' => 'Lapine Mère / Reproducteur', 'ration_g_per_day' => 120],
             ['species_code' => 'cuniculture', 'stage_label' => 'Sous-mères', 'ration_g_per_day' => 30],
             ['species_code' => 'cuniculture', 'stage_label' => 'Jeune', 'ration_g_per_day' => 60],

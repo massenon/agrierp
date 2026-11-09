@@ -34,11 +34,68 @@ class Sale extends Model
         // divergent que pour une vente encaissee hors ligne et remontee
         // plus tard — c'est exactement le cas ou la difference compte.
         'sold_at',
+        // MECEF-1 — ce que la DGI renvoie de la facture normalisée (écrits par `FacturationMecefService`, jamais par un poste).
+        'mecef_uid', 'mecef_code', 'mecef_nim', 'mecef_compteurs', 'mecef_normalise_le', 'mecef_message',
+        // Choix « Facture simple » / « Facture normalisée » (validé par `ChoixFactureService`) ; `mecef_aib_montant` = ce que la DGI a calculé.
+        'facture_type', 'client_ifu', 'client_nom_facture', 'aib_taux', 'mecef_aib_montant',
+        // Frais de livraison : `true` = ils sont DANS `total` (nouvelles ventes) ; `false` = hors total (ventes d'avant, inchangées).
+        'delivery_in_total',
     ];
+
+    /**
+     * MECEF-1 — LE VERROU D'UNE FACTURE NORMALISÉE. Seules ces colonnes bougent encore après la normalisation (le lien
+     * comptable, l'horodatage) ; tout le reste — client, montants, mode de règlement, statut (donc l'annulation) — est refusé.
+     */
+    private const COLONNES_LIBRES_APRES_NORMALISATION = ['accounting_entry_id', 'updated_at'];
+
+    protected static function booted(): void
+    {
+        static::updating(function (Sale $vente): void {
+            if ($vente->getOriginal('mecef_status') !== \App\Support\MecefEtat::NORMALISEE) {
+                return;
+            }
+
+            if (array_diff(array_keys($vente->getDirty()), self::COLONNES_LIBRES_APRES_NORMALISATION) !== []) {
+                throw new \App\Exceptions\FactureNormaliseeException();
+            }
+        });
+
+        static::deleting(function (Sale $vente): void {
+            if ($vente->mecef_status === \App\Support\MecefEtat::NORMALISEE) {
+                throw new \App\Exceptions\FactureNormaliseeException();
+            }
+        });
+    }
+
+    /** MECEF-1 — la facture est-elle normalisée (déclarée à la DGI) ? Alors elle est verrouillée : seul un avoir la corrige. */
+    public function estNormalisee(): bool
+    {
+        return $this->mecef_status === \App\Support\MecefEtat::NORMALISEE;
+    }
+
+    /**
+     * Le type de la facture : `simple` (défaut, y compris une vente sans choix enregistré) ou `normalisee`. UNE SEULE lecture :
+     * une facture simple n'est JAMAIS transmise à la DGI (`FacturationMecefService`).
+     */
+    public function typeFacture(): string
+    {
+        // Une vente déjà normalisée l'est forcément, quel que soit le choix enregistré (donnée d'avant le choix).
+        return $this->facture_type === \App\Support\FactureType::NORMALISEE || $this->estNormalisee()
+            ? \App\Support\FactureType::NORMALISEE
+            : \App\Support\FactureType::SIMPLE;
+    }
+
+    /** La vente a-t-elle été choisie en facture normalisée (à transmettre, ou déjà transmise) ? */
+    public function estADeclarer(): bool
+    {
+        return $this->typeFacture() === \App\Support\FactureType::NORMALISEE;
+    }
 
     protected function casts(): array
     {
         return [
+            'delivery_in_total' => 'boolean',
+            'mecef_aib_montant' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'discount' => 'decimal:2',
             'total' => 'decimal:2',
@@ -46,6 +103,7 @@ class Sale extends Model
             'change_due' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
             'sold_at' => 'datetime',
+            'mecef_normalise_le' => 'datetime',
         ];
     }
 

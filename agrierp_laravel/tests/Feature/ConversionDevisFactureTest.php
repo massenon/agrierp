@@ -358,7 +358,7 @@ class ConversionDevisFactureTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-cv'.User::count(), 'email' => $role.'-cv'.User::count().'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         if ($permissionsEnPlus !== []) {
@@ -371,7 +371,7 @@ class ConversionDevisFactureTest extends TestCase
         $this->flushHeaders();
         $this->app['auth']->forgetGuards();
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => $utilisateur->username, 'password' => 'AgriERP@2026', 'device_name' => 'poste-'.$utilisateur->username,
+            'identifiant' => $utilisateur->username, 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-'.$utilisateur->username,
         ])->assertOk()->json('token');
     }
 
@@ -403,9 +403,10 @@ class ConversionDevisFactureTest extends TestCase
 
         // Comme toute vente reçue du poste : `FacturationMecefService::facturer`, après la transaction (aucun code DGI
         // nouveau, D-MECEF-1 laissé de côté). Le dispositif du projet est la passerelle factice.
+        // Facture issue d'un devis = facture SIMPLE (aucun choix à la conversion) : `facturer` ne la transmet JAMAIS.
         $vente = Sale::firstOrFail();
-        $this->assertContains($vente->mecef_status, ['transmise', 'erreur', 'en_attente']);
-        $this->assertSame('transmise', $vente->mecef_status);
+        $this->assertSame('simple', $vente->typeFacture());
+        $this->assertSame('en_attente', $vente->mecef_status);
     }
 
     public function test_le_renvoi_de_la_demande_est_acquitte_sans_seconde_facture(): void

@@ -613,6 +613,7 @@ void main() {
           'advance_date': '2026-10-09',
           'payment_mode': 'cheque',
           'motif': 'Poussins',
+          'is_active': true,
         });
         expect((envoi['advance_imputations'] as List).single, {
           'id': i.id,
@@ -1495,14 +1496,14 @@ void main() {
     );
 
     testWidgets(
-      '⚠️ pas de « Modifier » ni d’« Archiver » sur une avance (D4, D5)',
+      '⚠️ « Modifier », « Imputer » et « Archiver » sur une avance, comme au Blade (VC-4, D4/D5 revues)',
       (tester) async {
         await garnir();
         await avance('a1', 'c1', montant: 20000);
         await afficher(tester);
 
-        expect(find.byTooltip('Modifier'), findsNothing);
-        expect(find.byTooltip('Archiver'), findsNothing);
+        expect(find.byTooltip('Modifier'), findsOneWidget);
+        expect(find.byTooltip('Archiver'), findsOneWidget);
         expect(find.byTooltip('Imputer'), findsOneWidget);
       },
     );

@@ -27,7 +27,9 @@ void main() {
         .map((m) => m.group(1)!.replaceAll('&amp;', '&').trim())
         .toList();
     // Ticket VW : « Verrouiller » (verrou de session web) entre Paramètres et le séparateur de Déconnexion.
-    expect(libelles, ['Mon Profil', 'Aide & À Propos', "Contactez l'Éditeur", 'Paramètres', 'Verrouiller', 'Déconnexion']);
+    // PWA-1 : « Mode hors ligne » (activation de la caisse hors ligne du NAVIGATEUR) est une entrée propre au web : le poste
+    // Windows est lui-même hors ligne, il n'a donc pas cette entrée.
+    expect(libelles, ['Mon Profil', 'Mode hors ligne', 'Aide & À Propos', "Contactez l'Éditeur", 'Paramètres', 'Verrouiller', 'Déconnexion']);
   }, skip: sansLaravel);
 
   testWidgets('menu du compte : Paramètres puis, sous un séparateur, Déconnexion qui prévient le socle', (t) async {
@@ -70,6 +72,12 @@ void main() {
     expect(deconnexions, 1);
   });
 
+  test('la barre dit « Facturation » quand MeCeF est désactivé, comme le web', () {
+    expect(SocleAccueilTitres.titre(EcranPoste.facturation), 'Facturation');
+    expect(SocleAccueilTitres.titre(EcranPoste.facturation, mecefActif: true), 'Facturation & MeCeF');
+    expect(SocleAccueilTitres.titre(EcranPoste.comptabilite), 'Comptabilité');
+  });
+
   test('le titre de la barre est celui que le web affiche pour chaque écran', () {
     final routes = File('$dossierLaravel/routes/web.php').readAsStringSync();
     String titreWeb(String chemin) {
@@ -77,7 +85,9 @@ void main() {
       final fichier = '$dossierLaravel/app/${m.group(1)!.replaceFirst(RegExp(r'^\\?App\\'), '').replaceAll(r'\', '/')}.php';
       final source = File(fichier).readAsStringSync();
       // Le `$title` passé au layout par `render()` (le dernier du fichier : les premiers peuvent être des cartes).
-      final titres = RegExp(r"'title' => '((?:[^'\\]|\\.)*)'\]").allMatches(source).toList();
+      // VC-5 : le titre de la facturation suit le module (`$this->mecefActif ? 'Facturation & MeCeF' : 'Facturation'`) : c'est
+      // la forme module ACTIVÉ qui est comparée.
+      final titres = RegExp(r"'title' => (?:\$this->mecefActif \? )?'((?:[^'\\]|\\.)*)'(?: : '[^']*')?\]").allMatches(source).toList();
       return titres.isEmpty ? 'Ferme École Olouwachegoun' : titres.last.group(1)!.replaceAll(r"\'", "'");
     }
 
@@ -87,6 +97,7 @@ void main() {
       EcranPoste.dashboardElevage: '/elevage-dashboard',
       EcranPoste.suiviReproduction: '/suivi-reproduction',
       EcranPoste.soinsEtVaccins: '/soins-vaccins-hub',
+      EcranPoste.transformation: '/transformation',
       EcranPoste.parametresElevage: '/parametres-elevage',
       EcranPoste.ficheElevage: '/fiche-lapins',
       EcranPoste.fichePondeuses: '/fiche-volailles-pondeuses',
@@ -94,6 +105,7 @@ void main() {
       EcranPoste.fichePorcs: '/fiche-porcs',
       EcranPoste.ficheEscargots: '/fiche-escargots',
       EcranPoste.transfertsBandes: '/transferts-bandes',
+      EcranPoste.importationMasse: '/importation-masse',
       EcranPoste.gestionBandes: '/gestion-bandes',
       EcranPoste.enregistrerSujets: '/enregistrer-sujets',
       EcranPoste.ventesEtDevis: '/ventes-devis',
@@ -116,7 +128,7 @@ void main() {
     };
     final ecarts = <String>[
       for (final MapEntry(key: e, value: chemin) in chemins.entries)
-        if (SocleAccueilTitres.titre(e) != titreWeb(chemin)) '${e.name} : poste « ${SocleAccueilTitres.titre(e)} », web « ${titreWeb(chemin)} »',
+        if (SocleAccueilTitres.titre(e, mecefActif: true) != titreWeb(chemin)) '${e.name} : poste « ${SocleAccueilTitres.titre(e, mecefActif: true)} », web « ${titreWeb(chemin)} »',
     ];
     expect(ecarts, isEmpty);
   }, skip: sansLaravel);
@@ -138,7 +150,7 @@ void main() {
 
     final blade = layout.readAsStringSync();
     final ruban = blade.substring(blade.indexOf('x-show="sidebarDesktopHidden"'), blade.indexOf('Réafficher le menu'));
-    final titresBlade = RegExp(r'<a href="[^"]+" title="([^"]+)"').allMatches(ruban).map((m) => m.group(1)).toList();
+    final titresBlade = RegExp(r'<a (?:wire:navigate )?href="[^"]+" title="([^"]+)"').allMatches(ruban).map((m) => m.group(1)).toList();
     final infobulles = t.widgetList<IconButton>(find.descendant(of: find.byKey(const Key('ruban-replie')), matching: find.byType(IconButton))).map((b) => b.tooltip).toList();
     expect(infobulles, [...titresBlade, 'Réafficher le menu']);
 

@@ -207,43 +207,25 @@ class JournalComptable extends Component
             'amount' => ['required', 'numeric', 'min:1'],
         ]);
 
-        if ($this->debitAccountId === $this->creditAccountId) {
-            $this->addError('creditAccountId', 'Le compte à créditer doit être différent du compte à débiter.');
-
-            return;
-        }
-
-        // 🔴→✅ TICKET 14.14 — APPLICATION RÉELLE DE LA CLÔTURE PÉRIODIQUE.
-        // C'est ce contrôle qui fait la différence entre une fonctionnalité et
-        // une liste décorative : sans lui, clôturer un mois n'empêcherait
-        // strictement rien. Vaut pour une création comme pour une
-        // modification — antidater une écriture dans un mois clos est
-        // exactement le contournement à interdire.
-        if (\App\Models\PeriodicClosure::isDateLocked($this->entryDate)) {
-            $this->addError('entryDate', 'Ce mois est clôturé — aucune écriture ne peut y être ajoutée ni modifiée. Un Administrateur peut le déclôturer exceptionnellement.');
-
-            return;
-        }
-
+        // Ticket CP-2 — `SaisieEcritureManuelleAction`, partagée avec l'envoi du poste : compte débité ≠ crédité, mois non clôturé
+        // (ticket 14.14), puis `AccountingEntryService`. Un refus de validation se pose sous le champ concerné.
         try {
-            $service = app(AccountingEntryService::class);
+            $action = app(\App\Actions\SaisieEcritureManuelleAction::class);
 
             if ($this->editingId) {
-                $entry = AccountingEntry::findOrFail($this->editingId);
-                $existingReference = explode('—', (string) $entry->reference, 2)[0];
-                $reference = trim($existingReference).' — '.$this->label;
-                $service->updateManual($entry, $this->debitAccountId, $this->creditAccountId, $this->amount, $this->entryDate, $reference);
+                $action->modifier(AccountingEntry::findOrFail($this->editingId), $this->debitAccountId, $this->creditAccountId, $this->amount, $this->entryDate, $this->label);
                 $message = 'Modification enregistrée avec succès.';
-                AuditLog::record('accounting_entry.updated', 'comptabilite');
             } else {
-                $reference = AccountingEntry::generateReference().' — '.$this->label;
-                $service->recordManual($this->debitAccountId, $this->creditAccountId, $this->amount, $this->entryDate, $reference);
+                $action->creer($this->debitAccountId, $this->creditAccountId, $this->amount, $this->entryDate, $this->label);
                 $message = 'Écriture enregistrée avec succès.';
-                AuditLog::record('accounting_entry.created', 'comptabilite');
             }
 
             $this->dispatch('close-modal', name: 'modal-create-journal-comptable');
             $this->dispatch('toast', message: $message, type: 'success');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ, $messages[0]);
+            }
         } catch (\Throwable $e) {
             // Ticket U5 : le motif d'une exception du framework (SQL…) n'est pas montré en anglais.
             $this->dispatch('toast', message: \App\Support\MessagesErreurFr::pourUtilisateur($e), type: 'error');
@@ -258,14 +240,13 @@ class JournalComptable extends Component
 
         // Tickets EX4 / EX5 — mêmes refus que la modification (verrouillée, à-nouveau, exercice clos), dans le service.
         try {
-            app(AccountingEntryService::class)->archiver($entry);
+            app(\App\Actions\SaisieEcritureManuelleAction::class)->archiver($entry);
         } catch (\App\Exceptions\EcritureVerrouilleeException|\App\Exceptions\ClosedFiscalYearException $e) {
             $this->dispatch('toast', message: $e->getMessage(), type: 'error');
 
             return;
         }
 
-        AuditLog::record('accounting_entry.archived', 'comptabilite', null, $entry);
         $this->dispatch('toast', message: 'Écriture archivée avec succès.', type: 'warning');
     }
 

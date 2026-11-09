@@ -61,7 +61,10 @@ void main() {
           'Morts par catégorie',
           'Dons par catégorie',
           'Effectif Final du Jour',
-          'x-ration-volaille',
+          // VOL-2 : le rationnement par stade est écrit dans le Blade (le composant `x-ration-volaille` n'existe plus) ; son
+          // titre est celui de `RationPondeusesFiche` (elements_fiche.dart), gardé par `volailles_effectif_test` pour les deux
+          // fiches.
+          'Rationnement &amp; Provende Servie par Stade (en Grammes g/j)',
           'Poids Général Pesé (g)',
           'Stock Œufs &amp; Plateaux (30) — Jour Sélectionné',
           'Traitements &amp; Rappels</p>',
@@ -74,7 +77,7 @@ void main() {
           final i = b.indexOf(s, precedent + 1);
           expect(i, greaterThan(precedent), reason: 'ordre du Blade : $s');
           precedent = i;
-          if (s == 'x-ration-volaille') continue;
+          if (s.startsWith('Rationnement')) continue;
           final libelle = texte(s).toLowerCase();
           expect(e, contains(libelle), reason: 'écran : $s');
         }
@@ -96,6 +99,9 @@ void main() {
         };
         expect(libelles, contains('Taux de Ponte Calculé (%)'));
         for (final l in libelles) {
+          // VOL-2 : les libellés des quatre stades sont écrits par une expression Blade (`{{ $libellesStades[…] }}`, boucle sur
+          // les quatre stades du barème) : ils sont gardés par `PondeusesStadesBladeTest` (test/fiche_pondeuses_stades_test.dart).
+          if (l.contains(r'$')) continue;
           // « Ventes (POS, réel) » : libellé et précision en petits caractères, écrits à part à l'écran.
           final morceaux = RegExp(r'^(.*?)\s*(\([^()]*(\([^()]*\))?[^()]*\))?$').firstMatch(l)!;
           final principal = morceaux[1]!.toLowerCase();
@@ -136,7 +142,8 @@ void main() {
           expect(e, contains("'${c.toLowerCase()}'"), reason: c);
         }
 
-        final thead = b.substring(b.indexOf('<thead'), b.indexOf('</thead>'));
+        // VOL-2 : le Blade porte désormais un premier `<thead>` (le tableau du rationnement) : celui du MOIS est le dernier.
+        final thead = b.substring(b.lastIndexOf('<thead'), b.lastIndexOf('</thead>'));
         final colonnes = [
           for (final m in RegExp(r'<th[^>]*>(.*?)</th>').allMatches(thead))
             texte(m[1]!),

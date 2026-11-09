@@ -1,8 +1,11 @@
 import collapse from '@alpinejs/collapse';
 import './verrou';
+import './aide';
+import './hors-ligne/activation-page';
+import './hors-ligne/deconnexion-web';
 
 /**
- * AgriERP — resources/js/app.js
+ * LogiAgriERP — resources/js/app.js
  *
  * Décision d'architecture (Sprint 0, ticket 0.2, documentée) :
  * Le prototype statique (assets/js/common.js) pilotait sidebar/dropdowns/
@@ -48,20 +51,14 @@ document.addEventListener('alpine:init', () => {
 });
 
 /**
- * Pont Toast : tout composant Livewire déclenche
- *   $this->dispatch('toast', message: '...', type: 'success|error|info');
- * capté ici et re-diffusé comme CustomEvent DOM 'toast' que
- * components/toast-container.blade.php écoute via x-on:toast.window.
- * Un seul point d'entrée pour tous les toasts de l'application
- * (AVOID_INSTRUCTIONS.md — un seul point de vérité par mécanisme partagé).
+ * Livewire 3 dispatche $this->dispatch('toast', ...) DIRECTEMENT comme browser event sur window.
+ * Le relais Livewire.on('toast') ci-dessous n'est plus nécessaire et causait un doublon :
+ * toast-container.blade.php recevait l'event une première fois depuis Livewire 3 (natif),
+ * et une seconde fois depuis ce relais — supprimé le 26/10/2026.
  */
 document.addEventListener('livewire:init', () => {
-    Livewire.on('toast', (event) => {
-        window.dispatchEvent(new CustomEvent('toast', { detail: event }));
-    });
-
     /**
-     * Ticket U5 (D-U5) — PAGE EXPIRÉE (419) EN FRANÇAIS.
+     * Ticket U5 (D-U5) — PAGE EXPIRÉE (419) SANS BOÎTE DU NAVIGATEUR.
      *
      * Sur un jeton CSRF expiré, Livewire 3 ouvre une boîte de confirmation ANGLAISE codée en dur
      * dans son JavaScript (« This page has expired. Would you like to refresh the page? »), qu'aucun
@@ -75,9 +72,9 @@ document.addEventListener('livewire:init', () => {
                 return;
             }
             preventDefault();
-            if (window.confirm('Cette page a expiré.\nVoulez-vous la recharger ?')) {
-                window.location.reload();
-            }
+            // Plus de boîte de confirmation du navigateur : la session a expiré, on recharge (le serveur renvoie
+            // alors à la connexion, ou rouvre la page si le jeton seul était périmé).
+            window.location.reload();
         });
     });
 });

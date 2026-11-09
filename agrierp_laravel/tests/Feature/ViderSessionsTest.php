@@ -32,7 +32,7 @@ class ViderSessionsTest extends TestCase
     {
         $u = User::create([
             'name' => ucfirst($role), 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);
 
@@ -68,7 +68,8 @@ class ViderSessionsTest extends TestCase
         $this->sessionsEtJetons();
         $this->actingAs($this->compte('comptable'));
 
-        Livewire::test(GestionUtilisateurs::class)->call('viderSessions')->assertForbidden();
+        // CONF-1 : l'onglet refuse l'ouverture sans `manage-users`, donc l'action n'est même pas atteignable.
+        Livewire::test(GestionUtilisateurs::class)->assertForbidden();
 
         $this->assertSame(2, DB::table('personal_access_tokens')->count());
     }

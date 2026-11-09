@@ -7,14 +7,12 @@ use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Url;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 use Livewire\Component;
 
 /**
  * Suite du Sprint 11 — gestion-utilisateurs.html → Livewire\Parametres\GestionUtilisateurs
- * "Administration des comptes d'accès à AgriERP."
+ * "Administration des comptes d'accès à LogiAgriERP."
  *
  * CRUD réel sur `User` — `is_active` (archivage) et
  * `getRoleLabelAttribute()` existaient déjà, explicitement anticipés
@@ -48,6 +46,12 @@ use Livewire\Component;
  */
 class GestionUtilisateurs extends Component
 {
+    public function mount(): void
+    {
+        // CONF-1 : jamais d'ouverture sans le droit de l'onglet (même garde que `EmailSmtp::mount`).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-users'), 403);
+    }
+
     #[Url]
     public string $search = '';
 
@@ -71,6 +75,11 @@ class GestionUtilisateurs extends Component
     public string $role = '';
 
     public string $password = '';
+
+    /** MDP-1 — compte dont l'administrateur réinitialise le mot de passe, et le mot de passe TEMPORAIRE choisi. */
+    public ?string $resetUserId = null;
+
+    public string $motDePasseTemporaire = '';
 
     public function getKpisProperty(): array
     {
@@ -138,52 +147,23 @@ class GestionUtilisateurs extends Component
         $this->dispatch('open-modal', name: 'modal-create-gestion-utilisateurs');
     }
 
+    /** Ticket UT-1 — les règles et les effets vivent dans `SaisieUtilisateurAction`, partagée avec l'envoi des postes. */
     public function saveUser(): void
     {
         $this->authorize('manage-users');
 
-        $this->validate([
-            'name' => ['required', 'string', 'max:150'],
-            // ⚠️ `regex` INTERDISANT L'ARROBASE : la connexion choisit sa colonne
-            // selon la presence d'un « @ ». Un identifiant qui en contiendrait
-            // serait cherche parmi les ADRESSES, donc introuvable — un compte
-            // creable mais inatteignable, sans le moindre message d'erreur.
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-zA-Z0-9._-]+$/', 'unique:users,username,'.$this->editingUserId],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email,'.$this->editingUserId],
-            'role' => ['required', 'exists:roles,name'],
-            // ⚠️ TICKET 14.65 — meme politique qu'a la reinitialisation :
-            // `min:8` seul laissait passer « 12345678 ».
-            'password' => [
-                $this->editingUserId ? 'nullable' : 'required',
-                'string',
-                PasswordRule::defaults(),
-            ],
-        ]);
+        $this->validate(\App\Actions\SaisieUtilisateurAction::regles($this->editingUserId, $this->editingUserId === null));
 
+        $donnees = [
+            'name' => $this->name, 'username' => $this->username, 'email' => $this->email,
+            'role' => $this->role, 'password' => $this->password,
+        ];
+        $saisie = app(\App\Actions\SaisieUtilisateurAction::class);
         if ($this->editingUserId) {
-            $user = User::findOrFail($this->editingUserId);
-            $payload = [
-                'name' => $this->name,
-                'username' => $this->username,
-                'email' => $this->email,
-            ];
-            if ($this->password) {
-                $payload['password'] = Hash::make($this->password);
-            }
-            $user->update($payload);
-            $user->syncRoles([$this->role]);
-            AuditLog::record('user.updated', 'parametres');
+            $saisie->modifier($this->editingUserId, $donnees);
             $message = 'Utilisateur modifié avec succès.';
         } else {
-            $user = User::create([
-                'name' => $this->name,
-                'username' => $this->username,
-                'email' => $this->email,
-                'password' => Hash::make($this->password),
-                'is_active' => true,
-            ]);
-            $user->assignRole($this->role);
-            AuditLog::record('user.created', 'parametres');
+            $saisie->creer($donnees);
             $message = 'Utilisateur créé avec succès.';
         }
 
@@ -195,26 +175,66 @@ class GestionUtilisateurs extends Component
     {
         $this->authorize('manage-users');
 
+        try {
+            app(\App\Actions\SaisieUtilisateurAction::class)->archiver($id, Auth::id());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+
+            return;
+        }
+        $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
+    }
+
+    /** MDP-1 — ouvre la fenêtre « Réinitialiser le mot de passe » ; le propre compte de l'administrateur est refusé d'emblée. */
+    public function resetPasswordUser(string $id): void
+    {
+        $this->authorize('manage-users');
+
         if ($id === Auth::id()) {
-            $this->dispatch('toast', message: 'Vous ne pouvez pas archiver votre propre compte.', type: 'error');
+            $this->dispatch('toast', message: \App\Actions\SaisieUtilisateurAction::MESSAGE_PROPRE_REINITIALISATION, type: 'error');
 
             return;
         }
 
-        $utilisateur = User::findOrFail($id);
-        $utilisateur->update(['is_active' => false]);
-        // Ticket S3 — les jetons de ses postes sont révoqués : la désactivation vaut aussi hors du web.
-        $utilisateur->tokens()->delete();
-        AuditLog::record('user.archived', 'parametres', null, $utilisateur);
-        $this->dispatch('toast', message: 'Utilisateur archivé avec succès.', type: 'warning');
+        $this->resetErrorBag();
+        $this->resetUserId = User::findOrFail($id)->id;
+        $this->motDePasseTemporaire = '';
+        $this->dispatch('open-modal', name: 'modal-reinitialiser-mot-de-passe');
+    }
+
+    /**
+     * MDP-1 — l'administrateur choisit un mot de passe TEMPORAIRE (`Password::defaults()`, comme à la création) : le
+     * compte devra le changer à sa première connexion, ses jetons et sessions sont fermés. Règles et effets dans
+     * `SaisieUtilisateurAction::reinitialiserMotDePasse`, partagée avec l'envoi des postes.
+     */
+    public function reinitialiserMotDePasse(): void
+    {
+        $this->authorize('manage-users');
+
+        $this->validate([
+            'motDePasseTemporaire' => \App\Actions\SaisieUtilisateurAction::reglesMotDePasseTemporaire()['password'],
+        ]);
+
+        try {
+            app(\App\Actions\SaisieUtilisateurAction::class)->reinitialiserMotDePasse((string) $this->resetUserId, $this->motDePasseTemporaire, Auth::id());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('close-modal', name: 'modal-reinitialiser-mot-de-passe');
+            $this->dispatch('toast', message: $e->validator->errors()->first(), type: 'error');
+            $this->reset(['resetUserId', 'motDePasseTemporaire']);
+
+            return;
+        }
+
+        $this->reset(['resetUserId', 'motDePasseTemporaire']);
+        $this->dispatch('close-modal', name: 'modal-reinitialiser-mot-de-passe');
+        $this->dispatch('toast', message: 'Mot de passe réinitialisé : le compte devra le changer à sa prochaine connexion.', type: 'success');
     }
 
     public function reactivateUser(string $id): void
     {
         $this->authorize('manage-users');
 
-        User::findOrFail($id)->update(['is_active' => true]);
-        AuditLog::record('user.reactivated', 'parametres');
+        app(\App\Actions\SaisieUtilisateurAction::class)->reactiver($id);
         $this->dispatch('toast', message: 'Utilisateur réactivé avec succès.', type: 'success');
     }
 

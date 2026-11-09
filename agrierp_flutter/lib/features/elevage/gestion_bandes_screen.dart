@@ -166,9 +166,13 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
     );
   }
 
-  /// `flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm border-b border-outline-variant pb-md mb-lg`.
+  /// `flex flex-col xl:flex-row xl:items-center xl:justify-between gap-sm border-b border-outline-variant pb-md mb-lg`.
+  ///
+  /// ⚠️ Les trois boutons restent SUR UNE LIGNE dès que l'en-tête passe en rangée (`xl:flex-nowrap`,
+  /// `whitespace-nowrap`) : à `lg` ils étaient renvoyés à la ligne et « Nouvelle Bande » tombait sous les deux autres.
   Widget _enTete() {
     final large = AgriBreakpoints.large(context);
+    final enRangee = AgriBreakpoints.tresLarge(context);
     final titre = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,11 +200,7 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
       ],
     );
     // `<a href="/enregistrer-sujets">` : bouton à bordure, puis — avec `manage-elevage` — « Nouvelle Bande ».
-    final boutons = Wrap(
-      spacing: AgriSpacing.sm,
-      runSpacing: AgriSpacing.sm,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
+    final boutonsListe = <Widget>[
         OutlinedButton.icon(
           key: const Key('bandes-enregistrer-sujets'),
           onPressed: widget.onOuvrirSujets,
@@ -242,12 +242,27 @@ class _GestionBandesScreenState extends State<GestionBandesScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AgriRadius.full)),
             ),
           ),
-      ],
-    );
+    ];
+    final boutons = enRangee
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < boutonsListe.length; i++) ...[
+                if (i > 0) const SizedBox(width: AgriSpacing.sm),
+                boutonsListe[i],
+              ],
+            ],
+          )
+        : Wrap(
+            spacing: AgriSpacing.sm,
+            runSpacing: AgriSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: boutonsListe,
+          );
     return Container(
       padding: const EdgeInsets.only(bottom: AgriSpacing.md),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AgriColors.outlineVariant))),
-      child: large
+      child: enRangee
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

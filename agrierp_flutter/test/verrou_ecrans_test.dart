@@ -151,7 +151,7 @@ void main() {
     // Même présentation que la connexion : panneau de la ferme, champ d'identifiant en lecture seule.
     expect(find.byKey(const Key('login-panneau-gauche')), findsOneWidget);
     expect(find.text('Bienvenue !'), findsNothing);
-    expect(find.textContaining('Comptable Ferme'), findsOneWidget);
+    expect(find.textContaining('reprendre votre travail'), findsNothing); // plus de phrase sous le titre (client, 06/11/2026)
     final champ = tester.widget<TextField>(find.byKey(const Key('verrou-utilisateur')));
     expect(champ.readOnly, isTrue);
     expect(champ.controller!.text, 'compta');

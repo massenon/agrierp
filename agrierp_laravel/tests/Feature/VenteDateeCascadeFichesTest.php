@@ -44,7 +44,7 @@ class VenteDateeCascadeFichesTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     private const VENTE_A = '11111111-1111-4111-8111-111111111111';
 

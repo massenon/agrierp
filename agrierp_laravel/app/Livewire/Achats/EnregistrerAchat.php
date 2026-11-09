@@ -76,6 +76,8 @@ class EnregistrerAchat extends Component
 
     public $receiptFile = null;
 
+    public string $purchaseDate = '';
+
     public string $newSupplierName = '';
 
     public string $newSupplierPhone = '';
@@ -89,6 +91,7 @@ class EnregistrerAchat extends Component
     public function mount(): void
     {
         $this->treasuryAccountId = (string) (TreasuryAccount::where('is_active', true)->first()?->id ?? '');
+        $this->purchaseDate = now()->format('Y-m-d');
     }
 
     public function getSuppliersProperty()
@@ -177,6 +180,9 @@ class EnregistrerAchat extends Component
         $supplier = Supplier::create([
             'name' => $this->newSupplierName,
             'phone' => $this->newSupplierPhone,
+            // Ticket AC-2 — la catégorie est EXIGÉE par `SupplierCatalogService` (donc par le poste, à l'envoi) : une fiche créée
+            // à la volée porte « Autre », comme celle du poste, pour qu'une fiche du web ne soit jamais sans catégorie.
+            'category' => 'Autre',
             'is_active' => true,
         ]);
 
@@ -238,9 +244,10 @@ class EnregistrerAchat extends Component
 
         $this->validate([
             'supplierId' => ['required', 'exists:suppliers,id'],
+            'purchaseDate' => ['required', 'date', 'date_format:Y-m-d'],
             'treasuryAccountId' => ['required', 'exists:treasury_accounts,id'],
             'amountPaid' => ['nullable', 'numeric', 'min:0'],
-            'receiptFile' => ['nullable', 'image', 'max:5120'],
+            'receiptFile' => ['nullable', 'file', 'mimes:'.\App\Services\JustificatifService::FORMATS, 'max:'.\App\Services\JustificatifService::TAILLE_MAX_KO],
         ]);
 
         $total = $this->total;
@@ -255,7 +262,7 @@ class EnregistrerAchat extends Component
         // total nul annulent TOUT (la transaction de l'action) et s'affichent en français, jamais en erreur 500.
         // Le panier est conservé pour que l'utilisateur corrige et réessaie.
         try {
-            app(RecordPurchaseAction::class)->execute(
+            $achat = app(RecordPurchaseAction::class)->execute(
                 supplierId: $this->supplierId,
                 lignes: array_map(fn (array $item) => [
                     'product_id' => $item['product_id'],
@@ -265,6 +272,7 @@ class EnregistrerAchat extends Component
                 paymentMode: $this->paymentMode,
                 treasuryAccountId: $this->treasuryAccountId,
                 montantRegle: (float) $paid,
+                purchaseDate: $this->purchaseDate,
             );
         } catch (NoOpenFiscalYearException|ClosedFiscalYearException|AchatNonComptabilisableException $e) {
             $this->dispatch('toast', message: 'Achat refusé : '.$e->getMessage(), type: 'error');
@@ -272,8 +280,10 @@ class EnregistrerAchat extends Component
             return;
         }
 
+        // Ticket AC-3 — le justificatif est RATTACHÉ à l'achat (avant : rangé sur le disque sans lien), par le service que le
+        // poste utilise aussi.
         if ($this->receiptFile) {
-            $this->receiptFile->store('achats-recus', 'local');
+            app(\App\Services\JustificatifService::class)->rattacher('achat', $achat->id, $this->receiptFile);
         }
 
         $this->dispatch('toast', message: 'Achat enregistré avec succès — total '.number_format($total, 0, ',', ' ').' FCFA.', type: 'success');

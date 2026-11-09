@@ -189,7 +189,7 @@ class DepensesRepository {
   /// (`getChargeAccountsProperty()` du web). Jamais codés en dur ici : le plan descend par la synchronisation.
   Future<List<ChartOfAccount>> comptesDeCharge() {
     return (_db.select(_db.chartOfAccounts)
-          ..where((t) => t.accountClass.equals(6))
+          ..where((t) => t.accountClass.equals(6) & t.isActive.equals(true))
           ..orderBy([(t) => OrderingTerm(expression: t.code)]))
         .get();
   }
@@ -460,6 +460,8 @@ class DepensesRepository {
     String beneficiaire = '',
     String? idEnModification,
     bool aCredit = false,
+    /// Ticket #48 — chemin absolu local du justificatif copié ; ticket AC-3 : envoyé au serveur une fois la dépense acceptée.
+    String? receiptLocalPath,
   }) async {
     final existante = idEnModification == null
         ? null
@@ -566,6 +568,9 @@ class DepensesRepository {
             isActive: const Value(true),
             syncStatus: const Value(SyncStatus.pending),
             updatedAt: Value(maintenant),
+            receiptLocalPath: Value(receiptLocalPath),
+            // Ticket AC-3 — un NOUVEAU fichier est à envoyer ; le même fichier, déjà reçu du serveur, n'est pas renvoyé.
+            receiptSent: Value(receiptLocalPath == existante.receiptLocalPath && existante.receiptSent),
           ),
         );
         await ecrireLesLignes(existante.id);
@@ -604,6 +609,7 @@ class DepensesRepository {
               onCredit: Value(credit),
               status: Value(credit ? 'en_attente' : 'payee'),
               createdBy: Value(_auteurId?.call()),
+              receiptLocalPath: Value(receiptLocalPath),
             ),
           );
       await ecrireLesLignes(id);

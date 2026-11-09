@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import '../database/app_database.dart';
+import '../systeme/plateforme_poste.dart';
 import 'environnement.dart';
 
 /// Réglages propres à ce poste : son identifiant et l'adresse du serveur.
@@ -67,14 +68,21 @@ class ParametresPoste {
 
     // Préfixe lisible : le support doit pouvoir citer l'identifiant au
     // téléphone sans épeler un UUID entier.
-    final nouveau = 'poste-${_uuid.v4().substring(0, 8)}';
+    // PWA-2 : un poste navigateur se reconnaît à son préfixe (`poste-web-xxxxxxxx`), tiré une fois puis gardé en base.
+    final prefixe = PlateformePoste.navigateur ? 'poste-web-' : 'poste-';
+    final nouveau = '$prefixe${_uuid.v4().substring(0, 8)}';
     await _ecrire(cleIdentifiant, nouveau);
 
     return nouveau;
   }
 
+  /// PWA-2 : adresse du serveur par défaut. Navigateur : l'ORIGINE de la page (le poste est servi par Laravel sous `/poste/`,
+  /// même origine que l'API : pas de CORS) ; Windows : celle de l'environnement de construction.
+  static String Function() origineNavigateur = () => Uri.base.origin;
+
   Future<String> adresseServeur() async =>
-      await _lire(cleAdresseServeur) ?? _environnement.adresseParDefaut;
+      await _lire(cleAdresseServeur) ??
+      (PlateformePoste.navigateur ? origineNavigateur() : _environnement.adresseParDefaut);
 
   /// ⚠️ L'ADRESSE EST NORMALISÉE À L'ENREGISTREMENT. Une barre oblique finale
   /// produirait `//api/sync/pull` — un chemin que le serveur ne reconnaît pas,

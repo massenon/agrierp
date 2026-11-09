@@ -253,6 +253,11 @@ class CustomerAdvanceService
      */
     public function modifier(CustomerAdvance $avance, string $customerId, float $montant, string $date): CustomerAdvance
     {
+        // VC-4 : une avance archivée ne se modifie plus (jamais de réactivation, ni au web ni au poste).
+        if (! $avance->is_active) {
+            throw ValidationException::withMessages(['advance' => 'Cette avance est archivée : elle ne peut plus être modifiée.']);
+        }
+
         $montant = round($montant, 2);
         $figee = $avance->estEntamee() || $avance->estComptabilisee();
         $raison = $avance->estEntamee() ? 'déjà entamée' : 'déjà comptabilisée';
@@ -296,5 +301,63 @@ class CustomerAdvanceService
 
         $avance->update(['is_active' => false]);
         AuditLog::record('customer_advance.archived', 'ventes', null, $avance);
+    }
+
+    /**
+     * VC-4 — LA LIGNE D'UNE AVANCE DÉJÀ CONNUE, REÇUE D'UN POSTE : modification des champs permis
+     * (client, montant, date : mêmes refus que la page web via `modifier()`) ou archivage
+     * (`$active` faux : mêmes refus que `archiver()`). JAMAIS de réactivation.
+     *
+     * Une ligne identique à celle du serveur, ou une avance déjà archivée qu'on demande d'archiver,
+     * est un ACQUITTEMENT : rien n'est réécrit, rien n'est journalisé. Le contrôle se fait sous
+     * verrou : une imputation simultanée ne passe pas entre la lecture du reste et l'archivage.
+     *
+     * @return bool vrai si quelque chose a été écrit
+     */
+    public function appliquerDuPoste(string $id, string $customerId, float $montant, string $date, bool $active): bool
+    {
+        return DB::transaction(function () use ($id, $customerId, $montant, $date, $active) {
+            $avance = CustomerAdvance::lockForUpdate()->find($id);
+
+            if (! $avance) {
+                throw ValidationException::withMessages(['customer_advance_id' => 'Avance introuvable.']);
+            }
+
+            if (! $active) {
+                if (! $avance->is_active) {
+                    return false;   // déjà archivée : acquittement
+                }
+
+                $this->archiver($avance);
+
+                return true;
+            }
+
+            if (! $avance->is_active) {
+                throw ValidationException::withMessages(['advance' => 'Cette avance est archivée : elle ne peut pas être rouverte ni modifiée.']);
+            }
+
+            $montant = round($montant, 2);
+
+            if ($montant < 1) {
+                throw ValidationException::withMessages(['amount' => 'Le montant doit être au moins 1 FCFA.']);
+            }
+
+            $identique = $customerId === $avance->customer_id
+                && abs($montant - (float) $avance->amount) < 0.01
+                && $date === $avance->advance_date->format('Y-m-d');
+
+            if ($identique) {
+                return false;
+            }
+
+            if (! Customer::whereKey($customerId)->exists()) {
+                throw ValidationException::withMessages(['customerId' => 'Client introuvable.']);
+            }
+
+            $this->modifier($avance, $customerId, $montant, $date);
+
+            return true;
+        });
     }
 }

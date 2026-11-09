@@ -48,7 +48,7 @@ class VirementInterneTest extends TestCase
         $role->givePermissionTo(['view-parametres', 'view-comptabilite', 'manage-comptabilite']);
 
         $user = User::create([
-            'name' => 'Comptable', 'email' => 'virement@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Comptable', 'email' => 'virement@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);
@@ -190,7 +190,7 @@ class VirementInterneTest extends TestCase
     public function test_a_user_without_accounting_rights_cannot_transfer(): void
     {
         $lecteur = User::create([
-            'name' => 'Observateur', 'email' => 'lecture-param@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Observateur', 'email' => 'lecture-param@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $lectureSeule = Role::findOrCreate('observateur', 'web');
         $lectureSeule->givePermissionTo(['view-parametres', 'view-comptabilite']);
@@ -198,12 +198,8 @@ class VirementInterneTest extends TestCase
 
         $this->actingAs($lecteur);
 
-        Livewire::test(ModesPaiement::class)
-            ->set('transferFromId', $this->caisse->id)
-            ->set('transferToId', $this->banque->id)
-            ->set('transferAmount', 100_000)
-            ->call('submitTransfer')
-            ->assertForbidden();
+        // CONF-3 : l'onglet refuse désormais l'ouverture sans `manage-comptabilite` (avant, seul le virement était refusé).
+        Livewire::test(ModesPaiement::class)->assertForbidden();
 
         $this->assertEquals(1_000_000, (float) $this->caisse->fresh()->balance);
     }

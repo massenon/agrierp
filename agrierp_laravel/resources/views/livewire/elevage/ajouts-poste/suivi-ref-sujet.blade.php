@@ -4,7 +4,7 @@
     que du texte). Reçoit : $ref (?string), $sujets (identifier → id).
 --}}
 @if($ref !== null && isset($sujets[$ref]))
-    <a href="{{ route('elevage.animal-details', $sujets[$ref]) }}" class="text-brand-emerald underline hover:text-brand-forest">{{ $ref }}</a>
+    <a wire:navigate href="{{ route('elevage.animal-details', $sujets[$ref]) }}" class="text-brand-emerald underline hover:text-brand-forest">{{ $ref }}</a>
 @else
     {{ $ref ?? '—' }}
 @endif

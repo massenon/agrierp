@@ -61,7 +61,7 @@ class PosChampDateVenteTest extends TestCase
         $role = Role::findOrCreate('caissier', 'web');
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
 
-        $user = User::create(['name' => 'Caissière', 'email' => 'champdate@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
+        $user = User::create(['name' => 'Caissière', 'email' => 'champdate@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026')]);
         $user->assignRole($role);
         $this->actingAs($user);
 
@@ -380,11 +380,18 @@ class PosChampDateVenteTest extends TestCase
 
     public function test_un_utilisateur_sans_manage_ventes_ne_peut_pas_vendre_meme_avec_une_date(): void
     {
-        $lecteur = User::create(['name' => 'Lecteur', 'email' => 'lecteur@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
+        $lecteur = User::create(['name' => 'Lecteur', 'email' => 'lecteur@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026')]);
         $lecteur->givePermissionTo('view-ventes');
-        $this->actingAs($lecteur);
 
-        $this->panier('especes', '2026-10-11')->call('validateSale')->assertForbidden();
+        // CONF-4 : la caisse ne se monte plus sans `manage-ventes` (le comptable lit les ventes sans l'ouvrir) ...
+        $this->actingAs($lecteur);
+        Livewire::test(PosInterface::class)->assertForbidden();
+
+        // ... et la méthode qui vend garde SA garde : un panier monté par un compte autorisé, appelé par un lecteur, est refusé.
+        $this->actingAs(User::first());
+        $caisse = $this->panier('especes', '2026-10-11');
+        $this->actingAs($lecteur);
+        $caisse->call('validateSale')->assertForbidden();
 
         $this->assertSame(0, Sale::count());
     }

@@ -8,10 +8,14 @@ import 'package:agrierp/features/achats/fournisseurs_repository.dart';
 import 'package:agrierp/features/administration/administration_repository.dart';
 import 'package:agrierp/features/clients/clients_creances_repository.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
+import 'package:agrierp/features/comptabilite/cloture_exercice_repository.dart';
+import 'package:agrierp/features/comptabilite/immobilisations_repository.dart';
+import 'package:agrierp/features/comptabilite/rapprochement_repository.dart';
 import 'package:agrierp/features/elevage/bandes_repository.dart';
 import 'package:agrierp/features/elevage/reproducteurs_repository.dart';
 import 'package:agrierp/features/elevage/sujets_entrees_repository.dart';
 import 'package:agrierp/features/elevage/transferts_repository.dart';
+import 'package:agrierp/features/elevage/transformation_repository.dart';
 import 'package:agrierp/features/elevage/dashboard_elevage_repository.dart';
 import 'package:agrierp/features/elevage/fiche_journaliere_repository.dart';
 import 'package:agrierp/features/elevage/parametres_elevage_repository.dart';
@@ -75,11 +79,15 @@ SocleAccueil coqueDeTest(
     personnel: PersonnelRepository(database: db, identifiantPoste: poste),
     administration: AdministrationRepository(database: db),
     comptabilite: ComptabiliteRepository(database: db),
+    immobilisations: ImmobilisationsRepository(database: db),
+    cloture: ClotureExerciceRepository(database: db),
+    rapprochement: RapprochementRepository(database: db),
     parametresGeneraux: ParametresGenerauxRepository(database: db),
     rapports: RapportsRepository(database: db),
     tableauDeBord: TableauDeBordRepository(database: db),
     dashboardElevage: DashboardElevageRepository(database: db, soins: soins),
     transferts: TransfertsRepository(database: db, deviceId: poste),
+    transformation: TransformationRepository(database: db, deviceId: poste),
     bandes: BandesRepository(database: db, deviceId: poste),
     reproducteurs: ReproducteursRepository(database: db, deviceId: poste),
     sujetsEntrees: SujetsEntreesRepository(

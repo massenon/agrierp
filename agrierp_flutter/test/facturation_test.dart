@@ -1,6 +1,7 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/core/export/document_officiel.dart';
 import 'package:agrierp/features/ventes/facturation_repository.dart';
 import 'package:agrierp/features/ventes/facturation_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -44,6 +45,12 @@ void main() {
     String? client,
     DateTime? date,
     bool envoyee = true,
+    String? codeMecef,
+    String? nimMecef,
+    String? compteursMecef,
+    String? messageMecef,
+    DateTime? normaliseLe,
+    String type = 'normalisee',
   }) => db
       .into(db.sales)
       .insert(
@@ -55,8 +62,15 @@ void main() {
           customerName: Value(client),
           paymentMode: 'especes',
           total: total,
+          // MECEF-3 — ces essais portent sur le statut des factures NORMALISÉES (une facture simple n'a pas de statut MeCeF).
+          factureType: Value(type),
           mecefStatus: Value(statutMecef),
           mecefQrRef: Value(refMecef),
+          mecefCode: Value(codeMecef),
+          mecefNim: Value(nimMecef),
+          mecefCompteurs: Value(compteursMecef),
+          mecefMessage: Value(messageMecef),
+          mecefNormaliseLe: Value(normaliseLe),
           soldAt: date ?? aujourdhui,
         ),
       );
@@ -84,10 +98,12 @@ void main() {
       },
     );
 
-    test('les quatre statuts de la maquette sont reconnus', () {
-      expect(StatutMecef.depuis('transmise').libelle, 'Transmise');
+    // MECEF-1 : les CLÉS stockées sont celles d'avant (`transmise`, `erreur`), les libellés ceux du web (`MecefEtat`).
+    test('les statuts MeCeF sont reconnus : clés d\'avant, libellés du web, et « Expirée » nouvelle', () {
+      expect(StatutMecef.depuis('transmise').libelle, 'Normalisée');
       expect(StatutMecef.depuis('en_attente').libelle, 'En attente');
-      expect(StatutMecef.depuis('erreur').libelle, 'Erreur MeCeF');
+      expect(StatutMecef.depuis('erreur').libelle, 'Refusée');
+      expect(StatutMecef.depuis('expiree').libelle, 'Expirée');
       expect(StatutMecef.depuis(null).libelle, 'Non transmise');
     });
 
@@ -185,7 +201,8 @@ void main() {
 
       await afficher(tester);
 
-      expect(find.text('Vente pas encore envoyée'), findsOneWidget);
+      // MECEF-3 — une facture normalisée demandée, pas encore envoyée : « demandée — en attente » jusqu'au tirage.
+      expect(find.text('Facture normalisée demandée — en attente'), findsOneWidget);
       expect(
         find.textContaining('1 facture(s) pas encore envoyée(s)'),
         findsOneWidget,
@@ -206,7 +223,7 @@ void main() {
       await afficher(tester);
 
       expect(find.text('MECEF-9B554B3BBF18'), findsOneWidget);
-      expect(find.text('Transmise'), findsWidgets);
+      expect(find.text('Normalisée'), findsWidgets);
       expect(find.text('14 646'), findsOneWidget);
       expect(find.text('GBAGUIDI Solange'), findsOneWidget);
     });
@@ -232,23 +249,26 @@ void main() {
       expect(find.text('1 000'), findsOneWidget);
       expect(find.text('2 000'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('filtre-Erreur MeCeF')));
+      await tester.tap(find.byKey(const Key('filtre-Refusée')));
       await tester.pumpAndSettle();
 
       expect(find.text('2 000'), findsOneWidget);
       expect(find.text('1 000'), findsNothing);
     });
 
-    /// ⚠️ Le QR n'est pas dessiné : sa référence est affichée, et l'écran dit
-    /// pourquoi.
+    /// MECEF-1 : le QR est dessiné à partir de la DONNÉE de la DGI, et SEULEMENT pour une facture normalisée.
     testWidgets(
-      '⚠️ la facture normalisée montre sa référence, pas un faux QR',
+      '⚠️ la facture normalisée montre le QR de la DGI et ses mentions',
       (tester) async {
         await facture(
           'f1',
           total: 5000,
           statutMecef: 'transmise',
-          refMecef: 'NIM-20260824-ABCD1234|SIG',
+          refMecef: 'F;ED01000001;TEST-AAAA;3202601234567;20261107101500',
+          codeMecef: 'TEST-AAAA',
+          nimMecef: 'ED01000001',
+          compteursMecef: '12/34 FV',
+          normaliseLe: DateTime(2026, 11, 7, 10, 15, 0),
           client: 'AMOUSSOU Régis',
         );
 
@@ -257,12 +277,35 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Facture Normalisee MeCeF'), findsOneWidget);
-        // ⚠️ La reference figure DEUX fois : colonne « N° Facture » et modale.
-        expect(find.text('NIM-20260824-ABCD1234|SIG'), findsWidgets);
-        expect(
-          find.textContaining('produit par le dispositif MeCeF'),
-          findsOneWidget,
+        expect(find.byKey(const Key('qr-facture')), findsOneWidget);
+        expect(find.text('TEST-AAAA'), findsOneWidget);
+        expect(find.text('ED01000001'), findsOneWidget);
+        expect(find.text('12/34 FV'), findsOneWidget);
+        expect(find.text('07/11/2026 à 10:15:00'), findsOneWidget);
+        expect(find.textContaining('produit par le dispositif MeCeF'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '⚠️⚠️ en attente, refusée ou expirée : AUCUN QR, le motif à la place, et le motif sous la pastille',
+      (tester) async {
+        await facture(
+          'f1',
+          total: 5000,
+          statutMecef: 'erreur',
+          refMecef: 'REF-NON-CERTIFIEE',
+          messageMecef: 'Création refusée par e-MECeF (422) : IFU inconnu.',
         );
+
+        await afficher(tester);
+        expect(find.text('Refusée'), findsWidgets);
+        expect(find.text('Création refusée par e-MECeF (422) : IFU inconnu.'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('voir-facture-0')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('qr-facture')), findsNothing);
+        expect(find.text('Aucune référence MeCeF disponible pour cette facture.'), findsOneWidget);
       },
     );
 
@@ -306,6 +349,77 @@ void main() {
       await afficher(tester);
 
       expect(find.text('— Aucune facture pour ces critères —'), findsOneWidget);
+    });
+  });
+
+  group('VC-5 · sans MeCeF', () {
+    Future<void> afficherSansMecef(WidgetTester tester, {List<String>? documents}) async {
+      tester.view.physicalSize = const Size(1600, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await depot.definirMecefActif(false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FacturationScreen(
+            depot: depot,
+            imprimer: (doc, maintenant) async {
+              documents?.add(doc.titre);
+              return null;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    test('le module est désactivé par défaut au poste de l\'application, activé pour les tests, et le serveur le dit', () async {
+      expect(await FacturationRepository(database: db, mecefParDefaut: false).mecefActif(), isFalse);
+      expect(await depot.mecefActif(), isTrue);
+      await depot.definirMecefActif(false);
+      expect(await depot.mecefActif(), isFalse);
+      await depot.definirMecefActif(true);
+      expect(await depot.mecefActif(), isTrue);
+    });
+
+    testWidgets('⚠️ la facturation reste utilisable : registre, trois cartes, numéro FV-AAAA-XXXXXX, aucune colonne ni filtre MeCeF', (tester) async {
+      await facture('abcdef12', total: 12500, client: 'AMOUSSOU Régis');
+      await afficherSansMecef(tester);
+
+      expect(find.text('Facturation'), findsOneWidget);
+      expect(find.text('Facturation & MeCeF'), findsNothing);
+      expect(find.text('Montant facturé (mois)'.toUpperCase()), findsOneWidget);
+      expect(find.text('Clients facturés (mois)'.toUpperCase()), findsOneWidget);
+      expect(find.text('Statut MeCeF'.toUpperCase()), findsNothing);
+      expect(find.byKey(const Key('filtre-Normalisée')), findsNothing);
+      expect(find.text('FV-${aujourdhui.year}-ABCDEF'), findsOneWidget);
+      expect(find.byKey(const Key('voir-facture-0')), findsNothing);
+    });
+
+    testWidgets('« Imprimer la facture » produit le document au poste, hors ligne', (tester) async {
+      await facture('abcdef12', total: 12500, client: 'AMOUSSOU Régis');
+      final imprimes = <String>[];
+      await afficherSansMecef(tester, documents: imprimes);
+
+      await tester.tap(find.byKey(const Key('imprimer-facture-0')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+
+      expect(imprimes, ['Facture FV-${aujourdhui.year}-ABCDEF']);
+    });
+
+    test('la facture porte lignes, total et la mention du web, avec ou sans référence MeCeF', () async {
+      await facture('abcdef12', total: 8000, client: 'GBAGUIDI Solange', type: 'simple');
+      await db.into(db.products).insert(ProductsCompanion.insert(id: uuid('prod'), sku: 'OEUF', name: 'Oeufs de table', unit: 'plateau', pricingMode: 'fixe'));
+      await db.into(db.saleLines).insert(SaleLinesCompanion.insert(id: uuid('ligne'), saleId: uuid('abcdef12'), productId: uuid('prod'), qty: 4, unitPrice: 2000, manualTotalAmount: 8000));
+
+      final doc = (await depot.documentFacture(uuid('abcdef12')))!;
+      expect(doc.noteDePied, 'Facture simple — non normalisée DGI', reason: 'sans choix enregistré : une facture simple');
+      final textes = [for (final l in doc.lignes) if (l is DonneesDocument) l.cellules.join('|') else if (l is TotalDocument) l.cellules.join('|')];
+      expect(textes, ['Oeufs de table|4|2 000|8 000', 'Total TTC|||8 000']);
+
+      await (db.update(db.sales)..where((s) => s.id.equals(uuid('abcdef12')))).write(const SalesCompanion(mecefStatus: Value('transmise'), mecefQrRef: Value('REF-9')));
+      expect((await depot.documentFacture(uuid('abcdef12')))!.noteDePied, 'Facture normalisée MeCeF — référence : REF-9');
     });
   });
 }

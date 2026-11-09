@@ -1,5 +1,5 @@
 // GENERE par outils/libelles_audit.py — NE PAS RETOUCHER A LA MAIN.
-// Source : app/Models/AuditLog.php (Laravel), 148 actions et 12 modules.
+// Source : app/Models/AuditLog.php (Laravel), 159 actions et 12 modules.
 
 /// Libellés français du journal d'audit.
 ///
@@ -27,6 +27,11 @@ class LibellesAudit {
     'session.deverrouillage_echec': 'Échec de déverrouillage de la session',
     'session.deconnexion_apres_echecs': 'Déconnexion après trop d\'échecs de déverrouillage',
     'password.updated': 'Mot de passe modifié',
+    'user.password_reset': 'Mot de passe réinitialisé par un administrateur',
+    'user.password_reset_secours': 'Mot de passe de l\'administrateur réinitialisé par le code de secours',
+    'user.password_reset_secours_echec': 'Échec du code de secours de l\'administrateur',
+    'user.password_reset_secours_bloque': 'Code de secours de l\'administrateur bloqué (trop d\'échecs)',
+    'recovery_code.generated': 'Code de secours de l\'administrateur généré',
     'user.created': 'Utilisateur créé',
     'user.updated': 'Utilisateur modifié',
     'user.archived': 'Utilisateur archivé',
@@ -48,6 +53,8 @@ class LibellesAudit {
     'sale.validated': 'Vente validée',
     'sale.cancelled': 'Vente annulée',
     'sale.mecef_retried': 'Retransmission MeCeF',
+    'company_settings.fichier_supprime': 'Logo ou icône de l\'entreprise supprimé',
+    'company_settings.mecef_updated': 'Réglage de la facturation normalisée (MeCeF) modifié',
     'pos.item_added': 'Article ajouté au panier POS',
     'quote.created': 'Devis créé',
     'quote.updated': 'Devis modifié',
@@ -84,6 +91,7 @@ class LibellesAudit {
     'expense.updated': 'Dépense modifiée',
     'expense.archived': 'Dépense archivée',
     'product.created': 'Produit créé',
+    'import.masse': 'Importation en masse',
     'product.updated': 'Produit modifié',
     'product.archived': 'Produit archivé',
     'product.merged': 'Produit du poste fusionné avec une fiche existante',
@@ -122,6 +130,9 @@ class LibellesAudit {
     'feed_type.archived': 'Type d\'aliment archivé',
     'prophylaxis_schedule.archived': 'Calendrier de prophylaxie archivé',
     'rappel_soins.updated': 'Délai de rappel des soins modifié',
+    'releve.saved': 'Relevé de terrain enregistré',
+    'releve.valide': 'Relevé de terrain validé',
+    'releve.archived': 'Relevé de terrain archivé',
     'employee.created': 'Employé créé',
     'employee.updated': 'Employé modifié',
     'employee.archived': 'Employé archivé',

@@ -3,9 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgriERP | {{ $title ?? 'Connexion' }}</title>
+    <title>LogiAgriERP | {{ $title ?? 'Connexion' }}</title>
     <meta name="author" content="Dr Rhodes MASSENON, Contact: +2290151335040">
-    <link rel="icon" type="image/png" href="{{ asset('assets/images/logo_favicon.webp') }}">
+    {{-- CONF-1 : l'icône CHOISIE (type MIME déduit du fichier, `?v=` = date du fichier), sinon celle d'installation. --}}
+    <link rel="icon" type="{{ \App\Support\IdentiteVisuelle::faviconType() }}" href="{{ \App\Support\IdentiteVisuelle::faviconUrl() }}">
     <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/Inter-latin.woff2" crossorigin>
     <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/MaterialSymbolsOutlined.woff2" crossorigin>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
@@ -13,7 +14,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AgriERP">
+    <meta name="apple-mobile-web-app-title" content="LogiAgriERP">
     <link rel="apple-touch-icon" href="{{ asset('assets/icons/apple-touch-icon.png') }}">
     <script>
         window.agrierpInviteInstallation = null;

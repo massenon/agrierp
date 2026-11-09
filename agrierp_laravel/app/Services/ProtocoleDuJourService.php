@@ -99,7 +99,20 @@ class ProtocoleDuJourService
         $jourDeCycle = $this->jourDeCycle($bande, $quand);
 
         if ($jourDeCycle === null) {
-            return new ProtocoleDuJour(collect(), null, $this->motifIndetermine($bande), $calendaires);
+            // Ticket #45 — bande indéterminée (reproduction sans saillie) : le cycle n'est pas
+            // calculable, mais l'animalier peut quand même administrer des traitements. On expose
+            // tous les traitements du barème avec bornes non nulles et l'état « déjà administré »
+            // du jour, comme pour une bande déterminée — le motif reste affiché.
+            $jour = Carbon::instance($quand ?? now())->startOfDay();
+            $faits = $this->soinsDuJour($bande, $jour);
+            $traitements = $this->tousLesTraitementsCycles($codeEspece)
+                ->map(fn (ProphylaxisScheduleStandard $standard) => [
+                    'standard' => $standard,
+                    'deja_administre' => $faits->contains($standard->treatment),
+                ])
+                ->values();
+
+            return new ProtocoleDuJour($traitements, null, $this->motifIndetermine($bande), $calendaires);
         }
 
         $jour = Carbon::instance($quand ?? now())->startOfDay();
@@ -132,6 +145,17 @@ class ProtocoleDuJourService
             ->where('is_active', true)
             ->whereDate('record_date', $jour->toDateString())
             ->pluck('action_type');
+    }
+
+    /** Tous les traitements actifs du barème ayant des bornes de cycle (hors calendaires). */
+    private function tousLesTraitementsCycles(string $codeEspece): Collection
+    {
+        return ProphylaxisScheduleStandard::where('species_code', $codeEspece)
+            ->where('is_active', true)
+            ->whereNotNull('cycle_day_start')
+            ->orderBy('cycle_day_start')
+            ->orderBy('treatment')
+            ->get();
     }
 
     private function dateDeReference(LivestockLot $bande): ?Carbon

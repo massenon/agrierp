@@ -2,6 +2,7 @@ import 'package:agrierp/core/audit/libelles_audit.dart';
 import 'package:agrierp/core/auth/auth_service.dart';
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/temps/heure_benin.dart';
 import 'package:agrierp/core/widgets/barre_superieure.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
@@ -46,6 +47,9 @@ void main() {
       .insert(
         UtilisateursCompanion.insert(
           id: session.id,
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           name: nom ?? session.nom,
           isActive: Value(actif),
         ),

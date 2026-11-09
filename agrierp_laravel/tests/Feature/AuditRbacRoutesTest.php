@@ -42,7 +42,7 @@ class AuditRbacRoutesTest extends TestCase
     /** Les 4 rôles réellement implémentés (`RBAC_PAGE_MAP`, Document 00 §6). */
     private const ROLES = ['admin', 'comptable', 'caissier', 'animalier'];
 
-    private const EXCLUES = ['login', 'password.reset', 'logout', 'health-check'];
+    private const EXCLUES = ['login', 'logout', 'health-check'];
 
     private function estRouteDeFramework(?string $nom): bool
     {
@@ -123,7 +123,7 @@ class AuditRbacRoutesTest extends TestCase
             $user = User::create([
                 'name' => 'Audit '.$nomRole,
                 'email' => $nomRole.'.rbac@fermeolouwachegoun.com',
-                'password' => bcrypt('AgriERP@2026'),
+                'password' => bcrypt('LogiAgriERP@2026'),
             ]);
             $user->assignRole($role);
 
@@ -183,6 +183,8 @@ class AuditRbacRoutesTest extends TestCase
             'notifications.index', 'public.welcome', 'public.presentation',
             // Sprint VW : l'écran de verrouillage protège la session de tout compte connecté, sans permission dédiée.
             'session.verrou',
+            // MDP-1 : la page de changement obligatoire sert tout compte connecté dont le mot de passe est temporaire.
+            'mot-de-passe.obligatoire',
         ];
 
         $sansPermission = [];

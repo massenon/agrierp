@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/core/theme/agri_theme.dart';
 import 'package:agrierp/main.dart';
@@ -336,6 +337,9 @@ void main() {
         .insert(
           EmployeesCompanion.insert(
             id: 'emp-attest'.padRight(36, '0'),
+            deviceId: 'serveur',
+            updatedAt: DateTime(2026, 1, 1),
+            syncStatus: const Value(SyncStatus.synced),
             firstName: 'Jean',
             lastName: 'AGOSSOU',
             position: const Value('Animalier'),

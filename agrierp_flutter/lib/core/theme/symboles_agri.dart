@@ -18,6 +18,7 @@ abstract final class SymbolesAgri {
   static const IconData add_box = IconData(0xe146, fontFamily: famille);
   static const IconData add_circle = IconData(0xe147, fontFamily: famille);
   static const IconData add_circle_outline = IconData(0xe147, fontFamily: famille);
+  static const IconData add_photo_alternate = IconData(0xe43e, fontFamily: famille);
   static const IconData add_shopping_cart = IconData(0xe854, fontFamily: famille);
   static const IconData admin_panel_settings = IconData(0xef3d, fontFamily: famille);
   static const IconData agriculture = IconData(0xea79, fontFamily: famille);
@@ -29,10 +30,10 @@ abstract final class SymbolesAgri {
   static const IconData arrow_downward = IconData(0xe5db, fontFamily: famille);
   static const IconData arrow_forward = IconData(0xe5c8, fontFamily: famille);
   static const IconData arrow_upward = IconData(0xe5d8, fontFamily: famille);
-  static const IconData assessment = IconData(0xe24b, fontFamily: famille);
   static const IconData assignment = IconData(0xe85d, fontFamily: famille);
   static const IconData assignment_return = IconData(0xe860, fontFamily: famille);
-  static const IconData auto_stories = IconData(0xe666, fontFamily: famille);
+  static const IconData assignment_turned_in = IconData(0xe862, fontFamily: famille);
+  static const IconData attach_file = IconData(0xe226, fontFamily: famille);
   static const IconData backup = IconData(0xe864, fontFamily: famille);
   static const IconData badge = IconData(0xea67, fontFamily: famille);
   static const IconData balance = IconData(0xeaf6, fontFamily: famille);
@@ -46,6 +47,7 @@ abstract final class SymbolesAgri {
   static const IconData campaign = IconData(0xef49, fontFamily: famille);
   static const IconData cancel = IconData(0xe5c9, fontFamily: famille);
   static const IconData category = IconData(0xe574, fontFamily: famille);
+  static const IconData chat = IconData(0xe0b7, fontFamily: famille);
   static const IconData check_circle = IconData(0xe86c, fontFamily: famille);
   static const IconData checklist = IconData(0xe6b1, fontFamily: famille);
   static const IconData chevron_left = IconData(0xe408, fontFamily: famille);
@@ -57,10 +59,12 @@ abstract final class SymbolesAgri {
   static const IconData cloud_upload = IconData(0xe2c3, fontFamily: famille);
   static const IconData contact_page = IconData(0xf22e, fontFamily: famille);
   static const IconData coronavirus = IconData(0xf221, fontFamily: famille);
+  static const IconData credit_card = IconData(0xe870, fontFamily: famille);
   static const IconData crop_square = IconData(0xe3c1, fontFamily: famille);
   static const IconData cruelty_free = IconData(0xe799, fontFamily: famille);
   static const IconData dark_mode = IconData(0xe51c, fontFamily: famille);
   static const IconData dashboard = IconData(0xe871, fontFamily: famille);
+  static const IconData database = IconData(0xf20e, fontFamily: famille);
   static const IconData delete = IconData(0xe872, fontFamily: famille);
   static const IconData delete_outline = IconData(0xe872, fontFamily: famille);
   static const IconData delete_sweep = IconData(0xe16c, fontFamily: famille);
@@ -86,6 +90,7 @@ abstract final class SymbolesAgri {
   static const IconData flag = IconData(0xe153, fontFamily: famille);
   static const IconData folder = IconData(0xe2c7, fontFamily: famille);
   static const IconData folder_shared = IconData(0xe2c9, fontFamily: famille);
+  static const IconData functions = IconData(0xe24a, fontFamily: famille);
   static const IconData grid_view = IconData(0xe9b0, fontFamily: famille);
   static const IconData group = IconData(0xe7ef, fontFamily: famille);
   static const IconData groups = IconData(0xf233, fontFamily: famille);
@@ -95,8 +100,10 @@ abstract final class SymbolesAgri {
   static const IconData history = IconData(0xe28e, fontFamily: famille);
   static const IconData hourglass_empty = IconData(0xe88b, fontFamily: famille);
   static const IconData how_to_reg = IconData(0xe174, fontFamily: famille);
+  static const IconData import_contacts = IconData(0xe0e0, fontFamily: famille);
   static const IconData inbox = IconData(0xe156, fontFamily: famille);
   static const IconData info = IconData(0xe88e, fontFamily: famille);
+  static const IconData insights = IconData(0xf092, fontFamily: famille);
   static const IconData inventory = IconData(0xe179, fontFamily: famille);
   static const IconData inventory_2 = IconData(0xe1a1, fontFamily: famille);
   static const IconData layers = IconData(0xe53b, fontFamily: famille);
@@ -109,6 +116,7 @@ abstract final class SymbolesAgri {
   static const IconData lock_clock = IconData(0xef57, fontFamily: famille);
   static const IconData lock_open = IconData(0xe898, fontFamily: famille);
   static const IconData lock_outline = IconData(0xe88d, fontFamily: famille);
+  static const IconData lock_reset = IconData(0xeade, fontFamily: famille);
   static const IconData logout = IconData(0xe9ba, fontFamily: famille);
   static const IconData mail = IconData(0xe0be, fontFamily: famille);
   static const IconData male = IconData(0xe58e, fontFamily: famille);
@@ -134,8 +142,8 @@ abstract final class SymbolesAgri {
   static const IconData person_outline = IconData(0xe7fd, fontFamily: famille);
   static const IconData pets = IconData(0xe91d, fontFamily: famille);
   static const IconData picture_as_pdf = IconData(0xe415, fontFamily: famille);
-  static const IconData pie_chart = IconData(0xe6c4, fontFamily: famille);
   static const IconData point_of_sale = IconData(0xf17e, fontFamily: famille);
+  static const IconData post_add = IconData(0xea20, fontFamily: famille);
   static const IconData print = IconData(0xe555, fontFamily: famille);
   static const IconData priority_high = IconData(0xe645, fontFamily: famille);
   static const IconData qr_code_2 = IconData(0xe00a, fontFamily: famille);
@@ -143,7 +151,9 @@ abstract final class SymbolesAgri {
   static const IconData receipt = IconData(0xe8b0, fontFamily: famille);
   static const IconData receipt_long = IconData(0xef6e, fontFamily: famille);
   static const IconData redeem = IconData(0xe8b1, fontFamily: famille);
+  static const IconData refresh = IconData(0xe5d5, fontFamily: famille);
   static const IconData remove = IconData(0xe15b, fontFamily: famille);
+  static const IconData remove_circle_outline = IconData(0xe15c, fontFamily: famille);
   static const IconData request_page = IconData(0xf22c, fontFamily: famille);
   static const IconData request_quote = IconData(0xf1b6, fontFamily: famille);
   static const IconData restart_alt = IconData(0xf053, fontFamily: famille);
@@ -162,6 +172,7 @@ abstract final class SymbolesAgri {
   static const IconData settings_applications = IconData(0xe8b9, fontFamily: famille);
   static const IconData settings_backup_restore = IconData(0xe8ba, fontFamily: famille);
   static const IconData shield = IconData(0xe75b, fontFamily: famille);
+  static const IconData shopping_basket = IconData(0xe8cb, fontFamily: famille);
   static const IconData shopping_cart = IconData(0xe547, fontFamily: famille);
   static const IconData show_chart = IconData(0xe6e1, fontFamily: famille);
   static const IconData skull = IconData(0xf89a, fontFamily: famille);
@@ -171,6 +182,7 @@ abstract final class SymbolesAgri {
   static const IconData support_agent = IconData(0xf0e2, fontFamily: famille);
   static const IconData swap_horiz = IconData(0xe8d4, fontFamily: famille);
   static const IconData sync = IconData(0xe627, fontFamily: famille);
+  static const IconData sync_alt = IconData(0xea18, fontFamily: famille);
   static const IconData sync_problem = IconData(0xe629, fontFamily: famille);
   static const IconData table_view = IconData(0xf1be, fontFamily: famille);
   static const IconData tag = IconData(0xe9ef, fontFamily: famille);
@@ -182,6 +194,7 @@ abstract final class SymbolesAgri {
   static const IconData trending_down = IconData(0xe8e3, fontFamily: famille);
   static const IconData trending_up = IconData(0xe8e5, fontFamily: famille);
   static const IconData tune = IconData(0xe429, fontFamily: famille);
+  static const IconData upload = IconData(0xe2c6, fontFamily: famille);
   static const IconData upload_file = IconData(0xe9fc, fontFamily: famille);
   static const IconData vaccines = IconData(0xe138, fontFamily: famille);
   static const IconData verified = IconData(0xe031, fontFamily: famille);
@@ -189,6 +202,7 @@ abstract final class SymbolesAgri {
   static const IconData visibility = IconData(0xe417, fontFamily: famille);
   static const IconData visibility_off = IconData(0xe8f5, fontFamily: famille);
   static const IconData warning = IconData(0xe002, fontFamily: famille);
+  static const IconData web = IconData(0xe051, fontFamily: famille);
   static const IconData wifi = IconData(0xe63e, fontFamily: famille);
   static const IconData wifi_find = IconData(0xeb31, fontFamily: famille);
   static const IconData wifi_off = IconData(0xe648, fontFamily: famille);

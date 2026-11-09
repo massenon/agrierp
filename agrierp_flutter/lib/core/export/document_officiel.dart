@@ -4,6 +4,8 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../config/fichiers_entreprise.dart';
+
 /// Une ligne du corps d'un document officiel.
 ///
 /// ⚠️ **QUATRE FORMES, PARCE QUE LA MAQUETTE EN EMPLOIE QUATRE.** Les exports
@@ -46,7 +48,7 @@ class TotalDocument extends LigneDocument {
   final bool premiere;
 }
 
-/// Un document officiel AgriERP, prêt à imprimer.
+/// Un document officiel LogiAgriERP, prêt à imprimer.
 ///
 /// Transposition de `prototype_html/assets/js/pdf-export.js` —
 /// `exportOfficialPDF(opts)`.
@@ -62,7 +64,17 @@ class DocumentOfficiel {
     this.filigrane,
     this.noteDePied,
     this.fichier,
+    this.mentions = const [],
+    this.codeQr,
   });
+
+  /// MECEF-1 — lignes de mentions sous le tableau (facture normalisée : code MeCeF/DGI, NIM, compteurs, date) et [codeQr],
+  /// la DONNÉE DGI dont le QR est rendu à droite (`exports.facture-vente` du web : même bloc). Vides : rien n'est ajouté —
+  /// aucune mention n'est inventée pour une facture non normalisée.
+  final List<String> mentions;
+
+  /// Donnée du QR renvoyée par la DGI (jamais construite au poste).
+  final String? codeQr;
 
   /// 🔴→✅ Ticket U11 — NOM DU FICHIER PDF, celui que le web donne au même export (`streamDownload(…, 'stocks-'.
   /// now()->format('Y-m-d').'.pdf')`), avec deux marques remplacées à l'édition par la date du poste :
@@ -169,7 +181,7 @@ class ExportOfficiel {
   /// règle métier, l'implémentation Laravel l'emporte sur la maquette. La
   /// ligne est donc celle du pied de page de l'application, au mot près.
   static const creditsProjet =
-      'AgriERP — Projet d’Appui à l’Entrepreneuriat au Bénin (PAEB) '
+      'LogiAgriERP — Projet d’Appui à l’Entrepreneuriat au Bénin (PAEB) '
       '— Accompagnement : Cabinet FAGUEZ SARL '
       '— Édité par Dr MASSENON Rhodes';
 
@@ -194,7 +206,7 @@ class ExportOfficiel {
     Uint8List? logo,
     PolicesDocument? polices,
   }) async {
-    final document = pw.Document(title: 'AgriERP - ${doc.titre}');
+    final document = pw.Document(title: 'LogiAgriERP - ${doc.titre}');
     final image = logo == null ? null : pw.MemoryImage(logo);
     final theme = polices == null
         ? null
@@ -232,6 +244,30 @@ class ExportOfficiel {
                 style: const pw.TextStyle(fontSize: 9, color: _encreTexte),
               ),
             ),
+          if (doc.mentions.isNotEmpty || doc.codeQr != null)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 6),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      for (final m in doc.mentions)
+                        pw.Text(m, style: const pw.TextStyle(fontSize: 9, color: _encreTexte)),
+                    ],
+                  ),
+                  if (doc.codeQr != null)
+                    pw.BarcodeWidget(
+                      barcode: pw.Barcode.qrCode(),
+                      data: doc.codeQr!,
+                      width: 90,
+                      height: 90,
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -241,8 +277,14 @@ class ExportOfficiel {
 
   /// Charge le logo officiel embarqué. Rendu séparément pour qu'un test
   /// puisse construire un document sans dépendre du chargeur d'actifs.
-  static Future<Uint8List> chargerLogo() async =>
-      (await rootBundle.load(cheminLogo)).buffer.asUint8List();
+  static Future<Uint8List> chargerLogo() async {
+    // Ticket AUT-2 — le logo choisi par la ferme (Paramètres > Données de l'Entreprise) passe avant celui de l'installation.
+    try {
+      final choisi = await FichiersEntreprise.courant.logoPourPdf();
+      if (choisi != null) return choisi;
+    } catch (_) {}
+    return (await rootBundle.load(cheminLogo)).buffer.asUint8List();
+  }
 
   static const cheminPoliceNormale = 'assets/fonts/Roboto-Regular.ttf';
   static const cheminPoliceGrasse = 'assets/fonts/Roboto-Bold.ttf';
@@ -285,7 +327,7 @@ class ExportOfficiel {
                     pw.Text(
                       nomFerme,
                       style: pw.TextStyle(
-                        fontSize: 15,
+                        fontSize: 22,
                         fontWeight: pw.FontWeight.bold,
                         color: _encreForet,
                       ),

@@ -16,7 +16,7 @@
                 {{ $animal->species?->label ?? '—' }}
                 @if($animal->breed) · Race {{ $animal->breed }} @endif
                 · {{ $animal->sex === 'F' ? 'Femelle' : 'Mâle' }}
-                @if($animal->lot) · Lot <a href="{{ route('elevage.bandes') }}" class="text-brand-emerald underline font-semibold">{{ $animal->lot->code }}</a> @endif
+                @if($animal->lot) · Lot <a wire:navigate href="{{ route('elevage.bandes') }}" class="text-brand-emerald underline font-semibold">{{ $animal->lot->code }}</a> @endif
                 @if($animal->cage) · Cage {{ $animal->cage }} @endif
             </p>
         </div>
@@ -150,7 +150,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="text-[11px] text-outline p-sm border-t border-outline-variant">Événements retrouvés par correspondance sur les références mère/géniteur déjà saisies dans le <a href="{{ route('elevage.suivi-reproduction') }}" class="text-brand-emerald underline font-semibold">Suivi de Reproduction</a>.</p>
+            <p class="text-[11px] text-outline p-sm border-t border-outline-variant">Événements retrouvés par correspondance sur les références mère/géniteur déjà saisies dans le <a wire:navigate href="{{ route('elevage.suivi-reproduction') }}" class="text-brand-emerald underline font-semibold">Suivi de Reproduction</a>.</p>
         </div>
     @endif
 

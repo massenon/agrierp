@@ -40,6 +40,10 @@ void main() {
     'livestock_lots': 'livestock_lots',
     'livestock_daily_entries': 'livestock_daily_entries',
     'livestock_transfers': 'livestock_transfers',
+    // Ticket EL-1 — transformations (table mixte : saisie ET tirée), lues par l'écran « Transformation ».
+    'transformations': 'transformations',
+    // Ticket RELEVES-1 — relevés de terrain (table mixte de barème), lus par Paramètres Élevage et le Dashboard Élevage.
+    'field_survey_entries': 'field_survey_entries',
     'feed_ration_standards': 'feed_ration_standards',
     'growth_standards': 'growth_standards',
     'veterinary_withdrawal_periods': 'veterinary_withdrawal_periods',
@@ -65,11 +69,22 @@ void main() {
     'payables': 'payables',
     'employees': 'employees',
     'internships': 'internships',
+    // Ticket RH-2 — absences de stagiaire (table mixte) ; RH-4 — barème ITS (référentiel).
+    'internship_absences': 'internship_absences',
+    'income_tax_brackets': 'income_tax_brackets',
     'attendance_records': 'attendance_records',
     'mails': 'mails',
     'administrative_documents': 'administrative_documents',
     'archived_documents': 'archived_documents',
     'chart_of_accounts': 'chart_of_accounts',
+    // Ticket CP-3 — le registre des immobilisations (table mixte : saisie au poste ET tirée).
+    'fixed_assets': 'fixed_assets',
+    // Ticket PA-2 — les droits existants (administrateur), pour la modale « Rôle ».
+    'permissions': 'permissions_applicatives',
+    // Ticket CP-5 — lignes de relevé bancaire importées (rapprochement).
+    'bank_statement_lines': 'bank_statement_lines',
+    // Ticket CP-4 — les mois clôturés.
+    'periodic_closures': 'periodic_closures',
     'fiscal_years': 'fiscal_years',
     'accounting_entries': 'accounting_entries',
     'accounting_entry_lines': 'accounting_entry_lines',
@@ -109,6 +124,22 @@ void main() {
     'supplier_payments',
     'supplier_refunds',
     'corbeille_demandes',
+    // Ticket RH-4 — demandes de règlement de paie (envoyées, jamais tirées : le bulletin redescend dans `payslips`).
+    'payslip_requests',
+    // Ticket VC-1 — encaissements de créances (envoyés, jamais tirés : la créance soldée redescend dans `receivables`).
+    'receivable_payments',
+    // Ticket AC-1 — lignes des bons de commande : elles descendent DANS l'entrée `purchase_orders` du tirage (pas de clé propre).
+    'purchase_order_lines',
+    // Ticket CP-2 — demandes d'écriture manuelle (envoyées, jamais tirées : l'écriture redescend dans `accounting_entries`).
+    'manual_entry_requests',
+    // Ticket CP-3 — demandes de dotation aux amortissements (envoyées, jamais tirées : l'écriture redescend dans `accounting_entries`).
+    'depreciation_requests',
+    // Tickets PA-2/3/4/7/8 — demandes de réglage de la ferme (envoyées, jamais tirées : l'état redescend dans leurs tables).
+    'settings_requests',
+    // Ticket CP-5 — demandes d'import de relevé bancaire (envoyées, jamais tirées : les lignes redescendent dans `bank_statement_lines`).
+    'bank_statement_imports',
+    // Ticket CP-4 — demandes de clôture (envoyées, jamais tirées : l'exercice et les mois clos redescendent dans `fiscal_years` et `periodic_closures`).
+    'fiscal_closure_requests',
     'sync_conflicts',
     'app_settings',
     'sync_state',
@@ -122,6 +153,7 @@ void main() {
     EcranPoste.suiviReproduction: 'elevage/suivi_reproduction_screen.dart',
     EcranPoste.ficheSujet: 'elevage/fiche_sujet_screen.dart',
     EcranPoste.soinsEtVaccins: 'elevage/soins_vaccins_screen.dart',
+    EcranPoste.transformation: 'elevage/transformation_screen.dart',
     EcranPoste.parametresElevage: 'elevage/parametres_elevage_screen.dart',
     EcranPoste.ficheElevage: 'elevage/fiche_lapins_screen.dart',
     EcranPoste.fichePondeuses: 'elevage/fiche_pondeuses_screen.dart',
@@ -151,6 +183,7 @@ void main() {
     // CFG-2 : « Paramètres du poste » ouvre le hub Paramètres sur l'onglet Appairage.
     EcranPoste.parametres: 'parametres/parametres_generaux_screen.dart',
     EcranPoste.transfertsBandes: 'elevage/transferts_bandes_screen.dart',
+    EcranPoste.importationMasse: 'importation/importation_screen.dart',
     EcranPoste.gestionBandes: 'elevage/gestion_bandes_screen.dart',
     EcranPoste.enregistrerSujets: 'elevage/enregistrer_sujets_screen.dart',
     EcranPoste.registreReproducteurs: 'elevage/registre_reproducteurs_screen.dart',
@@ -170,6 +203,18 @@ void main() {
         'accounting_entries',
         'accounting_entry_lines',
       },
+    },
+    // Ticket IMPORT-1 — l'écran n'offre (et ne lit) que les modules du compte : le catalogue et les filières pour
+    // `manage-stocks`, les fournisseurs pour `manage-achats` (le caissier n'a que `manage-ventes` : clients).
+    // Ticket RELEVES-1 — le bloc « Relevés de terrain » du Dashboard Élevage calcule le délai constaté du fournisseur de
+    // provende sur les bons de commande reçus : le poste les lit SEULEMENT s'il les a (`view-achats`) ; sans eux (poste de
+    // l'animalier) il n'y a aucun délai constaté et la règle garde ses valeurs de départ (écart assumé, voir CLAUDE.md).
+    EcranPoste.dashboardElevage: {
+      'view-achats': {'purchase_orders'},
+    },
+    EcranPoste.importationMasse: {
+      'manage-stocks': {'livestock_species'},
+      'manage-achats': {'suppliers', 'purchase_orders'},
     },
   };
 
@@ -440,6 +485,26 @@ void main() {
       );
       expect(caissier, isNot(contains('accounting_entries')));
       expect(animalier, isNot(contains('accounting_entries')));
+      // Ticket CONF-4 (DV-20) — le comptable LIT les ventes, les achats et les stocks : il reçoit devis, avoirs, relances,
+      // bons de commande, crédits fournisseurs et mouvements de stock. Ni le personnel, ni les soins, ni la corbeille.
+      expect(
+        comptable,
+        containsAll([
+          'quotes',
+          'credit_notes',
+          'customer_advances',
+          'customer_reminders',
+          'purchase_orders',
+          'supplier_credits',
+          'expense_categories',
+          'stock_movements',
+        ]),
+      );
+      expect(comptable, isNot(contains('veterinary_records')));
+      expect(comptable, isNot(contains('corbeille_elements')));
+      expect(comptable, isNot(contains('permissions_applicatives')));
+      // Le caissier ne reçoit pas les achats détaillés (inchangé).
+      expect(caissier, isNot(contains('purchase_orders')));
       for (final role in [caissier, animalier, comptable]) {
         expect(role, isNot(contains('employees')));
         expect(role, isNot(contains('mails')));

@@ -16,7 +16,7 @@ abstract class VerrouSessionBase extends TestCase
 {
     use RefreshDatabase;
 
-    protected const MOT_DE_PASSE = 'AgriERP@2026';
+    protected const MOT_DE_PASSE = 'LogiAgriERP@2026';
 
     protected function utilisateur(string $role = 'admin', string $username = 'admin'): User
     {

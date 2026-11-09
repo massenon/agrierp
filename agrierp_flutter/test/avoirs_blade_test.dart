@@ -5,6 +5,7 @@ import 'package:agrierp/features/ventes/avoirs_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'blade_ventes_lecture.dart';
+import 'chemins_depot.dart';
 
 /// Ticket AV1 — « RETOURS ET AVOIRS » DU POSTE ALIGNÉ SUR LE BLADE (le maître, doctrine art. 5, directive de fidélité
 /// absolue du 17/10/2026).
@@ -238,8 +239,13 @@ void main() {
     expect(chaines, contains('Retour refusé : \$motif'));
   }, skip: saut);
 
-  test('les droits : `authorize(\'manage-ventes\')` sur les deux méthodes qui écrivent, comme au web', () {
-    expect(RegExp(r"authorize\('manage-ventes'\)").allMatches(composant).length, 2);
+  test('les droits : `authorize(\'avoir-client\')` sur les trois méthodes qui écrivent (saisie, « traité », retransmission MeCeF), comme au web — CONF-4 : manage-ventes OU correct-invoices', () {
+    // CONF-4 (DV-20) : l'avoir n'est plus à la seule caisse (`manage-ventes`) : la Gate `avoir-client` l'ouvre aussi au comptable
+    // (`correct-invoices`). Trois méthodes gardées, AUCUNE ne retombe sur `manage-ventes` seul.
+    expect(RegExp(r"authorize\('avoir-client'\)").allMatches(composant).length, 3);
+    expect(composant, isNot(contains("authorize('manage-ventes')")));
+    final fournisseur = File('$dossierLaravel/app/Providers/AppServiceProvider.php').readAsStringSync();
+    expect(fournisseur, matches(RegExp(r"Gate::define\('avoir-client'.*'manage-ventes', 'correct-invoices'")));
     final source = codeSeul(fichiers.first);
     expect(source, contains('widget.peutGerer'));
     expect(chaines, contains('Votre rôle ne permet pas cette action.'));

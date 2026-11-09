@@ -59,7 +59,7 @@ class MessagesErreurFrancaisTest extends TestCase
 
         $user = User::create([
             'name' => 'Animalier', 'username' => 'elevage', 'email' => 'elevage@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);
 
@@ -206,9 +206,6 @@ class MessagesErreurFrancaisTest extends TestCase
         $this->assertSame("Le nom d'utilisateur ou l'adresse e-mail est obligatoire.", $vide->errors()->first('identifiant'));
         $this->assertSame('Le mot de passe est obligatoire.', $vide->errors()->first('password'));
 
-        $oubli = Livewire::test(Login::class)->set('forgotEmail', 'pas-une-adresse')->call('sendResetLink');
-        $this->assertSame('Le champ adresse e-mail doit être une adresse e-mail valide.', $oubli->errors()->first('forgotEmail'));
-
         // Quatre échecs de plus : le cinquième déclenche le verrouillage (5 tentatives / 15 min).
         foreach (range(1, 4) as $_) {
             $bloque = $tentative();
@@ -233,7 +230,7 @@ class MessagesErreurFrancaisTest extends TestCase
         // passe par `lang/fr.json`.
         $sansDroit = User::create([
             'name' => 'Sans droit', 'username' => 'sansdroit', 'email' => 'sansdroit@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         Permission::findOrCreate('view-elevage', 'web');
         $refus = $this->actingAs($sansDroit)->get(route('elevage.gestion'))->assertForbidden();
@@ -301,12 +298,13 @@ class MessagesErreurFrancaisTest extends TestCase
     }
 
     /** La boîte « page expirée » de Livewire (anglaise, codée en dur dans son JS) est remplacée. */
-    public function test_la_confirmation_de_page_expiree_de_livewire_est_en_francais(): void
+    public function test_la_page_expiree_recharge_sans_boite_du_navigateur(): void
     {
         $js = file_get_contents(resource_path('js/app.js'));
 
         $this->assertStringContainsString("Livewire.hook('request'", $js);
         $this->assertStringContainsString('status !== 419', $js);
-        $this->assertStringContainsString('Cette page a expiré.', $js);
+        $this->assertStringNotContainsString('window.confirm', $js, 'plus de boîte du navigateur sur une page expirée');
+        $this->assertStringContainsString('window.location.reload()', $js);
     }
 }

@@ -67,6 +67,9 @@ class DonneesEntreprise extends Component
 
     public function mount(): void
     {
+        // CONF-1 : jamais d'ouverture sans le droit (même garde que `EmailSmtp::mount`).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-parametres'), 403);
+
         $settings = CompanySetting::current();
 
         $this->companyName = $settings->company_name;
@@ -91,84 +94,93 @@ class DonneesEntreprise extends Component
         return CompanySetting::current();
     }
 
+    /** CONF-1 : un fichier déposé est jugé tout de suite (même règle que l'enregistrement) ; refusé, il est retiré de la zone. */
+    public function updatedLogoFile(): void
+    {
+        $this->jugerDepot('logo');
+    }
+
+    public function updatedFaviconFile(): void
+    {
+        $this->jugerDepot('favicon');
+    }
+
+    private function jugerDepot(string $genre): void
+    {
+        $propriete = $genre.'File';
+        $this->resetErrorBag($propriete);
+
+        if (! $this->{$propriete}) {
+            return;
+        }
+
+        [, $erreur] = app(\App\Services\EntrepriseService::class)
+            ->jugerFichier($genre, $this->{$propriete}->get(), $this->{$propriete}->getClientOriginalName());
+
+        if ($erreur !== null) {
+            $this->{$propriete} = null;
+            $this->addError($propriete, $erreur);
+        }
+    }
+
+    /** CONF-1 : « Supprimer » le logo ou le favicon (confirmation côté vue) ; l'ancien fichier part du disque. */
+    public function supprimerFichier(string $genre): void
+    {
+        $this->authorize('manage-parametres');
+        abort_unless(in_array($genre, ['logo', 'favicon'], true), 404);
+
+        app(\App\Services\EntrepriseService::class)->supprimerFichier($genre);
+
+        $this->reset([$genre.'File']);
+        $this->dispatch('toast', message: $genre === 'logo' ? "Logo de l'entreprise supprimé." : "Icône du site supprimée.", type: 'success');
+    }
+
     public function save(): void
     {
         $this->authorize('manage-parametres');
 
-        $this->validate([
-            'companyName' => ['required', 'string', 'max:150'],
-            'ifu' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:50'],
-            'email' => ['nullable', 'email'],
-            'logoFile' => ['nullable', 'image', 'max:2048'],
-            'faviconFile' => ['nullable', 'image', 'max:500'],
-            // ⚠️ Bornes issues du droit béninois : VPS 2 % (enseignement privé)
-            // ou 4 % (autres) ; risques professionnels 1 à 4 % selon le niveau
-            // de risque de l'entreprise. Les laisser libres inviterait à saisir
-            // un taux hors barème sans que rien ne le signale.
-            'vpsRate' => ['required', 'numeric', 'min:0', 'max:10'],
-            'cnssEmployeeRate' => ['required', 'numeric', 'min:0', 'max:20'],
-            'cnssEmployerPensionRate' => ['required', 'numeric', 'min:0', 'max:20'],
-            'cnssEmployerFamilyRate' => ['required', 'numeric', 'min:0', 'max:20'],
-            'cnssEmployerRiskRate' => ['required', 'numeric', 'min:1', 'max:4'],
-        ], [
-            'ifu.regex' => "L'IFU doit contenir uniquement des chiffres.",
-        ]);
+        $service = app(\App\Services\EntrepriseService::class);
 
-        $settings = CompanySetting::current();
+        // Les règles `mecef*` ne s'appliquent qu'à la demande du poste et à l'onglet « Facturation normalisée (e-MECeF) » : pas ici.
+        // Les fichiers n'ont plus la règle `image` de Laravel (elle refuse l'ICO) : `EntrepriseService::fichiersDepuis` les juge.
+        $this->validate(array_filter($service->regles(), fn ($cle) => ! str_starts_with($cle, 'mecef'), ARRAY_FILTER_USE_KEY), \App\Services\EntrepriseService::MESSAGES);
 
-        // ⚠️ TICKET 14.39 — VERROU SUR LES TAUX DE PAIE. La première
-        // configuration est ouverte (elle entre les valeurs validées par le
-        // client) ; toute modification ultérieure exige le rôle
-        // administrateur. Les taux déterminent le net versé à chaque salarié et
-        // les montants déclarés aux organismes.
-        $tauxModifies = $settings->payrollSettingsLocked() && (
-            (float) $settings->vps_rate !== (float) $this->vpsRate
-            || (float) $settings->cnss_employee_rate !== (float) $this->cnssEmployeeRate
-            || (float) $settings->cnss_employer_pension_rate !== (float) $this->cnssEmployerPensionRate
-            || (float) $settings->cnss_employer_family_rate !== (float) $this->cnssEmployerFamilyRate
-            || (float) $settings->cnss_employer_risk_rate !== (float) $this->cnssEmployerRiskRate
-        );
+        // CONF-1 : TOUT est jugé avant d'écrire quoi que ce soit (logo ET favicon), puis les fichiers sont rangés.
+        $entrees = [];
+        foreach (['logo' => $this->logoFile, 'favicon' => $this->faviconFile] as $genre => $fichier) {
+            if ($fichier) {
+                $entrees[$genre] = ['octets' => $fichier->get(), 'nom' => $fichier->getClientOriginalName()];
+            }
+        }
 
-        if ($tauxModifies && ! $settings->payrollSettingsEditableBy(auth()->user())) {
-            $this->addError('vpsRate', "Les taux de charges sociales ont été arrêtés le "
-                .$settings->payroll_settings_edited_at?->format('d/m/Y à H:i')
-                .". Seul un administrateur peut les modifier.");
+        try {
+            $fichiers = $service->fichiersDepuis($entrees);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ, $messages[0]);
+            }
 
             return;
         }
 
-        $payload = [
-            'company_name' => $this->companyName,
-            'promoter_name' => $this->promoterName ?: null,
-            'address' => $this->address ?: null,
-            'phone' => $this->phone ?: null,
-            'email' => $this->email ?: null,
-            'ifu' => $this->ifu,
-            'rccm' => $this->rccm ?: null,
-            'tva_enabled' => $this->tvaEnabled,
-            'vps_rate' => $this->vpsRate,
-            'cnss_employee_rate' => $this->cnssEmployeeRate,
-            'cnss_employer_pension_rate' => $this->cnssEmployerPensionRate,
-            'cnss_employer_family_rate' => $this->cnssEmployerFamilyRate,
-            'cnss_employer_risk_rate' => $this->cnssEmployerRiskRate,
-        ];
+        try {
+            $service->enregistrer([
+                'companyName' => $this->companyName, 'promoterName' => $this->promoterName, 'address' => $this->address,
+                'phone' => $this->phone, 'email' => $this->email, 'ifu' => $this->ifu, 'rccm' => $this->rccm,
+                'tvaEnabled' => $this->tvaEnabled, 'vpsRate' => $this->vpsRate, 'cnssEmployeeRate' => $this->cnssEmployeeRate,
+                'cnssEmployerPensionRate' => $this->cnssEmployerPensionRate, 'cnssEmployerFamilyRate' => $this->cnssEmployerFamilyRate,
+                'cnssEmployerRiskRate' => $this->cnssEmployerRiskRate,
+                // Le réglage MeCeF a son onglet (`FacturationEmecef`) : aucune clé `mecef*` ici, il reste tel quel.
+            ], auth()->user(), $fichiers);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Le refus porte sur UN champ : l'IFU (e-MECeF) ou les taux de paie arrêtés.
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ, $messages[0]);
+            }
 
-        if ($this->logoFile) {
-            $payload['logo_path'] = $this->logoFile->store('company', 'public');
+            return;
         }
 
-        if ($this->faviconFile) {
-            $payload['favicon_path'] = $this->faviconFile->store('company', 'public');
-        }
-
-        $settings->update($payload);
-
-        // Première saisie des taux : le paramétrage est désormais arrêté.
-        if ($tauxModifies || ! $settings->payrollSettingsLocked()) {
-            $settings->fresh()->markPayrollSettingsEdited(auth()->user());
-        }
-
-        AuditLog::record('company_settings.updated', 'parametres');
         $this->reset(['logoFile', 'faviconFile']);
         $this->dispatch('toast', message: 'Modifications enregistrées avec succès.', type: 'success');
     }

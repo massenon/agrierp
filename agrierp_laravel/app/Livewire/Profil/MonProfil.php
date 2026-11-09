@@ -6,7 +6,6 @@ use App\Models\AuditLog;
 use App\Services\VerrouSessionService;
 use App\Support\PolitiqueMotDePasse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -102,11 +101,13 @@ class MonProfil extends Component
             'new_password.confirmed' => 'La confirmation ne correspond pas au mot de passe saisi.',
         ]);
 
-        Auth::user()->forceFill([
-            'password' => Hash::make($this->new_password),
-        ])->save();
+        try {
+            app(\App\Actions\ChangerMotDePasseAction::class)->executer(Auth::user(), $this->new_password);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->addError('new_password', $e->validator->errors()->first());
 
-        AuditLog::record('password.updated', 'auth');
+            return;
+        }
 
         $this->reset(['current_password', 'new_password', 'new_password_confirmation']);
 

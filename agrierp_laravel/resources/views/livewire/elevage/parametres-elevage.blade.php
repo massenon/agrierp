@@ -5,6 +5,7 @@
             ['key' => 'prophylaxie', 'label' => 'Calendriers de Prophylaxie', 'icon' => 'event_repeat'],
             ['key' => 'provende', 'label' => 'Types de Provende', 'icon' => 'inventory_2'],
             ['key' => 'numerotation', 'label' => 'Numérotation Bandes & Sujets', 'icon' => 'tag'],
+            ['key' => 'releves', 'label' => 'Relevés de terrain', 'icon' => 'check_circle'],
         ]"
         :active="$tab">
 
@@ -344,6 +345,118 @@
                     </button>
                 </div>
             </form>
+        @endif
+        @if($tab === 'releves')
+            @php
+                $familles = ['incubation' => ['Incubation', 'egg'], 'provende' => ['Délais fournisseur de provende', 'local_shipping'], 'technicien' => ['Technicien — poissons-chats', 'set_meal']];
+                $statutClasses = ['a_valider' => 'bg-amber-100 text-amber-800', 'valide' => 'bg-green-100 text-green-800'];
+                $typesDeLaFamille = array_keys(array_filter(\App\Services\Elevage\ReleveTerrainService::FAMILLES, fn ($f) => $f === $releveFamille));
+                $ajouts = ['incubation_regle' => 'Ajouter une règle', 'incubation_lot' => 'Ajouter un relevé de lot', 'poisson_bareme' => 'Ajouter une classe de poids'];
+            @endphp
+            <div class="space-y-md">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
+                    <div>
+                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">check_circle</span>Relevés de terrain</h2>
+                        <p class="text-xs text-outline mt-xs">Valeurs par défaut = <strong>propositions « À valider »</strong>. Le bouton « Valider » les confirme ; enregistrer une ligne la passe aussi à « Validé ».</p>
+                    </div>
+                    <a href="{{ route('elevage.dashboard') }}" class="flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline"><span class="material-symbols-outlined text-[18px]">monitoring</span>{{ $this->relevesAValider }} référentiel(s) à valider — Dashboard Élevage</a>
+                </div>
+
+                <div class="flex flex-wrap gap-xs">
+                    @foreach($familles as $cle => [$libelle, $icone])
+                        <button type="button" wire:click="setReleveFamille('{{ $cle }}')" class="flex items-center gap-xs px-md py-xs rounded-full text-xs font-bold border {{ $releveFamille === $cle ? 'bg-brand-emerald text-white border-brand-emerald' : 'bg-white text-outline border-outline-variant hover:bg-surface-zebra' }}">
+                            <span class="material-symbols-outlined text-[16px]">{{ $icone }}</span>{{ $libelle }}
+                        </button>
+                    @endforeach
+                </div>
+
+                <div class="flex flex-wrap gap-sm">
+                    @foreach($ajouts as $type => $libelle)
+                        @if(in_array($type, $typesDeLaFamille, true))
+                            <button type="button" wire:click="newReleve('{{ $type }}')" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
+                                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ $libelle }}
+                            </button>
+                        @endif
+                    @endforeach
+                </div>
+
+                <x-datatable :headers="['Type', 'Libellé / espèce', 'Valeurs', 'Statut', 'Validé par / le', 'Actions']">
+                    @forelse($this->releves as $i => $l)
+                        <tr class="rrow border-b border-outline-variant {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
+                            <td data-label="Type" class="px-md py-sm text-xs font-semibold">{{ \App\Services\Elevage\ReleveTerrainService::TYPES_LIBELLES[$l->type] ?? $l->type }}</td>
+                            <td data-label="Libellé" class="px-md py-sm text-xs">{{ $l->label }}@if($l->species_code) <span class="text-outline">({{ $l->species_code }})</span>@endif</td>
+                            <td data-label="Valeurs" class="px-md py-sm text-xs">{{ \App\Services\Elevage\ReleveTerrainService::resume($l->type, $l->data ?? []) }}</td>
+                            <td data-label="Statut" class="px-md py-sm"><span class="px-sm py-[2px] rounded-full text-[10px] font-bold {{ $statutClasses[$l->status] ?? '' }}">{{ \App\Services\Elevage\ReleveTerrainService::STATUTS[$l->status] ?? $l->status }}</span></td>
+                            <td data-label="Validé par" class="px-md py-sm text-xs">{{ $l->validated_at ? ($l->validateur?->name ?? '—').' — '.$l->validated_at->format('d/m/Y') : '—' }}</td>
+                            <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @if($l->status === 'a_valider')
+                                    <button type="button" wire:click="ouvrirValidation('{{ $l->id }}')" class="inline-flex items-center gap-xs px-sm py-1 rounded-full bg-brand-emerald text-white text-[11px] font-bold hover:bg-brand-forest"><span class="material-symbols-outlined text-[16px]">task_alt</span>Valider</button>
+                                @endif
+                                <button type="button" wire:click="editReleve('{{ $l->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+                                <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-releve-{{ $l->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                            </td>
+                        </tr>
+                        <x-modal-confirm-delete :name="'archive-releve-'.$l->id" :item-label="$l->label" :action="'archiveReleve(\''.$l->id.'\')'" />
+                    @empty
+                        <tr><td colspan="6" class="px-md py-lg text-center text-xs text-outline">Aucun relevé dans cette famille.</td></tr>
+                    @endforelse
+                </x-datatable>
+
+                @if($releveFamille === 'provende')
+                    <div class="space-y-sm">
+                        <h3 class="text-sm font-bold text-brand-forest">Délais constatés par fournisseur (5 derniers bons de commande de provende reçus)</h3>
+                        <p class="text-xs text-outline">Calculé en lecture : du jour du bon au jour de la réception, bons de la catégorie « Aliments ». Règle retenue :
+                            <strong>critique {{ $this->regleDelai['critique'] }} j · alerte {{ $this->regleDelai['alerte'] }} j</strong>
+                            ({{ ['constate' => 'le plus long des 5 délais, plus la marge', 'manuel' => 'valeurs saisies', 'depart' => 'valeurs de départ, moins de 5 bons ou règle à valider'][$this->regleDelai['source']] }}).</p>
+                        <x-datatable :headers="['Fournisseur', 'Bons retenus', 'Délais constatés (jours)', 'Critique proposé']">
+                            @forelse($this->delaisFournisseurs as $f)
+                                <tr class="rrow border-b border-outline-variant bg-white">
+                                    <td data-label="Fournisseur" class="px-md py-sm text-xs font-semibold">{{ $f['supplier'] }}</td>
+                                    <td data-label="Bons" class="px-md py-sm text-xs">{{ $f['nb'] }} sur 5</td>
+                                    <td data-label="Délais" class="px-md py-sm text-xs">{{ implode(' · ', array_map(fn ($b) => $b['delai_jours'].' j ('.\Carbon\Carbon::parse($b['date_bon'])->format('d/m').' → '.\Carbon\Carbon::parse($b['date_reception'])->format('d/m').')', $f['bons'])) }}</td>
+                                    <td data-label="Critique proposé" class="px-md py-sm text-xs font-bold">{{ $f['critique_propose'] === null ? '— (moins de 5 bons)' : $f['critique_propose'].' j · alerte '.($f['critique_propose'] + $this->regleDelai['marge']).' j' }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="px-md py-lg text-center text-xs text-outline">Aucun bon de commande de provende reçu.</td></tr>
+                            @endforelse
+                        </x-datatable>
+                    </div>
+                @endif
+            </div>
+
+            <x-modal name="modal-releve" max-width="xl">
+                <div class="flex items-center justify-between mb-md">
+                    <h3 class="font-bold text-lg text-brand-forest">{{ $releveId ? 'Modifier le relevé' : 'Saisir un relevé' }} — {{ \App\Services\Elevage\ReleveTerrainService::TYPES_LIBELLES[$releveType] ?? '' }}</h3>
+                    <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-releve' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <form wire:submit="saveReleve" class="space-y-md">
+                    @include('livewire.elevage._releve-champs')
+                    <p class="text-[11px] text-outline">Enregistrer fait passer la ligne à « Validé ».</p>
+                    <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
+                        <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-releve' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+                        <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                    </div>
+                </form>
+            </x-modal>
+
+            <x-modal name="modal-valider-releve" max-width="xl">
+                <div class="flex items-center justify-between mb-md">
+                    <h3 class="font-bold text-lg text-brand-forest">Valider le relevé — {{ \App\Services\Elevage\ReleveTerrainService::TYPES_LIBELLES[$releveType] ?? '' }}</h3>
+                    <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-valider-releve' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <form wire:submit="validerReleve" class="space-y-md">
+                    <p class="text-xs text-outline">Relisez les valeurs proposées, corrigez-les si besoin, puis validez.</p>
+                    @include('livewire.elevage._releve-champs')
+                    <div>
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Statut</label>
+                        <p class="text-sm"><span class="px-sm py-[2px] rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">À valider</span> <span class="material-symbols-outlined text-[16px] align-middle">arrow_forward</span> <span class="px-sm py-[2px] rounded-full text-[10px] font-bold bg-green-100 text-green-800">Validé</span></p>
+                    </div>
+                    <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
+                        <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-valider-releve' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+                        <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Valider</button>
+                    </div>
+                </form>
+            </x-modal>
         @endif
     </x-tab-page>
 </div>

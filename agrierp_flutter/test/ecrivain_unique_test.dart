@@ -35,7 +35,36 @@ void main() {
     'quotes': 'lib/features/ventes/devis_repository.dart',
     'livestock_reproduction_events': 'lib/features/elevage/suivi_reproduction_repository.dart',
     'purchases': 'lib/features/achats/achats_repository.dart',
+    // Ticket AC-1 — « Bons de Commande » : « Générer le Bon » et la réception s'écrivent par ce dépôt.
+    'purchase_orders': 'lib/features/achats/achats_repository.dart',
+    // Ticket CP-1 — « Plan Comptable » : « Nouveau Compte », « Modifier » et « Archiver » s'écrivent par ce dépôt.
+    // Ticket EL-1 — « Bon d'Abattage & Transformation » : la transformation (le fait seul) s'écrit par ce dépôt.
+    'transformations': 'lib/features/elevage/transformation_repository.dart',
+    'field_survey_entries': 'lib/features/elevage/releve_terrain_repository.dart', // RELEVES-1
+    'chart_of_accounts': 'lib/features/comptabilite/comptabilite_repository.dart',
+    // Ticket CP-2 — « Journal Comptable » : « Saisie d'Écriture », « Modifier » et « Archiver » s'écrivent (en demandes) par ce dépôt.
+    'manual_entry_requests': 'lib/features/comptabilite/comptabilite_repository.dart',
+    // Ticket CP-3 — « Immobilisations » : le bien s'enregistre, se modifie et sort du registre ; la dotation se demande, par ce dépôt.
+    'fixed_assets': 'lib/features/comptabilite/immobilisations_repository.dart',
+    'depreciation_requests': 'lib/features/comptabilite/immobilisations_repository.dart',
+    // Tickets PA-2/3/4/7/8 — réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles, SMS) : demandes écrites par ce dépôt.
+    'settings_requests': 'lib/features/parametres/reglages_ferme_repository.dart',
+    // Ticket CP-5 — « Rapprochement Bancaire » : l'import d'un relevé s'écrit (en demande) par ce dépôt.
+    'bank_statement_imports': 'lib/features/comptabilite/rapprochement_repository.dart',
+    // Ticket CP-4 — « Clôture d'exercice » : périodes, exercice et premier exercice se DEMANDENT (le serveur les joue) par ce dépôt.
+    'fiscal_closure_requests': 'lib/features/comptabilite/cloture_exercice_repository.dart',
     'attendance_records': 'lib/features/rh/personnel_repository.dart',
+    // Tickets RH-1, RH-2, RH-4 — « Personnel & Stages » : employés, stagiaires, absences et demandes de paie s'écrivent par ce dépôt.
+    'employees': 'lib/features/rh/personnel_repository.dart',
+    'internships': 'lib/features/rh/personnel_repository.dart',
+    'internship_absences': 'lib/features/rh/personnel_repository.dart',
+    'payslip_requests': 'lib/features/rh/personnel_repository.dart',
+    // Ticket UT-1 — « Gestion Utilisateurs » : les comptes se créent, se modifient, s'archivent et se réactivent par ce dépôt.
+    'utilisateurs': 'lib/features/parametres/parametres_generaux_repository.dart',
+    // Ticket VC-1 — « Suivi des Dettes » : l'encaissement d'une créance s'écrit par ce dépôt.
+    'receivable_payments': 'lib/features/clients/clients_creances_repository.dart',
+    // Ticket VC-2 — « Relances Clients » : WhatsApp, e-mail, courrier, SMS s'écrivent par ce dépôt.
+    'customer_reminders': 'lib/features/clients/clients_creances_repository.dart',
     'products': 'lib/features/stocks/produits_repository.dart',
     'suppliers': 'lib/features/achats/fournisseurs_repository.dart',
     'supplier_payments': 'lib/features/achats/fournisseurs_repository.dart',

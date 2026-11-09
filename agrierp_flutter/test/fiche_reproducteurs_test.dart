@@ -77,6 +77,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// VOL-1 : le départ de la bande (60 sujets) — Reproducteur 20 / Jeune 30 / Poussin 10 — est exigé avant toute journée.
+  Future<void> departer(WidgetTester tester) async {
+    for (final (cle, v) in [('repro', '20'), ('jeune', '30'), ('sevre', '10')]) {
+      await tester.enterText(find.byKey(Key('champ-depart-$cle')), v);
+      await tester.pumpAndSettle();
+    }
+  }
+
   double y(WidgetTester tester, String texte) =>
       tester.getTopLeft(find.text(texte)).dy;
 
@@ -114,8 +122,10 @@ void main() {
       y(tester, 'ŒUFS COUVÉS (MIS EN INCUBATION)'),
       y(tester, 'MORTS PAR CATÉGORIE'),
       y(tester, 'DONS PAR CATÉGORIE'),
+      y(tester, 'PASSAGE DU JOUR (POUSSIN → JEUNE)'),
+      y(tester, 'EFFECTIF DE DÉPART PAR CATÉGORIE (OBLIGATOIRE)'),
       y(tester, 'EFFECTIF FINAL'),
-      y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR STADE (EN GRAMMES G/J)'),
+      y(tester, 'RATIONNEMENT & PROVENDE SERVIE PAR CATÉGORIE (EN GRAMMES G/J)'),
       y(tester, 'POIDS MOYEN CONSTATÉ'),
       y(tester, 'TRAITEMENTS & PROPHYLAXIE'),
       y(tester, 'Enregistrer ce Jour'),
@@ -130,9 +140,12 @@ void main() {
   ) async {
     await afficher(tester);
 
-    for (final categorie in ['REPRO', 'POULET', 'POUSSIN']) {
-      expect(find.text(categorie), findsNWidgets(2), reason: '$categorie : Morts et Dons');
+    // 🔁 VOL-1 : Reproducteur / Jeune / Poussin (jamais « Poulet ») — Morts, Dons et, sans chaîne, le départ.
+    for (final categorie in ['REPRODUCTEUR', 'JEUNE', 'POUSSIN']) {
+      expect(find.text(categorie), findsNWidgets(3), reason: '$categorie : Morts, Dons et départ');
     }
+    expect(find.text('POULET'), findsNothing);
+    expect(find.text('REPRO'), findsNothing);
     expect(find.text('DONS PAR CATÉGORIE'), findsOneWidget);
   });
 
@@ -203,6 +216,7 @@ void main() {
         '34',
       );
       await tester.pumpAndSettle();
+      await departer(tester);
 
       final bouton = find.byKey(const Key('bouton-enregistrer'));
       await tester.ensureVisible(bouton);
@@ -323,8 +337,8 @@ void main() {
     await afficher(tester);
 
     final avant = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
-    await tester.ensureVisible(find.byKey(const Key('pas-don-poulet-1')));
-    await tester.tap(find.byKey(const Key('pas-don-poulet-1')));
+    await tester.ensureVisible(find.byKey(const Key('pas-don-jeune-1')));
+    await tester.tap(find.byKey(const Key('pas-don-jeune-1')));
     await tester.pumpAndSettle();
     final apres = tester.widget<Text>(find.byKey(const Key('effectif-final'))).data;
 

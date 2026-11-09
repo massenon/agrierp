@@ -158,7 +158,7 @@ void main() {
       expect((await etat())['porciculture'], (false, SyncStatus.pending));
       expect((await etat())['cuniculture'], (true, SyncStatus.synced), reason: 'indépendamment des autres espèces');
       expect(find.byIcon(SymbolesAgri.toggle_on), findsNWidgets(2));
-      expect(find.byIcon(SymbolesAgri.toggle_off), findsNWidgets(2));
+      expect(find.byIcon(SymbolesAgri.toggle_off), findsNWidgets(3), reason: 'porciculture, héliciculture et l\'assistant (éteint par défaut)');
       expect(find.text('Modification appliquée avec succès.'), findsOne);
       await tester.pump(ToastAgri.duree + const Duration(seconds: 1));
     });
@@ -415,7 +415,11 @@ if (isset($in['envoi'])) {
     $sortie['statut'] = $r->getStatusCode();
     $sortie['push'] = json_decode($r->getContent(), true);
     // Pendant ce temps, au WEB : l'aviculture est éteinte par le vrai composant Livewire.
-    Livewire\Livewire::actingAs($u)->test(App\Livewire\Parametres\ModulesActifs::class)->call('toggleModule', 'aviculture');
+    // CONF-1 : l'écran refuse désormais un compte sans `manage-modules` dès l'ouverture (403) ; pour ce compte le geste
+    // du web n'avait déjà aucun effet : seul l'administrateur éteint réellement l'aviculture.
+    if ($in['role'] === 'admin') {
+        Livewire\Livewire::actingAs($u)->test(App\Livewire\Parametres\ModulesActifs::class)->call('toggleModule', 'aviculture');
+    }
     $sortie['apres'] = $tirer();
 }
 echo json_encode($sortie);

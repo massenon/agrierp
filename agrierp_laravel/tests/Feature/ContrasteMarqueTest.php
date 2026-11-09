@@ -8,7 +8,7 @@ use Tests\TestCase;
  * Ticket 15.7 — LE MAÏS DE LA MARQUE SUR FOND CLAIR.
  *
  * ⚠️⚠️ CE QUE CE CONTRÔLE PROTÈGE. #FFD55F sur blanc donne 1,41:1 là où WCAG AA
- * exige 4,5:1. Le « ERP » de « AgriERP » était illisible sur la page de
+ * exige 4,5:1. Le « ERP » de « LogiAgriERP » était illisible sur la page de
  * connexion, et l'étiquette de catégorie de la recherche globale — 10 px, gras,
  * sur panneau blanc — l'était davantage encore : celle-là n'est même pas un
  * logo, c'est du texte d'interface, et l'audit ne l'avait pas vue parce que le
@@ -22,7 +22,6 @@ class ContrasteMarqueTest extends TestCase
     /** Surfaces claires : le maïs foncé, jamais le maïs clair. */
     private const SUR_FOND_CLAIR = [
         'resources/views/livewire/auth/login.blade.php',
-        'resources/views/livewire/auth/reset-password.blade.php',
         // Sprint VW : l'écran de verrouillage reprend la page de connexion (même logo sur fond blanc).
         'resources/views/components/verrou-session.blade.php',
         'resources/views/livewire/shared/global-search.blade.php',

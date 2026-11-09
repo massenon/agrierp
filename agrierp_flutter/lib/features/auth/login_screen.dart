@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/agri_tokens.dart';
-import '../../core/widgets/modale_agri.dart';
-import '../demarrage/premier_demarrage_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/login.html` → écran de connexion Desktop.
@@ -16,8 +14,8 @@ import '../../core/theme/symboles_agri.dart';
 ///     « Bienvenue ! », bandeau de blocage, formulaire, pied de page.
 ///
 /// ⚠️ LIBELLÉS REPRIS AU MOT : « NOM D'UTILISATEUR OU EMAIL », « MOT DE
-/// PASSE », « Se souvenir de moi », « Mot de passe oublié ? », « SE
-/// CONNECTER », et le titre « Bienvenue ! » avec son point d'exclamation.
+/// PASSE », « Se souvenir de moi », « Contactez l'administrateur » (MDP-1 : texte
+/// non cliquable qui remplace l'ancien lien de réinitialisation par e-mail), « SE CONNECTER », et le titre « Bienvenue ! » avec son point d'exclamation.
 ///
 /// ÉCARTS ASSUMÉS PAR RAPPORT À LA MAQUETTE :
 /// 1. Le sélecteur de langue et le bouton « Mode sombre » sont affichés mais
@@ -35,15 +33,10 @@ class LoginScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.onConnecte,
-    this.demarrage,
   });
 
   final AuthService auth;
   final VoidCallback onConnecte;
-
-  /// Ticket F0.98 — sur un poste NEUF, l'adresse du serveur s'affiche et se change avant la connexion
-  /// (« Paramètres du poste », réservé à l'administrateur, n'est pas encore accessible).
-  final PremierDemarrageRepository? demarrage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -57,36 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _seSouvenir = false;
   bool _enCours = false;
   String? _erreur;
-
-  /// Ticket F0.98 — adresse affichée seulement sur un poste neuf (null sinon).
-  String? _adresseServeur;
-
-  @override
-  void initState() {
-    super.initState();
-    _lireServeur();
-  }
-
-  Future<void> _lireServeur() async {
-    final depot = widget.demarrage;
-    if (depot == null || !await depot.posteNeuf()) return;
-    final adresse = await depot.adresse();
-    if (mounted) setState(() => _adresseServeur = adresse);
-  }
-
-  Future<void> _changerServeur() async {
-    final nouvelle = await afficherModale<String>(
-      context: context,
-      constructeur: (_) => _DialogueServeur(adresse: _adresseServeur ?? ''),
-    );
-    if (nouvelle == null || nouvelle.trim().isEmpty) return;
-    try {
-      final enregistree = await widget.demarrage!.changerAdresse(nouvelle);
-      if (mounted) setState(() => _adresseServeur = enregistree);
-    } on StateError catch (e) {
-      if (mounted) setState(() => _erreur = e.message);
-    }
-  }
 
   @override
   void dispose() {
@@ -134,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return CadreConnexion(
       titre: 'Bienvenue !',
-      sousTitre: "Connectez-vous à votre espace d'administration AgriERP.",
+      sousTitre: "Connectez-vous à votre espace d'administration LogiAgriERP.",
       enfants: [
       if (_erreur != null) ...[
         _BandeauErreur(message: _erreur!),
@@ -151,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
         libelle: 'MOT DE PASSE',
         controleur: _motDePasse,
         icone: SymbolesAgri.lock_outline,
-        indice: 'AgriERP@2026',
+        indice: 'LogiAgriERP@2026',
         masque: !_motDePasseVisible,
         suffixe: IconButton(
           icon: Icon(
@@ -170,31 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _ligneOptions(),
       const SizedBox(height: AgriSpacing.md),
       _boutonConnexion(),
-      if (_adresseServeur != null) ...[
-        const SizedBox(height: AgriSpacing.md),
-        Row(
-          key: const Key('login-serveur'),
-          children: [
-            Expanded(
-              child: Text(
-                'Serveur : $_adresseServeur',
-                style: const TextStyle(
-                  fontSize: AgriTypography.xs,
-                  color: AgriColors.outline,
-                ),
-              ),
-            ),
-            TextButton(
-              key: const Key('login-modifier-serveur'),
-              onPressed: _changerServeur,
-              child: const Text(
-                'Modifier',
-                style: TextStyle(fontSize: AgriTypography.xs),
-              ),
-            ),
-          ],
-        ),
-      ],
       ],
     );
   }
@@ -246,23 +184,16 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        Flexible(
-          child: TextButton(
-            // ⚠️ La réinitialisation passe par un lien envoyé par E-MAIL : elle
-            // exige donc le réseau ET une adresse. Ouvrir une saisie hors ligne
-            // laisserait croire à un envoi qui n'aura pas lieu — l'écran renvoie
-            // vers la surface web, qui porte ce parcours en entier.
-            onPressed: () => afficherModale<void>(
-              context: context,
-              constructeur: (_) => const _DialogueMotDePasseOublie(),
-            ),
-            child: const Text(
-              'Mot de passe oublié ?',
-              style: TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.w600,
-                color: AgriColors.brandEmerald,
-              ),
+        // MDP-1 : plus de réinitialisation par e-mail. Un administrateur choisit un mot de passe temporaire ; le
+        // texte, NON cliquable, remplace le lien au même emplacement (même mots que le Blade `login.blade.php`).
+        const Flexible(
+          child: Text(
+            "Contactez l'administrateur",
+            key: Key('login-contacter-administrateur'),
+            style: TextStyle(
+              fontSize: AgriTypography.xs,
+              fontWeight: FontWeight.w600,
+              color: AgriColors.outline,
             ),
           ),
         ),
@@ -285,12 +216,13 @@ class CadreConnexion extends StatelessWidget {
   const CadreConnexion({
     super.key,
     required this.titre,
-    required this.sousTitre,
+    this.sousTitre,
     required this.enfants,
   });
 
   final String titre;
-  final String sousTitre;
+  /// Absent (`null`) : aucune phrase sous le titre (écran de verrouillage et définition du PIN, demande du client 06/11/2026).
+  final String? sousTitre;
   final List<Widget> enfants;
 
   @override
@@ -344,14 +276,16 @@ class CadreConnexion extends StatelessWidget {
                           color: AgriColors.brandForest,
                         ),
                       ),
-                      const SizedBox(height: AgriSpacing.xs),
-                      Text(
-                        sousTitre,
-                        style: const TextStyle(
-                          fontSize: AgriTypography.xs,
-                          color: AgriColors.outline,
+                      if (sousTitre != null) ...[
+                        const SizedBox(height: AgriSpacing.xs),
+                        Text(
+                          sousTitre!,
+                          style: const TextStyle(
+                            fontSize: AgriTypography.xs,
+                            color: AgriColors.outline,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: AgriSpacing.lg),
                       ...enfants,
                     ],
@@ -481,12 +415,16 @@ class BoutonConnexion extends StatelessWidget {
             else
               const Icon(SymbolesAgri.lock_open, size: 16),
             const SizedBox(width: AgriSpacing.sm),
-            Text(
-              libelle,
-              style: const TextStyle(
-                fontSize: AgriTypography.xs,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
+            // Flexible : un libellé long (« ENREGISTRER LE MOT DE PASSE ») ne déborde pas du bouton de 44 px.
+            Flexible(
+              child: Text(
+                libelle,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AgriTypography.xs,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
               ),
             ),
           ],
@@ -591,7 +529,7 @@ class _ContenuPanneauFerme extends StatelessWidget {
                   color: Colors.white,
                 ),
                 children: [
-                  TextSpan(text: 'Agri'),
+                  TextSpan(text: 'LogiAgri'),
                   TextSpan(
                     text: 'ERP',
                     style: TextStyle(color: AgriColors.accentYellow),
@@ -696,7 +634,7 @@ class _EnTeteMarque extends StatelessWidget {
                       color: AgriColors.brandForest,
                     ),
                     children: [
-                      TextSpan(text: 'Agri'),
+                      TextSpan(text: 'LogiAgri'),
                       TextSpan(
                         text: 'ERP',
                         style: TextStyle(color: AgriColors.accentYellow),
@@ -806,77 +744,6 @@ class _BandeauErreur extends StatelessWidget {
   }
 }
 
-/// Ticket F0.98 — saisie de l'adresse du serveur. ⚠️ StatefulWidget : le contrôleur vit avec la modale ;
-/// le libérer au retour de `afficherModale` le faisait servir pendant l'animation de fermeture.
-class _DialogueServeur extends StatefulWidget {
-  const _DialogueServeur({required this.adresse});
-
-  final String adresse;
-
-  @override
-  State<_DialogueServeur> createState() => _DialogueServeurState();
-}
-
-class _DialogueServeurState extends State<_DialogueServeur> {
-  late final _saisie = TextEditingController(text: widget.adresse);
-
-  @override
-  void dispose() {
-    _saisie.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ModaleAgri(
-      titre: 'Adresse du serveur',
-      largeur: LargeurModale.sm,
-      contenu: TextField(
-        key: const Key('login-adresse-serveur'),
-        controller: _saisie,
-        style: const TextStyle(fontSize: AgriTypography.xs),
-      ),
-      actions: [
-        BoutonModaleSecondaire(
-          libelle: 'Annuler',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        BoutonModalePrimaire(
-          libelle: 'Enregistrer',
-          onPressed: () => Navigator.of(context).pop(_saisie.text),
-        ),
-      ],
-    );
-  }
-}
-
-class _DialogueMotDePasseOublie extends StatelessWidget {
-  const _DialogueMotDePasseOublie();
-
-  @override
-  Widget build(BuildContext context) {
-    // ⚠️ Gabarit `max-w-sm` des modales d'information : le prototype n'a pas
-    // d'écran de mot de passe oublié au poste, la réinitialisation se faisant
-    // sur la surface web.
-    return ModaleAgri(
-      titre: 'Mot de passe oublié',
-      largeur: LargeurModale.sm,
-      contenu: const Text(
-        "La réinitialisation se fait par un lien envoyé sur votre adresse "
-        "e-mail professionnelle, depuis l'espace web AgriERP. Ce poste ne "
-        "peut pas l'envoyer lui-même.",
-        style: TextStyle(fontSize: AgriTypography.xs),
-      ),
-      actions: [
-        BoutonModaleSecondaire(
-          libelle: 'Fermer',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
-    );
-  }
-}
-
 class _PiedDePage extends StatelessWidget {
   const _PiedDePage();
 
@@ -885,7 +752,7 @@ class _PiedDePage extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(top: AgriSpacing.md),
       child: Text(
-        "© 2026 AgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — FAGUEZ SARL",
+        "© 2026 LogiAgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — FAGUEZ SARL",
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 10, color: AgriColors.outline),
       ),

@@ -4,7 +4,7 @@
     'title',
     'description' => null,
 ])
-<a href="{{ $href }}" {{ $attributes->class(['group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all']) }}>
+<a wire:navigate href="{{ $href }}" {{ $attributes->class(['group bg-white rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md hover:border-brand-emerald hover:shadow-md transition-all']) }}>
     <div class="w-12 h-12 rounded-lg bg-brand-emerald/10 flex items-center justify-center flex-shrink-0">
         <span class="material-symbols-outlined text-brand-emerald text-[24px]">{{ $icon }}</span>
     </div>

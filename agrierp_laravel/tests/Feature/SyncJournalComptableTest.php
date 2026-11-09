@@ -63,7 +63,7 @@ class SyncJournalComptableTest extends TestCase
 
         $this->utilisateur = User::create([
             'name' => 'Poste', 'username' => 'poste', 'email' => 'poste@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
     }
 
@@ -95,7 +95,7 @@ class SyncJournalComptableTest extends TestCase
         $role->givePermissionTo(['view-comptabilite', 'manage-comptabilite']);
         $compta = User::create([
             'name' => 'Compta', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $compta->assignRole($role);
         $this->actingAs($compta);

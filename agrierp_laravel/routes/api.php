@@ -31,7 +31,7 @@ Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
 
 // Ticket S3 — `CompteActif` : un compte désactivé sur le web perd aussitôt l'accès de ses postes.
-Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class, \App\Http\Middleware\ChangementMotDePasseObligatoireApi::class])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     // Ticket 15.9 : changement de mot de passe depuis le poste. Même limiteur
     // que la connexion : il vérifie lui aussi un mot de passe.
@@ -50,6 +50,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
 
     Route::post('/attestations', [AttestationController::class, 'generer'])
         ->middleware('throttle:30,1');
+    // ATT-3 : le poste fabrique le PDF ; le serveur attribue le numéro et journalise (idempotent par `id`).
+    Route::post('/attestations/emissions', [AttestationController::class, 'emission'])
+        ->middleware('throttle:60,1');
     Route::put('/attestation-templates/{type}', [AttestationController::class, 'enregistrerModele']);
 
     // Ticket 15.11 : « Contactez l'Éditeur » depuis le poste. Limité : chaque
@@ -68,6 +71,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
     // page 1 et ne finirait jamais. Compteur PROPRE, à 120 pages par minute (120 000 lignes au plus).
     Route::get('/sync/pull', [SyncController::class, 'pull'])->middleware('throttle:120,1,sync-pull');
     Route::post('/sync/push', [SyncController::class, 'push'])->middleware('throttle:30,1');
+    // Ticket AC-3 — le FICHIER d'un justificatif (achat ou dépense), envoyé par le poste APRÈS que l'enregistrement a été
+    // accepté par `/sync/push` : le contrat de push ne transporte aucun fichier.
+    Route::get('/sync/company-file/{genre}', [SyncController::class, 'fichierEntreprise'])->middleware('throttle:60,1');
+    Route::post('/sync/receipts', [SyncController::class, 'receipt'])->middleware('throttle:60,1');
 
     // Ticket S-T6 — demande de synchronisation déposée au web, lue par chaque poste toutes les 30 s ; comptes du
     // serveur pour le contrôle de cohérence. Compteurs de débit PROPRES (3e paramètre) : sans préfixe, tous les
@@ -88,4 +95,16 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class])->gr
         ->middleware('throttle:10,1,reinitialisation-bascule');
     Route::post('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'reinitialiser'])
         ->middleware('throttle:5,1,reinitialisation-execution');
+
+    // Tickets PA-1, PA-5, PA-6, PA-8 — gestes d'administration EN LIGNE depuis le poste (mêmes services et droits que le web).
+    Route::prefix('/parametres')->middleware('throttle:30,1,administration-en-ligne')->group(function () {
+        Route::post('/sessions/vider', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'viderSessions']);
+        Route::get('/postes', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'postes']);
+        Route::post('/postes/demander', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'demanderSynchronisation']);
+        Route::post('/postes/revoquer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'revoquerAppairage']);
+        Route::get('/sauvegardes', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'sauvegardes']);
+        Route::post('/sauvegardes/generer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'genererSauvegarde']);
+        Route::get('/sauvegardes/telecharger/{fichier}', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'telechargerSauvegarde']);
+        Route::post('/sauvegardes/importer', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'importerModule']);
+    });
 });

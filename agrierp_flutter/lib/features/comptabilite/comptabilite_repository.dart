@@ -1,5 +1,11 @@
+import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../core/comptabilite/exercice_choisi.dart';
+import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
+import '../../core/temps/heure_benin.dart';
 import 'etats_comparatifs.dart';
 import 'nature_compte.dart';
 import 'soldes_exercice.dart';
@@ -17,6 +23,24 @@ import 'soldes_exercice.dart';
   if (i < 0) return (brute.trim(), '');
   return (brute.substring(0, i).trim(), brute.substring(i + 1).trim());
 }
+
+/// Les neuf classes SYSCOHADA, libellés EXACTS du Blade (`PlanComptable::classLabels`) — un seul endroit pour le sélecteur de
+/// « Nouveau Compte », la colonne « Classe » de l'écran et le PDF du plan.
+const classesSyscohada = <(String, String)>[
+  ('1', '1 - Ressources'),
+  ('2', '2 - Immobilisations'),
+  ('3', '3 - Stocks'),
+  ('4', '4 - Tiers'),
+  ('5', '5 - Trésorerie'),
+  ('6', '6 - Charges'),
+  ('7', '7 - Produits'),
+  ('8', '8 - Autres'),
+  ('9', '9 - Hors bilan et analytique'),
+];
+
+/// « 6 - Charges » ; la classe seule si elle est hors 1 à 9 ; [inconnu] si elle est absente.
+String libelleClasse(int? classe, {String inconnu = '—'}) =>
+    classe == null ? inconnu : classesSyscohada.where((c) => c.$1 == '$classe').map((c) => c.$2).firstOrNull ?? '$classe';
 
 /// Une écriture du journal, avec ses lignes.
 class LigneJournal {
@@ -240,7 +264,12 @@ class DonneesComptabilite {
     required this.exercices,
     required this.journal,
     required this.lignesParEcriture,
+    this.demandes = const [],
   });
+
+  /// Ticket CP-2 — demandes d'écriture manuelle pas encore acquittées (`pending`) ou refusées (`conflict`), les plus récentes
+  /// d'abord.
+  final List<DemandeEcriture> demandes;
 
   /// Tickets EX1 / EX2 — règles R1 et R3 (`FinancialReportService` du serveur), sur le journal reçu.
   late final SoldesExercice soldesExercice = SoldesExercice(
@@ -696,15 +725,277 @@ class DonneesComptabilite {
 /// la génère lui-même. C'est ce qui garantit qu'aucun mouvement ne pèse sur les
 /// comptes sans avoir pesé sur le stock ou la caisse.
 class ComptabiliteRepository {
-  ComptabiliteRepository({required this.database});
+  ComptabiliteRepository({required this.database, this.deviceId = 'poste', Uuid? uuid, this.horloge}) : _uuid = uuid ?? const Uuid();
+
+  /// Horloge injectée (tests) : « exercice clos ou absent » se juge sur le jour du poste.
+  final DateTime Function()? horloge;
+
+  ExerciceDeSaisie get _exercice => ExerciceDeSaisie(database, maintenant: horloge ?? HeureBenin.maintenant);
 
   final AppDatabase database;
 
+  /// Ticket CP-1 — identifiant du poste, posé sur les comptes saisis ici.
+  final String deviceId;
+  final Uuid _uuid;
+
+  // ── Écritures manuelles (ticket CP-2) ─────────────────────────────────────
+
+  /// Borne basse du calendrier de « Saisie d'Écriture » : début du plus ancien exercice OUVERT connu, `null` si aucun.
+  Future<DateTime?> premierJourSaisissable() => _exercice.premierJour();
+
+  /// Règles de saisie de `JournalComptable::saveEntry` (un message par champ, ceux du web) ; vide si recevable. Le mois clôturé,
+  /// l'écriture verrouillée et le numéro restent jugés par le SERVEUR, qui refuse avec son motif.
+  Future<Map<String, String>> validerEcriture({
+    required DateTime? date,
+    required String libelle,
+    required String debitId,
+    required String creditId,
+    required String montant,
+  }) async {
+    final e = <String, String>{};
+    if (date == null) {
+      e['entryDate'] = "Le champ date de l'écriture est obligatoire.";
+    } else {
+      try {
+        await _exercice.refuser(date);
+      } on RefusExercice catch (r) {
+        e['entryDate'] = r.motif;
+      }
+    }
+    if (libelle.trim().isEmpty) {
+      e['label'] = 'Le champ libellé est obligatoire.';
+    } else if (libelle.trim().length > 255) {
+      e['label'] = 'Le champ libellé ne doit pas dépasser 255 caractères.';
+    }
+    if (debitId.isEmpty) e['debitAccountId'] = 'Le champ compte à débiter est obligatoire.';
+    if (creditId.isEmpty) {
+      e['creditAccountId'] = 'Le champ compte à créditer est obligatoire.';
+    } else if (creditId == debitId) {
+      e['creditAccountId'] = 'Le compte à créditer doit être différent du compte à débiter.';
+    }
+    final m = double.tryParse(montant.trim().replaceAll(',', '.'));
+    if (montant.trim().isEmpty) {
+      e['amount'] = 'Le champ montant est obligatoire.';
+    } else if (m == null) {
+      e['amount'] = 'Le champ montant doit être un nombre.';
+    } else if (m < 1) {
+      e['amount'] = 'Le champ montant doit être au moins 1.';
+    }
+    return e;
+  }
+
+  /// « Saisie d'Écriture » : écrit la DEMANDE (`pending`) ; le serveur écrit l'écriture, la numérote `OD-AAAA-NNNN` et la rend au
+  /// tirage. Refuse AVANT d'écrire ([validerEcriture]).
+  Future<ManualEntryRequest> creerEcriture({
+    required DateTime? date,
+    required String libelle,
+    required String debitId,
+    required String creditId,
+    required String montant,
+  }) async {
+    final refus = await validerEcriture(date: date, libelle: libelle, debitId: debitId, creditId: creditId, montant: montant);
+    if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
+
+    return _ecrireDemande(
+      action: 'creer',
+      date: date,
+      libelle: libelle,
+      debitId: debitId,
+      creditId: creditId,
+      montant: double.parse(montant.trim().replaceAll(',', '.')),
+    );
+  }
+
+  /// « Modifier » une écriture : demande de remplacement de ses deux lignes (date, libellé, comptes, montant).
+  Future<ManualEntryRequest> modifierEcriture(
+    String ecritureId, {
+    required DateTime? date,
+    required String libelle,
+    required String debitId,
+    required String creditId,
+    required String montant,
+  }) async {
+    final interdit = await _motifEcritureIntouchable(ecritureId, 'modifiée');
+    if (interdit != null) throw SaisieCompteRefusee({'formulaire': interdit});
+    final refus = await validerEcriture(date: date, libelle: libelle, debitId: debitId, creditId: creditId, montant: montant);
+    if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
+
+    return _ecrireDemande(
+      action: 'modifier',
+      entryId: ecritureId,
+      date: date,
+      libelle: libelle,
+      debitId: debitId,
+      creditId: creditId,
+      montant: double.parse(montant.trim().replaceAll(',', '.')),
+    );
+  }
+
+  /// « Archiver » une écriture : demande d'archivage (mêmes refus que la modification).
+  Future<ManualEntryRequest> archiverEcriture(String ecritureId) async {
+    final interdit = await _motifEcritureIntouchable(ecritureId, 'archivée');
+    if (interdit != null) throw SaisieCompteRefusee({'formulaire': interdit});
+
+    return _ecrireDemande(action: 'archiver', entryId: ecritureId);
+  }
+
+  /// Ce qui interdit de toucher une écriture (`AccountingEntryService::verifierModifiable`) et que le poste sait déjà : à-nouveau,
+  /// écriture verrouillée, demande déjà en attente, écriture de plus de deux lignes (la modale ne sait en représenter que deux).
+  Future<String?> _motifEcritureIntouchable(String ecritureId, String geste) async {
+    final e = await (database.select(database.accountingEntries)..where((x) => x.id.equals(ecritureId))).getSingleOrNull();
+    if (e == null) return 'Écriture inconnue — synchronisez le poste.';
+    if (e.sourceType == 'ran' || e.sourceType == 'ran_reversal') {
+      final annee = e.entryDate.year;
+      return "L'écriture d'à-nouveau de l'exercice $annee est verrouillée : elle ne se modifie ni ne s'archive. Pour la corriger, rouvrez l'exercice ${annee - 1}.";
+    }
+    if (e.isLocked) return 'Cette écriture est verrouillée (exercice clôturé) et ne peut plus être $geste.';
+    final deja = await (database.select(database.manualEntryRequests)
+          ..where((d) => d.entryId.equals(ecritureId) & d.syncStatus.equalsValue(SyncStatus.synced).not()))
+        .get();
+    if (deja.isNotEmpty) return 'Une demande est déjà en attente pour cette écriture : synchronisez le poste avant de la retoucher.';
+    final lignes = await (database.select(database.accountingEntryLines)..where((l) => l.entryId.equals(ecritureId))).get();
+    if (lignes.length != 2 || lignes.where((l) => l.debit > 0).length != 1 || lignes.where((l) => l.credit > 0).length != 1) {
+      return 'Cette écriture compte plus d\'un débit ou d\'un crédit : elle ne se retouche pas depuis la saisie d\'écriture.';
+    }
+    return null;
+  }
+
+  Future<ManualEntryRequest> _ecrireDemande({
+    required String action,
+    String? entryId,
+    DateTime? date,
+    String? libelle,
+    String? debitId,
+    String? creditId,
+    double? montant,
+  }) async {
+    final id = _uuid.v4();
+    await database.into(database.manualEntryRequests).insert(
+      ManualEntryRequestsCompanion.insert(
+        id: id,
+        deviceId: deviceId,
+        updatedAt: HeureBenin.maintenant(),
+        action: action,
+        entryId: Value(entryId),
+        entryDate: Value(date),
+        label: Value(libelle?.trim()),
+        debitAccountId: Value(debitId),
+        creditAccountId: Value(creditId),
+        amount: Value(montant),
+      ),
+    );
+    return (await (database.select(database.manualEntryRequests)..where((d) => d.id.equals(id))).getSingle());
+  }
+
+  // ── Plan comptable (ticket CP-1) ──────────────────────────────────────────
+
+  /// Motif du serveur (`PlanComptableService::MOTIF_COMPTE_UTILISE`), reproduit tel quel.
+  static const motifCompteUtilise = "Impossible d'archiver : ce compte est déjà utilisé dans au moins une écriture comptable.";
+
+  /// Règles de saisie de `PlanComptable::saveAccount` (via `PlanComptableService::regles`), un message par champ ; vide si
+  /// recevable. [idModifie] : le compte en cours de modification (son numéro ne compte pas comme doublon).
+  Future<Map<String, String>> validerCompte({
+    required String code,
+    required String libelle,
+    required String classe,
+    String? idModifie,
+  }) async {
+    final e = <String, String>{};
+    final numero = code.trim();
+    if (numero.isEmpty) {
+      e['code'] = 'Le champ numéro de compte est obligatoire.';
+    } else if (numero.length > 20) {
+      e['code'] = 'Le champ numéro de compte ne doit pas dépasser 20 caractères.';
+    } else {
+      final pris = await (database.select(database.chartOfAccounts)
+            ..where((c) => c.code.equals(numero) & (idModifie == null ? const Constant(true) : c.id.equals(idModifie).not())))
+          .get();
+      if (pris.isNotEmpty) e['code'] = 'La valeur du champ numéro de compte existe déjà.';
+    }
+    if (libelle.trim().isEmpty) {
+      e['label'] = 'Le champ intitulé est obligatoire.';
+    } else if (libelle.trim().length > 255) {
+      e['label'] = 'Le champ intitulé ne doit pas dépasser 255 caractères.';
+    }
+    final n = int.tryParse(classe.trim());
+    if (classe.trim().isEmpty) {
+      e['class'] = 'Le champ classe est obligatoire.';
+    } else if (n == null || n < 1 || n > 9) {
+      e['class'] = 'Le champ classe doit être compris entre 1 et 9.';
+    }
+    return e;
+  }
+
+  /// « Nouveau Compte » : écrit le compte LOCALEMENT (`pending`) ; le serveur le crée (`PlanComptableService::creer`).
+  /// Refuse AVANT d'écrire ([validerCompte]).
+  Future<ChartOfAccount> creerCompte({required String code, required String libelle, required String classe}) async {
+    final refus = await validerCompte(code: code, libelle: libelle, classe: classe);
+    if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
+
+    final id = _uuid.v4();
+    await database.into(database.chartOfAccounts).insert(
+      ChartOfAccountsCompanion.insert(
+        id: id,
+        deviceId: Value(deviceId),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.maintenant()),
+        code: code.trim(),
+        label: libelle.trim(),
+        accountClass: Value(int.parse(classe.trim())),
+      ),
+    );
+    return (await compte(id))!;
+  }
+
+  /// « Modifier le Compte » : numéro, intitulé, classe (la fiche repasse `pending`).
+  Future<ChartOfAccount> modifierCompte(String id, {required String code, required String libelle, required String classe}) async {
+    if (await compte(id) == null) throw const SaisieCompteRefusee({'formulaire': 'Compte inconnu — synchronisez le poste.'});
+    final refus = await validerCompte(code: code, libelle: libelle, classe: classe, idModifie: id);
+    if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
+
+    await (database.update(database.chartOfAccounts)..where((c) => c.id.equals(id))).write(
+      ChartOfAccountsCompanion(
+        code: Value(code.trim()),
+        label: Value(libelle.trim()),
+        accountClass: Value(int.parse(classe.trim())),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.maintenant()),
+      ),
+    );
+    return (await compte(id))!;
+  }
+
+  /// « Archiver » : refusé si une écriture cite le compte (motif du web), sinon `is_active = false` et la fiche repasse `pending`.
+  Future<void> archiverCompte(String id) async {
+    final c = await compte(id);
+    if (c == null || !c.isActive) return;
+
+    final utilise = await (database.select(database.accountingEntryLines)..where((l) => l.accountId.equals(id))..limit(1)).get();
+    if (utilise.isNotEmpty) throw const SaisieCompteRefusee({'formulaire': motifCompteUtilise});
+
+    await (database.update(database.chartOfAccounts)..where((x) => x.id.equals(id))).write(
+      ChartOfAccountsCompanion(
+        isActive: const Value(false),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(HeureBenin.maintenant()),
+      ),
+    );
+  }
+
+  Future<ChartOfAccount?> compte(String id) =>
+      (database.select(database.chartOfAccounts)..where((c) => c.id.equals(id))).getSingleOrNull();
+
   Future<DonneesComptabilite> charger() async {
     final comptes = await database.select(database.chartOfAccounts).get();
+    final comptesActifs = comptes.where((c) => c.isActive).toList();
     final exercices = await database.select(database.fiscalYears).get();
     final ecritures = await database.select(database.accountingEntries).get();
     final lignes = await database.select(database.accountingEntryLines).get();
+    final demandesEnAttente = await (database.select(database.manualEntryRequests)
+          ..where((d) => d.syncStatus.equalsValue(SyncStatus.synced).not())
+          ..orderBy([(d) => OrderingTerm.desc(d.updatedAt)]))
+        .get();
+    final refus = {for (final c in await database.select(database.syncConflicts).get()) c.id: c.reason};
 
     final parCompte = {for (final c in comptes) c.id: c};
 
@@ -714,7 +1005,14 @@ class ComptabiliteRepository {
     }
 
     return DonneesComptabilite(
-      comptes: comptes.toList()..sort((a, b) => a.code.compareTo(b.code)),
+      demandes: [
+        for (final d in demandesEnAttente)
+          DemandeEcriture(
+            demande: d,
+            motifRefus: d.syncStatus == SyncStatus.conflict ? refus['manual_entry_requests:${d.id}'] : null,
+          ),
+      ],
+      comptes: comptesActifs..sort((a, b) => a.code.compareTo(b.code)),
       exercices: exercices.toList()..sort((a, b) => b.year.compareTo(a.year)),
       lignesParEcriture: parEcriture,
       journal:
@@ -730,4 +1028,32 @@ class ComptabiliteRepository {
               .toList(),
     );
   }
+}
+
+/// Ticket CP-1 — saisie d'un compte refusée AVANT d'être écrite : un message par champ (`code`, `label`, `class`) ou un
+/// message général (`formulaire`), ceux du web.
+class SaisieCompteRefusee implements Exception {
+  const SaisieCompteRefusee(this.erreurs);
+
+  final Map<String, String> erreurs;
+
+  @override
+  String toString() => erreurs.values.join(' ');
+}
+
+/// Ticket CP-2 — une demande d'écriture manuelle pas encore jouée par le serveur : en attente d'envoi, ou refusée avec son motif.
+class DemandeEcriture {
+  const DemandeEcriture({required this.demande, this.motifRefus});
+
+  final ManualEntryRequest demande;
+  final String? motifRefus;
+
+  bool get refusee => demande.syncStatus == SyncStatus.conflict;
+
+  /// Le geste, en toutes lettres.
+  String get geste => switch (demande.action) {
+    'modifier' => 'Modification',
+    'archiver' => 'Archivage',
+    _ => 'Écriture',
+  };
 }

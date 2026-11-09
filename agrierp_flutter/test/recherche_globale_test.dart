@@ -54,7 +54,9 @@ void main() {
     String domaines(List<DomaineRecherche> d) => d.map((x) => x.cle).join(',');
     expect(domaines(await depot.rechercher('oeu', 'caissier')), 'commercial');
     expect(domaines(await depot.rechercher('oeu', 'animalier')), 'elevage');
-    expect(domaines(await depot.rechercher('oeu', 'comptable')), '');
+    // Ticket CONF-4 (DV-20) : le comptable LIT les ventes (`view-ventes`), les achats et les stocks (`view-achats`, `view-stocks`) :
+    // ces deux domaines lui sont interrogés, comme au web (`GlobalSearch`). L'élevage ne l'est JAMAIS (ni `view-elevage`).
+    expect(domaines(await depot.rechercher('oeu', 'comptable')), 'commercial,achats_stocks');
   });
 
   test('libellés des domaines et placeholder : ceux du web', () {

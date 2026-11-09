@@ -31,8 +31,10 @@
 
             <div class="space-y-xs">
                 <a href="{{ route('ventes.creances-hub') }}?tab=liste" class="block w-full py-sm rounded-lg border border-outline-variant text-xs font-bold text-brand-forest hover:bg-surface-zebra">Modifier la fiche</a>
+                @can('manage-ventes')
                 <button type="button" wire:click="openGlobalRegularisation" class="w-full py-sm rounded-lg bg-brand-emerald text-white text-xs font-bold hover:bg-brand-forest">Enregistrer un règlement</button>
                 <button type="button" wire:click="sendQuickReminder" class="w-full py-sm rounded-lg border border-brand-emerald text-brand-emerald text-xs font-bold hover:bg-brand-emerald/5">Envoyer une relance rapide</button>
+                @endcan
             </div>
         </div>
 
@@ -79,7 +81,9 @@
                                 <td class="py-xs">{{ $r->due_date->format('d/m/Y') }}</td>
                                 <td class="py-xs text-error-deep font-bold">{{ $r->due_date->diffInDays(now()) }} jours</td>
                                 <td class="py-xs text-right font-bold text-error-deep">{{ number_format($r->balance, 0, ',', ' ') }}</td>
+                                @can('manage-ventes')
                                 <td class="py-xs text-right"><button type="button" wire:click="openReceivableRegularisation('{{ $r->id }}')" class="text-brand-emerald text-[11px] font-bold hover:underline">Régler</button></td>
+                                @endcan
                             </tr>
                         @empty
                             <tr><td colspan="5" class="py-md text-center text-outline">Aucune créance en cours.</td></tr>
@@ -110,6 +114,8 @@
                                         <span class="inline-flex items-center gap-1 text-brand-emerald font-bold"><span class="material-symbols-outlined text-[14px]">chat</span>WhatsApp</span>
                                     @elseif($reminder->channel === 'email')
                                         <span class="inline-flex items-center gap-1 text-info-blue font-bold"><span class="material-symbols-outlined text-[14px]">mail</span>Email</span>
+                                    @elseif($reminder->channel === 'appel')
+                                        <span class="inline-flex items-center gap-1 text-brand-forest font-bold"><span class="material-symbols-outlined text-[14px]">call</span>Appel</span>
                                     @else
                                         <span class="inline-flex items-center gap-1 text-outline font-bold"><span class="material-symbols-outlined text-[14px]">sms</span>SMS</span>
                                     @endif

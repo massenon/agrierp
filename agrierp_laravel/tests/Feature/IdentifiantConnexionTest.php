@@ -32,7 +32,7 @@ class IdentifiantConnexionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     protected function setUp(): void
     {
@@ -129,7 +129,7 @@ class IdentifiantConnexionTest extends TestCase
             ->set('username', '')
             ->set('email', 'caisse2@fermeolouwachegoun.com')
             ->set('role', 'comptable')
-            ->set('password', 'AgriERP@2026')
+            ->set('password', 'LogiAgriERP@2026')
             ->call('saveUser')
             ->assertHasErrors('username');
     }
@@ -149,7 +149,7 @@ class IdentifiantConnexionTest extends TestCase
             ->set('username', 'compta@fermeolouwachegoun.com')
             ->set('email', 'piege@fermeolouwachegoun.com')
             ->set('role', 'comptable')
-            ->set('password', 'AgriERP@2026')
+            ->set('password', 'LogiAgriERP@2026')
             ->call('saveUser')
             ->assertHasErrors('username');
     }
@@ -164,7 +164,7 @@ class IdentifiantConnexionTest extends TestCase
             ->set('username', 'admin')
             ->set('email', 'doublon@fermeolouwachegoun.com')
             ->set('role', 'comptable')
-            ->set('password', 'AgriERP@2026')
+            ->set('password', 'LogiAgriERP@2026')
             ->call('saveUser')
             ->assertHasErrors('username');
     }
@@ -182,13 +182,13 @@ class IdentifiantConnexionTest extends TestCase
             ->set('username', 'caisse2')
             ->set('email', 'caisse2@fermeolouwachegoun.com')
             ->set('role', 'comptable')
-            ->set('password', 'AgriERP@2026')
+            ->set('password', 'LogiAgriERP@2026')
             ->call('saveUser')
             ->assertHasNoErrors();
 
         auth()->logout();
 
-        $this->connecter('caisse2', 'AgriERP@2026');
+        $this->connecter('caisse2', 'LogiAgriERP@2026');
 
         $this->assertTrue(auth()->check());
         $this->assertEquals('caisse2', auth()->user()->username);

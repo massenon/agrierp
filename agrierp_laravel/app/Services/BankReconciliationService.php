@@ -277,8 +277,13 @@ class BankReconciliationService
      *
      * @return array{imported: int, skipped: int}
      */
-    public function importCsv(string $accountId, string $contents): array
+    public function importCsv(string $accountId, string $contents, ?string $importId = null): array
     {
+        // Ticket CP-5 — un import déjà joué (même UUID de poste) n'est pas rejoué : ses lignes existent déjà.
+        if ($importId !== null && BankStatementLine::where('import_id', $importId)->exists()) {
+            return ['imported' => BankStatementLine::where('import_id', $importId)->count(), 'skipped' => 0];
+        }
+
         $imported = 0;
         $skipped = 0;
 
@@ -324,12 +329,14 @@ class BankReconciliationService
                 continue;
             }
 
-            BankStatementLine::create([
+            $ligneReleve = new BankStatementLine([
                 'account_id' => $accountId,
                 'statement_date' => $date,
                 'label' => $label !== '' ? mb_substr($label, 0, 255) : 'Opération bancaire',
                 'amount' => (float) $montant,
             ]);
+            $ligneReleve->import_id = $importId;
+            $ligneReleve->save();
 
             $imported++;
         }

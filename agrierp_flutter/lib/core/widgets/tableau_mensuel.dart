@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../theme/agri_tokens.dart';
@@ -142,16 +144,18 @@ class TableauMensuel extends StatelessWidget {
             // ⚠️ DÉFILEMENT HORIZONTAL PROPRE : jusqu'à treize colonnes sur la
             // fiche Lapins. Les laisser déborder rognerait les dernières sans
             // que rien ne le signale.
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: _largeurTotale(),
-                child: Column(
-                  children: [
-                    _rangeeGroupes(),
-                    _rangeeColonnes(),
-                    for (var i = 0; i < nombreDeJours; i++) _ligne(i),
-                  ],
+            LayoutBuilder(
+              builder: (_, contraintes) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: max(_largeurTotale(), contraintes.maxWidth),
+                  child: Column(
+                    children: [
+                      _rangeeGroupes(),
+                      _rangeeColonnes(),
+                      for (var i = 0; i < nombreDeJours; i++) _ligne(i),
+                    ],
+                  ),
                 ),
               ),
             ),

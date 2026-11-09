@@ -5,7 +5,7 @@
                 <div class="flex items-center gap-sm mb-sm">
                     <span class="material-symbols-outlined text-brand-emerald" style="font-size:32px;">checklist</span>
                     <div>
-                        <h3 class="font-bold text-lg text-brand-forest">Bienvenue dans AgriERP</h3>
+                        <h3 class="font-bold text-lg text-brand-forest">Bienvenue dans LogiAgriERP</h3>
                         <p class="text-xs text-outline">Ce qu'il faut en place avant la première saisie — constaté dans la base, pas à cocher.</p>
                     </div>
                 </div>

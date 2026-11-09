@@ -48,7 +48,7 @@ class CycleAvoirComptableTest extends TestCase
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
 
         $user = User::create([
-            'name' => 'Caissière', 'email' => 'avoir@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Caissière', 'email' => 'avoir@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);
@@ -88,7 +88,6 @@ class CycleAvoirComptableTest extends TestCase
             'total' => 59_000,
             'delivery_fee' => 0,
             'status' => 'validee',
-            'mecef_status' => 'transmise',
         ]);
 
         SaleLine::create([
@@ -98,6 +97,10 @@ class CycleAvoirComptableTest extends TestCase
             'unit_price' => 5_900,
             'manual_total_amount' => 59_000,
         ]);
+
+        // MECEF-1 : une facture normalisée est figée — ses lignes se posent AVANT la normalisation du fixture.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $this->vente->id)->update(['mecef_status' => 'transmise']);
+        $this->vente->refresh();
 
         app(\App\Actions\RecordSaleAccountingEntryAction::class)->execute($this->vente->fresh('lines'));
     }
@@ -264,7 +267,7 @@ class CycleAvoirComptableTest extends TestCase
     public function test_a_read_only_user_can_neither_create_nor_settle_a_credit_note(): void
     {
         $lecteur = User::create([
-            'name' => 'Observateur', 'email' => 'lecture-ventes@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'),
+            'name' => 'Observateur', 'email' => 'lecture-ventes@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $lectureSeule = Role::findOrCreate('observateur', 'web');
         $lectureSeule->givePermissionTo('view-ventes');

@@ -52,7 +52,7 @@ class LoginLogoutTest extends DuskTestCase
         $this->browse(function (Browser $browser) {
             $browser->visit('/login')
                 ->type('identifiant', 'admin')
-                ->type('password', 'AgriERP@2026')
+                ->type('password', 'LogiAgriERP@2026')
                 ->press('@login-submit')
                 ->waitForLocation('/dashboard', 10)
                 ->assertPathIs('/dashboard')

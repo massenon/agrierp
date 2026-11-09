@@ -37,7 +37,7 @@ class DemoUsersSeeder extends Seeder
                 [
                     'name' => $account['name'],
                     'email' => $account['email'],
-                    'password' => Hash::make('AgriERP@2026'),
+                    'password' => Hash::make('LogiAgriERP@2026'),
                     'email_verified_at' => now(),
                     'is_active' => true,
                 ]

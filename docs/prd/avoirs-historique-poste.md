@@ -41,7 +41,7 @@ Voir l'écran : `view-ventes` (admin, caissier). Écrire (retour, « traité »,
 - Sans réseau : tout s'enregistre ; le ticket PDF exige le réseau (produit par le serveur).
 
 ## 7. Interface
-Voir `docs/AUDIT_FIDELITE_ECRANS.md` § 11 (écarts et ÉCARTS ASSUMÉS : numéro « — » d'une demande non reçue, mention « Non envoyé », toasts qui ne promettent pas un effet pas encore fait, ticket PDF enregistré dans Documents\AgriERP).
+Voir `docs/AUDIT_FIDELITE_ECRANS.md` § 11 (écarts et ÉCARTS ASSUMÉS : numéro « — » d'une demande non reçue, mention « Non envoyé », toasts qui ne promettent pas un effet pas encore fait, ticket PDF enregistré dans Documents\LogiAgriERP).
 
 ## 8. Hors périmètre
 Imputation de l'avoir sur la créance du client, remboursement (trésorerie), contre-passation d'une vente annulée, export Excel / PDF en masse de l'historique : **le web ne le fait pas** (article 0) — ils se construisent d'abord au web (questions ci-dessous).

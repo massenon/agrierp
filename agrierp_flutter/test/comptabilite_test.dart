@@ -1,6 +1,8 @@
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_repository.dart';
+import 'package:agrierp/features/comptabilite/immobilisations_repository.dart';
+import 'package:agrierp/features/comptabilite/rapprochement_repository.dart';
 import 'package:agrierp/features/comptabilite/comptabilite_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -139,6 +141,8 @@ void main() {
       MaterialApp(
         home: ComptabiliteScreen(
           depot: depot,
+          depotImmobilisations: ImmobilisationsRepository(database: db),
+          depotRapprochement: RapprochementRepository(database: db),
           maintenant: maintenant == null ? DateTime.now : () => maintenant,
         ),
       ),
@@ -472,18 +476,16 @@ void main() {
       );
     });
 
-    /// ⚠️⚠️ Une écriture saisie à la main ne pèserait ni sur le stock ni sur
-    /// la caisse : la saisie reste sur le web.
-    testWidgets('⚠️⚠️ le journal dit pourquoi il ne se saisit pas ici', (
+    /// Ticket CP-2 — la saisie manuelle est PORTÉE (en demande, jouée par le serveur) : le bouton du Blade est là et l'ancienne
+    /// mention « la saisie reste sur le web » a disparu.
+    testWidgets('⚠️⚠️ le journal offre « Saisie d\'Écriture » et ne renvoie plus au web', (
       tester,
     ) async {
       await afficher(tester);
       await ouvrir(tester, PageComptable.journal);
 
-      expect(
-        find.textContaining("Une écriture naît d'une opération"),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('journal-saisie-ecriture')), findsOneWidget);
+      expect(find.textContaining("Une écriture naît d'une opération"), findsNothing);
     });
 
     testWidgets('le grand livre porte les six colonnes de la maquette', (
@@ -584,24 +586,14 @@ void main() {
       );
     });
 
-    /// ⚠️⚠️ QUATRE PAGES RESTENT SUR LE WEB, chacune avec SA raison (cinq avant EX8 : les États Financiers sont
+    /// ⚠️⚠️ TROIS PAGES RESTENT SUR LE WEB, chacune avec SA raison (quatre avant CP-5, cinq avant EX8 : les États Financiers sont
     /// embarqués).
     testWidgets('⚠️⚠️ chaque page non embarquée porte son propre motif', (
       tester,
     ) async {
       await afficher(tester);
-      // Sur le hub, seules ces pages disent « Consultation sur la surface web » (plus les États Financiers).
-      expect(
-        find.text('Consultation sur la surface web'),
-        findsNWidgets(_ComptabiliteMotifs.attendus.length),
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('carte-etatsFinanciers')),
-          matching: find.text('Consultation sur la surface web'),
-        ),
-        findsNothing,
-      );
+      // Sur le hub, la carte ne porte que titre + description (comme le web) : le motif se lit en ouvrant la page.
+      expect(find.text('Consultation sur la surface web'), findsNothing);
 
       for (final entree in _ComptabiliteMotifs.attendus.entries) {
         await ouvrir(tester, entree.key);
@@ -628,9 +620,9 @@ void main() {
 /// Financiers sont embarqués (`comparatif_n_moins_un_parite_test.dart`).
 class _ComptabiliteMotifs {
   static const attendus = <PageComptable, String>{
-    PageComptable.cloture: "hors du contrat de synchronisation",
+    PageComptable.cloture: "le poste en écrit la demande",
     PageComptable.analytique: 'centres de coût',
     PageComptable.tva: 'pièce fiscale',
-    PageComptable.rapprochement: 'RELEVÉ de banque',
+    // Ticket CP-5 : le rapprochement bancaire est embarqué (page `RapprochementPage`).
   };
 }

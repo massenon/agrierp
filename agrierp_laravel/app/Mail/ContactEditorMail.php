@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  * DÉCISION DOCUMENTÉE : aucune table `contact_messages`/`bug_reports`
  * n'existe dans le schéma documenté (26 tables, `FULL_MIGRATIONS_DATABASE.md`)
  * — un formulaire "Contactez l'Éditeur" est par nature un envoi ponctuel,
- * pas une donnée d'exploitation à conserver dans AgriERP. Implémenté par
+ * pas une donnée d'exploitation à conserver dans LogiAgriERP. Implémenté par
  * envoi d'e-mail réel (`Mail::send`) vers l'éditeur (FAGUEZ SARL), plutôt
  * que par une table dédiée — aucun changement de schéma nécessaire.
  * `MAIL_MAILER=log` en développement (`.env.example`, Sprint 0) : les
@@ -41,8 +41,8 @@ class ContactEditorMail extends Mailable
     public function envelope(): Envelope
     {
         $subject = $this->payload['type'] === 'bug'
-            ? 'AgriERP — Signalement de bug : '.($this->payload['module'] ?? 'Non précisé')
-            : 'AgriERP — Message : '.($this->payload['subject'] ?? 'Sans objet');
+            ? 'LogiAgriERP — Signalement de bug : '.($this->payload['module'] ?? 'Non précisé')
+            : 'LogiAgriERP — Message : '.($this->payload['subject'] ?? 'Sans objet');
 
         return new Envelope(
             subject: $subject,

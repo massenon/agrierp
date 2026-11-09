@@ -96,9 +96,11 @@ void main() {
     expect(envoyees, isNot(contains('accounting_entry_id')));
   }, skip: saut);
 
-  test('le droit d\'écriture et de lecture de la table : `manage-ventes` à l\'envoi, `view-ventes` au tirage', () {
+  test('le droit d\'écriture et de lecture de la table : `avoir-client` (manage-ventes OU correct-invoices, CONF-4) à l\'envoi, `view-ventes` au tirage', () {
     final source = controleur.readAsStringSync();
-    expect(source, contains("'credit_notes' => 'manage-ventes',"));
+    // CONF-4 (DV-20) : le comptable envoie ses avoirs sans caisse ; `sales` (donc l'annulation) reste à `manage-ventes` seul.
+    expect(source, contains("'credit_notes' => 'avoir-client',"));
+    expect(source, contains("'sales' => 'manage-ventes',"));
     expect(source, contains("'credit_notes' => ['view-ventes'],"));
   }, skip: saut);
 

@@ -5,7 +5,6 @@ namespace App\Livewire\Auth;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -45,7 +44,7 @@ use Livewire\Component;
  *    00 §4) — nécessaire pour ne pas laisser le mécanisme d'envoi de lien
  *    sans destination (Document 00 §2.2, zéro fonctionnalité inachevée).
  *    Ajoutée en tant que `Livewire\Auth\ResetPassword`, minimale, stylée
- *    cohérence AgriERP — À VALIDER explicitement avec le promoteur au
+ *    cohérence LogiAgriERP — À VALIDER explicitement avec le promoteur au
  *    prochain point de synchronisation, puisqu'elle sort du périmètre
  *    strict des 94 pages recensées.
  * 6. Journalisation d'audit de connexion (`AuditLog::record('login', 'auth')`)
@@ -90,8 +89,6 @@ class Login extends Component
     public string $password = '';
 
     public bool $remember = false;
-
-    public string $forgotEmail = '';
 
     public ?int $lockedSecondsRemaining = null;
 
@@ -175,22 +172,6 @@ class Login extends Component
         ]);
 
         $this->redirect(session()->pull('url.intended', route('dashboard.index')), navigate: false);
-    }
-
-    public function sendResetLink(): void
-    {
-        $this->validate([
-            'forgotEmail' => ['required', 'email'],
-        ], [], ['forgotEmail' => 'adresse e-mail']); // U5 : « Le champ adresse e-mail… », pas « Le champ l'adresse… »
-
-        // Le statut réel n'est jamais exposé à l'utilisateur (prévention
-        // d'énumération de comptes, Document 06 §12) — même message de
-        // succès que l'e-mail existe en base ou non.
-        Password::sendResetLink(['email' => $this->forgotEmail]);
-
-        $this->reset('forgotEmail');
-        $this->dispatch('close-modal', name: 'forgot-password');
-        $this->dispatch('toast', message: 'Lien de réinitialisation envoyé.', type: 'success');
     }
 
     /**

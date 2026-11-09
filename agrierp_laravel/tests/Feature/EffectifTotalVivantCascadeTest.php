@@ -16,6 +16,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Feature\Concerns\AvecDepartPondeuses;
 use Tests\TestCase;
 
 /**
@@ -34,6 +35,7 @@ use Tests\TestCase;
 class EffectifTotalVivantCascadeTest extends TestCase
 {
     use RefreshDatabase;
+    use AvecDepartPondeuses;
 
     private const J1 = '2026-10-13';
 
@@ -54,7 +56,7 @@ class EffectifTotalVivantCascadeTest extends TestCase
         $admin = User::create([
             'name' => 'Directeur', 'username' => 'admin',
             'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');
         $this->actingAs($admin);
@@ -93,14 +95,19 @@ class EffectifTotalVivantCascadeTest extends TestCase
     {
         $lot = $this->bande('AVI-REP-01', 'reproduction', 60);
 
+        // VOL-1 : le départ par catégorie est exigé avant toute journée (J1) ; une fiche d'avant J1 n'est plus saisissable.
         $fiche = Livewire::test(FicheReproducteurs::class)
             ->set('selectedLotId', $lot->id)
+            ->call('loadDay', self::J1)
+            ->set('departRepro', 60)->set('departJeune', 0)->set('departSevre', 0)
+            ->call('saveDay')
             ->call('loadDay', self::J2)
             ->set('poussinsNes', 10)
             ->call('saveDay');
 
         $this->assertSame(70, (int) $lot->fresh()->current_quantity);
 
+        // J1 corrigé APRÈS J2 : 5 morts de Reproducteur.
         $fiche->call('loadDay', self::J1)
             ->set('mortRepro', 5)
             ->call('saveDay');
@@ -111,7 +118,7 @@ class EffectifTotalVivantCascadeTest extends TestCase
     }
 
     /**
-     * Bande de ponte de 200. J2 : 4 morts → 196. Puis J1 : 6 morts.
+     * Bande de ponte de 200 (VOL-2 : départ « Pondeuse » 200 à J1). J2 : 4 morts → 196. Puis J1 : 6 morts.
      * J1 = 194 ; J2 recalculé = 190 ; bande = 190.
      */
     public function test_pondeuses_une_fiche_anterieure_recalcule_les_jours_suivants(): void
@@ -119,14 +126,17 @@ class EffectifTotalVivantCascadeTest extends TestCase
         $lot = $this->bande('AVI-PON-01', 'ponte', 200);
 
         $fiche = Livewire::test(FichePondeuses::class)
+            ->call('loadDay', self::J1)
+            ->set('departPondeuse', 200)->set('departPoulette', 0)->set('departPoussinCroissance', 0)->set('departPoussinPonte', 0)
+            ->call('saveDay')
             ->call('loadDay', self::J2)
-            ->set('mortRepro', 4)
+            ->set('mortPondeuse', 4)
             ->call('saveDay');
 
         $this->assertSame(196, (int) $lot->fresh()->current_quantity);
 
         $fiche->call('loadDay', self::J1)
-            ->set('mortRepro', 6)
+            ->set('mortPondeuse', 6)
             ->call('saveDay');
 
         $this->assertSame(194, $this->effectifDuJour($lot, self::J1));
@@ -140,7 +150,9 @@ class EffectifTotalVivantCascadeTest extends TestCase
      */
     public function test_enregistrer_sujets_une_entree_antidatee_recalcule_la_bande(): void
     {
-        $lot = $this->bande('AVI-REP-02', 'reproduction', 60);
+        // VOL-1 / VOL-2 : toute bande d'aviculture exige son départ avant la première entrée ; il est posé à J1 (60 « Pondeuse »).
+        $lot = $this->bande('AVI-REP-02', 'ponte', 60);
+        $this->departPondeuses($lot, self::J1);
 
         $saisie = fn (string $jour, int $quantite) => Livewire::test(EnregistrerSujets::class)
             ->set('species_id', $this->aviculture->id)
@@ -172,6 +184,9 @@ class EffectifTotalVivantCascadeTest extends TestCase
 
         Livewire::test(FicheReproducteurs::class)
             ->set('selectedLotId', $repro->id)
+            ->call('loadDay', self::J1)
+            ->set('departRepro', 60)->set('departJeune', 0)->set('departSevre', 0)
+            ->call('saveDay')
             ->call('loadDay', self::J2)
             ->set('poussinsNes', 10)
             ->call('saveDay')

@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/temps/heure_benin.dart';
@@ -558,17 +560,18 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: 960,
-        child: Column(
-          children: [
-            Container(
-              decoration: const BoxDecoration(
-                color: AgriColors.surfaceZebra,
-                border: Border(
-                  bottom: BorderSide(color: AgriColors.outlineVariant),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(960, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                decoration: const BoxDecoration(
+                  color: AgriColors.surfaceZebra,
+                  border: Border(
+                    bottom: BorderSide(color: AgriColors.outlineVariant),
                 ),
               ),
               padding: const EdgeInsets.symmetric(
@@ -629,6 +632,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 
@@ -885,21 +889,22 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
               border: Border.all(color: AgriColors.outlineVariant),
               borderRadius: BorderRadius.circular(AgriRadius.lg),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: 200 + d.fenetre.length * 44,
-                child: Column(
-                  children: [
-                    Container(
-                      color: AgriColors.surfaceZebra,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AgriSpacing.sm,
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 200,
+            child: LayoutBuilder(
+              builder: (_, contraintes) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: max(200 + d.fenetre.length * 44, contraintes.maxWidth),
+                  child: Column(
+                    children: [
+                      Container(
+                        color: AgriColors.surfaceZebra,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AgriSpacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(
+                              width: 200,
                             child: Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: AgriSpacing.md,
@@ -944,6 +949,7 @@ class _SoinsVaccinsScreenState extends State<SoinsVaccinsScreen> {
                   ],
                 ),
               ),
+            ),
             ),
           ),
       ],

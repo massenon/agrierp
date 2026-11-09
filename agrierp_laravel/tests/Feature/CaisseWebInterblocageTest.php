@@ -76,7 +76,9 @@ class CaisseWebInterblocageTest extends TestCase
         }
         TreasuryAccount::create(['type' => 'caisse', 'label' => 'Caisse Principale', 'account_code' => '531', 'balance' => 0, 'is_active' => true]);
 
-        $espece = LivestockSpecies::create(['label' => 'Aviculture', 'code' => 'aviculture', 'is_active' => true]);
+        // VOL-2 : toute bande d'aviculture exige un départ par catégorie/stade ; ces tests portent sur la caisse et les envois (interblocage,
+        // plusieurs postes), pas sur l'effectif par catégorie — filière NEUTRE (sans chaîne), pas de contournement d'un refus.
+        $espece = LivestockSpecies::create(['label' => 'Héliciculture', 'code' => 'helico', 'is_active' => true]);
         $categorie = ProductCategory::create(['label' => 'Volailles', 'is_active' => true]);
         $this->poulet = Product::create([
             'sku' => 'AVI-001', 'name' => 'Poulet goliath', 'category_id' => $categorie->id,
@@ -84,14 +86,14 @@ class CaisseWebInterblocageTest extends TestCase
             'price_min' => 3_000, 'price_max' => 4_000, 'tva_rate' => 0, 'stock_qty' => 50, 'is_active' => true,
         ]);
         $this->bande = LivestockLot::create([
-            'code' => 'ESSAI-A', 'species_id' => $espece->id, 'stage' => 'engraissement',
+            'code' => 'ESSAI-A', 'species_id' => $espece->id, 'stage' => 'ponte',
             'initial_quantity' => 300, 'current_quantity' => 300,
             'created_date' => '2026-10-01', 'status' => 'actif', 'is_active' => true,
         ]);
 
         $caissiere = User::create([
             'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissiere->assignRole('caissier');
         $this->actingAs($caissiere);
@@ -195,7 +197,11 @@ class CaisseWebInterblocageTest extends TestCase
             ->set('weightLotId', $this->bande->id)
             ->call('confirmWeightAdd')
             ->set('paymentMode', 'especes')
-            ->set('cashReceived', 7_000);
+            ->set('cashReceived', 7_000)
+            // Ces essais portent sur la FACTURE NORMALISÉE (la facture simple n'est jamais transmise).
+            ->set('factureType', 'normalisee')
+            ->set('clientNomFacture', 'Client Essai')
+            ->set('aibTaux', 'N/A');
     }
 
     /** Un toast de ce type contenant cet extrait, parmi TOUS ceux du dernier appel (`assertDispatched` ne lit que le premier). */
@@ -375,7 +381,7 @@ class CaisseWebInterblocageTest extends TestCase
     public function test_la_vente_est_relue_sous_verrou_avant_le_controle_deja_transmise(): void
     {
         $source = (string) file_get_contents(app_path('Services/Mecef/FacturationMecefService.php'));
-        $controle = strpos($source, "if (\$sale->mecef_status === 'transmise')");
+        $controle = strpos($source, "if (\$objet->mecef_status === MecefEtat::NORMALISEE)");
         $this->assertNotFalse($controle, 'le contrôle « déjà transmise » a disparu');
         $this->assertStringContainsString('->lockForUpdate()', substr($source, 0, $controle),
             'sans verrou, deux retransmissions simultanées liraient toutes deux « erreur » et factureraient deux fois');
@@ -396,6 +402,7 @@ class CaisseWebInterblocageTest extends TestCase
         $this->actingAs(User::where('username', 'caisse')->sole(), 'sanctum')->postJson('/api/sync/push', ['sales' => array_map(fn ($id) => [
             'id' => $id, 'payment_mode' => 'especes', 'status' => 'validee',
             'subtotal' => 3_500, 'discount' => 0, 'total' => 3_500, 'sold_at' => self::JOUR.' 10:00:00',
+            'facture_type' => 'normalisee', 'client_nom_facture' => 'Client Essai', 'aib_taux' => 'N/A',
             'lines' => [['product_id' => $this->poulet->id, 'lot_id' => $this->bande->id, 'qty' => 1, 'unit_price' => 3_500, 'manual_total_amount' => 3_500]],
         ], $ids)])->assertOk()->assertJsonPath('sales.accepted', $ids);
 

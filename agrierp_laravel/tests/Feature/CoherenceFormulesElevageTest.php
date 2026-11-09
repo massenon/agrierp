@@ -42,7 +42,7 @@ class CoherenceFormulesElevageTest extends TestCase
         $admin = User::create([
             'name' => 'Directeur', 'username' => 'admin',
             'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');
         $this->actingAs($admin);
@@ -141,7 +141,13 @@ class CoherenceFormulesElevageTest extends TestCase
     ): void {
         $this->bande($codeEspece, $stade);
 
-        Livewire::test($composant)
+        $fiche = Livewire::test($composant);
+        if ($composant === \App\Livewire\Elevage\FicheReproducteurs::class) {
+            // VOL-1 : le départ par catégorie (bande de 40) est exigé avant d'enregistrer la journée.
+            $fiche->set('departRepro', 40)->set('departJeune', 0)->set('departSevre', 0);
+        }
+
+        $fiche
             ->set($champ, 3600)
             ->call('saveDay')
             ->call('loadDay', now()->toDateString())

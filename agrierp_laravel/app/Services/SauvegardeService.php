@@ -69,13 +69,13 @@ class SauvegardeService
                 'animals', 'transformations', 'veterinary_records',
                 'veterinary_withdrawal_periods', 'veterinary_calendar_events',
                 'infirmary_records', 'livestock_lots', 'feed_ration_standards',
-                'prophylaxis_schedule_standards', 'feed_types', 'livestock_species',
+                'prophylaxis_schedule_standards', 'feed_types', 'livestock_species', 'field_survey_entries',
             ]],
             'comptabilite' => ['libelle' => 'Comptabilité', 'tables' => [
                 // Ticket 15.20b : le compteur de numéros voyage AVEC les écritures (exporté, vidé, restauré).
                 // Avant : absent, il survivait au remplacement — orphelin, et sa clé étrangère vers `fiscal_years`
                 // faisait même échouer le vidage. Enfant de `fiscal_years` : donc listé AVANT elle.
-                'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures',
+                'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures', 'fiscal_closure_requests',
                 'bank_statement_lines', 'fixed_assets', 'cost_centers',
                 'treasury_accounts', 'fiscal_years', 'chart_of_accounts',
             ]],
@@ -262,7 +262,7 @@ class SauvegardeService
     {
         $pdo = DB::connection()->getPdo();
         $lignes = [
-            '-- Sauvegarde AgriERP — '.now()->toDateTimeString(),
+            '-- Sauvegarde LogiAgriERP — '.now()->toDateTimeString(),
             '-- Export de données uniquement : ce fichier ne contient PAS le schéma.',
             'SET FOREIGN_KEY_CHECKS=0;',
             '',

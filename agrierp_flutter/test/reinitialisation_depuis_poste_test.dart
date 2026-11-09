@@ -214,7 +214,13 @@ void main() {
       ),
     );
     await db.into(db.utilisateurs).insert(
-      UtilisateursCompanion.insert(id: 'uuuuuuuu-r100-4000-8000-000000000001', name: 'Directeur'),
+      UtilisateursCompanion.insert(
+        id: 'uuuuuuuu-r100-4000-8000-000000000001',
+        deviceId: 'serveur',
+        updatedAt: DateTime(2026, 1, 1),
+        syncStatus: const Value(SyncStatus.synced),
+        name: 'Directeur',
+      ),
     );
     await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 18));
     // Poste en service : ses resynchronisations uniques sont faites, son tirage ordinaire est incrémental
@@ -605,7 +611,7 @@ void main() {
       await nettoyer(tester);
     });
 
-    testWidgets('hub : « Réinitialisation » est le dernier onglet, ouvert sur l onglet du poste', (tester) async {
+    testWidgets('hub : « Réinitialisation » précède « Sauvegardes », ouvert sur l onglet du poste', (tester) async {
       tester.view.physicalSize = const Size(1700, 2600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -620,7 +626,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(ParametresGenerauxScreen.onglets.last.$1, 'Réinitialisation');
+      expect(ParametresGenerauxScreen.onglets[ParametresGenerauxScreen.onglets.length - 2].$1, 'Réinitialisation');
       expect(find.byType(OngletReinitialisation), findsOne);
       expect(find.text('Réinitialisation des Données'), findsOne);
       await nettoyer(tester);

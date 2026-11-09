@@ -7,11 +7,13 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 
 import 'core/auth/auth_service.dart';
+import 'core/systeme/plateforme_poste.dart';
 import 'core/comptabilite/exercice_choisi.dart';
 import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
 import 'core/config/envoi_email_test.dart';
 import 'core/config/parametres_poste.dart';
+import 'core/config/envoi_email.dart';
 import 'core/config/parametres_smtp.dart';
 import 'core/database/app_database.dart';
 import 'core/localisation/localisation_poste.dart';
@@ -20,7 +22,9 @@ import 'core/sync/gestes_importants.dart';
 import 'core/widgets/navigation_poste.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
+import 'core/systeme/evenements_navigateur.dart';
 import 'core/widgets/acces_rapide.dart';
+import 'core/widgets/aide_flottante.dart';
 import 'features/recherche/recherche_globale_champ.dart';
 import 'features/recherche/recherche_globale_repository.dart';
 import 'core/widgets/modale_agri.dart';
@@ -54,6 +58,8 @@ import 'features/elevage/reproducteurs_repository.dart';
 import 'features/elevage/sujets_entrees_repository.dart';
 import 'features/elevage/transferts_bandes_screen.dart';
 import 'features/elevage/transferts_repository.dart';
+import 'features/elevage/transformation_repository.dart';
+import 'features/elevage/transformation_screen.dart';
 import 'features/elevage/dashboard_elevage_screen.dart';
 import 'features/elevage/fiche_escargots_screen.dart';
 import 'features/elevage/soins_vaccins_repository.dart';
@@ -75,6 +81,11 @@ import 'features/elevage/fiche_lapins_screen.dart';
 import 'features/ventes/caisse_repository.dart';
 import 'features/administration/administration_repository.dart';
 import 'features/comptabilite/comptabilite_repository.dart';
+import 'features/comptabilite/cloture_exercice_repository.dart';
+import 'features/comptabilite/immobilisations_repository.dart';
+import 'features/comptabilite/rapprochement_repository.dart';
+import 'features/parametres/reglages_ferme_repository.dart';
+import 'features/parametres/administration_locale.dart';
 import 'features/parametres/parametres_generaux_repository.dart';
 import 'features/parametres/parametres_generaux_screen.dart';
 import 'features/rapports/rapports_exports_screen.dart';
@@ -91,12 +102,15 @@ import 'features/parametres/corbeille_repository.dart';
 import 'features/parametres/reinitialisation_poste.dart';
 import 'features/aide/aide_a_propos_screen.dart';
 import 'features/contact/contact_editeur_repository.dart';
+import 'features/importation/importation_repository.dart';
+import 'features/importation/importation_screen.dart';
 import 'features/stocks/produits_repository.dart';
 import 'features/contact/contact_editeur_screen.dart';
 import 'features/notifications/notifications_repository.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/pilotage/tableau_de_bord_repository.dart';
 import 'features/pilotage/tableau_de_bord_screen.dart';
+import 'core/demarrage/demarrage_poste.dart';
 import 'features/profil/mon_profil_repository.dart';
 import 'features/profil/mon_profil_screen.dart';
 import 'features/sync/synchronisation_screen.dart';
@@ -117,7 +131,7 @@ import 'core/auth/verrou_local.dart';
 import 'features/verrou/changement_pin.dart';
 import 'features/verrou/porte_session.dart';
 
-/// AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
+/// LogiAgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
 ///
 /// Client Windows offline-first. La base locale fait foi ; la synchronisation
 /// avec la surface web Laravel intervient ensuite, à la demande.
@@ -133,15 +147,23 @@ Future<void> main() async {
   Intl.defaultLocale = 'fr_FR';
   await initializeDateFormatting('fr_FR');
 
-  final db = AppDatabase();
-  final parametres = ParametresPoste(database: db);
-
+  // ⚠️ Une panne de démarrage (base illisible, migration impossible, fichier verrouillé) se VOIT : sans cela la fenêtre,
+  // créée cachée et montrée à la première image, ne s'ouvrait jamais et `agrierp.exe` restait fantôme en arrière-plan.
   runApp(
-    AgriErpApp(
-      database: db,
-      identifiantPoste: await parametres.identifiant(),
-      adresseServeur: await parametres.adresseServeur(),
-      parametres: parametres,
+    await DemarragePoste.preparer(
+      construire: () async {
+        // Ticket AUT-4 — une restauration programmée s'installe AVANT l'ouverture de la base.
+        await AdministrationLocale.appliquerRestaurationEnAttente();
+        final db = AppDatabase();
+        final parametres = ParametresPoste(database: db);
+
+        return AgriErpApp(
+          database: db,
+          identifiantPoste: await parametres.identifiant(),
+          adresseServeur: await parametres.adresseServeur(),
+          parametres: parametres,
+        );
+      },
     ),
   );
 }
@@ -178,6 +200,9 @@ class _AgriErpAppState extends State<AgriErpApp> {
       baseUrl: widget.adresseServeur,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
+      // PWA-2 : le navigateur n'envoie PAS d'en-tête Accept de lui-même ; sans lui, Laravel traite un refus de validation en
+      // page web (302) au lieu de la réponse JSON 422 que le poste sait lire.
+      headers: const {'Accept': 'application/json'},
     ),
   );
 
@@ -188,6 +213,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
     // poste. La constante partagée d'avant rendait deux postes de la ferme
     // indiscernables : aucun conflit n'était explicable.
     deviceId: widget.identifiantPoste,
+    // ATT-3 : les attestations produites hors ligne sont déclarées au serveur (numéro, trace) à la synchronisation.
+    apresSynchronisation: () => AttestationsRepository.viderLaFile(_db, ClientAttestations(_client)),
   );
 
   /// Ticket F0.98 — premier démarrage d'un poste neuf (adresse du serveur, première synchronisation).
@@ -205,6 +232,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres : la route du serveur (même service que le web), par
   /// le client partagé (il porte le jeton), puis la purge immédiate de ce poste par le moteur (mécanisme 15.50)
   /// et un tirage complet. Le droit est celui du rôle de la session ouverte.
+  late final _adminLocale = AdministrationLocale(database: _db, role: () => _auth.utilisateur?.role ?? '', idUtilisateur: () => _auth.utilisateur?.id ?? '');
+
   late final ReinitialisationPoste _reinitialisation = ReinitialisationPoste(
     database: _db,
     client: _client,
@@ -241,6 +270,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   late final ClientsCreancesRepository _clients = ClientsCreancesRepository(
     database: _db,
     deviceId: widget.identifiantPoste,
+    // Ticket AUT-3 — la relance par e-mail part du SMTP de ce poste (remplace le SMS).
+    envoyerEmail: EnvoiEmail(parametres: ParametresSmtp(database: _db)).envoyer,
   );
 
   /// ⚠️ Le même client HTTP : il porte le jeton de la session, que le serveur
@@ -332,6 +363,12 @@ class _AgriErpAppState extends State<AgriErpApp> {
     deviceId: widget.identifiantPoste,
   );
 
+  /// Ticket EL-1 — « Bon d'Abattage & Transformation » : UN SEUL écrivain de `transformations`.
+  late final TransformationRepository _transformation = TransformationRepository(
+    database: _db,
+    deviceId: widget.identifiantPoste,
+  );
+
   /// Tickets BS1 et BS2 — « Bandes & Sujets » et « Enregistrer des Sujets » : la bande se crée, se modifie et s'archive
   /// par ce dépôt (constitution par les transferts) ; les entrées de sujets passent par l'unique écrivain des fiches.
   late final BandesRepository _bandes = BandesRepository(
@@ -355,11 +392,24 @@ class _AgriErpAppState extends State<AgriErpApp> {
   );
 
   late final ComptabiliteRepository _comptabilite = ComptabiliteRepository(
+    deviceId: widget.identifiantPoste,
+    database: _db,
+  );
+
+  late final RapprochementRepository _rapprochement = RapprochementRepository(database: _db, deviceId: widget.identifiantPoste);
+
+  late final ImmobilisationsRepository _immobilisations = ImmobilisationsRepository(
+    deviceId: widget.identifiantPoste,
+    database: _db,
+  );
+
+  late final ClotureExerciceRepository _cloture = ClotureExerciceRepository(
+    deviceId: widget.identifiantPoste,
     database: _db,
   );
 
   late final ParametresGenerauxRepository _parametresGeneraux =
-      ParametresGenerauxRepository(database: _db);
+      ParametresGenerauxRepository(database: _db, identifiantPoste: widget.identifiantPoste);
 
   late final RapportsRepository _rapports = RapportsRepository(database: _db);
 
@@ -373,6 +423,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   late final FacturationRepository _facturation = FacturationRepository(
     database: _db,
+    // Ticket VC-5 — module MeCeF désactivé tant que le serveur ne l'a pas activé (comme `config/mecef.php`).
+    mecefParDefaut: false,
   );
 
   late final FournisseursRepository _fournisseurs = FournisseursRepository(
@@ -440,7 +492,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
 
   /// Juste avant d'ouvrir l'application (connexion, déverrouillage) : le poste est-il neuf ? (écran F0.98).
   Future<void> _preparerOuverture() async {
-    final neuf = await _demarrage.posteNeuf();
+    final neuf = await _demarrage.afficherAssistant();
     if (mounted) {
       setState(() {
         _premierDemarrage = neuf;
@@ -462,7 +514,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AgriERP — Ferme École OLOUWACHEGOUN',
+      title: 'LogiAgriERP — Ferme École OLOUWACHEGOUN',
       debugShowCheckedModeBanner: false,
       theme: AgriTheme.light,
       // Ticket U5 (D-U5) : composants Material en français (sélecteurs de date,
@@ -486,7 +538,6 @@ class _AgriErpAppState extends State<AgriErpApp> {
         surOuverture: _ouvrirRappelsDuJour,
         ecranConnexion: (onConnecte) => LoginScreen(
           auth: _auth,
-          demarrage: _demarrage,
           onConnecte: onConnecte,
         ),
         application: (verrouiller, onDeconnecte) => _premierDemarrage
@@ -494,16 +545,20 @@ class _AgriErpAppState extends State<AgriErpApp> {
                 depot: _demarrage,
                 engine: _engine,
                 utilisateur: _auth.utilisateur?.nom ?? '—',
+                depotCloture: _cloture,
+                peutOuvrirExercice: PermissionsPoste.peut(_auth.utilisateur?.role ?? '', 'manage-comptabilite'),
                 onTermine: () => setState(() {
                   _premierDemarrage = false;
                   _synchroniserALOuverture = false;
                 }),
               )
             : SocleAccueil(
+          demarrage: _demarrage,
           database: _db,
           engine: _engine,
           auth: _auth,
           reinitialisation: _reinitialisation,
+          adminLocale: _adminLocale,
           fiches: _fiches,
           caisse: _caisse,
           soins: _soins,
@@ -515,11 +570,15 @@ class _AgriErpAppState extends State<AgriErpApp> {
           personnel: _personnel,
           administration: _administration,
           comptabilite: _comptabilite,
+          immobilisations: _immobilisations,
+          cloture: _cloture,
+          rapprochement: _rapprochement,
           parametresGeneraux: _parametresGeneraux,
           rapports: _rapports,
           tableauDeBord: _tableauDeBord,
           dashboardElevage: _dashboardElevage,
           transferts: _transferts,
+          transformation: _transformation,
           bandes: _bandes,
           sujetsEntrees: _sujetsEntrees,
           reproducteurs: _reproducteurs,
@@ -579,11 +638,15 @@ class SocleAccueil extends StatefulWidget {
     required this.personnel,
     required this.administration,
     required this.comptabilite,
+    required this.immobilisations,
+    required this.cloture,
+    required this.rapprochement,
     required this.parametresGeneraux,
     required this.rapports,
     required this.tableauDeBord,
     required this.dashboardElevage,
     required this.transferts,
+    required this.transformation,
     required this.bandes,
     required this.sujetsEntrees,
     required this.reproducteurs,
@@ -605,6 +668,7 @@ class SocleAccueil extends StatefulWidget {
     required this.parametres,
     required this.identifiantPoste,
     this.reinitialisation,
+    this.adminLocale,
     this.onDeconnecte,
     this.verrou,
     this.demandeEcran,
@@ -614,7 +678,11 @@ class SocleAccueil extends StatefulWidget {
     this.changementsReseau,
     this.gestes,
     this.synchroniserALOuverture = true,
+    this.demarrage,
   });
+
+  /// Ticket AIDE-1 — dépôt du premier démarrage, pour « Relancer l'assistant de démarrage » ; `null` : un dépôt local est bâti.
+  final PremierDemarrageRepository? demarrage;
 
   /// Ticket H1 — appelé après « Déconnexion » : l'application revient à l'écran de connexion.
   final VoidCallback? onDeconnecte;
@@ -638,6 +706,7 @@ class SocleAccueil extends StatefulWidget {
 
   /// Ticket R-1 — onglet « Réinitialisation » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
   final ReinitialisationPoste? reinitialisation;
+  final AdministrationLocale? adminLocale;
 
   /// Ticket H13 — changements de liaison réseau ; `null` = pas de synchronisation automatique (tests du
   /// châssis, qui n'ont pas de plateforme native pour la connectivité).
@@ -665,11 +734,15 @@ class SocleAccueil extends StatefulWidget {
   final PersonnelRepository personnel;
   final AdministrationRepository administration;
   final ComptabiliteRepository comptabilite;
+  final ImmobilisationsRepository immobilisations;
+  final ClotureExerciceRepository cloture;
+  final RapprochementRepository rapprochement;
   final ParametresGenerauxRepository parametresGeneraux;
   final RapportsRepository rapports;
   final TableauDeBordRepository tableauDeBord;
   final DashboardElevageRepository dashboardElevage;
   final TransfertsRepository transferts;
+  final TransformationRepository transformation;
   final BandesRepository bandes;
   final SujetsEntreesRepository sujetsEntrees;
   final ReproducteursRepository reproducteurs;
@@ -715,6 +788,13 @@ class _SocleAccueilState extends State<SocleAccueil> {
   /// cours à chaque tirage.
   int _versionTirage = 0;
 
+  /// PWA-2b — signale la fin de chaque tirage aux écrans qui se relisent seuls (Tableau de bord), sans changer de clé.
+  final ValueNotifier<int> _finDeTirage = ValueNotifier<int>(0);
+
+  /// Incrémenté par « Actualiser » du menu contextuel (clic droit) : force la
+  /// reconstruction de l'écran courant sans changer d'écran.
+  int _cleActualisation = 0;
+
   /// Sujet dont la fiche est ouverte, et l'écran d'où l'on est venu (le bouton
   /// « Retour » y revient : le poste n'a pas de bouton « précédent » de
   /// navigateur).
@@ -741,6 +821,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
     });
   }
 
+  /// Période (et onglet) demandés par le Tableau de bord à Rapports & Exports ; lue à l'ouverture de l'écran puis effacée.
+  PeriodeDemandee? _periodeDemandee;
+
   /// Brouillon de « Contactez l'Éditeur » : possédé par la coque (`_AgriErpAppState`) pour survivre aux
   /// changements d'écran ET au verrouillage (ticket VL-2).
   /// Sans brouillon fourni (tests du socle), le socle en possède un et le libère lui-même.
@@ -753,6 +836,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   /// Ticket CFG-2 — réglages SMTP de ce poste (mot de passe au coffre du système, jamais en base) et e-mail de test.
   late final _smtp = ParametresSmtp(database: widget.database);
+  late final _reglages = ReglagesFermeRepository(database: widget.database, deviceId: widget.identifiantPoste);
   late final _envoiEmail = EnvoiEmailTest(parametres: _smtp);
 
   /// Ticket CFG-2 — onglet « Appairage » : réglages du poste, session, état du jeton (S-T1 : synchronisation
@@ -776,6 +860,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
     reinitialisation: widget.reinitialisation,
     corbeille: widget.corbeille,
     ongletInitial: ongletInitial,
+    idUtilisateurConnecte: widget.auth.utilisateur?.id,
+    reglages: _reglages,
+    admin: widget.adminLocale,
+    estAdmin: widget.auth.utilisateur?.role == 'admin',
+    surAssistantBascule: _lireAssistant,
   );
 
   /// Ticket EX7 (EF8) — l'exercice AFFICHÉ, un seul pour la session, diffusé par [PorteeExerciceChoisi] : sélecteur de
@@ -792,13 +881,59 @@ class _SocleAccueilState extends State<SocleAccueil> {
   /// Après un tirage : les notifications et la file (`_versionTirage`), et les exercices (statut, N+1 ouvert).
   void _apresTirage() {
     if (!mounted) return;
+    _lireMecef();
+    _lireAssistant();
     setState(() => _versionTirage++);
+    _finDeTirage.value++;
     _exercice.charger();
+  }
+
+  /// VC-5 — le module MeCeF est-il activé ? (titre de la barre et libellé du menu : « Facturation » sinon).
+  bool _mecefActif = false;
+
+  Future<void> _lireMecef() async {
+    final actif = await widget.facturation.mecefActif();
+    if (mounted && actif != _mecefActif) setState(() => _mecefActif = actif);
+  }
+
+  /// Ticket AIDE-1 — le module « Assistant de démarrage » est-il allumé ? (copie locale de `modules_config`, éteint par
+  /// défaut) : seul module allumé, le bouton d'aide existe. Relu après chaque tirage et quand la carte de Paramètres bascule
+  /// (même motif que [_lireMecef]).
+  bool _assistantActif = false;
+
+  /// Les quatre éléments expliqués par la visite guidée (`data-aide` du web).
+  final CiblesVisite _cibles = CiblesVisite();
+
+  Future<void> _lireAssistant() async {
+    final actif = await widget.parametresGeneraux.assistantActif();
+    if (mounted && actif != _assistantActif) setState(() => _assistantActif = actif);
+  }
+
+  /// Ticket AIDE-1 — « Relancer l'assistant de démarrage » : rouvre l'écran du premier démarrage par-dessus le socle, même
+  /// s'il a été fermé (« Plus tard ») — rien n'est écrit. Réservé à `manage-parametres`, comme au web.
+  void _relancerAssistant() {
+    final depot = widget.demarrage ??
+        PremierDemarrageRepository(database: widget.database, parametres: widget.parametres, client: Dio());
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (contexte) => PremierDemarrageScreen(
+          depot: depot,
+          engine: widget.engine,
+          utilisateur: widget.auth.utilisateur?.nom ?? '—',
+          depotCloture: widget.cloture,
+          peutOuvrirExercice: PermissionsPoste.peut(_role, 'manage-comptabilite'),
+          relance: true,
+          onTermine: () => Navigator.of(contexte).pop(),
+        ),
+      ),
+    );
   }
 
   @override
   void initState() {
     super.initState();
+    _lireMecef();
+    _lireAssistant();
 
     // ⚠️ ON N'OUVRE PAS SUR UN ÉCRAN INTERDIT. Démarrer sur la fiche d'élevage
     // quel que soit le rôle accueillerait le caissier par un « accès refusé »
@@ -843,6 +978,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
       // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
       onTermine: _apresTirage,
       gestes: widget.gestes,
+      // PWA-2b — navigateur seulement : retour en ligne (`online`) et retour de focus de l'onglet. Natif : flux vide.
+      evenementsNavigateur: evenementsDuNavigateur(),
+      // PWA-2c — sondage léger (`/up`, 3 s, jamais en cache) avant de synchroniser au retour en ligne / de focus.
+      sondeur: widget.engine.serveurJoignable,
     )..demarrer(aussitot: widget.synchroniserALOuverture);
     _cycleDeVie = AppLifecycleListener(
       onExitRequested: () async {
@@ -865,11 +1004,12 @@ class _SocleAccueilState extends State<SocleAccueil> {
   }
 
   /// Titre de la barre supérieure (groupe vide : `BarreSuperieure` affiche alors le seul titre).
-  (String, String) get _situation => ('', SocleAccueilTitres.titre(_ecran));
+  (String, String) get _situation => ('', SocleAccueilTitres.titre(_ecran, mecefActif: _mecefActif));
 
   @override
   void dispose() {
     _automatique?.arreter();
+    _finDeTirage.dispose();
     widget.demandeEcran?.removeListener(_ecranDemande);
     _cycleDeVie?.dispose();
     _exercice
@@ -877,6 +1017,25 @@ class _SocleAccueilState extends State<SocleAccueil> {
       ..dispose();
     _brouillonPropre?.dispose();
     super.dispose();
+  }
+
+  /// Menu contextuel clic droit — une seule entrée « Actualiser » qui recrée l'écran courant.
+  Future<void> _afficherMenuContextuel(BuildContext context, Offset position) async {
+    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final zone = RelativeRect.fromRect(
+      Rect.fromLTWH(position.dx, position.dy, 1, 1),
+      Offset.zero & overlay.size,
+    );
+    final choix = await showMenu<String>(
+      context: context,
+      position: zone,
+      items: [
+        const PopupMenuItem<String>(value: 'actualiser', child: Row(children: [Icon(SymbolesAgri.sync, size: 18), SizedBox(width: 8), Text('Actualiser')])),
+      ],
+    );
+    if (choix == 'actualiser' && mounted) {
+      setState(() => _cleActualisation++);
+    }
   }
 
   @override
@@ -889,16 +1048,26 @@ class _SocleAccueilState extends State<SocleAccueil> {
       child: NavigationPoste(
         ouvrir: (e) => setState(() => _ecran = e),
         child: Scaffold(
-      body: Row(
+      body: Listener(
+        onPointerDown: (event) {
+          if (event.buttons == 0x2) {  // bouton secondaire (clic droit)
+            _afficherMenuContextuel(context, event.position);
+          }
+        },
+        child: Row(
         children: [
           // ⚠️ La bascule de la barre supérieure replie la barre latérale,
           // comme `menu` / `menu_open` dans la maquette.
           if (_menuOuvert)
-            _BarreLaterale(
+            KeyedSubtree(
+              key: _cibles.menu,
+              child: _BarreLaterale(
               auth: widget.auth,
               actif: _ecran,
               ecrans: PermissionsPoste.ecransDe(_role),
+              mecefActif: _mecefActif,
               onNaviguer: (e) => setState(() => _ecran = e),
+            ),
             ),
           Expanded(
             child: Column(
@@ -908,7 +1077,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
                 // qu'une journée vient d'être saisie.
                 // 🔴→✅ Ticket U14 — et relu toutes les 30 s, comme `wire:poll.30s` de la cloche du web : non lues,
                 // quatre dernières, « il y a … » recalculé (la minuterie s'arrête avec le socle).
-                RafraichissementPeriodique(
+                KeyedSubtree(
+                  key: _cibles.topbar,
+                  child: RafraichissementPeriodique(
                   intervalle: BarreSuperieure.rafraichissementCloche,
                   builder: (context) => FutureBuilder<(({int aEnvoyer, int refuses}), DonneesNotifications)>(
                   future: _etatDeLaBarre(),
@@ -918,6 +1089,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     enAttente: (instantane.data?.$1.aEnvoyer ?? 0) + (instantane.data?.$1.refuses ?? 0),
                     refuses: instantane.data?.$1.refuses ?? 0,
                     onSynchroniser: _ouvrirSynchronisation,
+                    // PWA-2c — « Hors ligne / En attente (N) / Synchronisé » : au navigateur seulement (le poste
+                    // Windows garde sa barre telle quelle).
+                    liaison: PlateformePoste.navigateur ? widget.engine.liaisonServeur : null,
                     avantFermeture: widget.changementsReseau == null ? null : _avantFermeture,
                     nonLues: instantane.data?.$2.nonLues,
                     recentes: [
@@ -976,6 +1150,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     selecteurExercice: const SelecteurExercice(),
                   ),
                   ),
+                  ),
                 ),
                 // Ticket H1 — bouton flottant « Accès Rapide » au-dessus du contenu, comme `app.blade.php:219`.
                 Expanded(
@@ -984,19 +1159,29 @@ class _SocleAccueilState extends State<SocleAccueil> {
                       // Ticket EX7 (EF10) — bandeau de lecture seule d'un exercice clos en haut du contenu, puis
                       // l'écran, RECONSTRUIT quand l'exercice affiché ou son statut change (bornes, listes, boutons).
                       Positioned.fill(
-                        child: Column(
+                        child: KeyedSubtree(
+                          key: _cibles.contenu,
+                          child: Column(
                           children: [
                             const BandeauExercice(),
                             Expanded(
                               child: KeyedSubtree(
-                                key: ValueKey('exercice-${_exercice.etat?.annee}-${_exercice.etat?.clos}'),
+                                key: ValueKey('exercice-${_exercice.etat?.annee}-${_exercice.etat?.clos}-$_cleActualisation'),
                                 child: _contenu(),
                               ),
                             ),
                           ],
                         ),
+                        ),
                       ),
                       BoutonAccesRapide(onNaviguer: (e) => setState(() => _ecran = e)),
+                      // Ticket AIDE-1 — bouton d'aide AU-DESSUS d'« Accès rapide », module allumé seulement.
+                      if (_assistantActif)
+                        BoutonAide(
+                          ecran: _ecran,
+                          cibles: _cibles,
+                          surRelancer: PermissionsPoste.peut(_role, 'manage-parametres') ? _relancerAssistant : null,
+                        ),
                     ],
                   ),
                 ),
@@ -1010,6 +1195,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
             onReafficher: () => setState(() => _menuOuvert = true),
           ),
         ],
+      ),
       ),
       ),
       ),
@@ -1067,11 +1253,20 @@ class _SocleAccueilState extends State<SocleAccueil> {
         // « Élevage » vers Gestion Élevage.
         EcranPoste.tableauDeBord => TableauDeBordScreen(
           depot: widget.tableauDeBord,
+          finDeTirage: _finDeTirage,
           nomUtilisateur:
               widget.auth.utilisateur?.nom ?? 'M. Olouchègoun',
           onEnregistrerVente: () => setState(() => _ecran = EcranPoste.caisse),
           onElevage: () => setState(() => _ecran = EcranPoste.gestionElevage),
           onOuvrir: (e) => setState(() => _ecran = e),
+          // L'état choisi au Tableau de bord s'ouvre sur la période choisie (`?startDate=&endDate=` du web).
+          onOuvrirEtat: (e, periode) {
+            setState(() {
+              _periodeDemandee = periode;
+              _ecran = e;
+            });
+            WidgetsBinding.instance.addPostFrameCallback((_) => _periodeDemandee = null);
+          },
         ),
         EcranPoste.monProfil => MonProfilScreen(
           depot: MonProfilRepository(database: widget.database),
@@ -1114,6 +1309,16 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.transfertsBandes => TransfertsBandesScreen(
           depot: widget.transferts,
+        ),
+        // Ticket IMPORT-1 — « Importation en masse » : les lignes valides s'écrivent par les dépôts propriétaires (`pending`).
+        EcranPoste.importationMasse => ImportationScreen(
+          depot: ImportationRepository(database: widget.database),
+          role: _role,
+        ),
+        // Ticket EL-1 — « Bon d'Abattage & Transformation » : l'opérateur est le compte connecté (`auth()->user()->name`).
+        EcranPoste.transformation => TransformationScreen(
+          depot: widget.transformation,
+          nomOperateur: widget.auth.utilisateur?.nom ?? '',
         ),
         // Ticket BS1 — « Bandes & Sujets » : droit `manage-elevage` pour créer, modifier, archiver.
         EcranPoste.gestionBandes => GestionBandesScreen(
@@ -1188,6 +1393,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.clientsEtCreances => ClientsCreancesScreen(
           depot: widget.clients,
+          // Ticket CONF-5 — `manage-ventes` : le comptable CONSULTE (view-ventes) sans relancer, encaisser, imputer ni modifier.
+          peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
           imprimer: EditeursRapports.imprimer,
         ),
         // Ticket U10 — « Exporter », « Ajouter Stock » (`manage-stocks`), « Configurer les Seuils d'Alerte » et
@@ -1204,7 +1411,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
         EcranPoste.catalogueProduits => CatalogueProduitsScreen(
           key: ValueKey('catalogue-$_versionCatalogue'),
           depot: widget.stocks,
-          produits: widget.produits,
+          // Ticket CONF-4 (DV-20) — `manage-stocks` : sans lui (comptable : lecture des stocks), `produits: null` rend le
+          // catalogue CONSULTABLE SEULEMENT (créer, modifier, archiver, configurer un seuil : boutons inertes).
+          produits: PermissionsPoste.peut(_role, 'manage-stocks') ? widget.produits : null,
           ongletInitial: _catalogueOnglet,
           produitAModifier: _catalogueProduit,
         ),
@@ -1215,8 +1424,10 @@ class _SocleAccueilState extends State<SocleAccueil> {
           imprimer: EditeursRapports.imprimer,
           avoirs: widget.avoirs,
           historique: widget.historiqueVentes,
-          // Tickets AV1 / AV2 — `manage-ventes` (retour, avoir traité, annulation) et `export-ventes` (ticket PDF).
+          // Tickets AV1 / AV2 — `manage-ventes` (caisse, annulation, devis) et `export-ventes` (ticket PDF).
           peutGerer: PermissionsPoste.peut(_role, 'manage-ventes'),
+          // Ticket CONF-4 — retour et avoir traité : `manage-ventes` OU `correct-invoices` (Gate `avoir-client` du web).
+          peutCorriger: PermissionsPoste.peutCorrigerParAvoir(_role),
           peutExporter: PermissionsPoste.peut(_role, 'export-ventes'),
           // Ticket DEV3 — « Convertir en Facture » : `manage-facturation` EN PLUS de `manage-ventes` (admin seul aujourd'hui) ;
           // « Voir la facture » : `view-facturation`, vers l'écran Facturation & MeCeF.
@@ -1249,6 +1460,11 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.comptabilite => ComptabiliteScreen(
           depot: widget.comptabilite,
+          depotImmobilisations: widget.immobilisations,
+          depotCloture: widget.cloture,
+          peutCloturer: PermissionsPoste.peut(_role, 'close-fiscal-year'),
+          peutAdministrer: PermissionsPoste.peut(_role, 'manage-modules'),
+          depotRapprochement: widget.rapprochement,
           imprimer: EditeursRapports.imprimer,
           // Fusion EX7 + EX8 — le sélecteur pilote le paramètre d'exercice d'EX8 : colonne N = l'exercice choisi.
           exercice: _exercice.etat?.annee,
@@ -1260,6 +1476,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
           peutExporter: PermissionsPoste.peut(_role, 'export-rapports'),
           imprimer: EditeursRapports.imprimer,
           enregistrer: EditeursRapports.enregistrer,
+          // Période et onglet du Tableau de bord, lus une fois à l'ouverture puis oubliés (comme `_catalogueOnglet`) :
+          // une ouverture par le menu retrouve le mois en cours.
+          periodeDemandee: _periodeDemandee,
         ),
         EcranPoste.administrationEtDocument => AdministrationScreen(
           depot: widget.administration,
@@ -1271,18 +1490,27 @@ class _SocleAccueilState extends State<SocleAccueil> {
         ),
         EcranPoste.facturation => FacturationScreen(
           depot: widget.facturation,
-          onOuvrirCaisse: () => setState(() => _ecran = EcranPoste.caisse),
+          imprimer: EditeursRapports.imprimer,
+          // Ticket CONF-4 : sans le droit de la caisse (comptable), « Nouvelle Facture » ouvre le hub Ventes & Devis, comme le web.
+          onOuvrirCaisse: () => setState(
+            () => _ecran = PermissionsPoste.autorise(_role, EcranPoste.caisse) ? EcranPoste.caisse : EcranPoste.ventesEtDevis,
+          ),
         ),
+        // Ticket CONF-4 (DV-20) — `manage-achats` : le comptable LIT les achats, sans rien y écrire.
         EcranPoste.fournisseurs => FournisseursScreen(
           depot: widget.fournisseurs,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-achats'),
         ),
         EcranPoste.achatsEtCommandes => AchatsCommandesScreen(
           depot: widget.achats,
           depotFournisseurs: widget.fournisseurs,
+          depotProduits: widget.produits,
           imprimer: EditeursRapports.imprimer,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-achats'),
         ),
         EcranPoste.saisieDepenses => SaisieDepensesScreen(
           depot: widget.depenses,
+          peutGerer: PermissionsPoste.peut(_role, 'manage-achats'),
         ),
         // Ticket U12a — « Exporter PDF », liens du Blade (transferts, retour à Gestion Élevage, commande de stock).
         EcranPoste.ficheEscargots => FicheEscargotsScreen(
@@ -1300,6 +1528,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
           imprimer: EditeursRapports.imprimer,
           onOuvrirTransferts: () =>
               setState(() => _ecran = EcranPoste.transfertsBandes),
+          // Ticket VOL-1 : « Commander Stock » de la carte d'autonomie alimentaire (provende de l'aviculture).
+          onCommanderStock: () =>
+              setState(() => _ecran = EcranPoste.achatsEtCommandes),
         ),
         EcranPoste.fichePorcs => FichePorcsScreen(
           depot: widget.fiches,
@@ -1344,7 +1575,7 @@ class EtatDuSocle extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'AgriERP Desktop',
+                    'LogiAgriERP Desktop',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -1414,12 +1645,14 @@ class _BarreLaterale extends StatelessWidget {
     required this.auth,
     required this.actif,
     required this.ecrans,
+    this.mecefActif = false,
     required this.onNaviguer,
   });
 
   final AuthService auth;
   final EcranPoste actif;
   final List<EcranPoste> ecrans;
+  final bool mecefActif;
   final void Function(EcranPoste) onNaviguer;
 
   /// Arborescence **complète** de la barre latérale (`layouts/app.blade.php`, et avant lui
@@ -1446,6 +1679,8 @@ class _BarreLaterale extends StatelessWidget {
         (SymbolesAgri.dashboard, 'Dashboard Élevage', EcranPoste.dashboardElevage),
         (SymbolesAgri.favorite, 'Suivi Reproduction', EcranPoste.suiviReproduction),
         (SymbolesAgri.vaccines, 'Soins et vaccins', EcranPoste.soinsEtVaccins),
+        // Ticket EL-1 — l'entrée du menu web (`layouts/app.blade.php`), dans le même ordre.
+        (SymbolesAgri.restaurant, 'Transformation', EcranPoste.transformation),
         (SymbolesAgri.tune, 'Paramètres Élevage', EcranPoste.parametresElevage),
       ],
     ),
@@ -1491,6 +1726,8 @@ class _BarreLaterale extends StatelessWidget {
           'Administration & Document',
           EcranPoste.administrationEtDocument,
         ),
+        // Ticket IMPORT-1 : même groupe, même ordre, même libellé et même icône que le menu web.
+        (SymbolesAgri.upload_file, 'Importation en masse', EcranPoste.importationMasse),
       ],
     ),
     (
@@ -1618,13 +1855,13 @@ class _BarreLaterale extends StatelessWidget {
                   children: [
                     const Icon(SymbolesAgri.agriculture, color: AgriColors.accentYellow, size: 26),
                     const SizedBox(width: AgriSpacing.sm),
-                    // « Agri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
+                    // « LogiAgri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
                     RichText(
                       key: const Key('barre-laterale-marque'),
                       text: const TextSpan(
                         style: TextStyle(fontSize: AgriTypography.lg, fontWeight: FontWeight.w800, color: Colors.white),
                         children: [
-                          TextSpan(text: 'Agri'),
+                          TextSpan(text: 'LogiAgri'),
                           TextSpan(text: 'ERP', style: TextStyle(color: AgriColors.accentYellow)),
                         ],
                       ),
@@ -1658,7 +1895,7 @@ class _BarreLaterale extends StatelessWidget {
                     if (entrees.any((e) => e.$3 != null && ecrans.contains(e.$3))) ...[
                       _titreGroupe(titre),
                       for (final (icone, libelle, ecran) in entrees)
-                        if (ecran != null && ecrans.contains(ecran)) _entree(icone, libelle, ecran),
+                        if (ecran != null && ecrans.contains(ecran)) _entree(icone, ecran == EcranPoste.facturation && !mecefActif ? 'Facturation' : libelle, ecran),
                       const SizedBox(height: AgriSpacing.sm),
                     ],
                 ],
@@ -1781,6 +2018,7 @@ class SocleAccueilTitres {
     EcranPoste.dashboardElevage: 'Élevage > Dashboard Élevage',
     EcranPoste.suiviReproduction: 'Élevage > Suivi Reproduction',
     EcranPoste.soinsEtVaccins: 'Élevage > Soins et Vaccins',
+    EcranPoste.transformation: 'Élevage > Transformation',
     EcranPoste.parametresElevage: 'Paramètres Élevage',
     EcranPoste.ficheElevage: 'Élevage > Fiches Lapins',
     EcranPoste.fichePondeuses: 'Élevage > Fiches Pondeuses',
@@ -1799,6 +2037,7 @@ class SocleAccueilTitres {
     EcranPoste.saisieDepenses: 'Achats > Saisie des Dépenses',
     EcranPoste.gestionStocks: 'Gestion des Stocks',
     EcranPoste.catalogueProduits: 'Stocks & Produits > Catalogue Produits',
+    EcranPoste.importationMasse: 'Stocks & Produits > Importation en masse',
     EcranPoste.facturation: 'Facturation & MeCeF',
     EcranPoste.personnelEtStages: 'Personnel & Stages',
     EcranPoste.administrationEtDocument: 'Administration & Documents',
@@ -1814,5 +2053,9 @@ class SocleAccueilTitres {
   };
 
   /// Titre affiché pour [ecran] ; le défaut du web (`$title ?? 'Ferme École Olouwachegoun'`) sinon.
-  static String titre(EcranPoste ecran) => titresDuWeb[ecran] ?? 'Ferme École Olouwachegoun';
+  static String titre(EcranPoste ecran, {bool mecefActif = false}) {
+    // VC-5 : comme le web (`$this->mecefActif ? 'Facturation & MeCeF' : 'Facturation'`), le titre suit le module.
+    if (ecran == EcranPoste.facturation && !mecefActif) return 'Facturation';
+    return titresDuWeb[ecran] ?? 'Ferme École Olouwachegoun';
+  }
 }

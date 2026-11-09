@@ -50,6 +50,11 @@ enum EcranPoste {
   /// liste de l'animalier — contrairement à `suivi-reproduction.html`.
   soinsEtVaccins('soins-vaccins-hub.html'),
 
+  /// Ticket EL-1 — « Bon d'Abattage & Transformation » (`transformation.html`, route web `/transformation`, entrée
+  /// « Transformation » du menu, décision client). Figure dans la liste de l'animalier de `RBAC_PAGE_MAP` ; l'administrateur
+  /// a tout.
+  transformation('transformation.html'),
+
   /// ⚠️⚠️ **QUATRIÈME ÉCRAN PRÉSENT DANS LA MAQUETTE ET ABSENT DE
   /// `RBAC_PAGE_MAP`** — vérifié : `parametres-elevage.html` n'apparaît dans
   /// AUCUNE des quatre listes de `common.js`, comme `suivi-reproduction.html`,
@@ -57,10 +62,10 @@ enum EcranPoste {
   /// la carte n'ouvre donc l'écran qu'à `admin`, dont la liste vaut `null`.
   ///
   /// ⚠️ Ici, la restriction se défend : ces quatre référentiels fixent la
-  /// ration servie et le protocole sanitaire de toute la ferme. Mais l'écran
-  /// est en LECTURE SEULE au poste — le priver à l'animalier revient à lui
-  /// cacher la règle qu'il applique. **ARBITRAGE CLIENT**, avec les trois
-  /// autres pages absentes de la carte.
+  /// ration servie et le protocole sanitaire de toute la ferme. L'écran se
+  /// MODIFIE au poste depuis H9b (décision D-H9) — le priver à l'animalier
+  /// revient à lui cacher la règle qu'il applique. **ARBITRAGE CLIENT**, avec
+  /// les trois autres pages absentes de la carte.
   parametresElevage('parametres-elevage.html'),
   ficheElevage('fiche-lapins.html'),
   fichePondeuses('fiche-volailles-pondeuses.html'),
@@ -239,7 +244,13 @@ enum EcranPoste {
 
   /// ⚠️ Hors maquette (ticket 15.46, décision client du 17/10/2026) : écran dédié des transferts entre
   /// bandes, construit d'abord sur le web. Ouvert depuis « Gestion Élevage », comme les fiches.
-  transfertsBandes(null);
+  transfertsBandes(null),
+
+  /// ⚠️ Hors maquette (ticket IMPORT-1, décision du client du 08/11/2026) : « Importation en masse » par tableur xlsx,
+  /// construite d'abord sur le web (`/importation-masse`, Gate `importation-masse`). Ouverte à qui peut importer AU MOINS un
+  /// module : `manage-stocks`, `manage-ventes` ou `manage-achats` (admin et caissier d'après le seeder) ; l'écran n'offre que
+  /// les modules autorisés et le serveur re-juge chaque ligne à la synchronisation.
+  importationMasse(null);
 
   const EcranPoste(this.page);
 
@@ -308,6 +319,35 @@ class PermissionsPoste {
     ],
     'comptable': [
       'dashboard.html',
+      // Ticket CONF-4 (DV-20, décision du client du 08/11/2026 : « le même périmètre dans LogiAgriERP ») — EXTENSION DE LA
+      // CARTE DU PROTOTYPE (`RBAC_PAGE_MAP`), voulue et dite : le comptable LIT les ventes (hub Ventes & Devis SANS la caisse :
+      // devis, historique, retours et avoirs), CONSULTE la facturation, LIT les achats et les stocks. `pos-interface.html`
+      // (la caisse) n'y figure PAS.
+      //
+      // Ticket CONF-5 — DEUX EXTENSIONS DE PLUS de `RBAC_PAGE_MAP`, voulues et dites (décision du client, « lance le reste ») :
+      //  - `creances-clients.html` (+ `liste-clients`, `suivi-dettes`, `relances-clients`, `historique-avances`, `profile-client`) :
+      //    « Clients et Créances » s'ouvre en LECTURE (le web : `view-ventes`). Sans `manage-ventes`, chaque geste d'écriture
+      //    (relancer, encaisser, imputer une avance, créer / modifier / archiver un client) est masqué ET refusé (`RefusDroit`) ;
+      //  - `comptabilite-hub.html` : le comptable atteint tout le hub Comptabilité, comme au web (`view-comptabilite`) : plan
+      //    comptable, journal, grand livre, balance, états, clôture, analytique, TVA, rapprochement, bilan, immobilisations,
+      //    balance âgée. Ancienne incohérence de la carte (le hub manquait, ses pages non).
+      'comptabilite-hub.html',
+      'creances-clients.html',
+      'liste-clients.html',
+      'suivi-dettes.html',
+      'relances-clients.html',
+      'historique-avances.html',
+      'profile-client.html',
+      'ventes-devis.html',
+      'historique-ventes.html',
+      'devis.html',
+      'retours-avoirs.html',
+      'facturation.html',
+      'achats-commandes.html',
+      'fournisseurs.html',
+      'saisie-depenses.html',
+      'gestion-stocks.html',
+      'catalogue-produits.html',
       'journal-comptable.html',
       'rapport-bilan.html',
       'cloture-exercice.html',
@@ -366,6 +406,8 @@ class PermissionsPoste {
     EcranPoste.parametres => role == 'admin',
     // Ticket 15.46 — mêmes rôles que `manage-elevage` sur le web (seeder : admin et animalier).
     EcranPoste.transfertsBandes => role == 'admin' || role == 'animalier',
+    // Ticket IMPORT-1 — Gate `importation-masse` du web : un des trois droits d'écriture des modules importables.
+    EcranPoste.importationMasse => ['manage-stocks', 'manage-ventes', 'manage-achats'].any((d) => peut(role, d)),
     _ => true,
   };
 
@@ -387,8 +429,17 @@ class PermissionsPoste {
       'close-fiscal-year',
       'view-rapports',
       'export-rapports',
+      // Ticket CONF-4 (DV-20) : lecture des ventes, achats, stocks ; facturation ; droit fin de correction (avoir,
+      // retransmission) SANS la caisse (`manage-ventes`).
+      'view-ventes',
+      'view-achats',
+      'view-stocks',
+      'view-facturation',
+      'correct-invoices',
     },
-    'caissier': {'view-ventes', 'manage-ventes', 'export-ventes'},
+    // Ticket CONF-5 (DV-06) : le caissier CONSULTE et RÉIMPRIME ses factures (`view-facturation`, LECTURE seule) ; jamais
+    // `manage-facturation`, `correct-invoices` ni la retransmission.
+    'caissier': {'view-ventes', 'manage-ventes', 'export-ventes', 'view-facturation'},
     'animalier': {
       'view-elevage',
       'manage-elevage',
@@ -396,6 +447,15 @@ class PermissionsPoste {
       'export-elevage',
     },
   };
+
+  /// Ticket CONF-4 — Gate `avoir-client` du web : créer un avoir, le marquer traité, retransmettre sa facture `FA`.
+  /// `manage-ventes` (caissier) OU `correct-invoices` (comptable) ; l'annulation et la caisse restent à `manage-ventes` seul.
+  static bool peutCorrigerParAvoir(String role) =>
+      peut(role, 'manage-ventes') || peut(role, 'correct-invoices');
+
+  /// Ticket CONF-4 — Gate `retransmettre-facture` du web : `manage-facturation` (administrateur) OU `correct-invoices`.
+  static bool peutRetransmettreFacture(String role) =>
+      peut(role, 'manage-facturation') || peut(role, 'correct-invoices');
 
   /// `$user->can($permission)` du web, pour le rôle de la session du poste. Rôle inconnu : aucun droit
   /// d'écriture (le serveur refuserait de toute façon).

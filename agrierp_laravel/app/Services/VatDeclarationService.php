@@ -43,6 +43,30 @@ class VatDeclarationService
         return app(TvaSettingService::class)->active();
     }
 
+    /**
+     * Taux (fraction : 0,18) des frais de livraison INCLUS dans une vente : celui de la ligne de produit de plus grand montant
+     * (à égalité, le plus haut) — l'accessoire suit le principal. Un SEUL calcul, partagé par l'écriture comptable, la
+     * Déclaration de TVA et la facture normalisée (qui en tire le groupe A ou B).
+     */
+    public function tauxDeLaLivraison(\App\Models\Sale $sale): float
+    {
+        $sale->loadMissing('lines.product');
+        $meilleur = null;
+        $taux = 0.0;
+
+        foreach ($sale->lines as $ligne) {
+            $ttc = (float) ($ligne->manual_total_amount ?: ($ligne->qty * $ligne->unit_price));
+            $t = app(TvaSettingService::class)->tauxPour((float) ($ligne->product->tva_rate ?? 0)) / 100;
+
+            if ($meilleur === null || $ttc > $meilleur || ($ttc === $meilleur && $t > $taux)) {
+                $meilleur = $ttc;
+                $taux = $t;
+            }
+        }
+
+        return $taux;
+    }
+
     public function ht(float $ttc, float $rate): float
     {
         return round($ttc / (1 + $rate));
@@ -80,6 +104,17 @@ class VatDeclarationService
                 $ttc += $lineTtc;
                 $ht += $this->ht($lineTtc, $rate);
                 $tva += $this->tva($lineTtc, $rate);
+            }
+
+            // Frais de livraison inclus dans le total (nouvelles ventes) : TTC de la livraison, TVA au taux de la vente.
+            if ($sale->delivery_in_total && (float) $sale->delivery_fee > 0) {
+                $livraison = (float) $sale->delivery_fee;
+                $rate = $this->tauxDeLaLivraison($sale);
+
+                $rates[] = $rate;
+                $ttc += $livraison;
+                $ht += $this->ht($livraison, $rate);
+                $tva += $this->tva($livraison, $rate);
             }
 
             // Ticket DEV3 — facture d'un devis : aucune ligne, la TVA est celle du devis (total TTC de la vente).

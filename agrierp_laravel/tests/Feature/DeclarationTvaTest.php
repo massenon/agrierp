@@ -57,7 +57,6 @@ class DeclarationTvaTest extends TestCase
             'total' => array_sum(array_column($lines, 'ttc')),
             'delivery_fee' => 0,
             'status' => 'validee',
-            'mecef_status' => $mecefStatus,
         ]);
 
         foreach ($lines as $line) {
@@ -71,7 +70,10 @@ class DeclarationTvaTest extends TestCase
             ]);
         }
 
-        return $sale;
+        // MECEF-1 : une facture normalisée est figée — le statut se pose APRÈS les lignes du fixture.
+        \Illuminate\Support\Facades\DB::table('sales')->where('id', $sale->id)->update(['mecef_status' => $mecefStatus]);
+
+        return $sale->refresh();
     }
 
     /** HT = arrondi(TTC / 1,18) puis TVA = TTC − HT — formule exacte du prototype. */

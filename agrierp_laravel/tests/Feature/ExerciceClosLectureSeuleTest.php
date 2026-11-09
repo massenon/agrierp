@@ -142,6 +142,9 @@ class ExerciceClosLectureSeuleTest extends TestCase
     {
         $reponse = $this->envoyer(['livestock_daily_entries' => [[
             'id' => self::UUID_A, 'lot_id' => $this->pondeuses->id, 'entry_date' => '2027-03-14', 'mort' => 1,
+            // VOL-2 : une bande de pondeuses porte son départ par stade (tous « Pondeuse ») et ses morts ventilés.
+            'cat_depart_repro' => 200, 'cat_depart_sevre' => 0, 'cat_depart_jeune' => 0, 'cat_depart_4' => 0,
+            'mort_repro' => 1, 'mort_sevre' => 0, 'mort_jeune' => 0, 'mort_4' => 0,
         ]]])->assertOk();
 
         $this->assertSame([self::UUID_A], $reponse->json('livestock_daily_entries.accepted'));

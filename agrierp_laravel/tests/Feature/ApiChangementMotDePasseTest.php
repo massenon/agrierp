@@ -18,7 +18,7 @@ class ApiChangementMotDePasseTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const ANCIEN = 'AgriERP@2026';
+    private const ANCIEN = 'LogiAgriERP@2026';
 
     private User $user;
 

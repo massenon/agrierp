@@ -14,6 +14,9 @@ import '../../core/database/app_database.dart';
 /// connexion : un poste en service qui changerait de serveur sans administrateur couperait la ferme
 /// (règle de « Paramètres du poste ») — et n'aurait rien à perdre ici, puisqu'un poste neuf ne
 /// contient aucune saisie.
+/// Code de la ligne `modules_config` du module (le même qu'au serveur : `ModuleConfig::ASSISTANT_DEMARRAGE`).
+const codeModuleAssistant = 'assistant_demarrage';
+
 class PremierDemarrageRepository {
   PremierDemarrageRepository({
     required AppDatabase database,
@@ -26,6 +29,28 @@ class PremierDemarrageRepository {
   final AppDatabase _db;
   final ParametresPoste _reglages;
   final Dio _http;
+
+  /// Module « Assistant de démarrage » (Paramètres > Modules Actifs) : ÉTEINT par défaut, comme au web (absence de ligne = éteint).
+  Future<bool> moduleActif() async {
+    final ligne = await (_db.select(_db.modulesConfig)..where((m) => m.speciesCode.equals(codeModuleAssistant))).getSingleOrNull();
+    return ligne?.isEnabled ?? false;
+  }
+
+  /// Un poste neuf ne montre l'assistant que si le module est allumé.
+  ///
+  /// Un poste neuf n'a encore tiré aucun réglage : il LIT le module au serveur, à la connexion (`GET /api/auth/me`,
+  /// clé `assistant_demarrage_actif`). Hors ligne ou en erreur, il retombe sur sa copie locale (éteint par défaut).
+  Future<bool> afficherAssistant() async {
+    if (!await posteNeuf()) return false;
+    try {
+      final reponse = await _http.get<Map<String, dynamic>>('/api/auth/me');
+      final cle = reponse.data?['assistant_demarrage_actif'];
+      if (cle is bool) return cle;
+    } on DioException {
+      // Hors ligne : la copie locale décide.
+    }
+    return moduleActif();
+  }
 
   Future<bool> posteNeuf() async =>
       (await _db.etatDeSynchronisation())?.lastPulledAt == null &&

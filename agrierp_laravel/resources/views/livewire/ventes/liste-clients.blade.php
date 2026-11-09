@@ -10,9 +10,11 @@
             <button type="button" wire:click="exportClientsPdf" wire:loading.attr="disabled" wire:target="exportClientsPdf" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">
                 <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>PDF
             </button>
+            @can('manage-ventes')
             <button type="button" wire:click="newCustomer" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Client
             </button>
+            @endcan
         </div>
     </div>
 
@@ -34,7 +36,9 @@
     @if(count($selectedIds) > 0)
         <div class="bg-error-bg border border-error-deep/30 rounded-lg p-sm flex items-center justify-between">
             <span class="text-xs font-bold text-error-deep">{{ count($selectedIds) }} client(s) sélectionné(s)</span>
+            @can('manage-ventes')
             <button type="button" wire:click="openBulkArchiveModal" class="text-xs font-bold bg-error-red text-white px-md py-1.5 rounded-lg hover:bg-red-800">Supprimer la sélection</button>
+            @endcan
         </div>
     @endif
 
@@ -61,7 +65,9 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
+                        @can('manage-ventes')
                         <th class="px-md py-sm w-8"><input type="checkbox" wire:click="toggleSelectAll" @if(count($this->customersWithBalance) > 0 && count($selectedIds) === count($this->customersWithBalance)) checked @endif></th>
+                        @endcan
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Nom</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Téléphone</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Ville</th>
@@ -74,8 +80,10 @@
                 <tbody>
                     @forelse($this->customersWithBalance as $i => $row)
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
+                            @can('manage-ventes')
                             <td class="px-md py-sm"><input type="checkbox" wire:model.live="selectedIds" value="{{ $row['customer']->id }}"></td>
-                            <td data-label="Nom" class="px-md py-sm text-xs font-bold text-brand-forest"><a href="{{ route('ventes.profile-client', $row['customer']) }}" class="hover:underline hover:text-brand-emerald">{{ $row['customer']->name }}</a></td>
+                            @endcan
+                            <td data-label="Nom" class="px-md py-sm text-xs font-bold text-brand-forest"><a wire:navigate href="{{ route('ventes.profile-client', $row['customer']) }}" class="hover:underline hover:text-brand-emerald">{{ $row['customer']->name }}</a></td>
                             <td data-label="Téléphone" class="px-md py-sm text-xs">{{ $row['customer']->phone ?? '—' }}</td>
                             <td data-label="Ville" class="px-md py-sm text-xs">{{ $row['customer']->city ?? '—' }}</td>
                             <td data-label="Total Achats" class="px-md py-sm text-xs text-right">{{ number_format($row['total_achats'], 0, ',', ' ') }} FCFA</td>
@@ -88,9 +96,13 @@
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
+                                @can('manage-ventes')
                                 <button type="button" wire:click="editCustomer('{{ $row['customer']->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
-                                <a href="{{ route('ventes.devis-hub', ['tab' => 'historique']) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Historique d'achat"><span class="material-symbols-outlined text-[18px]">receipt_long</span></a>
+                                @endcan
+                                <a wire:navigate href="{{ route('ventes.devis-hub', ['tab' => 'historique']) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Historique d'achat"><span class="material-symbols-outlined text-[18px]">receipt_long</span></a>
+                                @can('manage-ventes')
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-client-{{ $row['customer']->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                @endcan
                             </td>
                         </tr>
                         <x-modal-confirm-delete :name="'archive-client-'.$row['customer']->id" :item-label="$row['customer']->name" :action="'archiveCustomer(\''.$row['customer']->id.'\')'" />
@@ -127,6 +139,12 @@
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Email</label>
                 <input wire:model="email" type="email" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('email') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('email') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">IFU</label>
+                <input wire:model="ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres (facultatif)" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('ifu') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('ifu') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                <p class="text-[10px] text-outline mt-xs">Préremplit la facture normalisée de ce client. Laissez vide pour un client particulier.</p>
             </div>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-client' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>

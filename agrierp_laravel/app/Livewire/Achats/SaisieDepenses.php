@@ -287,7 +287,7 @@ class SaisieDepenses extends Component
         $this->authorize('manage-achats');
 
         $this->resetErrorBag();
-        $this->validate(['receiptFile' => ['nullable', 'image', 'max:5120']]);
+        $this->validate(['receiptFile' => ['nullable', 'file', 'mimes:'.\App\Services\JustificatifService::FORMATS, 'max:'.\App\Services\JustificatifService::TAILLE_MAX_KO]]);
 
         $document = $this->document();
         $action = app(SaisieDepenseAction::class);

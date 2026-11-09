@@ -1,5 +1,8 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
+import '../../core/auth/refus_droit.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/document_officiel.dart';
 import '../../core/temps/heure_benin.dart';
@@ -10,12 +13,16 @@ import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
+import '../../core/systeme/justificatif_local.dart';
+import '../stocks/produits_repository.dart';
+import 'achats_creation_rapide.dart';
 import 'achats_modales.dart';
 import 'achats_repository.dart';
 import 'fournisseurs_repository.dart';
 import 'profil_fournisseur_screen.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 
 /// `prototype_html/achats-commandes.html` → Achats & Commandes.
@@ -53,15 +60,30 @@ class AchatsCommandesScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.depotFournisseurs,
+    this.depotProduits,
+    this.choisirJustificatif = choisirEtCopierJustificatif,
     this.imprimer,
     this.maintenant,
+    this.peutGerer = true,
   });
+
+  /// Ticket CONF-4 (DV-20) — `manage-achats` du rôle de la session : sans lui (comptable : LECTURE des achats, `view-achats`),
+  /// chaque geste d'écriture (achat, retour, remboursement, bon de commande, réception, fournisseur ou produit à la volée)
+  /// est refusé par « Votre rôle ne permet pas cette action. », comme le 403 du web.
+  final bool peutGerer;
 
   final AchatsRepository depot;
 
   /// Ouvre le profil du fournisseur depuis le détail (le lien de la maquette,
   /// `profile-fournisseur.html`). Absent : le nom s'affiche sans lien.
   final FournisseursRepository? depotFournisseurs;
+
+  /// Ticket AC-2 — dépôt propriétaire des produits : le bouton « + » de l'article crée un produit à la volée. Absent : le
+  /// bouton n'est pas offert.
+  final ProduitsRepository? depotProduits;
+
+  /// Ticket AC-3 — sélecteur du justificatif ; le sélecteur de fichiers du système en production, un faux en test.
+  final ChoisirJustificatif choisirJustificatif;
 
   /// Éditeur injecté — `EditeursRapports.imprimer` en production, un espion en
   /// test. Absent : les boutons d'édition ne font rien (comme à l'écran des
@@ -113,9 +135,31 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
   final List<LigneSaisieAchat> _panier = [];
 
+  /// Ticket AC-3 — chemin local du justificatif joint à l'achat en cours de saisie.
+  String? _justificatif;
+
+  // Ticket AC-1 — « Saisie d'un Bon de Commande » (`BonsCommande` du web) : fournisseur, livraison attendue, panier prévisionnel.
+  String? _bonFournisseurId;
+  DateTime? _bonLivraison;
+  String? _bonProduitId;
+  final _bonQuantite = TextEditingController(text: '1');
+  final _bonPrix = TextEditingController();
+  final List<LigneSaisieBon> _panierBon = [];
+
   DonneesAchats? _donnees;
   String? _message;
   bool _messageEstUneErreur = false;
+
+  /// Date de l'achat en cours de saisie (onglet 1) — par défaut : aujourd'hui.
+  DateTime? _dateAchat;
+
+  /// Filtre de date de la Liste d'Achats (onglet 2) ; `null` : aucun filtre.
+  DateTime? _dateFiltreAchats;
+
+  // #41 — barre de recherche et filtre de règlement (fidèles au `search`/`statusFilter` du Blade).
+  String _rechercheAchat = '';
+  String _filtreStatutAchat = '';
+  final _ctrlRechercheAchat = TextEditingController();
 
   /// Fournisseur dont le profil est ouvert depuis le détail d'un achat ;
   /// `null` : le hub.
@@ -126,6 +170,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   @override
   void initState() {
     super.initState();
+    _dateAchat = _maintenant;
     _charger();
   }
 
@@ -133,7 +178,10 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   void dispose() {
     _quantite.dispose();
     _prixUnitaire.dispose();
+    _bonQuantite.dispose();
+    _bonPrix.dispose();
     _montantPaye.dispose();
+    _ctrlRechercheAchat.dispose();
     super.dispose();
   }
 
@@ -150,6 +198,52 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       _compteId ??= donnees.comptes.isEmpty ? null : donnees.comptes.first.id;
     });
   }
+
+  /// `openAddSupplierModal` / `saveNewSupplier` du web : « Nouveau Fournisseur », puis le fournisseur est sélectionné.
+  Future<void> _nouveauFournisseur() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    final fiche = await ouvrirNouveauFournisseurRapide(context: context, depot: widget.depotFournisseurs!);
+    if (fiche == null) return;
+    await _charger();
+    if (!mounted) return;
+    setState(() => _fournisseurId = fiche.id);
+    ToastAgri.afficher(context, 'Fournisseur enregistré avec succès.');
+  }
+
+  /// `openAddProductModal` / `saveNewProduct` du web : « Nouveau Produit », puis le produit est sélectionné (P.U. à 0).
+  Future<void> _nouveauProduit() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    final fiche = await ouvrirNouveauProduitRapide(context: context, depot: widget.depotProduits!);
+    if (fiche == null) return;
+    await _charger();
+    if (!mounted) return;
+    setState(() {
+      _produitId = fiche.id;
+      _prixUnitaire.text = '0';
+    });
+    ToastAgri.afficher(
+      context,
+      'Produit ajouté au catalogue — complétez sa fiche (tarification) depuis le Catalogue.',
+    );
+  }
+
+  Widget _boutonPlus(Key cle, String infobulle, IconData icone, VoidCallback surTap) => SizedBox(
+    width: 40,
+    height: 40,
+    child: Tooltip(
+      message: infobulle,
+      child: Material(
+        color: AgriColors.brandEmerald,
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+        child: InkWell(
+          key: cle,
+          borderRadius: BorderRadius.circular(AgriRadius.lg),
+          onTap: surTap,
+          child: Icon(icone, size: 20, color: Colors.white),
+        ),
+      ),
+    ),
+  );
 
   double get _totalPanier => _panier.fold<double>(0, (t, l) => t + l.total);
 
@@ -181,6 +275,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   }
 
   Future<void> _enregistrer() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     if (_fournisseurId == null) {
       setState(() {
         _message = 'Choisissez le fournisseur de cet achat.';
@@ -206,6 +301,8 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         modePaiement: _modePaiement,
         compteId: _compteId!,
         montantPaye: paye,
+        date: _dateAchat,
+        receiptLocalPath: _justificatif,
       );
     } on RefusExercice catch (e) {
       // 🔴→✅ Ticket EX6 (EF7) — `EnregistrerAchat::save()` : « Achat refusé : » + le motif R4 en toast d'erreur, le
@@ -225,6 +322,8 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     setState(() {
       _panier.clear();
       _montantPaye.clear();
+      _justificatif = null;
+      _dateAchat = _maintenant;
       _message =
           'Achat enregistré sur ce poste — il partira à la prochaine '
           'synchronisation.';
@@ -232,6 +331,83 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     });
 
     await _charger();
+  }
+
+  // ── Sélecteurs de date ────────────────────────────────────────────────────
+
+  /// Ticket #40 — calendrier borné à l'exercice ouvert (fidèle à `min`/`max` du Blade).
+  Future<void> _choisirDateAchat() async {
+    final premier = await widget.depot.premierJourSaisissable();
+    if (!mounted) return;
+    final dernier = _maintenant;
+    final bornes = ExerciceDeSaisie.calendrier(
+      premier: premier,
+      repli: DateTime(2020),
+      dernier: dernier,
+      initial: _dateAchat ?? dernier,
+    );
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: bornes.initial,
+      firstDate: bornes.premier,
+      lastDate: dernier,
+      locale: const Locale('fr'),
+    );
+    if (choisie != null && mounted) setState(() => _dateAchat = choisie);
+  }
+
+  /// Ticket #40 — filtre de date de la Liste d'Achats, borné à l'exercice affiché.
+  Future<void> _choisirDateFiltreAchats() async {
+    final etat = PorteeExerciceChoisi.lire(context);
+    final valeurCourante = _dateFiltreAchats ?? _maintenant;
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: etat?.borner(valeurCourante) ?? valeurCourante,
+      firstDate: etat?.bornes.debut ?? DateTime(2020),
+      lastDate: etat?.bornes.fin ?? _maintenant,
+      locale: const Locale('fr'),
+    );
+    if (choisie != null && mounted) setState(() => _dateFiltreAchats = choisie);
+  }
+
+  bool _memeJour(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  // #41 — correspondance recherche : 8 premiers chars de l'UUID (référence affichée) ou nom fournisseur.
+  bool _matchRecherche(LigneAchat l, String q) {
+    final r = q.toLowerCase();
+    return l.achat.id.substring(0, l.achat.id.length.clamp(0, 8)).toLowerCase().contains(r) ||
+        (l.achat.supplierName ?? '').toLowerCase().contains(r);
+  }
+
+  // #42 — reste dû d'un achat d'après les dettes servies (null = inconnu).
+  double? _detteAchat(DonneesAchats d, LigneAchat l) {
+    if (!l.achat.hasDebt || !l.envoye) return 0;
+    final payables = d.dettes.where((p) => p.purchaseId == l.achat.id).toList();
+    if (payables.isEmpty) return null;
+    return payables.fold<double>(0, (t, p) => t + (p.amount - p.amountPaid).clamp(0, double.infinity));
+  }
+
+  Widget _montantPayeCell(DonneesAchats d, LigneAchat l, String cle) {
+    final dette = _detteAchat(d, l);
+    final paye = dette == null ? null : l.achat.total - dette;
+    return Text(
+      paye == null ? '—' : _montant(paye),
+      key: Key(cle),
+      style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+    );
+  }
+
+  Widget _detteCell(DonneesAchats d, LigneAchat l, String cle) {
+    final dette = _detteAchat(d, l);
+    return Text(
+      dette == null ? '—' : (dette > 0 ? _montant(dette) : '0'),
+      key: Key(cle),
+      style: TextStyle(
+        fontSize: AgriTypography.xs,
+        fontWeight: AgriTypography.gras,
+        color: dette != null && dette > 0 ? AgriColors.errorDeep : null,
+      ),
+    );
   }
 
   // ── Liste d'Achats : détail, impression ───────────────────────────────────
@@ -341,6 +517,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   /// « Retour Fournisseur » : la modale écrit la DEMANDE (`pending`) ; rien d'autre ne
   /// bouge au poste.
   Future<void> _demanderRetour(LigneAchat ligne) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirRetourFournisseur(
       context: context,
       depot: widget.depot,
@@ -355,6 +532,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   }
 
   Future<void> _demanderRemboursement(DonneesAchats d) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirRemboursement(
       context: context,
       depot: widget.depot,
@@ -486,6 +664,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     if (_profilFournisseur != null && depotFournisseurs != null) {
       return ProfilFournisseurScreen(
         depot: depotFournisseurs,
+        peutGerer: widget.peutGerer,
         fournisseurId: _profilFournisseur!,
         onRetour: () {
           setState(() => _profilFournisseur = null);
@@ -585,18 +764,32 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   Widget _ongletSaisie(DonneesAchats d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _titre('Enregistrer un Achat', large),
-      const SizedBox(height: AgriSpacing.md),
-      if (large)
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 60, child: _panneauArticles(d)),
-              const SizedBox(width: AgriSpacing.md),
-              Expanded(flex: 40, child: _panneauReglement(d)),
-            ],
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: AgriSpacing.sm,
+        children: [
+          _titre('Enregistrer un Achat', large, icone: SymbolesAgri.add_shopping_cart),
+          ChampDateFiltre(
+            cle: const Key('date-achat'),
+            valeur: _dateAchat ?? _maintenant,
+            onTap: _choisirDateAchat,
           ),
+        ],
+      ),
+      const SizedBox(height: AgriSpacing.md),
+      // ⚠️ Pas d'`IntrinsicHeight` : le tableau des articles contient un
+      // `LayoutBuilder` (largeur minimale du défilement horizontal), qui refuse
+      // les dimensions intrinsèques. Les deux cartes sont alignées en haut, donc
+      // aucune hauteur commune n'était de toute façon imposée.
+      if (large)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 60, child: _panneauArticles(d)),
+            const SizedBox(width: AgriSpacing.md),
+            Expanded(flex: 40, child: _panneauReglement(d)),
+          ],
         )
       else ...[
         _panneauArticles(d),
@@ -655,24 +848,46 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _etiquette('Selectionner Fournisseur'),
-        _liste(
-          cle: 'fournisseur',
-          valeur: _fournisseurId,
-          options: [for (final f in d.fournisseurs) (f.id, f.name)],
-          vide: '— Aucun fournisseur synchronisé —',
-          invite: 'Choisir le fournisseur...',
-          onChanged: (v) => setState(() => _fournisseurId = v),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _liste(
+                cle: 'fournisseur',
+                valeur: _fournisseurId,
+                options: [for (final f in d.fournisseurs) (f.id, f.name)],
+                vide: '— Aucun fournisseur synchronisé —',
+                invite: 'Choisir le fournisseur...',
+                onChanged: (v) => setState(() => _fournisseurId = v),
+              ),
+            ),
+            if (widget.depotFournisseurs != null) ...[
+              const SizedBox(width: AgriSpacing.xs),
+              _boutonPlus(const Key('ajouter-fournisseur'), 'Ajouter un fournisseur', SymbolesAgri.person_add, _nouveauFournisseur),
+            ],
+          ],
         ),
         const SizedBox(height: AgriSpacing.md),
         _etiquette('Ajouter un Article'),
         _etiquettePetite('Produit / Article'),
-        _liste(
-          cle: 'produit',
-          valeur: _produitId,
-          options: [for (final p in d.produits) (p.id, p.name)],
-          vide: '— Aucun produit synchronisé —',
-          invite: 'Choisir un produit...',
-          onChanged: (v) => setState(() => _produitId = v),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _liste(
+                cle: 'produit',
+                valeur: _produitId,
+                options: [for (final p in d.produits) (p.id, p.name)],
+                vide: '— Aucun produit synchronisé —',
+                invite: 'Choisir un produit...',
+                onChanged: (v) => setState(() => _produitId = v),
+              ),
+            ),
+            if (widget.depotProduits != null) ...[
+              const SizedBox(width: AgriSpacing.xs),
+              _boutonPlus(const Key('ajouter-produit'), 'Ajouter un produit', SymbolesAgri.add_box, _nouveauProduit),
+            ],
+          ],
         ),
         const SizedBox(height: AgriSpacing.sm),
         Row(
@@ -829,6 +1044,10 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         _etiquette('Montant Paye (FCFA)'),
         _champ('montant-paye', _montantPaye),
         const SizedBox(height: AgriSpacing.md),
+        // Ticket AC-3 — « Pièce Justificative » (Blade : cadre pointillé « Associer une photo du reçu »).
+        _etiquette('Pièce Justificative'),
+        _pieceJustificative(),
+        const SizedBox(height: AgriSpacing.md),
         // Ticket EX7 (EF10) — exercice affiché clos : grisé, motif en info-bulle (`@lectureSeule` du web).
         LectureSeule.infobulle(LectureSeule.motif(context), FilledButton.icon(
           key: const Key('enregistrer-achat'),
@@ -846,18 +1065,77 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
             ),
           ),
         )),
-        const SizedBox(height: AgriSpacing.sm),
-        // ⚠️ « Piece Justificative » de la maquette (l.192) : le poste n'a ni
-        // sélecteur de fichier ni canal d'envoi de pièce jointe. Promettre le
-        // champ ferait croire la photo du reçu enregistrée.
-        _mentionPoste(
-          "La pièce justificative se joint depuis la surface web : le poste "
-          "n'a pas de canal d'envoi de fichier. L'achat, lui, part avec sa "
-          'date de saisie.',
-        ),
       ],
     ),
   );
+
+  /// Ticket AC-3 — cadre pointillé du Blade ; le fichier est copié localement puis ENVOYÉ avec l'achat (synchronisation).
+  Widget _pieceJustificative() {
+    final chemin = _justificatif;
+    if (chemin == null) {
+      return InkWell(
+        key: const Key('achat-recu-choisir'),
+        onTap: () async {
+          final choisi = await widget.choisirJustificatif();
+          if (!mounted) return;
+          if (choisi != null) {
+            setState(() => _justificatif = choisi);
+          } else if (dernierRefusJustificatif != null) {
+            ToastAgri.afficher(context, dernierRefusJustificatif!, type: TypeToast.erreur);
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(AgriSpacing.md),
+          decoration: BoxDecoration(
+            border: Border.all(color: AgriColors.outlineVariant, width: 2),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: const Column(
+            children: [
+              Icon(SymbolesAgri.add_a_photo, size: 36, color: AgriColors.outlineVariant),
+              SizedBox(height: AgriSpacing.xs),
+              Text(
+                'Associer une photo du reçu',
+                key: Key('achat-recu-invite'),
+                style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.xs),
+      decoration: BoxDecoration(
+        border: Border.all(color: AgriColors.brandEmerald),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+        color: AgriColors.brandEmerald.withValues(alpha: 0.05),
+      ),
+      child: Row(
+        children: [
+          const Icon(SymbolesAgri.description, size: 18, color: AgriColors.brandEmerald),
+          const SizedBox(width: AgriSpacing.xs),
+          Expanded(
+            child: Text(
+              chemin.split(RegExp(r'[\\/]')).last,
+              key: const Key('achat-recu-nom'),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+            ),
+          ),
+          IconButton(
+            key: const Key('achat-recu-retirer'),
+            tooltip: 'Retirer le justificatif',
+            onPressed: () => setState(() => _justificatif = null),
+            icon: const Icon(SymbolesAgri.close, size: 16, color: AgriColors.outline),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── Onglet 2 : Liste d'Achats ─────────────────────────────────────────────
 
@@ -865,8 +1143,22 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
     // Ticket EX7 (EF9) — les achats de l'exercice AFFICHÉ, 25 par page (web : `achatsDeLExercice()` puis la page) ;
     // l'export reprend tout l'exercice. Les indicateurs restent ceux du web (toute la ferme).
     final etat = PorteeExerciceChoisi.lire(context);
-    final achats = etat == null ? d.achats : [for (final a in d.achats) if (etat.contient(a.achat.purchaseDate)) a];
-    final page = etat == null ? achats : PaginationAgri.tranche(achats, _pageAchats);
+    // Ticket #40 — filtre de date en plus du filtre exercice (fidèle au `dateFilter` du Blade).
+    final achatsExercice = etat == null ? d.achats : [for (final a in d.achats) if (etat.contient(a.achat.purchaseDate)) a];
+    final achats = _dateFiltreAchats == null
+        ? achatsExercice
+        : [for (final a in achatsExercice) if (_memeJour(a.achat.purchaseDate, _dateFiltreAchats!)) a];
+    // #41 — filtre texte : 8 premiers caractères de la référence ou nom fournisseur.
+    final achatsRecherche = _rechercheAchat.isEmpty
+        ? achats
+        : [for (final a in achats) if (_matchRecherche(a, _rechercheAchat)) a];
+    // #41 — filtre statut de règlement (fidèle au `statusFilter` 'paye'/'dette' du Blade).
+    final achatsFiltres = _filtreStatutAchat == 'paye'
+        ? [for (final a in achatsRecherche) if (a.envoye && !a.achat.hasDebt && !a.retourne) a]
+        : _filtreStatutAchat == 'dette'
+            ? [for (final a in achatsRecherche) if (a.achat.hasDebt) a]
+            : achatsRecherche;
+    final page = etat == null ? achatsFiltres : PaginationAgri.tranche(achatsFiltres, _pageAchats);
     final verrou = LectureSeule.motif(context);
     return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -876,11 +1168,46 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         crossAxisAlignment: WrapCrossAlignment.center,
         runSpacing: AgriSpacing.sm,
         children: [
-          _titre("Liste d'Achats", large),
+          _titre("Liste d'Achats", large, icone: SymbolesAgri.list_alt),
           Wrap(
             spacing: AgriSpacing.xs,
             runSpacing: AgriSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              // Filtre date (fidèle au `<input type="date" wire:model.live="dateFilter">` du Blade).
+              if (_dateFiltreAchats != null) ...[
+                ChampDateFiltre(
+                  cle: const Key('filtre-date-achats'),
+                  valeur: _dateFiltreAchats!,
+                  onTap: _choisirDateFiltreAchats,
+                ),
+                InkWell(
+                  key: const Key('effacer-filtre-date-achats'),
+                  onTap: () => setState(() => _dateFiltreAchats = null),
+                  borderRadius: BorderRadius.circular(AgriRadius.lg),
+                  child: const Tooltip(
+                    message: 'Effacer le filtre de date',
+                    child: Icon(SymbolesAgri.close, size: 18, color: AgriColors.outline),
+                  ),
+                ),
+              ] else
+                OutlinedButton.icon(
+                  key: const Key('ouvrir-filtre-date-achats'),
+                  onPressed: _choisirDateFiltreAchats,
+                  icon: const Icon(SymbolesAgri.calendar_today, size: 16),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AgriColors.outline,
+                    side: const BorderSide(color: AgriColors.outlineVariant),
+                    shape: const StadiumBorder(),
+                  ),
+                  label: const Text(
+                    'Filtrer par date',
+                    style: TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontWeight: AgriTypography.gras,
+                    ),
+                  ),
+                ),
               FilledButton.icon(
                 key: const Key('exporter-pdf-achats'),
                 onPressed: () => _exporterListe(d),
@@ -980,14 +1307,63 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
+      // #41 — barre de recherche + filtre de règlement (fidèles au bloc `bg-white border...p-md` du Blade).
+      Container(
+        padding: const EdgeInsets.all(AgriSpacing.md),
+        decoration: BoxDecoration(
+          color: AgriColors.surfaceCard,
+          border: Border.all(color: AgriColors.outlineVariant),
+          borderRadius: BorderRadius.circular(AgriRadius.lg),
+        ),
+        child: Wrap(
+          spacing: AgriSpacing.sm,
+          runSpacing: AgriSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 180),
+              child: TextField(
+                key: const Key('recherche-achats'),
+                controller: _ctrlRechercheAchat,
+                style: const TextStyle(fontSize: AgriTypography.xs),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher par référence ou fournisseur...',
+                  hintStyle: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                  prefixIcon: const Icon(SymbolesAgri.search, size: 18, color: AgriColors.outline),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(AgriRadius.lg)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AgriRadius.lg), borderSide: const BorderSide(color: AgriColors.outlineVariant)),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: AgriSpacing.sm),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() { _rechercheAchat = v.trim(); _pageAchats = 1; }),
+              ),
+            ),
+            DropdownButton<String>(
+              key: const Key('filtre-statut-achats'),
+              value: _filtreStatutAchat,
+              underline: const SizedBox.shrink(),
+              style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.onSurface),
+              items: const [
+                DropdownMenuItem(value: '', child: Text('Tous les règlements')),
+                DropdownMenuItem(value: 'paye', child: Text('Payé entièrement')),
+                DropdownMenuItem(value: 'dette', child: Text('Dette fournisseur')),
+              ],
+              onChanged: (v) => setState(() { _filtreStatutAchat = v ?? ''; _pageAchats = 1; }),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: AgriSpacing.md),
       _tableau(
-        largeur: 1050,
+        largeur: 1250,
         colonnes: const [
           ('Référence Achat', 3),
           ('Date', 3),
           ('Fournisseur', 4),
           ('Catégorie', 3),
-          ('Montant Total', 3),
+          ('Montant Payé', 2),
+          ('Montant Total', 2),
+          ('Dette', 2),
           ('Statut', 4),
           ('Actions', 3),
         ],
@@ -1016,16 +1392,20 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
                 ),
                 3,
               ),
+              // #42 — Montant Payé / Montant Total / Dette (fidèles au tiroir du Blade : `$purchase->payable->balance`).
+              (_montantPayeCell(d, page[i], 'paye-$i'), 2),
               (
                 Text(
                   _montant(page[i].achat.total),
+                  key: Key('total-achat-$i'),
                   style: const TextStyle(
                     fontSize: AgriTypography.xs,
                     fontWeight: AgriTypography.gras,
                   ),
                 ),
-                3,
+                2,
               ),
+              (_detteCell(d, page[i], 'dette-$i'), 2),
               (_statut(page[i], 'liste-$i'), 4),
               (_actionsAchat(page[i], i), 3),
             ]),
@@ -1034,7 +1414,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       if (etat != null)
         PaginationAgri(
           nom: 'achats',
-          total: achats.length,
+          total: achatsFiltres.length,
           page: _pageAchats,
           annee: etat.annee,
           onPage: (p) => setState(() => _pageAchats = p),
@@ -1111,76 +1491,478 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
 
   // ── Onglet 3 : Bons de Commande ───────────────────────────────────────────
 
+  // ── Onglet 3 : Bons de Commande (ticket AC-1 : `bons-commande.blade.php`) ─────
+
+  double get _totalBon => _panierBon.fold<double>(0, (t, l) => t + l.total);
+
+  /// `updatedLineProductId` du web : choisir un produit propose son prix minimal comme P.U estimé.
+  void _choisirProduitBon(DonneesAchats d, String? id) {
+    final produit = d.produits.where((p) => p.id == id).firstOrNull;
+    setState(() {
+      _bonProduitId = id;
+      _bonPrix.text = produit?.priceMin == null ? '' : _nombre(produit!.priceMin!);
+    });
+  }
+
+  void _ajouterAuBon(DonneesAchats d) {
+    final produit = d.produits.where((p) => p.id == _bonProduitId).firstOrNull;
+    final quantite = int.tryParse(_bonQuantite.text.trim());
+    final prix = double.tryParse(_bonPrix.text.trim().replaceAll(',', '.'));
+    final refus = produit == null
+        ? 'Le champ produit est obligatoire.'
+        : (quantite == null || quantite < 1)
+        ? 'Le champ quantité doit être un nombre entier supérieur ou égal à 1.'
+        : (prix == null || prix < 0)
+        ? 'Le champ prix unitaire estimé est obligatoire (zéro ou plus).'
+        : null;
+    if (refus != null) {
+      setState(() {
+        _message = refus;
+        _messageEstUneErreur = true;
+      });
+      return;
+    }
+    setState(() {
+      _panierBon.add(LigneSaisieBon(produit: produit!, quantite: quantite!, prixEstime: prix!));
+      _bonProduitId = null;
+      _bonPrix.clear();
+      _bonQuantite.text = '1';
+      _message = null;
+    });
+  }
+
+  Future<void> _genererBon() async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    try {
+      await widget.depot.creerBon(
+        fournisseurId: _bonFournisseurId ?? '',
+        livraisonAttendue: _bonLivraison,
+        lignes: List.of(_panierBon),
+      );
+    } on SaisieAchatRefusee catch (e) {
+      setState(() {
+        _message = e.motif;
+        _messageEstUneErreur = true;
+      });
+      return;
+    }
+    setState(() {
+      _panierBon.clear();
+      _bonFournisseurId = null;
+      _bonLivraison = null;
+      _message = null;
+    });
+    await _charger();
+    if (!mounted) return;
+    ToastAgri.afficher(context, 'Bon de commande généré avec succès.');
+  }
+
+  Future<void> _choisirLivraison() async {
+    final aujourdhui = _maintenant;
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: _bonLivraison ?? aujourdhui,
+      firstDate: DateTime(aujourdhui.year - 1),
+      lastDate: DateTime(aujourdhui.year + 3),
+      locale: const Locale('fr'),
+    );
+    if (choisie != null && mounted) setState(() => _bonLivraison = choisie);
+  }
+
+  /// `openReceiveModal` / `confirmReceiveOrder` : la modale « Valider la réception ».
+  Future<void> _recevoirBon(LigneBon l) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
+    final ok = await afficherModale<bool>(
+      context: context,
+      confirmation: true,
+      constructeur: (contexte) => ModaleConfirmation(
+        titre: 'Valider la réception',
+        message:
+            "Contrôle de validation et intégration aux stocks physiques. La validation de la réception générera "
+            "automatiquement une facture d'achat formelle et incrémentera vos stocks de marchandises physiques en base locale.",
+        icone: SymbolesAgri.assignment_turned_in,
+        actions: [
+          BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(contexte).pop(false)),
+          BoutonModalePrimaire(
+            key: const Key('reception-confirmer'),
+            libelle: 'Confirmer la Réception',
+            onPressed: () async {
+              try {
+                await widget.depot.recevoirBon(l.bon.id);
+              } on SaisieAchatRefusee catch (e) {
+                if (contexte.mounted) Navigator.of(contexte).pop(false);
+                _annoncer(e.motif);
+                return;
+              }
+              if (contexte.mounted) Navigator.of(contexte).pop(true);
+            },
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _charger();
+    _annoncer('Réception enregistrée — la facture d\'achat sera générée et les stocks mis à jour à la prochaine synchronisation.');
+  }
+
+  Future<void> _imprimerBon(DonneesAchats d, LigneBon l) async {
+    final fournisseur = d.fournisseurs.where((f) => f.id == l.bon.supplierId).firstOrNull;
+    final noms = {for (final p in d.produits) p.id: p};
+    await _editer(DocumentsAchats.bonCommande(l, fournisseur: fournisseur, produits: noms));
+  }
+
+  static const _libellesStatutBon = {
+    'brouillon': 'BROUILLON',
+    'envoye': 'ENVOYÉ / EN COURS',
+    'recu': 'REÇU / VALIDÉ',
+    'annule': 'ANNULÉ',
+  };
+
   Widget _ongletBons(DonneesAchats d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _titre('Bons de Commande', large),
+      const SizedBox(height: AgriSpacing.xs),
+      const Text(
+        'Planification des approvisionnements de la ferme.',
+        style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+      ),
       const SizedBox(height: AgriSpacing.md),
+      _carte(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(SymbolesAgri.assignment_turned_in, size: 20, color: AgriColors.brandEmerald),
+                SizedBox(width: AgriSpacing.xs),
+                Text(
+                  "Saisie d'un Bon de Commande",
+                  style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+                ),
+              ],
+            ),
+            const SizedBox(height: AgriSpacing.xs),
+            const Text(
+              'Générer un ordre d\'achat prévisionnel multi-produits.',
+              style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+            ),
+            const SizedBox(height: AgriSpacing.md),
+            Wrap(
+              spacing: AgriSpacing.md,
+              runSpacing: AgriSpacing.md,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                SizedBox(
+                  width: 260,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _etiquettePetite('Fournisseur'),
+                      _liste(
+                        cle: 'bon-fournisseur',
+                        valeur: _bonFournisseurId,
+                        options: [for (final f in d.fournisseurs) (f.id, f.name)],
+                        vide: '— Aucun fournisseur synchronisé —',
+                        invite: 'Choisir le fournisseur...',
+                        onChanged: (v) => setState(() => _bonFournisseurId = v),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _etiquettePetite('Date de Livraison Attendue'),
+                    ChampDateFiltre(
+                      cle: const Key('bon-livraison'),
+                      valeur: _bonLivraison ?? _maintenant,
+                      onTap: _choisirLivraison,
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 260,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _etiquettePetite('Produit / Article'),
+                      _liste(
+                        cle: 'bon-produit',
+                        valeur: _bonProduitId,
+                        options: [for (final p in d.produits) (p.id, p.name)],
+                        vide: '— Aucun produit synchronisé —',
+                        invite: 'Choisir un produit...',
+                        onChanged: (v) => _choisirProduitBon(d, v),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 110,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [_etiquettePetite('Quantité'), _champ('bon-quantite', _bonQuantite)],
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [_etiquettePetite('P.U Estimé (FCFA)'), _champ('bon-prix', _bonPrix)],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AgriSpacing.md),
+            OutlinedButton.icon(
+              key: const Key('bon-ajouter'),
+              onPressed: () => _ajouterAuBon(d),
+              icon: const Icon(SymbolesAgri.add, size: 18),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AgriColors.brandEmerald,
+                side: const BorderSide(color: AgriColors.brandEmerald, width: 2),
+                padding: const EdgeInsets.symmetric(vertical: AgriSpacing.sm),
+              ),
+              label: const Text(
+                'Ajouter au bon de commande',
+                style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras),
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (_message != null && _onglet == 'Bons de Commande') ...[
+        const SizedBox(height: AgriSpacing.md),
+        _bandeau(_message!, _messageEstUneErreur),
+      ],
+      const SizedBox(height: AgriSpacing.md),
+      if (large)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 65, child: _panneauArticlesBon()),
+            const SizedBox(width: AgriSpacing.md),
+            Expanded(flex: 35, child: _panneauTotalBon()),
+          ],
+        )
+      else ...[
+        _panneauArticlesBon(),
+        const SizedBox(height: AgriSpacing.md),
+        _panneauTotalBon(),
+      ],
+      const SizedBox(height: AgriSpacing.lg),
+      const Text(
+        'Bons de commande émis',
+        style: TextStyle(fontSize: AgriTypography.base, fontWeight: AgriTypography.gras, color: AgriColors.onSurface),
+      ),
+      const SizedBox(height: AgriSpacing.sm),
       _tableau(
-        largeur: 1050,
+        largeur: 1150,
         colonnes: const [
           ('Réf Commande', 3),
           ("Date d'Émission", 3),
           ('Livraison Attendue', 3),
           ('Fournisseur', 4),
           ('Montant Estimé', 3),
-          ('Statut', 3),
-          ('Actions', 2),
+          ('Statut', 4),
+          ('Actions', 3),
         ],
-        vide: '— Aucun bon de commande synchronisé —',
+        vide: 'Aucun bon de commande émis pour le moment.',
         lignes: [
           for (var i = 0; i < d.bonsCommande.length; i++)
             _ligne(i, [
-              (_reference(), 3),
-              (Text(_date(d.bonsCommande[i].createdAt), style: _cellule), 3),
+              (Text(d.bonsCommande[i].bon.id.substring(0, 8).toUpperCase(), key: Key('bon-ref-$i'), style: _cellule.copyWith(fontWeight: AgriTypography.gras, color: AgriColors.brandEmerald)), 3),
+              (Text(_date(d.bonsCommande[i].bon.createdAt), style: _cellule), 3),
+              (Text(_date(d.bonsCommande[i].bon.expectedDeliveryDate), style: _cellule), 3),
               (
                 Text(
-                  _date(d.bonsCommande[i].expectedDeliveryDate),
-                  style: _cellule,
-                ),
-                3,
-              ),
-              (
-                Text(
-                  d.bonsCommande[i].supplierName ?? '—',
+                  d.bonsCommande[i].bon.supplierName ?? '—',
                   overflow: TextOverflow.ellipsis,
-                  style: _cellule,
+                  style: _cellule.copyWith(fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
                 ),
                 4,
               ),
               (
                 Text(
-                  _montant(d.bonsCommande[i].estimatedTotal),
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                  ),
+                  _montant(d.bonsCommande[i].lignes.isEmpty ? d.bonsCommande[i].bon.estimatedTotal : d.bonsCommande[i].total),
+                  style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
                 ),
                 3,
               ),
-              (
-                Text(
-                  d.bonsCommande[i].status ?? '—',
-                  overflow: TextOverflow.ellipsis,
-                  style: _cellule,
-                ),
-                3,
-              ),
-              (_actionInerte(), 2),
+              (_statutBon(d.bonsCommande[i], i), 4),
+              (_actionsBon(d, d.bonsCommande[i], i), 3),
             ]),
         ],
       ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ LA SAISIE D'UN BON DE COMMANDE N'EST PAS PORTÉE. Un bon engage la
-      // ferme auprès d'un fournisseur : le serveur le sert en LECTURE SEULE et
-      // ignore tout envoi le concernant. Un bon saisi ici serait effacé au
-      // tirage suivant — et le fournisseur aurait été appelé pour rien.
-      _mentionPoste(
-        "La saisie d'un bon de commande et la validation d'une réception se "
-        'font sur la surface web : le serveur sert les bons en lecture seule. '
-        'Le poste les affiche pour que la livraison attendue soit connue au '
-        'magasin.',
+    ],
+  );
+
+  Widget _panneauArticlesBon() => _carte(
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Row(
+          children: [
+            Icon(SymbolesAgri.shopping_basket, size: 20, color: AgriColors.brandForest),
+            SizedBox(width: AgriSpacing.xs),
+            Text(
+              'Articles Prévisionnels de la Commande',
+              style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        if (_panierBon.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AgriSpacing.lg),
+            child: Center(
+              child: Text(
+                'Aucun article ajouté au bon de commande.',
+                key: Key('bon-panier-vide'),
+                style: TextStyle(fontSize: AgriTypography.sm, color: AgriColors.outline),
+              ),
+            ),
+          )
+        else
+          _tableau(
+            largeur: 520,
+            colonnes: const [('Produit', 5), ('Qté', 2), ('P.U', 2), ('Total', 3), ('', 1)],
+            vide: '',
+            lignes: [
+              for (var i = 0; i < _panierBon.length; i++)
+                _ligne(i, [
+                  (Text(_panierBon[i].produit.name, style: _cellule.copyWith(fontWeight: AgriTypography.gras, color: AgriColors.brandForest)), 5),
+                  (Text('${_panierBon[i].quantite} ${_panierBon[i].produit.unit}', style: _cellule), 2),
+                  (Text(_montant(_panierBon[i].prixEstime), style: _cellule), 2),
+                  (Text(_montant(_panierBon[i].total), key: Key('bon-ligne-total-$i'), style: _cellule.copyWith(fontWeight: AgriTypography.gras)), 3),
+                  (
+                    IconButton(
+                      key: Key('bon-retirer-$i'),
+                      tooltip: 'Retirer',
+                      onPressed: () => setState(() => _panierBon.removeAt(i)),
+                      icon: const Icon(SymbolesAgri.close, size: 16),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      color: AgriColors.errorDeep,
+                    ),
+                    1,
+                  ),
+                ]),
+            ],
+          ),
+      ],
+    ),
+  );
+
+  Widget _panneauTotalBon() => _carte(
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AgriSpacing.md),
+          decoration: BoxDecoration(
+            color: AgriColors.accentYellow.withValues(alpha: 0.20),
+            border: Border.all(color: AgriColors.accentYellow),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'TOTAL ESTIMÉ',
+                style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+              ),
+              Text(
+                '${_montant(_totalBon)} FCFA',
+                key: const Key('bon-total'),
+                style: const TextStyle(fontSize: AgriTypography.xl, fontWeight: FontWeight.w800, color: AgriColors.brandForest),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        _mentionPoste(
+          "Rappel : Ces articles d'approvisionnement (aliments, vaccins) sont stockés dans le module Stocks (Classe 3) et ne "
+          'seront jamais mélangés avec vos produits finis de la ferme (Classe 7).',
+          cle: const Key('bon-rappel'),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        ElevatedButton.icon(
+          key: const Key('bon-generer'),
+          onPressed: _genererBon,
+          icon: const Icon(SymbolesAgri.check_circle, size: 18),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AgriColors.brandEmerald,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: AgriSpacing.sm),
+          ),
+          label: const Text('Générer le Bon', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras)),
+        ),
+      ],
+    ),
+  );
+
+  /// Statut du bon (libellés du Blade) ; « En attente d'envoi » tant que le serveur n'a pas acquitté ; « Refusé » avec son motif.
+  Widget _statutBon(LigneBon l, int i) {
+    final etiquette = _libellesStatutBon[l.statut] ?? l.statut.toUpperCase();
+    final couleur = switch (l.statut) {
+      'recu' => AgriColors.brandEmerald,
+      'annule' => AgriColors.errorRed,
+      'envoye' => AgriColors.infoBlue,
+      _ => AgriColors.outline,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _pastille(etiquette, couleur, Key('bon-statut-$i')),
+        if (l.enAttente || (l.receptionEnAttente && l.bon.status != 'recu'))
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: _pastille(
+              l.receptionEnAttente && l.bon.status != 'recu' ? 'Réception en attente' : 'En attente d\'envoi',
+              AgriColors.accentYellow,
+              Key('bon-attente-$i'),
+            ),
+          ),
+        if (l.refuse)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: _pastille('Refusé par le serveur', AgriColors.errorRed, Key('bon-refus-$i')),
+          ),
+        if (l.motifRefus != null || l.motifRefusReception != null)
+          Text(
+            l.motifRefus ?? l.motifRefusReception!,
+            key: Key('bon-motif-$i'),
+            style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep),
+          ),
+      ],
+    );
+  }
+
+  /// Imprimer (`exportPdf`) et « Valider la réception » (`openReceiveModal`, absent d'un bon reçu ou annulé).
+  Widget _actionsBon(DonneesAchats d, LigneBon l, int i) => Row(
+    children: [
+      IconButton(
+        key: Key('bon-imprimer-$i'),
+        tooltip: 'Exporter PDF',
+        onPressed: () => _imprimerBon(d, l),
+        icon: const Icon(SymbolesAgri.print, size: 18),
+        padding: const EdgeInsets.all(4),
+        constraints: const BoxConstraints(),
+        color: AgriColors.outline,
       ),
+      if (l.receptionPossible)
+        IconButton(
+          key: Key('bon-recevoir-$i'),
+          tooltip: 'Valider la réception',
+          onPressed: () => _recevoirBon(l),
+          icon: const Icon(SymbolesAgri.assignment_turned_in, size: 18),
+          padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(),
+          color: AgriColors.brandEmerald,
+        ),
     ],
   );
 
@@ -1285,14 +2067,25 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
   Widget _grilleKpis(bool large, List<Widget> cartes) => GrilleKpi(colonnes: large ? cartes.length : 2, children: cartes,
   );
 
-  Widget _titre(String texte, bool large) => Text(
-    texte,
-    style: TextStyle(
-      fontSize: large ? AgriTypography.xxl : AgriTypography.xl,
-      fontWeight: AgriTypography.gras,
-      color: AgriColors.onSurface,
-    ),
-  );
+  Widget _titre(String texte, bool large, {IconData? icone}) {
+    final texteWidget = Text(
+      texte,
+      style: TextStyle(
+        fontSize: large ? AgriTypography.xxl : AgriTypography.xl,
+        fontWeight: AgriTypography.gras,
+        color: AgriColors.onSurface,
+      ),
+    );
+    if (icone == null) return texteWidget;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icone, size: large ? 28.0 : 24.0, color: AgriColors.brandEmerald),
+        const SizedBox(width: AgriSpacing.xs),
+        texteWidget,
+      ],
+    );
+  }
 
   Widget _carte(Widget contenu) => Container(
     padding: const EdgeInsets.all(AgriSpacing.md),
@@ -1347,7 +2140,11 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       );
     }
 
-    return DropdownButtonFormField<String>(
+    // Ticket AC-2 : la valeur peut changer SANS clic (fournisseur ou produit créé à la volée, puis sélectionné) ; `initialValue`
+    // n'est lu qu'à la création du champ, la clé de valeur le recrée.
+    return KeyedSubtree(
+      key: ValueKey('valeur-$cle-$valeur'),
+      child: DropdownButtonFormField<String>(
       key: Key('liste-$cle'),
       initialValue: valeur,
       isDense: true,
@@ -1376,6 +2173,7 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
           DropdownMenuItem(value: id, child: Text(libelle)),
       ],
       onChanged: onChanged,
+    ),
     );
   }
 
@@ -1422,42 +2220,44 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(libelle.toUpperCase(), style: _enteteColonne),
-                    ),
-                ],
-              ),
-            ),
-            if (lignes.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(AgriSpacing.lg),
-                child: Text(
-                  vide,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontStyle: FontStyle.italic,
-                    color: AgriColors.outline,
-                  ),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(libelle.toUpperCase(), style: _enteteColonne),
+                      ),
+                  ],
                 ),
               ),
-            ...lignes,
-          ],
+              if (lignes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AgriSpacing.lg),
+                  child: Text(
+                    vide,
+                    style: const TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontStyle: FontStyle.italic,
+                      color: AgriColors.outline,
+                    ),
+                  ),
+                ),
+              ...lignes,
+            ],
+          ),
         ),
       ),
     ),

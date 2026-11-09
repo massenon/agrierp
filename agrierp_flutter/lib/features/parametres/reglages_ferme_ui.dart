@@ -1,0 +1,916 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+
+import '../../core/config/apercu_image.dart';
+import '../../core/config/fichiers_entreprise.dart';
+import '../../core/database/app_database.dart';
+import '../../core/systeme/fichiers_poste.dart';
+import '../../core/theme/agri_tokens.dart';
+import '../../core/theme/symboles_agri.dart';
+import '../../core/widgets/modale_agri.dart';
+import '../../core/widgets/zone_depot.dart';
+import '../comptabilite/documents_comptabilite.dart';
+import '../rh/calcul_paie.dart';
+import 'reglages_ferme_repository.dart';
+
+/// Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — modales et sous-pages des réglages de la ferme. Les libellés sont ceux des Blade
+/// (`donnees-entreprise`, `bareme-its`, `integrations`, `modes-paiement`, `roles-permissions`). Chaque geste écrit une DEMANDE.
+
+Widget _etiquette(String texte) => Padding(
+  padding: const EdgeInsets.only(bottom: AgriSpacing.xs),
+  child: Text(texte.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+);
+
+Widget _erreur(String? texte, Key cle) => texte == null
+    ? const SizedBox.shrink()
+    : Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(texte, key: cle, style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+      );
+
+/// Un champ de texte étiqueté, clé `<prefixe>-<cle>`, erreur `<prefixe>-erreur-<cle>`.
+Widget champReglage(String prefixe, String cle, String etiquette, TextEditingController c, Map<String, String> erreurs, {String? indice, bool nombre = false, bool secret = false}) => Padding(
+  padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _etiquette(etiquette),
+      TextField(
+        key: Key('$prefixe-$cle'),
+        controller: c,
+        obscureText: secret,
+        keyboardType: nombre ? TextInputType.number : null,
+        decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), hintText: indice),
+      ),
+      _erreur(erreurs[cle], Key('$prefixe-erreur-$cle')),
+    ],
+  ),
+);
+
+Widget _formulaire(Map<String, String> erreurs, String prefixe, List<Widget> champs) => Column(
+  mainAxisSize: MainAxisSize.min,
+  crossAxisAlignment: CrossAxisAlignment.stretch,
+  children: [
+    if (erreurs['formulaire'] != null)
+      Padding(
+        padding: const EdgeInsets.only(bottom: AgriSpacing.md),
+        child: Text(erreurs['formulaire']!, key: Key('$prefixe-erreur-formulaire'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+      ),
+    ...champs,
+  ],
+);
+
+// ── PA-3 · Données de l'entreprise ─────────────────────────────────────────
+
+/// Sélecteur de fichier image du poste (logo, favicon), injectable : les formats proposés sont ceux du genre (CONF-1).
+Future<FichierChoisi?> choisirImage(String genre) async {
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: FichiersEntreprise.extensionsParGenre[genre], dialogTitle: 'Choisir une image', withData: selecteurAvecOctets);
+  if (r == null || r.files.isEmpty) return null;
+  final f = r.files.first;
+  final octets = await octetsDuFichierChoisi(f);
+  return octets == null ? null : (nom: f.name, octets: octets);
+}
+
+Future<bool> ouvrirEntreprise({
+  required BuildContext context,
+  required ReglagesFermeRepository depot,
+  required CompanySetting? existante,
+  required bool estAdmin,
+  Future<FichierChoisi?> Function(String genre) choisirFichier = choisirImage,
+}) async {
+  final ok = await afficherModale<bool>(
+    context: context,
+    constructeur: (_) => _ModaleEntreprise(depot: depot, e: existante, estAdmin: estAdmin, choisirFichier: choisirFichier),
+  );
+  return ok == true;
+}
+
+class _ModaleEntreprise extends StatefulWidget {
+  const _ModaleEntreprise({required this.depot, required this.e, required this.estAdmin, required this.choisirFichier});
+
+  final Future<FichierChoisi?> Function(String genre) choisirFichier;
+  final ReglagesFermeRepository depot;
+  final CompanySetting? e;
+  final bool estAdmin;
+
+  @override
+  State<_ModaleEntreprise> createState() => _ModaleEntrepriseState();
+}
+
+class _ModaleEntrepriseState extends State<_ModaleEntreprise> {
+  static String _n(double? v, double defaut) => ((v ?? defaut) == (v ?? defaut).roundToDouble() ? (v ?? defaut).round().toString() : (v ?? defaut).toString());
+
+  late final _raison = TextEditingController(text: widget.e?.companyName ?? '');
+  late final _promoteur = TextEditingController(text: widget.e?.promoterName ?? '');
+  late final _adresse = TextEditingController(text: widget.e?.address ?? '');
+  late final _tel = TextEditingController(text: widget.e?.phone ?? '');
+  late final _email = TextEditingController(text: widget.e?.email ?? '');
+  late final _ifu = TextEditingController(text: widget.e?.ifu ?? '');
+  late final _rccm = TextEditingController(text: widget.e?.rccm ?? '');
+  late final _vps = TextEditingController(text: _n(widget.e?.vpsRate, 4));
+  late final _salarie = TextEditingController(text: _n(widget.e?.cnssEmployeeRate, 3.6));
+  late final _pension = TextEditingController(text: _n(widget.e?.cnssEmployerPensionRate, 6.4));
+  late final _famille = TextEditingController(text: _n(widget.e?.cnssEmployerFamilyRate, 9));
+  late final _risque = TextEditingController(text: _n(widget.e?.cnssEmployerRiskRate, 2));
+  late bool _tva = widget.e?.tvaEnabled ?? true;
+
+  Map<String, String> _erreurs = const {};
+  FichierChoisi? _logo;
+  FichierChoisi? _favicon;
+  Uint8List? _logoActuel;
+  Uint8List? _faviconActuel;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerActuels();
+  }
+
+  Future<void> _chargerActuels() async {
+    final l = await widget.depot.fichiersEntreprise.lire('logo');
+    final f = await widget.depot.fichiersEntreprise.lire('favicon');
+    if (mounted) setState(() { _logoActuel = l; _faviconActuel = f; });
+  }
+
+  Future<void> _choisir(String genre) async {
+    final f = await widget.choisirFichier(genre);
+    if (f == null || !mounted) return;
+    _poser(genre, f);
+  }
+
+  /// CONF-2 : un fichier DÉPOSÉ par glisser-déposer suit EXACTEMENT le chemin du clic (`_poser`) : il est gardé tel quel,
+  /// puis jugé à l'enregistrement par `FichiersEntreprise.valider` (mêmes règles, mêmes messages que le web).
+  Future<void> _deposer(String genre, FichierChoisi f) async {
+    if (!mounted) return;
+    _poser(genre, f);
+  }
+
+  void _poser(String genre, FichierChoisi f) {
+    setState(() {
+      if (genre == 'logo') { _logo = f; } else { _favicon = f; }
+      _erreurs = {..._erreurs}..remove(genre == 'logo' ? 'logoFile' : 'faviconFile');
+    });
+  }
+
+  /// Ticket CONF-1 — « Supprimer » le logo ou le favicon, après confirmation ; l'ancien fichier part du poste et du serveur.
+  Future<void> _supprimer(String genre) async {
+    final cible = genre == 'logo' ? 'le logo' : "l'icône du site";
+    final ok = await afficherModale<bool>(
+      context: context,
+      confirmation: true,
+      constructeur: (c) => ModaleConfirmation(
+        titre: 'Supprimer $cible',
+        message: "Supprimer $cible de l'entreprise ? Le fichier sera effacé.",
+        icone: SymbolesAgri.delete,
+        couleurIcone: AgriColors.errorDeep,
+        actions: [
+          BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(c).pop(false)),
+          BoutonModalePrimaire(key: Key('entreprise-$genre-supprimer-confirmer'), libelle: 'Supprimer', onPressed: () => Navigator.of(c).pop(true)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await widget.depot.supprimerFichierEntreprise(genre, estAdmin: widget.estAdmin);
+    } on ReglageRefuse catch (r) {
+      setState(() => _erreurs = r.erreurs);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      if (genre == 'logo') { _logo = null; _logoActuel = null; } else { _favicon = null; _faviconActuel = null; }
+    });
+  }
+
+  Widget _depotFichier(String genre, String titre, String invite, String aide, IconData icone, FichierChoisi? choisi, Uint8List? actuel, double hauteur) {
+    final erreur = _erreurs[genre == 'logo' ? 'logoFile' : 'faviconFile'];
+    final image = choisi?.octets ?? actuel;
+    final apercu = image == null ? null : apercuAffichable(image);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(titre.toUpperCase(), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest))),
+            if (actuel != null)
+              TextButton.icon(
+                key: Key('entreprise-$genre-supprimer'),
+                onPressed: () => _supprimer(genre),
+                icon: const Icon(SymbolesAgri.delete, size: 16, color: AgriColors.errorDeep),
+                label: const Text('Supprimer', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.errorDeep)),
+              ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        ZoneDepot(
+          key: Key('entreprise-$genre-depot'),
+          surFichier: (f) => _deposer(genre, f),
+          enfant: (_, survol) => InkWell(
+            key: Key('entreprise-$genre'),
+            onTap: () => _choisir(genre),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              // Survol : bordure et fond d'accent, comme `:class="survol ? 'border-brand-emerald bg-surface-zebra' : …"` du Blade.
+              decoration: BoxDecoration(
+                color: survol ? AgriColors.surfaceZebra : null,
+                border: Border.all(color: survol ? AgriColors.brandEmerald : AgriColors.outlineVariant, width: survol ? 2 : 1),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
+              child: Column(children: [
+                // Aperçu dessiné pour PNG / JPEG / WEBP ET pour l'ICO (décodé par `apercuAffichable`, CONF-2).
+                if (apercu != null)
+                  Image.memory(apercu, key: Key('entreprise-$genre-apercu'), height: hauteur, fit: BoxFit.contain, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                Icon(icone, size: 40, color: AgriColors.outlineVariant),
+                Text(choisi?.nom ?? invite, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.outline)),
+                Text(aide, key: Key('entreprise-$genre-aide'), style: const TextStyle(fontSize: 10, color: AgriColors.outline)),
+              ]),
+            ),
+          ),
+        ),
+        if (erreur != null) Text(erreur, key: Key('entreprise-$genre-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+      ],
+    );
+  }
+
+  Future<void> _enregistrer() async {
+    try {
+      await widget.depot.enregistrerEntreprise(
+        raisonSociale: _raison.text, promoteur: _promoteur.text, adresse: _adresse.text, telephone: _tel.text, email: _email.text,
+        ifu: _ifu.text, rccm: _rccm.text, tva: _tva, vps: _vps.text, cnssSalarie: _salarie.text, cnssPension: _pension.text,
+        cnssFamille: _famille.text, cnssRisque: _risque.text, estAdmin: widget.estAdmin,
+        logo: _logo, favicon: _favicon,
+        // Le réglage MeCeF a son onglet (`PageFacturationEmecef`) : aucune clé `mecef*` ici, le serveur garde son réglage.
+      );
+    } on ReglageRefuse catch (r) {
+      setState(() => _erreurs = r.erreurs);
+      return;
+    }
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  /// Le mode de facturation normalisée, l'IFU de la facture, l'adresse de l'API et l'opérateur ont leur onglet (`PageFacturationEmecef`),
+  /// comme au web : ici, un simple renvoi (`donnees-entreprise.blade.php`).
+  Widget _blocMecef() => const Padding(
+    padding: EdgeInsets.only(bottom: AgriSpacing.md),
+    child: Text(
+      "Le mode de facturation normalisée, le jeton et l'adresse de l'API e-MECeF se règlent dans l'onglet Facturation normalisée (e-MECeF).",
+      key: Key('entreprise-renvoi-mecef'),
+      style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    const p = 'entreprise';
+    return ModaleAgri(
+      titre: "Données de l'Entreprise",
+      largeur: LargeurModale.lg,
+      contenu: SingleChildScrollView(
+        child: _formulaire(_erreurs, p, [
+          champReglage(p, 'companyName', 'Raison Sociale *', _raison, _erreurs),
+          champReglage(p, 'promoterName', 'Nom du Promoteur', _promoteur, _erreurs),
+          champReglage(p, 'address', "Adresse du Siège d'Exploitation", _adresse, _erreurs),
+          champReglage(p, 'phone', 'Téléphone Principal', _tel, _erreurs, indice: '+229 XX XX XX XX'),
+          champReglage(p, 'email', 'Email de Contact', _email, _erreurs, indice: 'contact@fermeolouwachegoun.com'),
+          champReglage(p, 'ifu', 'Identifiant Fiscal Unique (IFU) *', _ifu, _erreurs, indice: 'ex : 3202601234567'),
+          champReglage(p, 'rccm', 'Registre du Commerce (RCCM)', _rccm, _erreurs),
+          _blocMecef(),
+          SwitchListTile(
+            key: const Key('entreprise-tva'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Exploitation assujettie à la TVA', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras)),
+            value: _tva,
+            onChanged: (v) => setState(() => _tva = v),
+          ),
+          const SizedBox(height: AgriSpacing.sm),
+          champReglage(p, 'cnssEmployeeRate', 'CNSS salariale (%)', _salarie, _erreurs, nombre: true),
+          champReglage(p, 'vpsRate', 'VPS — Versement Patronal sur Salaires (%)', _vps, _erreurs, nombre: true),
+          champReglage(p, 'cnssEmployerPensionRate', 'CNSS patronale — pensions (%)', _pension, _erreurs, nombre: true),
+          champReglage(p, 'cnssEmployerFamilyRate', 'CNSS patronale — prestations familiales (%)', _famille, _erreurs, nombre: true),
+          champReglage(p, 'cnssEmployerRiskRate', 'CNSS patronale — risques professionnels (%)', _risque, _erreurs, nombre: true),
+          const SizedBox(height: AgriSpacing.sm),
+          _depotFichier('logo', "Logo de l'Entreprise", 'Glisser-déposer ou cliquer pour choisir un logo', 'PNG carré, fond transparent recommandé, max 2 Mo', SymbolesAgri.add_photo_alternate, _logo, _logoActuel, 48),
+          const SizedBox(height: AgriSpacing.sm),
+          _depotFichier('favicon', "Favicon (Icône d'Onglet)", 'Glisser-déposer ou cliquer pour choisir un favicon', 'ICO ou PNG 32x32px, max 500 Ko', SymbolesAgri.web, _favicon, _faviconActuel, 32),
+        ]),
+      ),
+      actions: [
+        BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop(false)),
+        BoutonModalePrimaire(key: const Key('entreprise-enregistrer'), libelle: 'Enregistrer les Modifications', onPressed: _enregistrer),
+      ],
+    );
+  }
+}
+
+// ── PA-7 · Barème IR-PTS / ITS ─────────────────────────────────────────────
+
+class PageBaremeIts extends StatefulWidget {
+  const PageBaremeIts({super.key, required this.depot, required this.estAdmin, required this.surRetour});
+
+  final ReglagesFermeRepository depot;
+  final bool estAdmin;
+  final VoidCallback surRetour;
+
+  @override
+  State<PageBaremeIts> createState() => _PageBaremeItsState();
+}
+
+class _LigneTranche {
+  _LigneTranche(String de, String a, String taux)
+      : de = TextEditingController(text: de),
+        a = TextEditingController(text: a),
+        taux = TextEditingController(text: taux);
+
+  final TextEditingController de;
+  final TextEditingController a;
+  final TextEditingController taux;
+}
+
+class _PageBaremeItsState extends State<PageBaremeIts> {
+  List<_LigneTranche>? _lignes;
+  CompanySetting? _entreprise;
+  final _brut = TextEditingController(text: '150000');
+  String? _erreur;
+  bool _enregistre = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  static String _n(double v) => v == v.roundToDouble() ? v.round().toString() : v.toString();
+
+  Future<void> _charger() async {
+    final b = await widget.depot.bareme();
+    final e = await widget.depot.entreprise();
+    if (!mounted) return;
+    setState(() {
+      _entreprise = e;
+      _lignes = b.isEmpty
+          ? [_LigneTranche('0', '', '0')]
+          : [for (final t in b) _LigneTranche(_n(t.fromAmount), t.toAmount == null ? '' : _n(t.toAmount!), _n(t.rate))];
+    });
+  }
+
+  bool get _modifiable => !(_entreprise?.payrollLocked ?? false) || widget.estAdmin;
+
+  List<TrancheSaisie> _saisies() => [
+    for (final l in _lignes!)
+      TrancheSaisie(
+        de: double.tryParse(l.de.text.replaceAll(',', '.')) ?? 0,
+        a: l.a.text.trim().isEmpty ? null : double.tryParse(l.a.text.replaceAll(',', '.')),
+        taux: double.tryParse(l.taux.text.replaceAll(',', '.')) ?? 0,
+      ),
+  ];
+
+  Future<void> _enregistrer() async {
+    try {
+      await widget.depot.enregistrerBareme(_saisies(), estAdmin: widget.estAdmin);
+      setState(() {
+        _erreur = null;
+        _enregistre = true;
+      });
+    } on ReglageRefuse catch (r) {
+      setState(() {
+        _erreur = r.toString();
+        _enregistre = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lignes = _lignes;
+    if (lignes == null) return const Center(child: CircularProgressIndicator());
+
+    final brut = double.tryParse(_brut.text.replaceAll(',', '.')) ?? 0;
+    final e = _entreprise;
+    final paie = CalculPaie.calculer(
+      brut,
+      0,
+      bareme: [for (final t in _saisies()) TrancheIts(plancher: t.de, plafond: t.a, taux: t.taux)],
+      taux: TauxPaie(
+        cnssSalarie: e?.cnssEmployeeRate, vps: e?.vpsRate, cnssPatronalePension: e?.cnssEmployerPensionRate,
+        cnssPatronaleFamille: e?.cnssEmployerFamilyRate, cnssPatronaleRisque: e?.cnssEmployerRiskRate,
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('bareme-retour'),
+            onPressed: widget.surRetour,
+            icon: const Icon(SymbolesAgri.arrow_back, size: 18),
+            label: const Text("Données de l'Entreprise", style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+            style: TextButton.styleFrom(foregroundColor: AgriColors.brandEmerald),
+          ),
+        ),
+        Row(children: const [
+          Icon(SymbolesAgri.functions, size: 26, color: AgriColors.brandEmerald),
+          SizedBox(width: AgriSpacing.xs),
+          Text('Barème IR-PTS / ITS', style: TextStyle(fontSize: AgriTypography.xl, fontWeight: AgriTypography.gras, color: AgriColors.onSurface)),
+        ]),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          'Impôt sur les Traitements et Salaires — retenu à la source, progressif, assis sur le net imposable (salaire dû moins CNSS salariale).',
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        if (!_modifiable)
+          Container(
+            key: const Key('bareme-arrete'),
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(border: Border.all(color: AgriColors.outlineVariant), borderRadius: BorderRadius.circular(AgriRadius.lg)),
+            child: Text(
+              'Barème arrêté le ${_entreprise?.payrollEditedAt ?? '—'}. Seul un administrateur peut le modifier. Les bulletins déjà réglés ne sont jamais recalculés.',
+              style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+            ),
+          ),
+        const SizedBox(height: AgriSpacing.md),
+        const Text("Tranches d'imposition", style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+        const SizedBox(height: AgriSpacing.sm),
+        for (var i = 0; i < lignes.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
+            child: Row(
+              children: [
+                for (final (cle, c, etiquette) in [('de', lignes[i].de, 'De (FCFA)'), ('a', lignes[i].a, 'À (FCFA)'), ('taux', lignes[i].taux, 'Taux (%)')])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: AgriSpacing.sm),
+                      child: TextField(
+                        key: Key('bareme-$cle-$i'),
+                        controller: c,
+                        enabled: _modifiable,
+                        onChanged: (_) => setState(() {}),
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), labelText: etiquette, hintText: cle == 'a' ? 'sans plafond' : null),
+                      ),
+                    ),
+                  ),
+                if (_modifiable)
+                  IconButton(
+                    key: Key('bareme-retirer-$i'),
+                    tooltip: 'Retirer',
+                    onPressed: () => setState(() => lignes.removeAt(i)),
+                    icon: const Icon(SymbolesAgri.delete, size: 18, color: AgriColors.errorDeep),
+                  ),
+              ],
+            ),
+          ),
+        if (_modifiable)
+          Row(children: [
+            OutlinedButton.icon(
+              key: const Key('bareme-ajouter'),
+              onPressed: () => setState(() {
+                final der = lignes.isEmpty ? null : double.tryParse(lignes.last.a.text);
+                lignes.add(_LigneTranche(der == null ? '0' : _n(der), '', '0'));
+              }),
+              icon: const Icon(SymbolesAgri.add, size: 18),
+              label: const Text('Ajouter une tranche', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            ElevatedButton.icon(
+              key: const Key('bareme-enregistrer'),
+              onPressed: _enregistrer,
+              icon: const Icon(SymbolesAgri.save, size: 18),
+              style: ElevatedButton.styleFrom(backgroundColor: AgriColors.brandEmerald, foregroundColor: Colors.white, shape: const StadiumBorder()),
+              label: const Text('Enregistrer le barème', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+          ]),
+        if (_erreur != null) _erreur_(_erreur!, const Key('bareme-erreur')),
+        if (_enregistre)
+          const Padding(
+            padding: EdgeInsets.only(top: AgriSpacing.sm),
+            child: Text('Barème demandé au serveur : il sera appliqué à la prochaine synchronisation.', key: Key('bareme-demande'), style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+          ),
+        const SizedBox(height: AgriSpacing.lg),
+        const Text('Simulation', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+        const SizedBox(height: AgriSpacing.sm),
+        SizedBox(
+          width: 280,
+          child: TextField(
+            key: const Key('bareme-brut'),
+            controller: _brut,
+            keyboardType: TextInputType.number,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), labelText: 'Salaire brut mensuel (FCFA)'),
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        for (final (cle, libelle, valeur) in [
+          ('du', 'Salaire dû', paie.salaireDu),
+          ('cnss', '− CNSS salariale', paie.cnssSalariale),
+          ('imposable', '= Net imposable', paie.netImposable),
+          ('its', '− ITS', paie.its),
+          ('net', 'NET À PAYER', paie.net),
+        ])
+          Text('$libelle : ${DocumentsComptabilite.montant(valeur)} FCFA', key: Key('bareme-sim-$cle'), style: const TextStyle(fontSize: AgriTypography.xs)),
+        if (!paie.baremeItsRenseigne)
+          const Padding(
+            padding: EdgeInsets.only(top: AgriSpacing.xs),
+            child: Text("Aucune tranche enregistrée : l'ITS est nul faute de barème, et non parce que le salaire serait sous le seuil.", style: TextStyle(fontSize: 11, color: AgriColors.outline)),
+          ),
+      ],
+    );
+  }
+
+  Widget _erreur_(String t, Key k) => Padding(
+    padding: const EdgeInsets.only(top: AgriSpacing.sm),
+    child: Text(t, key: k, style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+  );
+}
+
+// ── PA-4 · Modes de paiement ───────────────────────────────────────────────
+
+Future<bool> ouvrirBanque({required BuildContext context, required ReglagesFermeRepository depot}) async =>
+    (await afficherModale<bool>(context: context, constructeur: (_) => _ModaleSimple(
+      depot: depot, prefixe: 'banque', titre: 'Ajouter un Compte Bancaire',
+      champs: const [('bankName', 'Banque *'), ('holderName', 'Titulaire du compte'), ('rib', 'RIB *'), ('iban', 'IBAN *'), ('accountCode', 'Numéro de compte (plan)')],
+      valeurs: const {'holderName': 'Ferme École OLOUWACHEGOUN'},
+      enregistrer: (d, v) => d.creerBanque(banque: v['bankName']!, titulaire: v['holderName']!, rib: v['rib']!, iban: v['iban']!, compte: v['accountCode']!),
+    ))) == true;
+
+Future<bool> ouvrirMomo({required BuildContext context, required ReglagesFermeRepository depot}) async =>
+    (await afficherModale<bool>(context: context, constructeur: (_) => _ModaleSimple(
+      depot: depot, prefixe: 'momo', titre: 'Ajouter une Ligne Mobile Money',
+      champs: const [('operatorName', 'Opérateur *'), ('phoneNumber', 'Numéro de téléphone *'), ('holderName', 'Titulaire'), ('simSerial', 'Numéro de série SIM'), ('accountCode', 'Numéro de compte (plan)')],
+      valeurs: const {},
+      enregistrer: (d, v) => d.creerMomo(operateur: v['operatorName']!, telephone: v['phoneNumber']!, titulaire: v['holderName']!, sim: v['simSerial']!, compte: v['accountCode']!),
+    ))) == true;
+
+class _ModaleSimple extends StatefulWidget {
+  const _ModaleSimple({required this.depot, required this.prefixe, required this.titre, required this.champs, required this.valeurs, required this.enregistrer});
+
+  final ReglagesFermeRepository depot;
+  final String prefixe;
+  final String titre;
+  final List<(String, String)> champs;
+  final Map<String, String> valeurs;
+  final Future<void> Function(ReglagesFermeRepository, Map<String, String>) enregistrer;
+
+  @override
+  State<_ModaleSimple> createState() => _ModaleSimpleState();
+}
+
+class _ModaleSimpleState extends State<_ModaleSimple> {
+  late final Map<String, TextEditingController> _c = {for (final (cle, _) in widget.champs) cle: TextEditingController(text: widget.valeurs[cle] ?? '')};
+  Map<String, String> _erreurs = const {};
+
+  Future<void> _ok() async {
+    try {
+      await widget.enregistrer(widget.depot, {for (final e in _c.entries) e.key: e.value.text});
+    } on ReglageRefuse catch (r) {
+      setState(() => _erreurs = r.erreurs);
+      return;
+    }
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) => ModaleAgri(
+    titre: widget.titre,
+    contenu: SingleChildScrollView(
+      child: _formulaire(_erreurs, widget.prefixe, [for (final (cle, etiquette) in widget.champs) champReglage(widget.prefixe, cle, etiquette, _c[cle]!, _erreurs)]),
+    ),
+    actions: [
+      BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop(false)),
+      BoutonModalePrimaire(key: Key('${widget.prefixe}-enregistrer'), libelle: 'Enregistrer', onPressed: _ok),
+    ],
+  );
+}
+
+Future<bool> ouvrirVirement({required BuildContext context, required ReglagesFermeRepository depot, required List<TreasuryAccount> comptes}) async =>
+    (await afficherModale<bool>(context: context, constructeur: (_) => _ModaleVirement(depot: depot, comptes: comptes))) == true;
+
+class _ModaleVirement extends StatefulWidget {
+  const _ModaleVirement({required this.depot, required this.comptes});
+
+  final ReglagesFermeRepository depot;
+  final List<TreasuryAccount> comptes;
+
+  @override
+  State<_ModaleVirement> createState() => _ModaleVirementState();
+}
+
+class _ModaleVirementState extends State<_ModaleVirement> {
+  String _source = '';
+  String _destination = '';
+  final _montant = TextEditingController();
+  final _motif = TextEditingController();
+  Map<String, String> _erreurs = const {};
+
+  Widget _liste(String cle, String valeur, ValueChanged<String> surChoix) => DropdownButtonFormField<String>(
+    key: Key(cle),
+    initialValue: valeur,
+    isDense: true,
+    isExpanded: true,
+    decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+    style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+    items: [
+      const DropdownMenuItem(value: '', child: Text('-- Sélectionner --')),
+      for (final c in widget.comptes) DropdownMenuItem(value: c.id, child: Text('${c.label} — ${DocumentsComptabilite.montant(c.balance)} F', overflow: TextOverflow.ellipsis)),
+    ],
+    onChanged: (v) => setState(() => surChoix(v ?? '')),
+  );
+
+  Future<void> _ok() async {
+    try {
+      await widget.depot.virer(sourceId: _source, destinationId: _destination, montant: _montant.text, motif: _motif.text);
+    } on ReglageRefuse catch (r) {
+      setState(() => _erreurs = r.erreurs);
+      return;
+    }
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) => ModaleAgri(
+    titre: 'Virement Interne',
+    contenu: SingleChildScrollView(
+      child: _formulaire(_erreurs, 'virement', [
+        Padding(padding: const EdgeInsets.only(bottom: AgriSpacing.md), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_etiquette('Compte source *'), _liste('virement-source', _source, (v) => _source = v), _erreur(_erreurs['transferFromId'], const Key('virement-erreur-transferFromId'))])),
+        Padding(padding: const EdgeInsets.only(bottom: AgriSpacing.md), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_etiquette('Compte destinataire *'), _liste('virement-destination', _destination, (v) => _destination = v), _erreur(_erreurs['transferToId'], const Key('virement-erreur-transferToId'))])),
+        champReglage('virement', 'transferAmount', 'Montant (FCFA) *', _montant, _erreurs, nombre: true),
+        champReglage('virement', 'transferReason', 'Motif', _motif, _erreurs),
+      ]),
+    ),
+    actions: [
+      BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop(false)),
+      BoutonModalePrimaire(key: const Key('virement-enregistrer'), libelle: 'Enregistrer le virement', onPressed: _ok),
+    ],
+  );
+}
+
+// ── PA-2 · Rôles & permissions ─────────────────────────────────────────────
+
+Future<bool> ouvrirRole({required BuildContext context, required ReglagesFermeRepository depot, required List<String> droits, RolesApplicatif? existant, required bool estAdmin}) async =>
+    (await afficherModale<bool>(context: context, constructeur: (_) => _ModaleRole(depot: depot, droits: droits, existant: existant, estAdmin: estAdmin))) == true;
+
+class _ModaleRole extends StatefulWidget {
+  const _ModaleRole({required this.depot, required this.droits, required this.existant, required this.estAdmin});
+
+  final ReglagesFermeRepository depot;
+  final List<String> droits;
+  final RolesApplicatif? existant;
+  final bool estAdmin;
+
+  @override
+  State<_ModaleRole> createState() => _ModaleRoleState();
+}
+
+class _ModaleRoleState extends State<_ModaleRole> {
+  late final _nom = TextEditingController(text: widget.existant?.name ?? '');
+  late final Set<String> _accordes = {
+    for (final p in (widget.existant?.permissions ?? '').split(',')) if (p.trim().isNotEmpty) p.trim(),
+  };
+  Map<String, String> _erreurs = const {};
+
+  Future<void> _ok() async {
+    try {
+      await widget.depot.enregistrerRole(ancienNom: widget.existant?.name, nom: _nom.text, permissions: _accordes, estAdmin: widget.estAdmin);
+    } on ReglageRefuse catch (r) {
+      setState(() => _erreurs = r.erreurs);
+      return;
+    }
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) => ModaleAgri(
+    titre: widget.existant == null ? 'Nouveau Rôle' : 'Modifier le Rôle',
+    largeur: LargeurModale.lg,
+    contenu: SingleChildScrollView(
+      child: _formulaire(_erreurs, 'role', [
+        champReglage('role', 'roleName', 'Nom du rôle *', _nom, _erreurs, indice: 'ex : responsable-achats'),
+        _etiquette('Permissions'),
+        if (widget.droits.isEmpty)
+          const Text('Droits non synchronisés — le serveur ne les a pas encore servis à ce poste.', style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline)),
+        for (final d in widget.droits)
+          CheckboxListTile(
+            key: Key('role-droit-$d'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: Text(d, style: const TextStyle(fontSize: AgriTypography.xs)),
+            value: _accordes.contains(d),
+            onChanged: (v) => setState(() => v == true ? _accordes.add(d) : _accordes.remove(d)),
+          ),
+      ]),
+    ),
+    actions: [
+      BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop(false)),
+      BoutonModalePrimaire(key: const Key('role-enregistrer'), libelle: 'Enregistrer', onPressed: _ok),
+    ],
+  );
+}
+
+
+/// Paramètres > « Facturation normalisée (e-MECeF) » du poste — MÊME EMPLACEMENT que l'onglet du web (`FacturationEmecef`) pour le
+/// mode, l'IFU, l'adresse de l'API (deux préréglages) et l'opérateur : une DEMANDE `entreprise` rejouée par le serveur, comme
+/// pour « Données de l'Entreprise ». ⚠️ **Le jeton JWT n'existe PAS au poste** : ni colonne, ni champ, ni clé de demande ; l'écran
+/// montre seulement « •••• » (configuré) ou « Aucun jeton enregistré ». Il se saisit, se remplace, s'efface et se TESTE au web
+/// (« Tester la configuration » lit l'état de l'API avec le jeton, que le poste n'a pas).
+class PageFacturationEmecef extends StatefulWidget {
+  const PageFacturationEmecef({super.key, required this.depot, required this.estAdmin, this.surEnregistre});
+
+  final ReglagesFermeRepository depot;
+  final bool estAdmin;
+
+  /// Appelée après l'écriture de la demande (le message « elles seront appliquées à la prochaine synchronisation »).
+  final VoidCallback? surEnregistre;
+
+  @override
+  State<PageFacturationEmecef> createState() => _PageFacturationEmecefState();
+}
+
+class _PageFacturationEmecefState extends State<PageFacturationEmecef> {
+  String _mode = 'desactive';
+  bool _jetonConfigure = false;
+  bool _chargee = false;
+  bool _identiteConnue = true;
+  final _ifu = TextEditingController();
+  final _url = TextEditingController(text: ReglagesFermeRepository.urlEmecefParDefaut);
+  final _opId = TextEditingController();
+  final _opNom = TextEditingController();
+  Map<String, String> _erreurs = const {};
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  @override
+  void dispose() {
+    _ifu.dispose();
+    _url.dispose();
+    _opId.dispose();
+    _opNom.dispose();
+    super.dispose();
+  }
+
+  Future<void> _charger() async {
+    final m = await widget.depot.reglageMecef();
+    final e = await widget.depot.entreprise();
+    if (!mounted) return;
+    setState(() {
+      _mode = m.mode;
+      _jetonConfigure = m.jetonConfigure;
+      _url.text = m.apiUrl;
+      _opId.text = m.operateurId;
+      _opNom.text = m.operateurNom;
+      _ifu.text = e?.ifu ?? '';
+      _identiteConnue = e != null;
+      _chargee = true;
+    });
+  }
+
+  Future<void> _enregistrer() async {
+    try {
+      await widget.depot.enregistrerMecef(
+        mode: _mode, ifu: _ifu.text, apiUrl: _url.text, operateurId: _opId.text, operateurNom: _opNom.text, estAdmin: widget.estAdmin,
+      );
+    } on ReglageRefuse catch (r) {
+      setState(() {
+        _erreurs = r.erreurs;
+        _message = null;
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _erreurs = const {};
+      _message = 'Modifications demandées au serveur : elles seront appliquées à la prochaine synchronisation.';
+    });
+    widget.surEnregistre?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const p = 'entreprise';
+    if (!_chargee) return const Center(child: CircularProgressIndicator());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Facturation normalisée (e-MECeF)', style: TextStyle(fontSize: AgriTypography.lg, fontWeight: AgriTypography.gras, color: AgriColors.onSurface)),
+        const SizedBox(height: 2),
+        const Text(
+          "Renseignez ici le compte e-MECeF de la ferme pour transmettre ses factures normalisées à la DGI. Une facture normalisée n'est plus modifiable ni annulable : elle se corrige par un avoir. Une facture simple n'est jamais transmise.",
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        Container(
+          key: const Key('entreprise-mecef-aide'),
+          padding: const EdgeInsets.all(AgriSpacing.sm),
+          decoration: BoxDecoration(color: AgriColors.infoBlue.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(AgriRadius.lg)),
+          child: const Text(
+            "Où trouver le jeton ? Le jeton (JWT) est délivré par la DGI pour le compte e-MECeF de votre IFU : connectez-vous au portail e-MECeF de la DGI avec l'IFU de la ferme et copiez-y le jeton. Il est secret : chiffré sur le serveur, jamais affiché, jamais envoyé aux postes.",
+            style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.brandForest),
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        if (!_identiteConnue)
+          const Padding(
+            padding: EdgeInsets.only(bottom: AgriSpacing.md),
+            child: Text(
+              "Identité de la ferme non synchronisée — aucun tirage n'a encore eu lieu : lancez une synchronisation avant de régler la facturation normalisée.",
+              key: Key('entreprise-mecef-non-synchronisee'),
+              style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep),
+            ),
+          ),
+        _etiquette('Mode de facturation normalisée'),
+        DropdownButtonFormField<String>(
+          key: const Key('entreprise-mecefMode'),
+          initialValue: _mode,
+          isDense: true,
+          isExpanded: true,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+          items: [
+            for (final m in ReglagesFermeRepository.modesMecef) DropdownMenuItem(value: m, child: Text(ReglagesFermeRepository.libellesModesMecef[m]!)),
+          ],
+          onChanged: (v) => setState(() => _mode = v ?? 'desactive'),
+        ),
+        _erreur(_erreurs['mecefMode'], const Key('entreprise-erreur-mecefMode')),
+        if (_mode == 'boitier')
+          const Text(
+            "Mode boîtier : la transmission se fera par le poste Windows où le boîtier est branché. Le réglage est enregistré, mais rien n'est encore transmis : les factures restent en attente.",
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          )
+        else if (_mode == 'desactive')
+          const Text("Aucune facture n'est transmise : la facturation reste un registre avec facture PDF.", style: TextStyle(fontSize: 10, color: AgriColors.outline))
+        else
+          const Text(
+            "Les ventes choisies en « Facture normalisée » à l'encaissement sont transmises à la DGI par le serveur.",
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+        const SizedBox(height: AgriSpacing.md),
+        champReglage(p, 'ifu', "IFU de l'entreprise", _ifu, _erreurs, indice: '13 chiffres'),
+        const Text(
+          "13 chiffres, celui du compte e-MECeF. C'est le même IFU que celui de « Données de l'Entreprise » : une seule saisie.",
+          style: TextStyle(fontSize: 10, color: AgriColors.outline),
+        ),
+        if (_mode == 'emecef') ...[
+          const SizedBox(height: AgriSpacing.md),
+          champReglage(p, 'mecefApiUrl', "Adresse de l'API e-MECeF", _url, _erreurs, indice: ReglagesFermeRepository.urlEmecefParDefaut),
+          Wrap(
+            spacing: AgriSpacing.xs,
+            children: [
+              for (final e in ReglagesFermeRepository.prereglagesUrlMecef.entries)
+                OutlinedButton(
+                  key: Key('entreprise-url-${e.key}'),
+                  onPressed: () => setState(() => _url.text = e.value.$2),
+                  child: Text(e.value.$1, style: const TextStyle(fontSize: 11)),
+                ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: AgriSpacing.xs, bottom: AgriSpacing.md),
+            child: Text(
+              "Pour un premier essai sans valeur fiscale, choisissez l'environnement d'essai. Ces deux adresses sont relevées dans le paquet de référence : confirmez-les avec le portail e-MECeF de la DGI.",
+              style: TextStyle(fontSize: 10, color: AgriColors.outline),
+            ),
+          ),
+          _etiquette('Jeton e-MECeF (JWT)'),
+          Text(
+            _jetonConfigure ? '••••••••••••' : 'Aucun jeton enregistré',
+            key: const Key('entreprise-jeton-etat'),
+            style: const TextStyle(fontSize: AgriTypography.sm, letterSpacing: 2),
+          ),
+          const Text(
+            'Secret : chiffré sur le serveur, jamais affiché, jamais envoyé aux postes. Il se saisit, se remplace, s\'efface et se teste sur le web (« Tester la configuration »).',
+            style: TextStyle(fontSize: 10, color: AgriColors.outline),
+          ),
+          const SizedBox(height: AgriSpacing.md),
+          champReglage(p, 'mecefOperateurId', "Identifiant de l'opérateur", _opId, _erreurs, indice: '1'),
+          champReglage(p, 'mecefOperateurNom', "Nom de l'opérateur (caissier par défaut)", _opNom, _erreurs, indice: 'Caissier'),
+        ],
+        const SizedBox(height: AgriSpacing.sm),
+        Align(
+          alignment: Alignment.centerRight,
+          child: ElevatedButton(
+            key: const Key('entreprise-mecef-enregistrer'),
+            onPressed: _identiteConnue ? _enregistrer : null,
+            style: ElevatedButton.styleFrom(backgroundColor: AgriColors.brandEmerald, foregroundColor: Colors.white),
+            child: const Text('Enregistrer'),
+          ),
+        ),
+        if (_message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AgriSpacing.sm),
+            child: Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+          ),
+      ],
+    );
+  }
+}

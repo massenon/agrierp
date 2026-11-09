@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,6 +7,8 @@ import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'parametres_elevage_repository.dart';
+import 'releve_terrain.dart';
+import 'releve_terrain_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `parametres-elevage.blade.php` (composant `App\Livewire\Elevage\ParametresElevage`) → Paramètres Élevage.
@@ -29,9 +33,13 @@ class ParametresElevageScreen extends StatefulWidget {
     super.key,
     required this.depot,
     this.peutModifier = false,
+    this.releves,
   });
 
   final ParametresElevageRepository depot;
+
+  /// Ticket RELEVES-1 — dépôt des relevés de terrain ; `null` : construit sur la base du dépôt des paramètres.
+  final ReleveTerrainRepository? releves;
 
   /// Droit `manage-elevage` du rôle de la session (`PermissionsPoste.peut`).
   final bool peutModifier;
@@ -48,6 +56,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     ('Calendriers de Prophylaxie', SymbolesAgri.event_repeat),
     ('Types de Provende', SymbolesAgri.inventory_2),
     ('Numérotation Bandes & Sujets', SymbolesAgri.tag),
+    ('Relevés de terrain', SymbolesAgri.check_circle),
   ];
 
   /// Messages des toasts du composant (`dispatch('toast', message: …)`).
@@ -60,6 +69,8 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
   static const _rappelEnregistre = 'Délai de rappel des soins enregistré.';
   static const _parametreArchive =
       'Paramètre archivé — restaurable depuis Paramètres > Restauration.';
+
+  static const _releveArchive = 'Relevé archivé.';
 
   static const _selectionner = '-- Sélectionner --';
 
@@ -81,6 +92,14 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
   EspeceProphylaxie _espece = EspeceProphylaxie.lapins;
 
   DonneesParametresElevage? _donnees;
+
+  // ── Relevés de terrain (RELEVES-1) ──
+  late final ReleveTerrainRepository _releves = widget.releves ?? ReleveTerrainRepository(database: widget.depot.database);
+  String _familleReleve = 'incubation';
+  List<LigneReleve> _lignesReleves = const [];
+  List<DelaisFournisseur> _delais = const [];
+  RegleDelai? _regleDelai;
+  int _relevesAValider = 0;
 
   final _formats = <String, TextEditingController>{
     for (final cle in _libellesNumerotation.keys) cle: TextEditingController(),
@@ -132,9 +151,17 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
   /// après leur propre enregistrement) — jamais après une autre saisie, qui effacerait une frappe en cours.
   Future<void> _charger({bool formulaires = false}) async {
     final donnees = await widget.depot.charger();
+    final lignesReleves = await _releves.lignes(_familleReleve);
+    final delais = await _releves.delaisFournisseurs();
+    final regle = await _releves.regleEnVigueur();
+    final aValider = await _releves.nombreAValider();
     if (!mounted) return;
     setState(() {
       _donnees = donnees;
+      _lignesReleves = lignesReleves;
+      _delais = delais;
+      _regleDelai = regle;
+      _relevesAValider = aValider;
       if (formulaires) {
         final n = donnees.numerotation;
         final valeurs = <String, String?>{
@@ -192,6 +219,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
                           d,
                           large,
                         ),
+                        'Relevés de terrain' => _ongletReleves(large),
                         _ => _ongletRationnement(d, large),
                       },
                     ],
@@ -927,6 +955,425 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     _toast(_numerotationEnregistree);
   }
 
+  // ── Onglet 5 : Relevés de terrain (RELEVES-1) ────────────────────────────────
+
+  static const _famillesReleves = <(String, String, IconData)>[
+    ('incubation', 'Incubation', SymbolesAgri.egg),
+    ('provende', 'Délais fournisseur de provende', SymbolesAgri.local_shipping),
+    ('technicien', 'Technicien — poissons-chats', SymbolesAgri.restaurant),
+  ];
+
+  /// Boutons d'ajout du Blade, par type (les autres types sont semés : on les modifie).
+  static const _ajoutsReleves = <String, String>{
+    ReleveTerrain.incubationRegle: 'Ajouter une règle',
+    ReleveTerrain.incubationLot: 'Ajouter un relevé de lot',
+    ReleveTerrain.poissonBareme: 'Ajouter une classe de poids',
+  };
+
+  Future<void> _changerFamilleReleve(String famille) async {
+    final lignes = await _releves.lignes(famille);
+    if (!mounted) return;
+    setState(() {
+      _familleReleve = famille;
+      _lignesReleves = lignes;
+    });
+  }
+
+  Widget _pastilleStatut(String statut, String cle) {
+    final aValider = statut == ReleveTerrain.aValider;
+    return Container(
+      key: Key('statut-$cle'),
+      padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: 2),
+      decoration: BoxDecoration(
+        color: aValider ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(AgriRadius.full),
+      ),
+      child: Text(
+        ReleveTerrain.statuts[statut] ?? statut,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: AgriTypography.gras,
+          color: aValider ? const Color(0xFF92400E) : const Color(0xFF166534),
+        ),
+      ),
+    );
+  }
+
+  static String _jourFr(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Widget _ongletReleves(bool large) {
+    final typesFamille = [for (final e in ReleveTerrain.familles.entries) if (e.value == _familleReleve) e.key];
+    final regle = _regleDelai;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _entete(
+          titre: 'Relevés de terrain',
+          icone: SymbolesAgri.fact_check,
+          sousTitre: Text(
+            'Valeurs par défaut = propositions « À valider ». Le bouton « Valider » les confirme ; enregistrer une ligne la passe aussi à « Validé ».',
+            style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+          ),
+          large: large,
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        Text(
+          '$_relevesAValider référentiel(s) à valider — Dashboard Élevage',
+          key: const Key('releves-a-valider'),
+          style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandEmerald),
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        Wrap(
+          spacing: AgriSpacing.xs,
+          runSpacing: AgriSpacing.xs,
+          children: [
+            for (final (cle, libelle, icone) in _famillesReleves)
+              InkWell(
+                key: Key('releves-famille-$cle'),
+                onTap: () => _changerFamilleReleve(cle),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: _familleReleve == cle ? AgriColors.brandEmerald : AgriColors.surfaceCard,
+                    border: Border.all(color: _familleReleve == cle ? AgriColors.brandEmerald : AgriColors.outlineVariant),
+                    borderRadius: BorderRadius.circular(AgriRadius.full),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icone, size: 16, color: _familleReleve == cle ? Colors.white : AgriColors.outline),
+                      const SizedBox(width: 4),
+                      Text(
+                        libelle,
+                        style: TextStyle(
+                          fontSize: AgriTypography.xs,
+                          fontWeight: AgriTypography.gras,
+                          color: _familleReleve == cle ? Colors.white : AgriColors.outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.sm),
+        if (widget.peutModifier)
+          Wrap(
+            spacing: AgriSpacing.sm,
+            runSpacing: AgriSpacing.sm,
+            children: [
+              for (final e in _ajoutsReleves.entries)
+                if (typesFamille.contains(e.key)) _boutonAjout(e.value, 'ajouter-${e.key}', () => _ouvrirReleve(e.key)),
+            ],
+          ),
+        const SizedBox(height: AgriSpacing.md),
+        _tableau(
+          largeur: 1200,
+          colonnes: const [
+            ('Type', 2, false),
+            ('Libellé / espèce', 3, false),
+            ('Valeurs', 6, false),
+            ('Statut', 2, false),
+            ('Validé par / le', 3, false),
+            ('Actions', 3, true),
+          ],
+          vide: 'Aucun relevé dans cette famille.',
+          lignes: [
+            for (var i = 0; i < _lignesReleves.length; i++)
+              _ligne(i, 'releve-${_lignesReleves[i].entree.id}', [
+                Text(ReleveTerrain.typesLibelles[_lignesReleves[i].entree.type] ?? _lignesReleves[i].entree.type, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.demiGras)),
+                _avecEtat(
+                  Text(
+                    '${_lignesReleves[i].entree.label}${_lignesReleves[i].entree.speciesCode == null ? '' : ' (${_lignesReleves[i].entree.speciesCode})'}',
+                    style: _cellule,
+                  ),
+                  _lignesReleves[i].etat,
+                  'releve-${_lignesReleves[i].entree.id}',
+                ),
+                Text(ReleveTerrain.resume(_lignesReleves[i].entree.type, _lignesReleves[i].data), style: _cellule),
+                _pastilleStatut(_lignesReleves[i].entree.status, 'releve-${_lignesReleves[i].entree.id}'),
+                Text(
+                  _lignesReleves[i].entree.validatedAt == null
+                      ? '—'
+                      : '${_lignesReleves[i].entree.validatedByName ?? '—'} — ${_jourFr(_lignesReleves[i].entree.validatedAt!)}',
+                  style: _cellule,
+                ),
+                _actionsReleve(_lignesReleves[i]),
+              ]),
+          ],
+        ),
+        if (_familleReleve == 'provende') ...[
+          const SizedBox(height: AgriSpacing.lg),
+          const Text(
+            'Délais constatés par fournisseur (5 derniers bons de commande de provende reçus)',
+            style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+          ),
+          const SizedBox(height: AgriSpacing.xs),
+          if (regle != null)
+            Text(
+              'Calculé en lecture : du jour du bon au jour de la réception, bons de la catégorie « Aliments ». Règle retenue : '
+              'critique ${regle.critique} j · alerte ${regle.alerte} j '
+              '(${{'constate': 'le plus long des 5 délais, plus la marge', 'manuel': 'valeurs saisies', 'depart': 'valeurs de départ, moins de 5 bons ou règle à valider'}[regle.source]}).',
+              key: const Key('releves-regle-retenue'),
+              style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+            ),
+          const SizedBox(height: AgriSpacing.sm),
+          _tableau(
+            largeur: 1000,
+            colonnes: const [
+              ('Fournisseur', 3, false),
+              ('Bons retenus', 2, false),
+              ('Délais constatés (jours)', 6, false),
+              ('Critique proposé', 3, false),
+            ],
+            vide: 'Aucun bon de commande de provende reçu.',
+            lignes: [
+              for (var i = 0; i < _delais.length; i++)
+                _ligne(i, 'delai-$i', [
+                  Text(_delais[i].fournisseur, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.demiGras)),
+                  Text('${_delais[i].nb} sur 5', style: _cellule),
+                  Text(
+                    [
+                      for (final b in _delais[i].bons)
+                        '${b['delai_jours']} j (${_jourCourt(b['date_bon'] as String)} → ${_jourCourt(b['date_reception'] as String)})',
+                    ].join(' · '),
+                    style: _cellule,
+                  ),
+                  Text(
+                    _delais[i].critiquePropose == null
+                        ? '— (moins de 5 bons)'
+                        : '${_delais[i].critiquePropose} j · alerte ${_delais[i].critiquePropose! + (regle?.marge ?? ReleveTerrain.margeDefaut)} j',
+                    style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+                  ),
+                ]),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  static String _jourCourt(String iso) => '${iso.substring(8, 10)}/${iso.substring(5, 7)}';
+
+  /// « Valider » (ligne « À valider »), Modifier, Archiver — masqués sans le droit `manage-elevage`.
+  Widget _actionsReleve(LigneReleve l) {
+    if (!widget.peutModifier) return const SizedBox.shrink();
+    final cle = 'releve-${l.entree.id}';
+    return Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (l.aValider)
+          ElevatedButton.icon(
+            key: Key('valider-$cle'),
+            onPressed: () => _ouvrirReleve(l.entree.type, existante: l, validation: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AgriColors.brandEmerald,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.sm, vertical: 4),
+            ),
+            icon: const Icon(SymbolesAgri.task_alt, size: 16),
+            label: const Text('Valider', style: TextStyle(fontSize: 11, fontWeight: AgriTypography.gras)),
+          ),
+        IconButton(
+          key: Key('modifier-$cle'),
+          tooltip: 'Modifier',
+          onPressed: () => _ouvrirReleve(l.entree.type, existante: l),
+          icon: const Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue),
+          visualDensity: VisualDensity.compact,
+        ),
+        IconButton(
+          key: Key('supprimer-$cle'),
+          tooltip: 'Archiver',
+          onPressed: () => _confirmerSuppression(libelle: l.entree.label, cle: cle, archiver: () => _releves.archiver(l.entree.id), message: _releveArchive),
+          icon: const Icon(SymbolesAgri.delete, size: 18, color: AgriColors.outline),
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
+    );
+  }
+
+  /// Champs d'un type (clé de `data`, libellé du Blade, genre) — dans l'ordre du Blade.
+  static const _champsReleve = <String, List<(String, String, String)>>{
+    ReleveTerrain.incubationRegle: [
+      ('duree_jours', "Durée d'incubation (jours) *", 'int'),
+      ('eclosion_min', 'Éclosion possible dès le jour *', 'int'),
+      ('eclosion_max', "Éclosion possible jusqu'au jour *", 'int'),
+      ('mode', 'Mode par défaut *', 'mode'),
+      ('mirages', 'Jours de mirage *', 'texte'),
+      ('transfert_jour', "Jour de transfert à l'éclosoir", 'int'),
+      ('conservation_max_jours', 'Conservation maximale des œufs (jours) *', 'int'),
+    ],
+    ReleveTerrain.incubationLot: [
+      ('mise_date', 'Date de mise en incubation *', 'date'),
+      ('mode', 'Mode *', 'mode'),
+      ('oeufs_mis', 'Œufs mis', 'int'),
+      ('oeufs_fertiles', 'Œufs fertiles', 'int'),
+      ('oeufs_eclos', 'Œufs éclos', 'int'),
+      ('premier_eclos_date', 'Date du premier éclos', 'date'),
+      ('dernier_eclos_date', 'Date du dernier éclos', 'date'),
+    ],
+    ReleveTerrain.delaiRegle: [
+      ('mode', 'Seuils *', 'modeDelai'),
+      ('critique_jours', 'Délai critique de départ / saisi (jours) *', 'int'),
+      ('alerte_jours', "Délai d'alerte de départ / saisi (jours) *", 'int'),
+      ('marge_jours', 'Marge de sécurité (jours) *', 'int'),
+    ],
+    ReleveTerrain.poissonMarque: [('marque', 'Marque de granulés', 'texte')],
+    ReleveTerrain.poissonBareme: [
+      ('poids_min_g', 'Poids minimal (g) *', 'dec'),
+      ('poids_max_g', 'Poids maximal (g)', 'dec'),
+      ('biomasse_min_pct', '% de biomasse par jour, minimum *', 'dec'),
+      ('biomasse_max_pct', '% de biomasse par jour, maximum *', 'dec'),
+      ('granule', 'Taille du granulé', 'texte'),
+      ('proteine_pct', 'Protéine (%)', 'dec'),
+    ],
+    ReleveTerrain.poissonTemperature: [
+      ('optimale_min', 'Température optimale minimale (°C) *', 'dec'),
+      ('optimale_max', 'Température optimale maximale (°C) *', 'dec'),
+      ('reduire_sous', 'Réduire la ration sous (°C) *', 'dec'),
+    ],
+    ReleveTerrain.poissonDensite: [
+      ('densite', "Densité d'empoissonnement", 'dec'),
+      ('unite', 'Unité', 'texte'),
+    ],
+  };
+
+  static String _texteValeur(Object? v) => v == null ? '' : (v is List ? v.join(', ') : (v is num ? ReleveTerrain.nb(v) : v.toString()));
+
+  /// Modale « Saisir / Modifier le relevé » ET modale « Valider le relevé » (`modal-releve` / `modal-valider-releve`
+  /// du Blade) : mêmes champs ; [validation] : bouton « Valider » et statut « À valider → Validé ». Enregistrer OU
+  /// valider passe la ligne à « Validé ».
+  Future<void> _ouvrirReleve(String type, {LigneReleve? existante, bool validation = false}) async {
+    final e = existante?.entree;
+    final d = existante?.data ?? const <String, dynamic>{};
+    final libelle = TextEditingController(text: e?.label ?? '');
+    final espece = TextEditingController(text: e?.speciesCode ?? '');
+    final champs = {
+      for (final (cle, _, genre) in _champsReleve[type]!)
+        cle: TextEditingController(
+          text: d.containsKey(cle) ? _texteValeur(d[cle]) : (existante == null && genre == 'texte' && cle == 'mirages' ? '7, 14' : ''),
+        ),
+    };
+    var mode = (d['mode'] as String?) ??
+        (type == ReleveTerrain.delaiRegle ? 'constate' : 'couveuse_artificielle');
+    if (existante == null) {
+      switch (type) {
+        case ReleveTerrain.incubationRegle:
+          champs['conservation_max_jours']!.text = '10';
+        case ReleveTerrain.delaiRegle:
+          champs['marge_jours']!.text = '4';
+          champs['critique_jours']!.text = '3';
+          champs['alerte_jours']!.text = '7';
+      }
+    }
+    final avecEspece = type == ReleveTerrain.incubationRegle || type == ReleveTerrain.incubationLot;
+    final typeLibelle = ReleveTerrain.typesLibelles[type] ?? '';
+    Map<String, String> erreurs = {};
+
+    final ok = await afficherModale<bool>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, rafraichir) => ModaleAgri(
+          titre: validation
+              ? 'Valider le relevé — $typeLibelle'
+              : '${existante == null ? 'Saisir un relevé' : 'Modifier le relevé'} — $typeLibelle',
+          largeur: LargeurModale.lg,
+          contenu: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (validation)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: AgriSpacing.sm),
+                    child: Text(
+                      'Relisez les valeurs proposées, corrigez-les si besoin, puis validez.',
+                      style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                    ),
+                  ),
+                _champ(type == ReleveTerrain.incubationLot ? 'Code du lot *' : 'Libellé *', libelle, 'releve-label'),
+                if (erreurs['label'] != null) _erreur('releve-erreur-label', erreurs['label']!),
+                if (avecEspece) ...[
+                  _champ('Espèce *', espece, 'releve-espece', exemple: 'ex : pintade'),
+                  if (erreurs['species_code'] != null) _erreur('releve-erreur-species_code', erreurs['species_code']!),
+                ],
+                for (final (cle, etiquette, genre) in _champsReleve[type]!) ...[
+                  if (genre == 'mode' || genre == 'modeDelai') ...[
+                    _etiquette(etiquette),
+                    _liste(
+                      cle: 'releve-$cle',
+                      valeur: mode,
+                      options: [for (final m in (genre == 'mode' ? ReleveTerrain.modes : ReleveTerrain.modesDelai).entries) (m.key, m.value)],
+                      selection: false,
+                      surChangement: (v) => rafraichir(() => mode = v ?? mode),
+                    ),
+                    const SizedBox(height: AgriSpacing.md),
+                  ] else
+                    _champ(
+                      etiquette,
+                      champs[cle]!,
+                      'releve-$cle',
+                      exemple: genre == 'date' ? 'AAAA-MM-JJ' : null,
+                      decimal: genre == 'dec',
+                      numerique: genre == 'int',
+                    ),
+                  if (erreurs['data.$cle'] != null) _erreur('releve-erreur-$cle', erreurs['data.$cle']!),
+                ],
+                if (validation) ...[
+                  _etiquette('Statut'),
+                  Row(
+                    children: [
+                      _pastilleStatut(ReleveTerrain.aValider, 'avant'),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(SymbolesAgri.arrow_forward, size: 16)),
+                      _pastilleStatut(ReleveTerrain.valide, 'apres'),
+                    ],
+                  ),
+                ] else
+                  const Text('Enregistrer fait passer la ligne à « Validé ».', style: TextStyle(fontSize: 11, color: AgriColors.outline)),
+              ],
+            ),
+          ),
+          actions: [
+            BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop(false)),
+            BoutonModalePrimaire(
+              key: Key(validation ? 'releve-valider' : 'releve-enregistrer'),
+              libelle: validation ? 'Valider' : 'Enregistrer',
+              onPressed: () async {
+                final data = <String, dynamic>{
+                  for (final (cle, _, genre) in _champsReleve[type]!)
+                    cle: (genre == 'mode' || genre == 'modeDelai') ? mode : champs[cle]!.text,
+                };
+                try {
+                  if (existante == null) {
+                    await _releves.creer(type, label: libelle.text, especeCode: avecEspece ? espece.text : null, data: data);
+                  } else if (validation) {
+                    await _releves.valider(e!.id, label: libelle.text, especeCode: avecEspece ? espece.text : e.speciesCode, data: data);
+                  } else {
+                    await _releves.modifier(e!.id, label: libelle.text, especeCode: avecEspece ? espece.text : e.speciesCode, data: data);
+                  }
+                  if (context.mounted) Navigator.of(context).pop(true);
+                } on ReleveRefuse catch (r) {
+                  rafraichir(() => erreurs = r.erreurs);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // ⚠️ Les contrôleurs de la modale ne sont PAS libérés ici : sa fermeture est animée et lit encore les champs.
+    if (ok == true) {
+      await _charger();
+      _toast(validation ? 'Relevé validé.' : 'Relevé enregistré et validé.');
+    }
+  }
+
   // ── Modales de saisie ─────────────────────────────────────────────────────
 
   /// `modal-ration` : « Saisir une Ration » / « Modifier la Ration » (`newRation()` / `editRation()`).
@@ -1235,6 +1682,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     required String libelle,
     required String cle,
     required Future<void> Function() archiver,
+    String? message,
   }) async {
     final confirme = await afficherModale<bool>(
       context: context,
@@ -1304,7 +1752,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
     if (confirme == true) {
       await archiver();
       await _charger();
-      _toast(_parametreArchive, type: TypeToast.avertissement);
+      _toast(message ?? _parametreArchive, type: TypeToast.avertissement);
     }
   }
 
@@ -1426,37 +1874,38 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
     clipBehavior: Clip.antiAlias,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              decoration: const BoxDecoration(
-                color: AgriColors.surfaceZebra,
-                border: Border(
-                  bottom: BorderSide(color: AgriColors.outlineVariant),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                decoration: const BoxDecoration(
+                  color: AgriColors.surfaceZebra,
+                  border: Border(
+                    bottom: BorderSide(color: AgriColors.outlineVariant),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex, droite) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(
+                          libelle.toUpperCase(),
+                          textAlign: droite ? TextAlign.right : TextAlign.left,
+                          style: _enteteColonne,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex, droite) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(
-                        libelle.toUpperCase(),
-                        textAlign: droite ? TextAlign.right : TextAlign.left,
-                        style: _enteteColonne,
-                      ),
-                    ),
-                ],
-              ),
-            ),
             if (lignes.isEmpty && vide != null)
               Padding(
                 padding: const EdgeInsets.all(AgriSpacing.lg),
@@ -1477,6 +1926,7 @@ class _ParametresElevageScreenState extends State<ParametresElevageScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

@@ -296,6 +296,42 @@ class FicheEscargots extends Component
         return $this->previousEffectif > 0 ? round(($mort / $this->previousEffectif) * 100, 1) : 0.0;
     }
 
+    public function getPoidsMoyenEstimeProperty(): ?int
+    {
+        if ($this->peseeTotal !== null) {
+            return null;
+        }
+        $lot = $this->bande;
+        if (! $lot || ! $this->selectedDate) {
+            return null;
+        }
+        $pesees = LivestockDailyEntry::where('lot_id', $lot->id)
+            ->whereNotNull('weight_sample_avg_g')
+            ->where('entry_date', '<', $this->selectedDate)
+            ->orderBy('entry_date')
+            ->get(['entry_date', 'weight_sample_avg_g']);
+        if ($pesees->isEmpty()) {
+            return null;
+        }
+        $derniere = $pesees->last();
+        $jourTarget = \Carbon\Carbon::parse($this->selectedDate)->startOfDay();
+        $joursEcoules = (int) $derniere->entry_date->startOfDay()->diffInDays($jourTarget);
+        if ($joursEcoules <= 0) {
+            return (int) round($derniere->weight_sample_avg_g);
+        }
+        if ($pesees->count() >= 2) {
+            $premiere = $pesees->first();
+            $joursGmq = (int) $premiere->entry_date->startOfDay()->diffInDays($derniere->entry_date->startOfDay());
+            $gmq = $joursGmq > 0
+                ? ($derniere->weight_sample_avg_g - $premiere->weight_sample_avg_g) / $joursGmq
+                : 0.0;
+        } else {
+            $gmq = 0.0;
+        }
+
+        return (int) round($derniere->weight_sample_avg_g + $gmq * $joursEcoules);
+    }
+
     /**
      * 🔴→✅ TICKET U14 — sans un œuf mis en terre, le taux d'éclosion du jour est INCONNU : `null`, affiché « — »
      * (règle « inconnu = — », comme le taux du mois depuis U12a), jamais « 0,0 % ».

@@ -76,14 +76,17 @@ void main() {
       connectivity: _Connectivite(),
       maintenant: () => maintenant,
     );
-    await db.into(db.livestockSpecies).insert(LivestockSpeciesCompanion.insert(id: lapins, code: 'aviculture', label: 'Aviculture'));
-    await db.into(db.modulesConfig).insert(ModulesConfigCompanion.insert(id: uuid('mod'), speciesCode: 'aviculture'));
+    // VOL-2 : toute bande d'aviculture exige un départ par catégorie/stade avant la première entrée ; ce test porte sur le
+    // journal des sujets (BS2) et sa file de synchronisation, pas sur l'effectif par catégorie — filière NEUTRE (escargots,
+    // sans catégories) plutôt que de contourner un refus. Les règles des volailles sont dans `fiche_pondeuses_stades_test`.
+    await db.into(db.livestockSpecies).insert(LivestockSpeciesCompanion.insert(id: lapins, code: 'helico', label: 'Aviculture'));   // libellé inchangé : seul le CODE de filière devient neutre
+    await db.into(db.modulesConfig).insert(ModulesConfigCompanion.insert(id: uuid('mod'), speciesCode: 'helico'));
     await db.into(db.livestockLots).insert(
       LivestockLotsCompanion.insert(
         id: bande,
         code: 'PON-2026-01',
         speciesId: lapins,
-        speciesCode: const Value('aviculture'),
+        speciesCode: const Value('helico'),
         stage: const Value('ponte'),
         initialQuantity: const Value(200),
         currentQuantity: const Value(200),

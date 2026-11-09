@@ -137,7 +137,8 @@ class RetoursAvoirs extends Component
     {
         // ⚠️ Garde posée sur la méthode qui ÉCRIT : la route du hub ne porte
         // que `can:view-ventes`, et rien d'autre ne protégeait cette action.
-        $this->authorize('manage-ventes');
+        // CONF-4 : `manage-ventes` OU `correct-invoices` (le comptable corrige par l'avoir sans ouvrir la caisse).
+        $this->authorize('avoir-client');
 
         $this->validate([
             'saleId' => ['required', 'exists:sales,id'],
@@ -152,7 +153,7 @@ class RetoursAvoirs extends Component
         // refus (quantité au-delà du vendu, montant au-delà de la ligne, exercice clos, plan comptable incomplet), mêmes
         // effets (avoir, stock si réintégré, écriture inverse 701/443/411), une seule transaction — un refus n'écrit rien.
         try {
-            app(AvoirClientService::class)->enregistrer([
+            $avoir = app(AvoirClientService::class)->enregistrer([
                 'sale_id' => $this->saleId,
                 'product_id' => $this->productId,
                 'qty' => $this->qty,
@@ -169,6 +170,9 @@ class RetoursAvoirs extends Component
             return;
         }
 
+        // MECEF-1 — sur une facture NORMALISÉE, l'avoir part comme facture d'avoir `FA` (après l'écriture, hors transaction).
+        $facture = app(\App\Services\Mecef\FacturationMecefService::class)->facturerAvoir($avoir);
+
         $this->dispatch('close-modal', name: 'modal-nouveau-retour');
         $message = $this->decision === 'reintegre'
             ? 'Retour enregistré — produit réintégré au stock.'
@@ -177,11 +181,25 @@ class RetoursAvoirs extends Component
         $this->dispatch('toast', message: $message.((float) $this->amount > 0
             ? ' Avoir comptabilisé (débit 701 / crédit 411).'
             : ' Avoir de montant nul : aucune écriture comptable.'), type: 'success');
+
+        if (! ($facture['sans_objet'] ?? false) && ! ($facture['inactif'] ?? false) && ! $facture['transmise']) {
+            $this->dispatch('toast', message: 'ATTENTION : facture d\'avoir MeCeF non transmise ('.$facture['message'].'). Retransmettez-la depuis la liste des avoirs.', type: 'warning');
+        }
+    }
+
+    /** MECEF-1 — retransmet une facture d'avoir (`FA`) en attente, refusée ou expirée ; une avoir déjà normalisé ne repart jamais. */
+    public function retryMecef(string $id): void
+    {
+        $this->authorize('avoir-client');
+
+        $r = app(\App\Services\Mecef\FacturationMecefService::class)->facturerAvoir($id);
+
+        $this->dispatch('toast', message: $r['message'], type: $r['transmise'] ? 'success' : ($r['deja'] ? 'warning' : 'error'));
     }
 
     public function markAsTreated(string $id): void
     {
-        $this->authorize('manage-ventes');
+        $this->authorize('avoir-client');
 
         app(AvoirClientService::class)->marquerTraite(CreditNote::findOrFail($id));
         $this->dispatch('toast', message: 'Avoir marqué comme traité.', type: 'success');

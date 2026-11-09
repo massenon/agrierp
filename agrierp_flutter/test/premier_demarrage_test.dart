@@ -1,9 +1,12 @@
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/auth/auth_service.dart';
 import 'package:agrierp/core/config/parametres_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/sync/sync_engine.dart';
 import 'package:agrierp/features/auth/login_screen.dart';
+import 'package:agrierp/features/comptabilite/cloture_exercice_repository.dart';
 import 'package:agrierp/features/demarrage/premier_demarrage_repository.dart';
+import 'package:agrierp/features/parametres/parametres_generaux_repository.dart';
 import 'package:agrierp/features/demarrage/premier_demarrage_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -30,13 +33,18 @@ class _Connectivite implements Connectivity {
 }
 
 class _Serveur extends Interceptor {
+  /// Réponse de `GET /api/auth/me` (clé `assistant_demarrage_actif`) ; `null` = clé absente (serveur ancien).
+  static bool? assistantServeur;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
         statusCode: 200,
-        data: options.path.contains('push')
+        data: options.path.contains('auth/me')
+            ? <String, dynamic>{if (assistantServeur != null) 'assistant_demarrage_actif': assistantServeur}
+            : options.path.contains('push')
             ? <String, dynamic>{}
             : {'server_time': '2026-10-17T12:00:00Z'},
       ),
@@ -50,6 +58,7 @@ void main() {
   late PremierDemarrageRepository depot;
 
   setUp(() {
+    _Serveur.assistantServeur = null;
     db = AppDatabase.forTesting(NativeDatabase.memory());
     client = Dio(BaseOptions(baseUrl: ParametresPoste.adresseParDefaut))..interceptors.add(_Serveur());
     depot = PremierDemarrageRepository(
@@ -74,6 +83,37 @@ void main() {
       expect(await depot.posteNeuf(), isTrue);
       await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
       expect(await depot.posteNeuf(), isFalse);
+    });
+
+    test('module « Assistant de démarrage » : éteint par défaut, allumé depuis Paramètres, seulement pour un poste neuf', () async {
+      final reglages = ParametresGenerauxRepository(database: db);
+      expect(await depot.moduleActif(), isFalse);
+      expect(await depot.afficherAssistant(), isFalse);
+
+      await reglages.definirAssistant(actif: true);
+      expect(await depot.moduleActif(), isTrue);
+      expect((await reglages.charger()).assistantActif, isTrue);
+      // La bascule attend son envoi (`pending`) : le poste n'est plus « neuf » ; une ligne déjà acquittée, si.
+      expect(await depot.afficherAssistant(), isFalse);
+      await (db.update(db.modulesConfig)..where((m) => m.speciesCode.equals('assistant_demarrage')))
+          .write(const ModulesConfigCompanion(syncStatus: Value(SyncStatus.synced)));
+      expect(await depot.afficherAssistant(), isTrue);
+
+      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
+      expect(await depot.afficherAssistant(), isFalse);
+
+      await reglages.definirAssistant(actif: false);
+      expect((await reglages.charger()).assistantActif, isFalse);
+    });
+
+    test('poste vraiment neuf : le module est LU au serveur à la connexion, sans tirage préalable', () async {
+      _Serveur.assistantServeur = true;
+      expect(await depot.afficherAssistant(), isTrue);
+      _Serveur.assistantServeur = false;
+      expect(await depot.afficherAssistant(), isFalse);
+      _Serveur.assistantServeur = true;
+      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
+      expect(await depot.afficherAssistant(), isFalse, reason: 'un poste qui a déjà synchronisé n\'est plus neuf');
     });
 
     test('une saisie en attente suffit à ne plus être neuf', () async {
@@ -158,6 +198,34 @@ void main() {
       expect(find.byKey(const Key('premier-continuer')), findsNothing);
     });
 
+    testWidgets('⚠️ CP-4 : sans exercice reçu, « Ouvrir l\'exercice AAAA » écrit la DEMANDE d\'ouverture (jamais fiscal_years)', (tester) async {
+      final cloture = ClotureExerciceRepository(database: db, deviceId: 'poste-test', horloge: () => DateTime(2031, 10, 28, 9));
+      await afficher(
+        tester,
+        PremierDemarrageScreen(
+          depot: depot,
+          engine: moteur(),
+          utilisateur: 'Directeur',
+          onTermine: () {},
+          depotCloture: cloture,
+          peutOuvrirExercice: true,
+        ),
+      );
+      expect(find.byKey(const Key('premier-etape-exercice')), findsOneWidget);
+      expect(find.byKey(const Key('premier-ouvrir-exercice')), findsNothing, reason: 'rien n\'est proposé avant la première synchronisation');
+
+      await tester.tap(find.byKey(const Key('premier-synchroniser')));
+      await tester.pumpAndSettle();
+      expect(find.text("Ouvrir l'exercice 2031"), findsOneWidget, reason: 'l\'année du poste (heure du Bénin)');
+      await tester.tap(find.byKey(const Key('premier-ouvrir-exercice')));
+      await tester.pumpAndSettle();
+
+      final d = (await db.select(db.fiscalClosureRequests).get()).single;
+      expect((d.kind, d.payload), ('ouvrir_exercice', '{"year":2031}'));
+      expect(await db.select(db.fiscalYears).get(), isEmpty);
+      expect(find.byKey(const Key('premier-ouvrir-exercice')), findsNothing);
+    });
+
     testWidgets('« Plus tard » ouvre l\'application sans synchroniser', (tester) async {
       var termine = false;
       await afficher(
@@ -177,32 +245,13 @@ void main() {
   });
 
   group('écran de connexion', () {
-    LoginScreen connexion() => LoginScreen(
-      auth: AuthService(client: client, deviceName: 'poste-test'),
-      onConnecte: () {},
-      demarrage: depot,
-    );
-
-    testWidgets('poste neuf : le serveur est affiché et se change avant la connexion', (tester) async {
-      await afficher(tester, connexion());
-
-      expect(find.byKey(const Key('login-serveur')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('login-modifier-serveur')));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('login-adresse-serveur')), 'http://10.0.0.5:8002');
-      await tester.tap(find.text('Enregistrer'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Serveur : http://10.0.0.5:8002'), findsOneWidget);
-      expect(client.options.baseUrl, 'http://10.0.0.5:8002');
-    });
-
-    testWidgets('poste en service : aucune adresse ni bouton « Modifier »', (tester) async {
-      await db.noterEtatDeSynchronisation(tire: DateTime(2026, 10, 17));
-
-      await afficher(tester, connexion());
+    testWidgets('⚠️ l\'adresse du serveur ne s\'affiche ni ne se change à la connexion : elle se règle dans Paramètres > Appairage', (tester) async {
+      await afficher(tester, LoginScreen(auth: AuthService(client: client, deviceName: 'poste-test'), onConnecte: () {}));
 
       expect(find.byKey(const Key('login-serveur')), findsNothing);
+      expect(find.byKey(const Key('login-modifier-serveur')), findsNothing);
+      expect(find.textContaining('Serveur :'), findsNothing);
+      expect(find.text('Modifier'), findsNothing);
     });
   });
 }

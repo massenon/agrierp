@@ -41,10 +41,14 @@ void main() {
         'Workflow Couvoir &amp; Éclosion (Incubation → Poussins Nés)',
         'Morts par catégorie',
         'Dons par catégorie',
+        // VOL-1 : passage Poussin → Jeune, départ obligatoire, puis l'effectif et le rationnement PAR CATÉGORIE.
+        'Passage du jour (Poussin → Jeune)',
+        'Effectif de départ par catégorie (obligatoire)',
         'Effectif Final',
         '= Effectif (J-1) + Achats/Poussins Nés − (Morts + Ventes + Dons)',
         'Taux de Mortalité du Jour (%)',
-        'x-ration-volaille',
+        'Rationnement &amp; Provende Servie par Catégorie (en Grammes g/j)',
+        'x-autonomie-alimentaire',
         'Poids Général Pesé (g)',
         'Traitements &amp; Prophylaxie',
         'Observations',
@@ -55,28 +59,30 @@ void main() {
         final i = b.indexOf(s, precedent + 1);
         expect(i, greaterThan(precedent), reason: 'ordre du Blade : $s');
         precedent = i;
-        if (s == 'x-ration-volaille') continue;
+        // `<x-autonomie-alimentaire … filiere="aviculture" />` : composant partagé (`CarteAutonomieAlimentaire`).
+        if (s == 'x-autonomie-alimentaire') continue;
         expect(e, contains(texteBlade(s).toLowerCase()), reason: 'écran : $s');
       }
-      // `<x-ration-volaille … ligne-cle="des reproducteurs" />`, et le titre du composant.
-      expect(b, contains('ligne-cle="des reproducteurs"'));
-      expect(e, contains('des reproducteurs'));
-      expect(e, contains('rationnement & provende servie par stade (en grammes g/j)'));
+      expect(b, contains('filiere="aviculture"'));
+      expect(e, contains('aviculture'));
     }, skip: saut);
 
     test('U12a — chaque libellé de champ du Blade est dans l écran, avec les indices de saisie', () {
       final b = blade.readAsStringSync();
       final e = litterauxDe(fichiers);
       final libelles = etiquettesDe(b);
-      expect(libelles, containsAll(['Œufs Couvés (Mis en incubation)', 'Repro', 'Poulet', 'Poussin']));
+      expect(libelles, containsAll(['Œufs Couvés (Mis en incubation)', 'Reproducteur', 'Jeune', 'Poussin']));
       for (final l in libelles) {
         attendreLibelle(e, l);
       }
       for (final m in RegExp(r'placeholder="([^"]+)"').allMatches(b)) {
-        expect(e, contains(m[1]!.toLowerCase()), reason: 'indice ${m[1]}');
+        // Ticket #46 : l'indice du poids est une expression Blade (« ~X Kg (estimé) » calculé, sinon « ex : 85 ») ;
+        // l'indice STATIQUE du poste est le repli de l'expression.
+        final indice = m[1]!.contains('{{') ? RegExp(r"'([^']+)'\s*\}\}$").firstMatch(m[1]!)![1]! : m[1]!;
+        expect(e, contains(indice.toLowerCase()), reason: 'indice ${m[1]}');
       }
       // L'option du sélecteur : « code (Stade — N têtes) ».
-      expect(b, contains('{{ \$lot->code }} ({{ ucfirst(\$lot->stage) }} — {{ \$lot->current_quantity }} têtes)'));
+      expect(b, contains('{{ \$lot->code }} ({{ \$lot->libelleStade() }} — {{ \$lot->current_quantity }} têtes)'));
     }, skip: saut);
 
     test('U12a — cartes et légendes, colonnes du tableau du mois dans l ordre, note : celles du Blade', () {
@@ -99,7 +105,7 @@ void main() {
       final colonnes = entetesDe(b);
       expect(colonnes, [
         'Date', 'Couvoir', 'Morts (total)', 'Effectif Final', 'Taux Mort %', 'Poids Général (g)', 'Couvés', 'Nés',
-        'Repro+Poulet+Poussin',
+        'Reproducteur+Jeune+Poussin',
       ]);
       for (final c in colonnes) {
         expect(e, contains(c.toLowerCase()), reason: c);
@@ -214,7 +220,7 @@ void main() {
       );
     }
     expect(find.text('Seuil critique < 5%'), findsOneWidget);
-    expect(find.text('GOL-B (Engraissement — 488 têtes)'), findsOneWidget);
+    expect(find.text('GOL-B (Jeune — 488 têtes)'), findsOneWidget);
     expect(find.byKey(const Key('note-ventilation-morts')), findsOneWidget);
     await db.close();
   });

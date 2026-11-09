@@ -8,6 +8,8 @@ import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
 import '../clients/clients_creances_repository.dart';
 import '../elevage/fiche_journaliere_repository.dart';
+import 'choix_facture.dart';
+import 'facturation_repository.dart' show FacturationRepository, FactureNormaliseeRefusee, StatutMecef;
 
 /// Ligne du panier de caisse.
 class LignePanier {
@@ -165,6 +167,10 @@ class CaisseRepository {
     return client;
   }
 
+  /// MECEF-3 — le choix « Facture simple / normalisée » n'est proposé que si le module MeCeF est actif (mode e-MECeF, boîtier ou
+  /// simulé : `company_settings.mecef_actif`, servi par le tirage). Sinon toute vente est une facture simple.
+  Future<bool> mecefActif() => FacturationRepository(database: _db, mecefParDefaut: false).mecefActif();
+
   Future<List<Product>> catalogue() {
     return (_db.select(_db.products)
           ..where((t) => t.isActive.equals(true))
@@ -225,6 +231,10 @@ class CaisseRepository {
     double remise = 0,
     double? especesRecues,
     DateTime? dateVente,
+    String factureType = ChoixFacture.simple,
+    String? clientIfu,
+    String? clientNomFacture,
+    String? aibTaux,
   }) async {
     if (panier.isEmpty) {
       throw const VenteRefusee('Le panier est vide.');
@@ -240,6 +250,15 @@ class CaisseRepository {
     if (modePaiement == 'credit') {
       if (clientId == null || clientId.isEmpty) throw const VenteRefusee(motifCreditSansClient);
       if (client == null) throw const VenteRefusee(motifCreditClientIntrouvable);
+    }
+
+    // MECEF-3 — le choix de facture est jugé AVANT tout effet, par les règles du serveur (mêmes motifs, mêmes mots) : nom
+    // obligatoire, IFU de 13 chiffres s'il est saisi, taux d'AIB dans la liste. Une facture simple n'emporte aucune identité fiscale.
+    final ChoixValide choix;
+    try {
+      choix = ChoixFacture.valider(type: factureType, ifu: clientIfu, nom: clientNomFacture, aib: aibTaux);
+    } on ChoixFactureRefuse catch (e) {
+      throw VenteRefusee(e.message);
     }
 
     final saisie = maintenant();
@@ -289,6 +308,21 @@ class CaisseRepository {
       }
     }
 
+    // 🔁 TICKET VOL-1 — BANDE DE VOLAILLES REPRODUCTRICES : la vente se range dans la catégorie du PRODUIT. Produit sans
+    // catégorie d'effectif, bande sans départ saisi ou date antérieure au départ : refus motivé (mêmes textes que
+    // `PosInterface::validateSale`), AVANT toute écriture.
+    final fiches = FicheJournaliereRepository(database: _db, deviceId: _deviceId, uuid: _uuid);
+    for (final ligne in panier) {
+      if (ligne.lotId == null) continue;
+      final refusVolailles = await fiches.refusDeVenteVolailles(
+        lotId: ligne.lotId!,
+        categorieEffectif: ligne.produit.categorieEffectif,
+        nomProduit: ligne.produit.name,
+        jour: jourVente,
+      );
+      if (refusVolailles != null) throw VenteRefusee(refusVolailles);
+    }
+
     final sousTotal = panier.fold<double>(0, (s, l) => s + l.montant);
     final total = sousTotal - remise;
     final venteId = _uuid.v4();
@@ -315,6 +349,11 @@ class CaisseRepository {
                 especesRecues == null ? null : especesRecues - total,
               ),
               soldAt: soldAt,
+              // MECEF-3 — le choix de facture, ÉCRIT à la saisie et envoyé avec la vente (le serveur le revalide).
+              factureType: Value(choix.type),
+              clientIfu: Value(choix.ifu),
+              clientNomFacture: Value(choix.nom),
+              aibTaux: Value(choix.aib),
             ),
           );
 
@@ -362,6 +401,7 @@ class CaisseRepository {
             ligne.quantite,
             jourVente,
             saisie,
+            categorieEffectif: ligne.produit.categorieEffectif,
           );
         }
       }
@@ -387,6 +427,9 @@ class CaisseRepository {
     final vente = await (_db.select(_db.sales)..where((t) => t.id.equals(venteId))).getSingleOrNull();
     if (vente == null || vente.status == 'annulee') return false;
 
+    // MECEF-1 — une facture NORMALISÉE ne s'annule pas (même refus, même message qu'au web) : seul un avoir la corrige.
+    if (StatutMecef.depuis(vente.mecefStatus) == StatutMecef.transmise) throw const FactureNormaliseeRefusee();
+
     await (_db.update(_db.sales)..where((t) => t.id.equals(venteId))).write(
       SalesCompanion(
         status: const Value('annulee'),
@@ -409,12 +452,13 @@ class CaisseRepository {
     String lotId,
     int quantite,
     DateTime jour,
-    DateTime saisie,
-  ) => FicheJournaliereRepository(
+    DateTime saisie, {
+    String? categorieEffectif,
+  }) => FicheJournaliereRepository(
     database: _db,
     deviceId: _deviceId,
     uuid: _uuid,
-  ).repercuterVente(lotId, quantite, jour, saisie);
+  ).repercuterVente(lotId, quantite, jour, saisie, categorieEffectif: categorieEffectif);
 
   static DateTime _minuit(DateTime d) => DateTime(d.year, d.month, d.day);
 

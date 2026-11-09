@@ -65,7 +65,7 @@ class VerrouSessionReglageTest extends VerrouSessionBase
         $u = $this->utilisateur();
         $autre = User::create([
             'name' => 'Caissière POS', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
-            'password' => 'AgriERP@2026', 'is_active' => true,
+            'password' => 'LogiAgriERP@2026', 'is_active' => true,
         ]);
 
         Livewire::actingAs($u)->test(MonProfil::class)

@@ -86,7 +86,7 @@ bool FlutterWindow::OnCreate() {
   canal_fenetre_ = std::move(canal);
 
   flutter_controller_->engine()->SetNextFrameCallback([this]() {
-    // AgriERP S'OUVRE AGRANDI, SUR LA ZONE DE TRAVAIL.
+    // LogiAgriERP S'OUVRE AGRANDI, SUR LA ZONE DE TRAVAIL.
     //
     // La fenetre est creee CACHEE (sans `WS_VISIBLE`) et n'est montree qu'ici, a
     // la premiere image. L'agrandissement doit se faire au meme endroit que
@@ -138,7 +138,7 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // AgriERP : la zone de travail change (resolution, barre des taches). Le
+  // LogiAgriERP : la zone de travail change (resolution, barre des taches). Le
   // message est observe, jamais consomme : Flutter le recoit ensuite.
   OnWorkAreaMessage(message, wparam);
   if (message == WM_GETMINMAXINFO) {

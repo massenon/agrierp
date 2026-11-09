@@ -3,7 +3,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">support_agent</span>Contactez l'Éditeur
         </h2>
-        <p class="text-xs text-outline mt-xs">Assistance technique, suggestions et signalement d'anomalies pour AgriERP.</p>
+        <p class="text-xs text-outline mt-xs">Assistance technique, suggestions et signalement d'anomalies pour LogiAgriERP.</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-md">
@@ -103,7 +103,7 @@
             </div>
             <div class="bg-info-blue/10 border border-info-blue/30 rounded-lg p-md">
                 <p class="text-xs font-bold text-brand-forest mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-[18px] text-info-blue">lightbulb</span>Avant de nous contacter</p>
-                <p class="text-xs text-outline">Consultez d'abord notre <a href="/aide-a-propos" class="text-brand-emerald font-bold hover:underline">Aide &amp; FAQ</a> - la réponse à votre question s'y trouve peut-être déjà.</p>
+                <p class="text-xs text-outline">Consultez d'abord notre <a wire:navigate href="/aide-a-propos" class="text-brand-emerald font-bold hover:underline">Aide &amp; FAQ</a> - la réponse à votre question s'y trouve peut-être déjà.</p>
             </div>
         </div>
     </div>

@@ -27,7 +27,7 @@ class SyncSoinsVeterinairesTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     private LivestockLot $bande;
 

@@ -1,6 +1,7 @@
 import '../../core/export/document_officiel.dart';
 import 'comptabilite_repository.dart';
 import 'mention_anouveaux.dart';
+import 'rapprochement_repository.dart';
 
 /// Documents officiels (PDF) des quatre pages comptables du poste — ticket F0.87 (item 9, T4).
 ///
@@ -126,7 +127,8 @@ class DocumentsComptabilite {
         entetes: const ['N° Compte', 'Intitulé', 'Classe'],
         lignes: [
           for (final c in d.comptes)
-            DonneesDocument([c.code, c.label, '${c.accountClass ?? inconnu}']),
+            // Ticket CP-1 — « 6 - Charges » comme l'écran et le PDF du web (`$classLabels[$account->class]`).
+            DonneesDocument([c.code, c.label, libelleClasse(c.accountClass, inconnu: inconnu)]),
         ],
       );
 
@@ -247,6 +249,69 @@ class DocumentsComptabilite {
       noteDePied: g.journalIncomplet && mouvements.isNotEmpty
           ? '$motifJournalIncomplet.'
           : null,
+    );
+  }
+
+  // ── Clôture d'exercice ────────────────────────────────────────────────────
+
+  /// Ticket CP-4 — `exports.cloture-exercice` du web : l'exercice, le résultat provisoire, le nombre de comptes de gestion à
+  /// solder, puis le tableau Compte / Intitulé / Classe / Solde (`exportClotureExercicePdf`).
+  static DocumentOfficiel cloture({
+    required int? exercice,
+    required double resultat,
+    required List<({String code, String libelle, int classe, double solde})> comptes,
+  }) => DocumentOfficiel(
+    titre: "Bascule & Clôture d'Exercice Comptable",
+    sousTitre: exercice == null ? '' : 'Exercice $exercice',
+    fichier: 'cloture-exercice-{jour}.pdf',
+    entetes: const ['Compte', 'Intitulé', 'Classe', 'Solde'],
+    lignes: [
+      BandeDocument('Exercice : ${exercice ?? '—'} — Résultat Provisoire : ${montant(resultat)} FCFA — Comptes de Gestion à Solder : ${comptes.length}'),
+      if (comptes.isEmpty)
+        const DonneesDocument(['Aucun compte de gestion à solder.', '', '', ''])
+      else
+        for (final c in comptes) DonneesDocument([c.code, c.libelle, '${c.classe}', '${montant(c.solde)} FCFA']),
+    ],
+  );
+
+  // ── Rapprochement bancaire ────────────────────────────────────────────────
+
+  /// Ticket AUT-1 — `exports.rapprochement-bancaire` du web : les trois soldes, le GRAND LIVRE du compte, le RELEVÉ
+  /// importé, puis le verdict d'équilibre. Le document se construit au poste, sans réseau.
+  static DocumentOfficiel rapprochement(
+    Rapprochement r, {
+    required String compte,
+    required DateTime debut,
+    required DateTime fin,
+  }) {
+    const entetes = ['Date', 'Libellé', 'Montant', 'Statut'];
+    return DocumentOfficiel(
+      titre: 'Rapprochement Bancaire${compte.isEmpty ? '' : ' — Compte $compte'}',
+      sousTitre: 'Période du ${jour(debut)} au ${jour(fin)}',
+      fichier: 'rapprochement-bancaire-{jour}.pdf',
+      entetes: entetes,
+      lignes: [
+        BandeDocument(
+          'Solde Livre : ${montant(r.soldeLivre)} FCFA — Solde Relevé : ${montant(r.soldeReleve)} FCFA — '
+          'Opérations en instance : ${montant(r.enInstance.abs())} FCFA',
+        ),
+        BandeDocument('GRAND LIVRE${compte.isEmpty ? '' : ' — Compte $compte'}'),
+        if (r.livre.isEmpty)
+          const DonneesDocument(['Aucune écriture sur la période.', '', '', ''])
+        else
+          for (final l in r.livre)
+            DonneesDocument([jour(l.date), l.libelle, montant(l.montant), l.pointee ? 'Pointé' : 'En instance']),
+        const BandeDocument('RELEVÉ BANCAIRE IMPORTÉ'),
+        const EnteteDocument(entetes),
+        if (r.releve.isEmpty)
+          const DonneesDocument(['Aucun relevé importé sur la période.', '', '', ''])
+        else
+          for (final l in r.releve)
+            DonneesDocument([jour(l.date), l.libelle, montant(l.montant), l.pointee ? 'Pointé' : 'Nouveau — à saisir']),
+      ],
+      noteDePied: r.equilibre
+          ? 'Rapprochement équilibré — écart nul.'
+          : 'Rapprochement déséquilibré — écart de ${montant(r.ecart)} FCFA à justifier avant clôture.',
     );
   }
 

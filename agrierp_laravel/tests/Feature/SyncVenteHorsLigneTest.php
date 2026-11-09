@@ -39,7 +39,7 @@ class SyncVenteHorsLigneTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     private User $caissier;
 
@@ -388,7 +388,8 @@ class SyncVenteHorsLigneTest extends TestCase
      */
     public function test_a_pushed_sale_is_normalised_with_the_mecef_device(): void
     {
-        $this->pousserVente()->assertOk();
+        // Choix « Facture normalisée » fait au poste (la facture simple n'est jamais présentée à la DGI).
+        $this->pousserVente(['facture_type' => 'normalisee', 'client_nom_facture' => 'Client Essai', 'aib_taux' => '5%'])->assertOk();
 
         $vente = \App\Models\Sale::find('11111111-1111-4111-8111-111111111111');
 
@@ -412,7 +413,7 @@ class SyncVenteHorsLigneTest extends TestCase
      */
     public function test_the_invoices_reach_the_device_with_their_mecef_status(): void
     {
-        $this->pousserVente()->assertOk();
+        $this->pousserVente(['facture_type' => 'normalisee', 'client_nom_facture' => 'Client Essai', 'aib_taux' => '5%'])->assertOk();
 
         $reponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
             ->getJson('/api/sync/pull')

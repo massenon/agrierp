@@ -84,11 +84,34 @@ def construire():
     return bytes(sortie)
 
 
+def memes_images(a, b, tolerance=2.0):
+    """Même icône, à l'octet près OU presque : mêmes tailles et pixels décodés quasi identiques.
+
+    L'encodage PNG (zlib) et le rééchantillonnage LANCZOS varient d'une version de Pillow à l'autre : comparer les
+    octets rendait le contrôle rouge sur un autre poste alors que l'image était la même. L'écart moyen par canal
+    doit rester sous `tolerance` (sur 255) ; un autre logo en donne des dizaines."""
+    try:
+        ia, ib = Image.open(io.BytesIO(a)), Image.open(io.BytesIO(b))
+        if set(ia.info.get('sizes', ())) != set(ib.info.get('sizes', ())):
+            return False
+        for taille in sorted(ia.info['sizes']):
+            pa = ia.ico.getimage(taille).convert('RGBA').tobytes()
+            pb = ib.ico.getimage(taille).convert('RGBA').tobytes()
+            if len(pa) != len(pb):
+                return False
+            if sum(abs(x - y) for x, y in zip(pa, pb)) / len(pa) > tolerance:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def main():
     octets = construire()
     if '--verifier' in sys.argv:
         with open(ICONE, 'rb') as f:
-            ok = f.read() == octets
+            existant = f.read()
+        ok = existant == octets or memes_images(existant, octets)
         print('app_icon.ico à jour' if ok else 'app_icon.ico DIFFÈRE : relancer outils/generer_icone.py')
         sys.exit(0 if ok else 1)
     with open(ICONE, 'wb') as f:

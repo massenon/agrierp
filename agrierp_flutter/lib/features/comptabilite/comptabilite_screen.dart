@@ -1,7 +1,9 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/comptabilite/exercice_choisi.dart';
-import '../../core/database/app_database.dart' show FiscalYear;
+import '../../core/database/app_database.dart' show ChartOfAccount, FiscalYear;
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
@@ -9,10 +11,18 @@ import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
+import 'balance_agee.dart';
 import 'comptabilite_repository.dart';
 import 'documents_comptabilite.dart';
 import 'etats_comparatifs.dart';
+import 'cloture_exercice_page.dart';
+import 'cloture_exercice_repository.dart';
+import 'immobilisations_page.dart';
+import 'immobilisations_repository.dart';
+import 'rapprochement_page.dart';
+import 'rapprochement_repository.dart';
 import 'mention_anouveaux.dart';
+import 'plan_comptable_modales.dart';
 import '../../core/theme/symboles_agri.dart';
 
 /// `prototype_html/comptabilite-hub.html` → Comptabilité.
@@ -30,12 +40,33 @@ class ComptabiliteScreen extends StatefulWidget {
   const ComptabiliteScreen({
     super.key,
     required this.depot,
+    this.depotImmobilisations,
+    this.depotCloture,
+    this.peutCloturer = true,
+    this.peutAdministrer = true,
+    this.depotRapprochement,
     this.maintenant = HeureBenin.maintenant,
     this.imprimer,
     this.exercice,
   });
 
   final ComptabiliteRepository depot;
+
+  /// Ticket CP-3 — le registre des immobilisations (carte « Immobilisations » du hub web). Sans lui (tests anciens du châssis), la
+  /// carte n'est pas proposée.
+  final ImmobilisationsRepository? depotImmobilisations;
+
+  /// Ticket CP-4 — la clôture d'exercice (carte « Clôture Périodique & Annuelle »). Sans lui (tests anciens du châssis), la carte
+  /// garde le motif d'avant.
+  final ClotureExerciceRepository? depotCloture;
+
+  /// `close-fiscal-year` et `manage-modules` du compte (le serveur re-juge chaque demande).
+  final bool peutCloturer;
+  final bool peutAdministrer;
+
+  /// Ticket CP-5 — le rapprochement bancaire (carte « Rapprochement Bancaire » du hub). Sans lui (tests anciens du châssis),
+  /// la carte garde son motif « non embarquée ».
+  final RapprochementRepository? depotRapprochement;
 
   /// Ticket EX8 (EF11) — L'EXERCICE AFFICHÉ, paramètre explicite (`exercice` du composant web). Fusion EX7 + EX8 : le
   /// socle y passe l'exercice choisi au sélecteur (`ExerciceChoisi`) ; c'est un CHOIX, jamais une seconde vérité —
@@ -75,23 +106,47 @@ class ComptabiliteScreen extends StatefulWidget {
   State<ComptabiliteScreen> createState() => _ComptabiliteScreenState();
 }
 
-/// Les neuf cartes du hub, dans l'ordre de la maquette.
+/// Les DOUZE cartes du hub, dans l'ordre de la cible du client (07/11/2026) : les neuf de sa liste, puis les trois pages
+/// réelles sans autre accès (Bilan de l'Entreprise, Immobilisations, Balance Âgée). Libellé, DESCRIPTION et icône sont ceux
+/// du web (`comptabilite-hub.blade.php`), gardés par `comptabilite_hub_cartes_test.dart`.
 enum PageComptable {
-  hub('Comptabilité', SymbolesAgri.account_balance),
-  planComptable('Plan Comptable', SymbolesAgri.list_alt),
-  journal('Journal Comptable', SymbolesAgri.menu_book),
-  grandLivre('Grand Livre', SymbolesAgri.auto_stories),
-  balance('Balance Générale', SymbolesAgri.balance),
-  etatsFinanciers('États Financiers', SymbolesAgri.assessment),
-  cloture('Clôture Périodique & Annuelle', SymbolesAgri.lock_clock),
-  analytique('Comptabilité Analytique', SymbolesAgri.pie_chart),
-  tva('Déclaration TVA', SymbolesAgri.receipt_long),
-  rapprochement('Rapprochement Bancaire', SymbolesAgri.account_balance_wallet);
+  hub('Comptabilité', '', SymbolesAgri.account_balance),
+  planComptable('Plan Comptable', 'Comptes SYSCOHADA (Classes 1 à 7)', SymbolesAgri.menu_book),
+  journal('Journal Comptable', 'Écritures Débit/Crédit, saisie manuelle', SymbolesAgri.account_balance),
+  grandLivre('Grand Livre', 'Écritures par compte, solde progressif', SymbolesAgri.import_contacts),
+  balance('Balance Générale', 'Soldes de tous les comptes utilisés', SymbolesAgri.balance),
+  etatsFinanciers('États Financiers', 'Bilan, Résultat, Flux de Trésorerie, Notes Annexes', SymbolesAgri.description),
+  cloture('Clôture Périodique & Annuelle', "Clôture mensuelle, bascule d'exercice, report à nouveau", SymbolesAgri.event_repeat),
+  analytique(
+    'Comptabilité Analytique',
+    'Marges réelles par filière (Cuniculture, Aviculture, Porciculture)',
+    SymbolesAgri.insights,
+  ),
+  tva('Déclaration TVA', 'TVA Collectée / Déductible, taux 18% ou exonéré', SymbolesAgri.receipt_long),
+  rapprochement(
+    'Rapprochement Bancaire',
+    'Pointage Grand Livre / Relevé Banque et Mobile Money',
+    SymbolesAgri.sync_alt,
+  ),
+  bilan("Bilan de l'Entreprise", 'Actif / Passif, équilibre comptable', SymbolesAgri.account_balance),
+  immobilisations('Immobilisations', 'Registre des biens, amortissement linéaire et dotation', SymbolesAgri.domain),
+  balanceAgee(
+    'Balance Âgée',
+    'Encours clients et fournisseurs par ancienneté de retard',
+    SymbolesAgri.schedule,
+  );
 
-  const PageComptable(this.libelle, this.icone);
+  const PageComptable(this.libelle, this.description, this.icone);
 
   final String libelle;
+  final String description;
   final IconData icone;
+
+  /// Les douze cartes du hub, dans l'ordre (le hub lui-même en est exclu).
+  static List<PageComptable> get cartes => [
+    for (final p in values)
+      if (p != hub) p,
+  ];
 }
 
 class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
@@ -105,22 +160,22 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   /// pourrait être faux de structure ») est levé par cette preuve. Leurs onglets Flux de Trésorerie et Notes Annexes
   /// restent sur le web ([motifsOngletsWeb]).
   static const motifs = <PageComptable, String>{
+    // Ticket CP-4 — la clôture d'exercice se DEMANDE au poste (décision du client) : cette entrée ne sert plus qu'aux écrans
+    // construits sans dépôt de clôture.
     PageComptable.cloture:
-        "La clôture d'exercice est explicitement hors du contrat de "
-        'synchronisation : elle fige les comptes de toute la ferme. La lancer '
-        "depuis un poste qui n'a pas encore reçu les dernières pièces "
-        "clôturerait un exercice incomplet.",
+        "La clôture d'exercice s'ouvre depuis le menu Comptabilité, une fois "
+        'la session ouverte : le poste en écrit la demande et le serveur la joue.',
     PageComptable.analytique:
         "La ventilation analytique s'appuie sur les centres de coût, qui ne "
         'descendent pas au poste : les lignes reçues portent leur identifiant, '
         'jamais leur libellé.',
+    PageComptable.immobilisations:
+        "Le registre des immobilisations s'ouvre depuis le menu Comptabilité, une fois "
+        'la session ouverte.',
     PageComptable.tva:
         "La déclaration de TVA est une pièce fiscale : elle s'établit et se "
         'télédéclare depuis la surface web, avec le régime et les taux en '
         'vigueur.',
-    PageComptable.rapprochement:
-        "Le rapprochement pointe le Grand Livre contre un RELEVÉ de banque ou "
-        "de Mobile Money — un document que le poste ne reçoit pas.",
   };
 
   /// Onglet actif des États Financiers (`#[Url] public string $tab = 'bilan'`).
@@ -140,6 +195,14 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
   PeriodeBalance _periodeBalance = PeriodeBalance.mois;
 
   DonneesComptabilite? _donnees;
+
+  /// Page « Bilan de l'Entreprise » : date d'arrêté (`asOfDate` du web), `null` = l'arrêté de l'exercice affiché.
+  DateTime? _arreteBilan;
+
+  /// Page « Balance Âgée » : volet (`creances` / `dettes`), date d'arrêté (aujourd'hui) et données lues à l'ouverture.
+  String _voletAgee = 'creances';
+  DateTime? _arreteAgee;
+  DonneesBalanceAgee? _agee;
 
   /// Ticket EX7 (EF9) — page affichée du Journal (25 écritures par page), dans l'exercice affiché.
   int _pageDuJournal = 1;
@@ -186,7 +249,9 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
 
   Future<void> _charger() async {
     final donnees = await widget.depot.charger();
+    final agee = await DonneesBalanceAgee.charger(widget.depot.database);
     if (!mounted) return;
+    _agee = agee;
 
     final aujourdhui = widget.maintenant();
     // Ticket EX7 (EF9) — du 1er du mois à aujourd'hui quand l'exercice affiché contient le jour, l'exercice entier
@@ -236,6 +301,27 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                         PageComptable.grandLivre => _pageGrandLivre(d, large),
                         PageComptable.balance => _pageBalance(d, large),
                         PageComptable.etatsFinanciers => _pageEtatsFinanciers(d, large),
+                        PageComptable.rapprochement when widget.depotRapprochement != null => RapprochementPage(
+                          key: const Key('page-rapprochement'),
+                          depot: widget.depotRapprochement!,
+                          maintenant: widget.maintenant,
+                          imprimer: widget.imprimer,
+                        ),
+                        PageComptable.bilan => _pageBilan(d, large),
+                        PageComptable.balanceAgee => _pageBalanceAgee(large),
+                        PageComptable.immobilisations when widget.depotImmobilisations != null => ImmobilisationsPage(
+                          key: const Key('page-immobilisations'),
+                          depot: widget.depotImmobilisations!,
+                          maintenant: widget.maintenant,
+                        ),
+                        PageComptable.cloture when widget.depotCloture != null => ClotureExercicePage(
+                          key: const Key('page-cloture'),
+                          depot: widget.depotCloture!,
+                          imprimer: widget.imprimer,
+                          maintenant: widget.maintenant,
+                          peutCloturer: widget.peutCloturer,
+                          peutAdministrer: widget.peutAdministrer,
+                        ),
                         PageComptable.hub => _pageHub(d, large),
                         _ => _pageNonEmbarquee(_page, large),
                       },
@@ -317,23 +403,28 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.lg),
-      GridView.count(
-        crossAxisCount: large ? 3 : 1,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: AgriSpacing.md,
-        crossAxisSpacing: AgriSpacing.md,
-        childAspectRatio: large ? 3.2 : 4.5,
-        children: [
-          for (final page in PageComptable.values)
-            if (page != PageComptable.hub) _carteNavigation(page),
-        ],
-      ),
+      // UNE grille de douze cartes (décision du client, 07/11/2026), comme le web.
+      _grilleCartes([for (final page in PageComptable.cartes) _carteNavigation(page)], large),
     ],
   );
 
+  /// Deux colonnes (`sm:grid-cols-2` du web), une seule sur un écran étroit.
+  Widget _grilleCartes(List<Widget> cartes, bool large) => GridView.count(
+    crossAxisCount: large ? 2 : 1,
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    mainAxisSpacing: AgriSpacing.md,
+    crossAxisSpacing: AgriSpacing.md,
+    childAspectRatio: large ? 5.2 : 4.6,
+    children: cartes,
+  );
+
   Widget _carteNavigation(PageComptable page) {
-    final embarquee = !motifs.containsKey(page);
+    final embarquee =
+        !motifs.containsKey(page) ||
+        (page == PageComptable.cloture && widget.depotCloture != null) ||
+        (page == PageComptable.immobilisations && widget.depotImmobilisations != null);
+    final teinte = embarquee ? AgriColors.brandEmerald : AgriColors.outline;
 
     return InkWell(
       key: Key('carte-${page.name}'),
@@ -347,12 +438,17 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              page.icone,
-              size: 24,
-              color: embarquee ? AgriColors.brandEmerald : AgriColors.outline,
+            // Icône dans un carré teinté (`w-12 h-12 rounded-lg bg-brand-emerald/10`).
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: teinte.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AgriRadius.lg),
+              ),
+              child: Icon(page.icone, size: 24, color: teinte),
             ),
-            const SizedBox(width: AgriSpacing.sm),
+            const SizedBox(width: AgriSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,14 +463,16 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                       color: AgriColors.brandForest,
                     ),
                   ),
-                  if (!embarquee)
-                    const Text(
-                      'Consultation sur la surface web',
-                      style: TextStyle(fontSize: 10, color: AgriColors.outline),
-                    ),
+                  Text(
+                    page.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: AgriColors.outline),
+                  ),
                 ],
               ),
             ),
+            const Icon(SymbolesAgri.chevron_right, size: 24, color: AgriColors.outline),
           ],
         ),
       ),
@@ -388,12 +486,30 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     children: [
       _enTete(
         _titre('Plan Comptable SYSCOHADA', large),
-        _boutonExport(
-          'exporter-pdf-plan',
-          () => _exporter(
-            DocumentsComptabilite.plan(d, le: widget.maintenant()),
-            'Aucun compte à exporter.',
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _boutonExport(
+              'exporter-pdf-plan',
+              () => _exporter(
+                DocumentsComptabilite.plan(d, le: widget.maintenant()),
+                'Aucun compte à exporter.',
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.xs),
+            // Ticket CP-1 — « Nouveau Compte » (`newAccount` du web) : écrit le compte en local, le serveur le valide.
+            ElevatedButton.icon(
+              key: const Key('plan-nouveau-compte'),
+              onPressed: () => _ouvrirCompte(null),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AgriColors.brandEmerald,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+              ),
+              label: const Text('Nouveau Compte', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -450,22 +566,45 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 ),
                 7,
               ),
-              (Text('${d.comptes[i].accountClass ?? '—'}', style: _cellule), 2),
-              (_actionInerte(), 2),
+              (Text(libelleClasse(d.comptes[i].accountClass), style: _cellule), 2),
+              (
+                // Ticket CP-1 — « Modifier » (`editAccount`) et « Archiver » (`archiveAccount`) du Blade.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      key: Key('plan-modifier-$i'),
+                      onTap: () => _ouvrirCompte(d.comptes[i]),
+                      child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue)),
+                    ),
+                    InkWell(
+                      key: Key('plan-archiver-$i'),
+                      onTap: () => _archiverCompte(d.comptes[i]),
+                      child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorDeep)),
+                    ),
+                  ],
+                ),
+                2,
+              ),
             ]),
         ],
       ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️ (Ticket F0.83, 10 oct. 2026) Le serveur sert désormais le plan SYSCOHADA révisé
-      // officiel (1 332 comptes + ceux de la ferme absents du CSV) : l'étroitesse du plan,
-      // arbitrage ouvert depuis le Sprint 14, est levée pour l'AJOUT de comptes. Le REMAPPAGE
-      // des comptes de la ferme au sens divergent reste la phase B (cabinet FAGUEZ).
-      _mentionPoste(
-        "Le plan comptable se modifie sur la surface web : ajouter un compte "
-        "depuis le poste donnerait une saisie effacée au tirage suivant.",
-      ),
     ],
   );
+
+  Future<void> _ouvrirCompte(ChartOfAccount? existant) async {
+    final ecrit = await ouvrirCompte(context: context, depot: widget.depot, existant: existant);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer(existant == null ? 'Compte créé avec succès.' : 'Modification enregistrée avec succès.');
+  }
+
+  Future<void> _archiverCompte(ChartOfAccount compte) async {
+    final ecrit = await confirmerArchivageCompte(context: context, depot: widget.depot, compte: compte);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer('Compte archivé avec succès.');
+  }
 
   // ── Journal Comptable ─────────────────────────────────────────────────────
 
@@ -480,12 +619,30 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     children: [
       _enTete(
         _titre('Journal Comptable', large),
-        _boutonExport(
-          'exporter-pdf-journal',
-          () => _exporter(
-            DocumentsComptabilite.journal(d, le: widget.maintenant(), ecritures: ecritures),
-            'Aucune écriture à exporter.',
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _boutonExport(
+              'exporter-pdf-journal',
+              () => _exporter(
+                DocumentsComptabilite.journal(d, le: widget.maintenant(), ecritures: ecritures),
+                'Aucune écriture à exporter.',
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.xs),
+            // Ticket CP-2 — « Saisie d'Écriture » (`newEntry` du web) : écrit la DEMANDE, le serveur écrit et numérote l'écriture.
+            ElevatedButton.icon(
+              key: const Key('journal-saisie-ecriture'),
+              onPressed: () => _ouvrirEcriture(d, null),
+              icon: const Icon(SymbolesAgri.add_circle, size: 18),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AgriColors.brandEmerald,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+              ),
+              label: const Text("Saisie d'Écriture", style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -528,6 +685,11 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
+      // Ticket CP-2 — les demandes pas encore jouées par le serveur : en attente d'envoi, ou refusées avec leur motif.
+      if (d.demandes.isNotEmpty) ...[
+        _demandesEnAttente(d),
+        const SizedBox(height: AgriSpacing.md),
+      ],
       _tableau(
         largeur: 1200,
         colonnes: const [
@@ -585,7 +747,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                 2,
               ),
               (_montantEcriture(page[i]), 3),
-              (_actionInerte(), 2),
+              (_actionsEcriture(d, page[i], i), 2),
             ]),
         ],
       ),
@@ -597,20 +759,124 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           annee: etat.annee,
           onPage: (p) => setState(() => _pageDuJournal = p),
         ),
-      const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ AUCUNE ÉCRITURE NE SE SAISIT AU POSTE, et ce n'est pas un manque.
-      // Une écriture naît d'une opération — vente, achat, dépense, ponte,
-      // écart d'inventaire — et le serveur la génère lui-même. C'est ce qui
-      // garantit qu'aucun mouvement ne pèse sur les comptes sans avoir pesé
-      // sur le stock ou la caisse.
-      _mentionPoste(
-        "Une écriture naît d'une opération — vente, achat, dépense, écart "
-        "d'inventaire — et le serveur la génère lui-même. La saisie manuelle "
-        "d'écriture reste sur la surface web : une écriture saisie à la main "
-        'ne pèserait ni sur le stock ni sur la caisse.',
-      ),
     ],
   );
+  }
+
+  // ── Écritures manuelles (ticket CP-2) ─────────────────────────────────────
+
+  Future<void> _ouvrirEcriture(DonneesComptabilite d, LigneJournal? existante) async {
+    final ecrit = await ouvrirEcriture(
+      context: context,
+      depot: widget.depot,
+      comptes: d.comptes,
+      aujourdhui: widget.maintenant(),
+      existante: existante,
+    );
+    if (!ecrit) return;
+    await _charger();
+    _annoncer(
+      existante == null
+          ? "Écriture enregistrée — elle sera numérotée et passée à la prochaine synchronisation."
+          : 'Modification enregistrée — elle sera appliquée à la prochaine synchronisation.',
+    );
+  }
+
+  Future<void> _archiverEcriture(LigneJournal e) async {
+    final ecrit = await confirmerArchivageEcriture(context: context, depot: widget.depot, ecriture: e);
+    if (!ecrit) return;
+    await _charger();
+    _annoncer("Archivage enregistré — il sera appliqué à la prochaine synchronisation.");
+  }
+
+  /// Colonne « Actions » du Blade : cadenas pour une écriture verrouillée (exercice clôturé), sinon modifier + archiver ; une demande en
+  /// attente sur l'écriture le dit (le serveur n'a pas encore répondu).
+  Widget _actionsEcriture(DonneesComptabilite d, LigneJournal e, int i) {
+    if (e.ecriture.isLocked) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Tooltip(
+          message: 'Écriture verrouillée (exercice clôturé)',
+          child: Icon(SymbolesAgri.lock, size: 16, color: AgriColors.outline),
+        ),
+      );
+    }
+    final enAttente = d.demandes.where((x) => x.demande.entryId == e.ecriture.id).firstOrNull;
+    if (enAttente != null) {
+      return Text(
+        enAttente.refusee ? '${enAttente.geste} refusé(e)' : '${enAttente.geste} en attente',
+        key: Key('journal-attente-$i'),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: AgriTypography.gras,
+          color: enAttente.refusee ? AgriColors.errorDeep : AgriColors.outline,
+        ),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          key: Key('journal-modifier-$i'),
+          onTap: () => _ouvrirEcriture(d, e),
+          child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue)),
+        ),
+        InkWell(
+          key: Key('journal-archiver-$i'),
+          onTap: () => _archiverEcriture(e),
+          child: const Padding(padding: EdgeInsets.all(4), child: Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorDeep)),
+        ),
+      ],
+    );
+  }
+
+  /// Les demandes d'écriture pas encore jouées : ce que le poste a saisi et que le serveur n'a pas encore numéroté.
+  Widget _demandesEnAttente(DonneesComptabilite d) {
+    final comptes = {for (final c in d.comptes) c.id: c};
+    String code(String? id) => id == null ? '—' : comptes[id]?.code ?? '—';
+
+    return Container(
+      key: const Key('journal-demandes'),
+      padding: const EdgeInsets.all(AgriSpacing.sm),
+      decoration: BoxDecoration(
+        color: AgriColors.accentYellow.withValues(alpha: 0.10),
+        border: Border.all(color: AgriColors.accentYellow.withValues(alpha: 0.30)),
+        borderRadius: BorderRadius.circular(AgriRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Demandes d'écriture en attente de synchronisation",
+            style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+          ),
+          for (final (i, x) in d.demandes.indexed)
+            Padding(
+              padding: const EdgeInsets.only(top: AgriSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    x.demande.action == 'archiver'
+                        ? 'Archivage d\'une écriture'
+                        : '${x.geste} · ${x.demande.entryDate == null ? '—' : _date(x.demande.entryDate!)} · ${x.demande.label ?? '—'} · '
+                              'D ${code(x.demande.debitAccountId)} / C ${code(x.demande.creditAccountId)} · ${_montant(x.demande.amount ?? 0)} F',
+                    key: Key('journal-demande-$i'),
+                    style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.brandForest),
+                  ),
+                  Text(
+                    x.refusee ? 'Refusée par le serveur' : "En attente d'envoi",
+                    key: Key('journal-demande-statut-$i'),
+                    style: TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: x.refusee ? AgriColors.errorDeep : AgriColors.outline),
+                  ),
+                  if (x.motifRefus != null)
+                    Text(x.motifRefus!, key: Key('journal-demande-motif-$i'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _montantEcriture(LigneJournal e) {
@@ -1604,6 +1870,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     required (ColonneExercice, ColonneExercice?) entetes,
     required List<LigneTableauEtat> lignes,
     bool totalSombre = false,
+    String? pied,
   }) {
     const enTete = TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AgriColors.outline);
     Widget colonneEntete(String titre, String sousTitre) => Column(
@@ -1733,8 +2000,336 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
             ),
           ),
           for (var i = 0; i < lignes.length; i++) ligne(i, lignes[i]),
+          if (pied != null)
+            Container(
+              padding: const EdgeInsets.all(AgriSpacing.md),
+              decoration: const BoxDecoration(border: Border(top: BorderSide(color: AgriColors.outlineVariant))),
+              child: Text(
+                pied,
+                style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AgriColors.outline),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  // ── Bilan de l'Entreprise (`/rapport-bilan`, `Livewire\Comptabilite\Bilan`) ─────────────────────────────────
+
+  /// « Bilan Simplifié de l'Entreprise » : en-tête avec la date d'arrêté (bornée à l'exercice affiché), bandeau
+  /// d'équilibre, cartes Actif / Passif en colonnes N et N-1 — calculés par `bilanComparatif` (parité exécutée EX8).
+  Widget _pageBilan(DonneesComptabilite d, bool large) {
+    final etat = _etat(d);
+    final arrete = etat.borner(_arreteBilan ?? d.arreteEtatsFinanciers(etat));
+    final c = d.bilanComparatif(arrete);
+    final motif = d.journal.isEmpty
+        ? 'Aucune écriture reçue au poste'
+        : d.ecrituresIncompletes > 0
+        ? _motifJournalIncomplet
+        : null;
+    final jj = '${arrete.day.toString().padLeft(2, '0')}/${arrete.month.toString().padLeft(2, '0')}/${arrete.year}';
+    final equilibre = c.n.equilibre;
+
+    final actif = _carteEtat(
+      cle: 'bilan-actif',
+      titre: 'Actif (Emplois)',
+      couleur: AgriColors.brandEmerald,
+      couleurTotal: AgriColors.brandEmerald,
+      entetes: (c.exerciceN, c.exerciceN1),
+      lignes: EtatsComparatifs.tableauActifSimplifie(c),
+    );
+    final passif = _carteEtat(
+      cle: 'bilan-passif',
+      titre: 'Passif (Ressources)',
+      couleur: AgriColors.infoBlue,
+      couleurTotal: AgriColors.infoBlue,
+      entetes: (c.exerciceN, c.exerciceN1),
+      lignes: EtatsComparatifs.tableauPassifSimplifie(c),
+      pied:
+          "Le passif reflète les ressources ayant financé les emplois inscrits à l'actif : capitaux propres de "
+          "l'exploitant et dettes envers les tiers. Calculé directement depuis le grand livre comptable.",
+    );
+    final couleurBandeau = equilibre ? AgriColors.brandEmerald : AgriColors.errorDeep;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(SymbolesAgri.balance, size: 26, color: AgriColors.brandEmerald),
+                      const SizedBox(width: AgriSpacing.xs),
+                      Flexible(child: _titre("Bilan Simplifié de l'Entreprise", large)),
+                    ],
+                  ),
+                  const SizedBox(height: AgriSpacing.xs),
+                  Text(
+                    'Situation patrimoniale de la Ferme École OLOUWACHEGOUN au $jj.',
+                    key: const Key('bilan-situation'),
+                    style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AgriSpacing.sm),
+            ChampDateFiltre(
+              cle: const Key('bilan-arrete'),
+              valeur: arrete,
+              onTap: () async {
+                final choix = await showDatePicker(
+                  context: context,
+                  initialDate: arrete,
+                  firstDate: etat.bornes.debut,
+                  lastDate: etat.bornes.fin,
+                  locale: const Locale('fr'),
+                );
+                if (choix != null) setState(() => _arreteBilan = etat.borner(choix));
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        MentionAnouveauxProvisoires(ouverture: c.n.ouverture),
+        if (motif != null)
+          _mentionPoste('$motif : le Bilan ne peut pas être affirmé sur ce poste.')
+        else ...[
+          Container(
+            key: const Key('bilan-equilibre'),
+            margin: const EdgeInsets.only(bottom: AgriSpacing.lg),
+            padding: const EdgeInsets.all(AgriSpacing.md),
+            decoration: BoxDecoration(
+              color: couleurBandeau.withValues(alpha: 0.10),
+              border: Border.all(color: couleurBandeau.withValues(alpha: 0.30)),
+              borderRadius: BorderRadius.circular(AgriRadius.lg),
+            ),
+            child: Row(
+              children: [
+                Icon(equilibre ? SymbolesAgri.check_circle : SymbolesAgri.error, size: 24, color: couleurBandeau),
+                const SizedBox(width: AgriSpacing.xs),
+                Expanded(
+                  child: Text(
+                    equilibre
+                        ? 'Bilan équilibré — Total Actif = Total Passif = ${EtatsComparatifs.montant(c.n.totalActif)} FCFA'
+                        : 'Déséquilibre détecté — Actif ${EtatsComparatifs.montant(c.n.totalActif)} FCFA ≠ Passif ${EtatsComparatifs.montant(c.n.totalPassif)} FCFA',
+                    style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: couleurBandeau),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (large)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: actif),
+                const SizedBox(width: AgriSpacing.md),
+                Expanded(child: passif),
+              ],
+            )
+          else ...[
+            actif,
+            const SizedBox(height: AgriSpacing.md),
+            passif,
+          ],
+        ],
+      ],
+    );
+  }
+
+  // ── Balance Âgée (`/balance-agee`, `Livewire\Comptabilite\BalanceAgee`) ──────────────────────────────────
+
+  Widget _pageBalanceAgee(bool large) {
+    final donnees = _agee ?? const DonneesBalanceAgee();
+    final arrete = _arreteAgee ?? DateTime(widget.maintenant().year, widget.maintenant().month, widget.maintenant().day);
+    final b = donnees.calculer(_voletAgee, arrete);
+    final tiers = _voletAgee == 'dettes' ? 'Fournisseur' : 'Client';
+    String f(double v) => DocumentsComptabilite.montant(v);
+    const etiquette = TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest);
+    const saisie = TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.onSurface);
+
+    Color lisere(String t) => t == 'Non échu'
+        ? AgriColors.brandEmerald
+        : t == 'Plus de 90 jours'
+        ? AgriColors.errorRed
+        : AgriColors.accentYellow;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(SymbolesAgri.schedule, size: 26, color: AgriColors.brandEmerald),
+            const SizedBox(width: AgriSpacing.xs),
+            Flexible(child: _titre('Balance Âgée', large)),
+          ],
+        ),
+        const SizedBox(height: AgriSpacing.xs),
+        const Text(
+          'Encours par ancienneté de retard — qui relancer, et dans quel ordre.',
+          style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+        ),
+        const SizedBox(height: AgriSpacing.md),
+        Container(
+          key: const Key('agee-info'),
+          padding: const EdgeInsets.all(AgriSpacing.sm),
+          decoration: BoxDecoration(
+            color: AgriColors.infoBlue.withValues(alpha: 0.10),
+            border: Border.all(color: AgriColors.infoBlue.withValues(alpha: 0.20)),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: const Text.rich(
+            TextSpan(
+              style: TextStyle(fontSize: 11, color: AgriColors.brandForest),
+              children: [
+                TextSpan(text: "Écran ajouté hors maquette, à la demande. L'âge se compte depuis l'"),
+                TextSpan(text: 'échéance', style: TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: " — pas depuis l'émission — et seul le "),
+                TextSpan(text: 'reste dû', style: TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: ' est ventilé.'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.lg),
+        Container(
+          padding: const EdgeInsets.all(AgriSpacing.md),
+          decoration: BoxDecoration(
+            color: AgriColors.surfaceCard,
+            border: Border.all(color: AgriColors.outlineVariant),
+            borderRadius: BorderRadius.circular(AgriRadius.lg),
+          ),
+          child: Wrap(
+            spacing: AgriSpacing.md,
+            runSpacing: AgriSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('VOLET :', style: etiquette),
+                  const SizedBox(width: AgriSpacing.sm),
+                  DropdownButton<String>(
+                    key: const Key('agee-volet'),
+                    value: _voletAgee,
+                    style: saisie,
+                    items: const [
+                      DropdownMenuItem(value: 'creances', child: Text('Créances clients')),
+                      DropdownMenuItem(value: 'dettes', child: Text('Dettes fournisseurs')),
+                    ],
+                    onChanged: (v) => setState(() => _voletAgee = v ?? 'creances'),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('ARRÊTÉ AU :', style: etiquette),
+                  const SizedBox(width: AgriSpacing.sm),
+                  ChampDateFiltre(
+                    cle: const Key('agee-arrete'),
+                    valeur: arrete,
+                    onTap: () async {
+                      final choix = await showDatePicker(
+                        context: context,
+                        initialDate: arrete,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        locale: const Locale('fr'),
+                      );
+                      if (choix != null) setState(() => _arreteAgee = choix);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AgriSpacing.lg),
+        _grilleKpis(large, [
+          for (final (t, _) in BalanceAgee.tranches)
+            CarteKpi(
+              key: Key('agee-kpi-$t'),
+              libelle: t,
+              valeur: '${f(b.totaux[t]!)} F',
+              couleurLisere: lisere(t),
+            ),
+        ]),
+        const SizedBox(height: AgriSpacing.lg),
+        _tableau(
+          largeur: 900,
+          colonnes: [(tiers, 3), for (final (t, _) in BalanceAgee.tranches) (t, 2), ('Total', 2)],
+          vide: 'Aucun encours à cette date — tout est soldé.',
+          lignes: [
+            for (var i = 0; i < b.tiers.length; i++)
+              _ligne(i, [
+                (
+                  Text(
+                    b.tiers[i].nom,
+                    style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+                  ),
+                  3,
+                ),
+                for (final (t, _) in BalanceAgee.tranches)
+                  (
+                    Text(
+                      b.tiers[i].tranches[t]! > 0 ? f(b.tiers[i].tranches[t]!) : '—',
+                      textAlign: TextAlign.right,
+                      style: _cellule,
+                    ),
+                    2,
+                  ),
+                (
+                  Text(
+                    f(b.tiers[i].total),
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+                  ),
+                  2,
+                ),
+              ]),
+            if (b.tiers.isNotEmpty)
+              Container(
+                key: const Key('agee-total-general'),
+                color: AgriColors.brandEmerald.withValues(alpha: 0.10),
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md, vertical: AgriSpacing.sm),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      flex: 3,
+                      child: Text(
+                        'TOTAL GÉNÉRAL',
+                        style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.w900, color: AgriColors.brandForest),
+                      ),
+                    ),
+                    for (final (t, _) in BalanceAgee.tranches)
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          f(b.totaux[t]!),
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras),
+                        ),
+                      ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        f(b.total),
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.w900, color: AgriColors.brandForest),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1745,7 +2340,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
     children: [
       _titre(page.libelle, large),
       const SizedBox(height: AgriSpacing.md),
-      _mentionPoste(motifs[page] ?? ''),
+      _mentionPoste(motifs[page] ?? "Le rapprochement bancaire n'est pas disponible dans cette vue : il s'ouvre depuis le menu Comptabilité, une fois la session ouverte."),
     ],
   );
 
@@ -1800,13 +2395,14 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         border: Border.all(color: AgriColors.outlineVariant),
         borderRadius: BorderRadius.circular(AgriRadius.lg),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: largeur,
-          child: Column(
-            children: [
-              // Premier niveau : les groupes.
+      child: LayoutBuilder(
+        builder: (_, contraintes) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: max(largeur, contraintes.maxWidth),
+            child: Column(
+              children: [
+                // Premier niveau : les groupes.
               Container(
                 color: AgriColors.surfaceZebra,
                 padding: const EdgeInsets.symmetric(
@@ -1879,6 +2475,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -1906,20 +2503,21 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
                   for (final (libelle, flex) in colonnes)
                     Expanded(
                       flex: flex,
@@ -1945,6 +2543,7 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         ),
       ),
     ),
+    ),
   );
 
   Widget _ligne(int index, List<(Widget, int)> cellules) => Container(
@@ -1959,14 +2558,6 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
         for (final (contenu, flex) in cellules)
           Expanded(flex: flex, child: contenu),
       ],
-    ),
-  );
-
-  Widget _actionInerte() => const Opacity(
-    opacity: 0.4,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 

@@ -74,7 +74,7 @@
                 <button type="button" wire:click="closeDrawer" class="text-white/80 hover:text-white"><span class="material-symbols-outlined">close</span></button>
             </div>
             <div class="p-lg space-y-md">
-                <a href="{{ route('achats.profile-fournisseur', $this->viewingSupplier) }}" class="flex items-center justify-center gap-xs w-full py-sm rounded-lg bg-brand-emerald text-white text-xs font-bold hover:bg-brand-forest">
+                <a wire:navigate href="{{ route('achats.profile-fournisseur', $this->viewingSupplier) }}" class="flex items-center justify-center gap-xs w-full py-sm rounded-lg bg-brand-emerald text-white text-xs font-bold hover:bg-brand-forest">
                     <span class="material-symbols-outlined text-[16px]">open_in_full</span>Voir le Profil Complet
                 </a>
                 <div class="bg-surface-zebra rounded-lg p-md text-xs space-y-1">

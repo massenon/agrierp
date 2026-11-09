@@ -5,7 +5,7 @@
                 <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher un produit..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-full text-xs bg-surface-zebra outline-none focus:ring-2 focus:ring-brand-emerald">
             </div>
-            <a href="{{ route('stocks.produits.ajouter') }}" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-[11px] px-sm py-2 rounded-full">
+            <a wire:navigate href="{{ route('stocks.produits.ajouter') }}" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-[11px] px-sm py-2 rounded-full">
                 <span class="material-symbols-outlined text-[16px]">add_box</span>Ajouter Produit Ferme
             </a>
             <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-livraison' })" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-[11px] px-sm py-2 rounded-full">
@@ -50,28 +50,32 @@
             <h3 class="font-bold text-brand-forest text-sm">Panier de Vente</h3>
             <span class="w-6 h-6 rounded-full bg-brand-emerald text-white text-xs font-bold flex items-center justify-center">{{ count($cart) }}</span>
         </div>
-        <div class="p-md space-y-sm border-b border-outline-variant flex-shrink-0">
-            <label class="block text-[10px] text-brand-forest font-bold uppercase">Client</label>
-            <div class="flex items-center gap-xs">
-                <select wire:model="customerId" class="flex-1 h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
-                    <option value="">Client Anonyme</option>
-                    @foreach($this->customers as $customer)
-                        <option value="{{ $customer->id }}">{{ $customer->name }}</option>
-                    @endforeach
-                </select>
-                <button type="button" wire:click="openAddClientModal" class="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-emerald text-white flex-shrink-0"><span class="material-symbols-outlined text-[18px]">person_add</span></button>
-            </div>
-            {{-- Ticket VTE-1 — crédit ou avance sans client : refus motivé, affiché sous le champ. --}}
-            @error('customerId') <p class="invalid-feedback" dusk="client-erreur">{{ $message }}</p> @enderror
-            {{-- Ticket 15.32 — ÉCART ASSUMÉ avec la maquette (aucun champ date dans pos-interface.html) :
-                 décision client du 14/10/2026, UN seul champ au panier. Ce n'est pas une modale. --}}
-            <div>
-                <label for="date-vente" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la vente</label>
-                <input id="date-vente" dusk="date-vente" type="date" wire:model.live="dateVente" max="{{ $this->dateMax }}" @if($this->dateMin) min="{{ $this->dateMin }}" @endif class="w-full h-10 px-md border rounded-lg text-xs bg-white {{ $errors->has('dateVente') ? 'is-invalid' : 'border-outline-variant' }}">
-                @error('dateVente') <p class="invalid-feedback" dusk="date-vente-erreur">{{ $message }}</p> @enderror
-                @if(! $errors->has('dateVente') && $dateVente !== '' && $dateVente < now()->format('Y-m-d'))
-                    <p class="text-[10px] text-outline mt-xs">Vente antérieure : écriture, stock, créance et fiche seront datés du {{ \Carbon\Carbon::parse($dateVente)->format('d/m/Y') }}.</p>
-                @endif
+        <div class="p-md border-b border-outline-variant flex-shrink-0">
+            <div class="grid grid-cols-2 gap-md items-start">
+                <div class="min-w-0">
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Client</label>
+                    <div class="flex items-center gap-xs">
+                        <select wire:model="customerId" class="flex-1 min-w-0 h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                            <option value="">Client Anonyme</option>
+                            @foreach($this->customers as $customer)
+                                <option value="{{ $customer->id }}">{{ $customer->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" wire:click="openAddClientModal" class="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-emerald text-white flex-shrink-0"><span class="material-symbols-outlined text-[18px]">person_add</span></button>
+                    </div>
+                    {{-- Ticket VTE-1 — crédit ou avance sans client : refus motivé, affiché sous le champ. --}}
+                    @error('customerId') <p class="invalid-feedback" dusk="client-erreur">{{ $message }}</p> @enderror
+                </div>
+                <div class="min-w-0">
+                    {{-- Ticket 15.32 — ÉCART ASSUMÉ avec la maquette (aucun champ date dans pos-interface.html) :
+                         décision client du 14/10/2026, UN seul champ au panier. Ce n'est pas une modale. --}}
+                    <label for="date-vente" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la vente</label>
+                    <input id="date-vente" dusk="date-vente" type="date" wire:model.live="dateVente" max="{{ $this->dateMax }}" @if($this->dateMin) min="{{ $this->dateMin }}" @endif class="w-full h-10 px-md border rounded-lg text-xs bg-white {{ $errors->has('dateVente') ? 'is-invalid' : 'border-outline-variant' }}">
+                    @error('dateVente') <p class="invalid-feedback" dusk="date-vente-erreur">{{ $message }}</p> @enderror
+                    @if(! $errors->has('dateVente') && $dateVente !== '' && $dateVente < now()->format('Y-m-d'))
+                        <p class="text-[10px] text-outline mt-xs">Vente antérieure : écriture, stock, créance et fiche seront datés du {{ \Carbon\Carbon::parse($dateVente)->format('d/m/Y') }}.</p>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -94,19 +98,57 @@
         </div>
 
         <div class="p-md border-t border-outline-variant space-y-sm flex-shrink-0">
-            <div class="flex justify-between text-xs"><span class="text-outline">Sous-total</span><span class="font-bold">{{ number_format($this->subtotal, 0, ',', ' ') }} FCFA</span></div>
-            <div class="flex justify-between items-center text-xs"><span class="text-outline">Remise (FCFA)</span><input wire:model.live="discount" type="number" min="0" class="w-24 h-8 px-sm border border-outline-variant rounded-lg text-right text-xs"></div>
-            <div class="flex justify-between items-center border-t border-outline-variant pt-sm"><span class="font-bold text-brand-forest">Total à Payer</span><span class="text-lg font-extrabold text-brand-emerald">{{ number_format($this->total, 0, ',', ' ') }} FCFA</span></div>
-            <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de Règlement</label>
-                <select wire:model.live="paymentMode" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="virement">Virement bancaire</option>
-                    <option value="credit">Crédit / À terme</option>
-                    <option value="avance">Déduire de l'avance</option>
-                </select>
+            {{-- Ticket #47 (suite) : DEUX rangées de deux colonnes — Sous-total + Remise, puis Total à Payer + Mode de Règlement. --}}
+            <div class="grid grid-cols-2 gap-md items-end">
+                <div class="min-w-0">
+                    <span class="block text-xs text-outline mb-xs">Sous-total</span>
+                    <span class="block h-9 leading-9 text-sm font-bold">{{ number_format($this->subtotal, 0, ',', ' ') }} FCFA</span>
+                </div>
+                <div class="min-w-0">
+                    <label class="block text-xs text-outline mb-xs">Remise (FCFA)</label>
+                    <input wire:model.live="discount" type="number" min="0" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-right text-xs">
+                </div>
             </div>
+            @if($this->livraisonRetenue > 0)
+                <div class="flex items-center justify-between text-xs" dusk="ligne-livraison">
+                    <span class="text-outline">Frais de livraison</span>
+                    <span class="font-bold">{{ number_format($this->livraisonRetenue, 0, ',', ' ') }} FCFA</span>
+                </div>
+            @endif
+            <div class="grid grid-cols-2 gap-md items-end border-t border-outline-variant pt-sm">
+                <div class="min-w-0">
+                    <span class="block font-bold text-brand-forest mb-xs">Total à Payer</span>
+                    <span class="block h-10 leading-10 text-lg font-extrabold text-brand-emerald">{{ number_format($this->total, 0, ',', ' ') }} FCFA</span>
+                </div>
+                <div class="min-w-0">
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de Règlement</label>
+                    <select wire:model.live="paymentMode" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                        <option value="especes">Espèces</option>
+                        <option value="mobile_money">Mobile Money</option>
+                        <option value="virement">Virement bancaire</option>
+                        <option value="credit">Crédit / À terme</option>
+                        <option value="avance">Déduire de l'avance</option>
+                    </select>
+                </div>
+            </div>
+            {{-- Choix du type de facture : seulement quand le module MeCeF est actif. « Facture normalisée » ouvre la fenêtre (événement open-modal). --}}
+            @if($this->facturationNormaliseeDisponible)
+                <div class="grid grid-cols-2 gap-sm items-end" dusk="choix-facture">
+                    <div class="min-w-0">
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Type de Facture</label>
+                        <select wire:model.live="factureType" dusk="facture-type" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs bg-white">
+                            @foreach(\App\Support\FactureType::LIBELLES as $valeurType => $libelleType)
+                                <option value="{{ $valeurType }}">{{ $libelleType }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="min-w-0">
+                        @if($factureType === 'normalisee')
+                            <button type="button" wire:click="ouvrirFactureNormalisee" dusk="facture-infos" class="w-full h-10 px-sm rounded-lg border border-brand-emerald text-brand-emerald text-[11px] font-bold hover:bg-brand-emerald/5 truncate">Modifier les informations de facturation</button>
+                        @endif
+                    </div>
+                </div>
+            @endif
             @if($paymentMode === 'especes')
                 <div class="grid grid-cols-2 gap-xs">
                     <div><label class="block text-[9px] text-outline font-bold uppercase mb-xs">Montant Reçu</label><input wire:model.live="cashReceived" type="number" min="0" placeholder="0" class="w-full h-9 px-sm border border-outline-variant rounded-lg text-xs"></div>
@@ -179,6 +221,41 @@
         </form>
     </x-modal>
 
+    {{-- Fenêtre « Facture normalisée » : ouverte par l'événement open-modal (jamais par @if). Mêmes libellés et même ordre que le poste. --}}
+    <x-modal name="modal-facture-normalisee" max-width="sm">
+        <div class="flex items-center justify-between mb-md">
+            <h3 class="font-bold text-lg text-brand-forest">Facture Normalisée</h3>
+            <button type="button" wire:click="annulerFactureNormalisee" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="space-y-md">
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">IFU du client</label>
+                <input wire:model="clientIfu" dusk="client-ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('clientIfu') ? 'is-invalid' : 'border-outline-variant' }}">
+                <p class="text-[10px] text-outline mt-xs">Laissez vide pour un client sans IFU (client particulier).</p>
+                @error('clientIfu') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Nom et prénom du client *</label>
+                <input wire:model="clientNomFacture" dusk="client-nom-facture" type="text" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('clientNomFacture') ? 'is-invalid' : 'border-outline-variant' }}">
+                @error('clientNomFacture') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Taux AIB</label>
+                <select wire:model="aibTaux" dusk="aib-taux" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('aibTaux') ? 'is-invalid' : 'border-outline-variant' }}">
+                    @foreach(\App\Support\AibTaux::LIBELLES as $valeurAib => $libelleAib)
+                        <option value="{{ $valeurAib }}">{{ $libelleAib }}</option>
+                    @endforeach
+                </select>
+                <p class="text-[10px] text-outline mt-xs">Le montant de l'AIB est calculé par la DGI.</p>
+                @error('aibTaux') <p class="invalid-feedback">{{ $message }}</p> @enderror
+            </div>
+        </div>
+        <div class="flex justify-end gap-sm pt-md mt-md border-t border-outline-variant">
+            <button type="button" wire:click="annulerFactureNormalisee" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
+            <button type="button" wire:click="validerFactureNormalisee" dusk="facture-valider" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Valider</button>
+        </div>
+    </x-modal>
+
     <x-modal name="modal-livraison" max-width="sm">
         <div class="flex items-center justify-between mb-md">
             <h3 class="font-bold text-lg text-brand-forest">Livraison</h3>
@@ -195,10 +272,10 @@
                         <option value="gratuite">Livraison gratuite (offerte)</option>
                         <option value="client">Livraison assurée par le client</option>
                         <option value="incluse">Prix de livraison inclus dans le montant</option>
-                        <option value="facturee">Livraison facturée séparément</option>
+                        <option value="facturee">Livraison facturée (ajoutée au total de la vente)</option>
                     </select>
                     @if($deliveryMode === 'facturee')
-                        <input wire:model="deliveryFrais" type="number" placeholder="Frais de livraison (FCFA) si facturée séparément" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">
+                        <input wire:model="deliveryFrais" type="number" placeholder="Frais de livraison (FCFA), inclus dans le total" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">
                     @endif
                     <input wire:model="deliveryAdresse" type="text" placeholder="Adresse de livraison" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">
                     <input wire:model="deliveryContact" type="text" placeholder="Contact du transporteur" class="w-full h-9 px-md border border-outline-variant rounded-lg text-xs">

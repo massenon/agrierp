@@ -88,6 +88,10 @@ void main() {
     'livestock_lots',
     'livestock_daily_entries',
     'livestock_transfers',
+    // Ticket EL-1 — transformations (table mixte : saisie ET tirée).
+    'transformations',
+    // Ticket RELEVES-1 — relevés de terrain (table mixte de barème : saisie ET tirée).
+    'field_survey_entries',
     'feed_ration_standards',
     // Ticket U2 (D-U2) — objectifs de GMQ.
     'growth_standards',
@@ -112,11 +116,22 @@ void main() {
     'payables',
     'employees',
     'internships',
+    // Ticket RH-2 — absences de stagiaire ; RH-4 — barème ITS.
+    'internship_absences',
+    'income_tax_brackets',
     'attendance_records',
     'mails',
     'administrative_documents',
     'archived_documents',
     'chart_of_accounts',
+    // Ticket CP-3 — registre des immobilisations (table mixte).
+    'fixed_assets',
+    // Ticket PA-2 — les droits existants (administrateur).
+    'permissions',
+    // Ticket CP-5 — lignes de relevé bancaire.
+    'bank_statement_lines',
+    // Ticket CP-4 — les mois clôturés (`view-comptabilite`).
+    'periodic_closures',
     'fiscal_years',
     'accounting_entries',
     'accounting_entry_lines',

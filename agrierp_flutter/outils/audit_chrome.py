@@ -251,8 +251,8 @@ def main():
         ('En-tête « Agri**ERP** » (ERP en `accent-yellow`) + sous-titre '
          '« Ferme École Olouwachegoun »',
          'Ferme École Olouwachegoun' in src.replace('É', 'É')
-         and "'AgriERP'" not in src, 'mineur',
-         "le poste écrit 'AgriERP' d'une seule couleur, sans sous-titre"),
+         and "'LogiAgriERP'" not in src, 'mineur',
+         "le poste écrit 'LogiAgriERP' d'une seule couleur, sans sous-titre"),
         ('Bouton « Synchroniser » jaune en pied de barre',
          'SyncButton' in src, None, ''),
         ('Bloc utilisateur (nom + rôle en capitales)',

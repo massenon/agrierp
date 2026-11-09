@@ -1,4 +1,4 @@
-# Stratégie de Bascule Papier → Numérique — AgriERP
+# Stratégie de Bascule Papier → Numérique — LogiAgriERP
 
 Ticket 13.4 (Sprint 13, DERNIER TICKET DU PLAN D'EXÉCUTION), Document 08
 Partie C. Ce document ne recopie pas la Partie C générique déjà fournie
@@ -12,11 +12,11 @@ a été corrigé dans ce ticket, deux restent honnêtement documentés.
 ## 1. Principe de bascule progressive (repris tel quel, aucun écart)
 
 1. **Double-saisie transitoire (2 à 4 semaines)** : fiches papier
-   références officielles, saisie parallèle dans AgriERP.
+   références officielles, saisie parallèle dans LogiAgriERP.
 2. **Reprise de l'historique récent uniquement** (mois en cours), pas
    d'historique pluriannuel rétroactif sauf demande explicite.
 3. **Bascule officielle** une fois la double-saisie jugée fiable par le
-   Comptable et le Chef d'élevage — AgriERP devient source de vérité
+   Comptable et le Chef d'élevage — LogiAgriERP devient source de vérité
    unique, les fiches papier restent une sauvegarde de terrain.
 
 ---
@@ -64,7 +64,7 @@ pas contourner ainsi** — ce gap nécessite un vrai point de saisie dédié
 ("Solde d'Ouverture Client/Fournisseur", hors périmètre de ce ticket de
 documentation) avant la bascule officielle si des soldes en cours
 existent réellement à reprendre. Si la ferme démarre l'utilisation
-d'AgriERP sans encours (tous les comptes soldés au jour de bascule), ce
+d'LogiAgriERP sans encours (tous les comptes soldés au jour de bascule), ce
 gap n'a aucun impact pratique.
 
 ### ✅ Stocks — Inventaire physique du jour de bascule

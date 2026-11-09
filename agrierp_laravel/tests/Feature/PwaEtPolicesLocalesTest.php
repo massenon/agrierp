@@ -219,6 +219,167 @@ class PwaEtPolicesLocalesTest extends TestCase
         $this->assertStringContainsString('plusTard()', $vue);
     }
 
+    // =================================================================
+    //  3. PWA-1 (08/11/2026) — caisse hors ligne : les NOUVELLES règles
+    //     (aucune des gardes ci-dessus n'est retirée ; chacune est ici
+    //     doublée d'une garde plus précise)
+    // =================================================================
+
+    /** Le corps d'un tableau JavaScript `const NOM = [ ... ];` de sw.js, en liste de chaînes. */
+    private function listeDuWorker(string $nom): array
+    {
+        preg_match('/const '.$nom.' = \[(.*?)\];/s', $this->lire('public/sw.js'), $m);
+        $this->assertNotEmpty($m, "Liste {$nom} introuvable dans sw.js.");
+        preg_match_all("#'([^']+)'#", $m[1], $valeurs);
+
+        return $valeurs[1];
+    }
+
+    public function test_le_service_worker_garde_ses_trois_regles_de_surete_en_tete_mot_pour_mot(): void
+    {
+        $sw = $this->lire('public/sw.js');
+
+        // Avant PWA-1, seules les règles 1 et 3 étaient vérifiées « de loin » : la règle 2 (aucun HTML authentifié) n'était
+        // assertée nulle part. Elle l'est maintenant, par son intitulé ET par son code.
+        $this->assertStringContainsString('1. SEULES LES REQUÊTES `GET` SONT INTERCEPTÉES.', $sw);
+        $this->assertStringContainsString("2. AUCUNE PAGE HTML AUTHENTIFIÉE N'EST STOCKÉE.", $sw);
+        $this->assertStringContainsString('3. SEULS LES FICHIERS STATIQUES SONT MIS EN CACHE', $sw);
+        $this->assertStringContainsString("if (request.method !== 'GET') return;", $sw);
+    }
+
+    public function test_les_sept_chemins_jamais_touches_sont_exactement_ceux_de_la_doctrine(): void
+    {
+        $this->assertEqualsCanonicalizing(
+            ['/livewire/', '/api/', '/login', '/logout', '/reset-password', '/broadcasting/', '/storage/'],
+            $this->listeDuWorker('EXCLUS'),
+            'EXCLUS de sw.js ne doit ni perdre un chemin ni en gagner un sans décision écrite.'
+        );
+        $sw = $this->lire('public/sw.js');
+        $this->assertStringContainsString("EXCLUS.some((p) => url.pathname.startsWith(p))", $sw);
+        // Aucune requête portant un en-tête Authorization n'est jamais interceptée.
+        $this->assertStringContainsString("request.headers.has('Authorization')", $sw);
+    }
+
+    public function test_seules_deux_pages_html_statiques_peuvent_etre_en_cache_et_toute_ecriture_passe_par_la_garde(): void
+    {
+        $sw = $this->lire('public/sw.js');
+
+        $this->assertSame(['/offline.html', '/caisse-hors-ligne.html'], $this->listeDuWorker('HTML_STATIQUES'),
+            'Une page HTML de plus en cache serait une page de plus qui survit à la déconnexion.');
+
+        // La garde unique refuse tout HTML hors de cette liste, tout JSON, toute requête authentifiée.
+        $this->assertMatchesRegularExpression("/text\\/html'\\) && !HTML_STATIQUES\\.includes\\(url\\.pathname\\)\\) return false;/", $sw);
+        $this->assertStringContainsString("includes('json')) return false;", $sw);
+        $this->assertStringContainsString("requete.headers.has('Authorization')) return false;", $sw);
+
+        // Chaque écriture dans un cache (hors installation et purge) est précédée de `peutEtreStocke` : on compte.
+        $ecritures = preg_match_all('/\.put\(/', $sw);
+        $gardes = preg_match_all('/if \(peutEtreStocke\(request, url, reponse\)\)/', $sw);
+        $this->assertGreaterThan(0, $ecritures);
+        $this->assertSame($ecritures, $gardes, 'Toute écriture de cache doit passer par peutEtreStocke().');
+
+        // Le worker n'appelle jamais l'API ni Livewire : il ne voit aucune donnée métier.
+        $this->assertDoesNotMatchRegularExpression("#fetch\\([^)]*['\"]/(api|livewire)#", $sw);
+        // L'envoi des ventes n'est PAS fait par le worker : l'événement `sync` ne fait que réveiller un onglet.
+        preg_match("/addEventListener\\('sync'.*?\\n\\}\\);/s", $sw, $sync);
+        $this->assertNotEmpty($sync, "Gestionnaire 'sync' introuvable.");
+        $this->assertStringNotContainsString('fetch(', $sync[0]);
+        $this->assertStringContainsString("postMessage({ type: 'SYNCHRONISER' })", $sync[0]);
+    }
+
+    public function test_la_version_du_cache_a_ete_incrementee_et_la_purge_est_prevue(): void
+    {
+        $sw = $this->lire('public/sw.js');
+
+        preg_match("/const VERSION = 'agrierp-v(\\d+)';/", $sw, $m);
+        $this->assertNotEmpty($m);
+        $this->assertGreaterThanOrEqual(6, (int) $m[1], 'PWA-1 change des fichiers précachés : VERSION doit avoir passé v5.');
+
+        // `activate` supprime tout cache d'une autre version ; la déconnexion les supprime TOUS.
+        $this->assertStringContainsString('noms.filter((n) => !n.startsWith(VERSION)).map((n) => caches.delete(n))', $sw);
+        $this->assertStringContainsString("event.data.type === 'PURGER'", $sw);
+        $this->assertMatchesRegularExpression('/caches\.keys\(\)\.then\(\(noms\) => Promise\.all\(noms\.map\(\(n\) => caches\.delete\(n\)\)\)\)/', $sw);
+    }
+
+    public function test_l_enveloppe_de_la_caisse_est_precachee_et_l_installation_ignore_le_cache_http(): void
+    {
+        $socle = $this->listeDuWorker('SOCLE');
+        foreach (['/offline.html', '/caisse-hors-ligne.html', '/assets/hors-ligne/caisse.js', '/assets/hors-ligne/caisse-style.css'] as $fichier) {
+            $this->assertContains($fichier, $socle);
+        }
+        $this->assertStringContainsString("new Request(u, { cache: 'reload' })", $this->lire('public/sw.js'));
+    }
+
+    public function test_la_page_de_caisse_est_statique_sans_aucune_donnee_ni_session(): void
+    {
+        $html = $this->lire('public/caisse-hors-ligne.html');
+        $sansCommentaires = preg_replace('/<!--.*?-->/s', '', $html);
+
+        foreach (['{{', '@csrf', 'csrf-token', '<livewire', 'wire:', 'x-data', '@if', '@foreach', 'Bearer '] as $interdit) {
+            $this->assertStringNotContainsString($interdit, $sansCommentaires, "La page statique ne doit contenir ni gabarit ni donnée ({$interdit}).");
+        }
+        // Aucun nom d'utilisateur, de client ni de produit : un seul script, à elle, et des ressources locales.
+        preg_match_all('/(?:src|href)="([^"]+)"/', $sansCommentaires, $liens);
+        foreach ($liens[1] as $lien) {
+            $this->assertMatchesRegularExpression('#^/(assets/|manifest\.webmanifest|mode-hors-ligne)#', $lien, "Ressource inattendue : {$lien}");
+        }
+        $this->assertSame(1, preg_match_all('/<script/', $sansCommentaires));
+        $this->assertStringContainsString('type="module" src="/assets/hors-ligne/caisse.js"', $sansCommentaires);
+        $this->assertStringNotContainsString('fonts.googleapis.com', $html);
+    }
+
+    public function test_les_libelles_de_la_caisse_hors_ligne_sont_ceux_de_la_vue_blade_qui_est_le_maitre(): void
+    {
+        $blade = $this->lire('resources/views/livewire/ventes/pos-interface.blade.php');
+        $html = $this->lire('public/caisse-hors-ligne.html');
+
+        foreach ([
+            'Panier de Vente', 'Sous-total', 'Total à Payer', 'Remise (FCFA)', 'Mode de Règlement', 'Montant Reçu', 'Monnaie à Rendre',
+            'Client Anonyme', 'Type de Facture', 'Vente à la Pièce', 'Montant Global de la Vente (FCFA)', 'Nombre de sujets / Quantité',
+            'Ajouter au panier', 'Rechercher un produit...', 'Tous', 'Facture Normalisée', 'IFU du client', 'Nom et prénom du client *',
+            'Taux AIB', 'Aucun produit trouvé.', 'Sélectionnez un produit pour commencer.', 'Crédit / À terme', 'Virement bancaire',
+            'Mobile Money', 'Espèces', 'Modifier les informations de facturation', 'Laissez vide pour un client sans IFU (client particulier).',
+            "Le montant de l'AIB est calculé par la DGI.",
+        ] as $libelle) {
+            $this->assertStringContainsString($libelle, $blade, "« {$libelle} » n'est plus dans la caisse du web : la vue Blade est le maître.");
+            $this->assertStringContainsString($libelle, $html, "« {$libelle} » manque à la caisse hors ligne.");
+        }
+
+        // Les libellés de statut reprennent ceux de la modale « Synchronisation » du poste.
+        $dart = $this->lire('../agrierp_flutter/lib/core/sync/modale_synchronisation.dart');
+        foreach (['En attente d', 'Refusés par le serveur', 'Synchroniser maintenant'] as $libelle) {
+            $this->assertStringContainsString($libelle, $dart, $libelle);
+        }
+        $this->assertStringContainsString('Synchroniser maintenant', $html);
+        $this->assertStringContainsString("En attente d\\'envoi", file_get_contents(base_path('resources/js/hors-ligne/catalogue.js')));
+    }
+
+    public function test_le_javascript_de_la_caisse_ne_stocke_rien_en_clair_et_n_inventera_aucun_protocole(): void
+    {
+        foreach (glob(base_path('resources/js/hors-ligne/*.js')) as $fichier) {
+            $js = file_get_contents($fichier);
+            $nom = basename($fichier);
+            // Jamais de jeton, de mot de passe ni de PIN dans localStorage / sessionStorage : seuls deux marqueurs sans secret.
+            $this->assertStringNotContainsString('sessionStorage', $js, $nom);
+            $this->assertDoesNotMatchRegularExpression('/localStorage\.setItem\(\s*[\'"][^\'"]*(token|jeton|pin|password|mot)/i', $js, $nom);
+            // Un seul protocole : les routes existantes des postes, aucune autre route d'API.
+            preg_match_all("#['\"`](/api/[a-z/\\-]+)#", $js, $routes);
+            foreach ($routes[1] as $route) {
+                $this->assertContains($route, ['/api/auth/login', '/api/auth/logout', '/api/sync/pull', '/api/sync/push'], "{$nom} appelle une route non prévue : {$route}");
+            }
+            $this->assertDoesNotMatchRegularExpression('/Alpine\.start\(\)/', $js, "{$nom} : pas de Alpine.start()");
+            $this->assertDoesNotMatchRegularExpression('#https?://(?!www\.w3\.org)#', $js, "{$nom} : aucune ressource externe");
+        }
+    }
+
+    public function test_la_construction_de_la_caisse_est_branchee_au_build(): void
+    {
+        $this->assertStringContainsString('vite build --config vite.hors-ligne.config.js', $this->lire('package.json'));
+        $this->lire('vite.hors-ligne.config.js');
+        $this->assertFileExists(public_path('assets/hors-ligne/caisse.js'), 'Lancez `npm run build` : la caisse hors ligne est un fichier construit.');
+        $this->assertFileExists(public_path('assets/hors-ligne/caisse-style.css'));
+    }
+
     public function test_la_page_de_connexion_ne_demande_aucune_ressource_distante(): void
     {
         $reponse = $this->get('/login');

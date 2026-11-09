@@ -15,7 +15,7 @@ class InternshipAbsence extends Model
 
     protected function casts(): array
     {
-        return ['absence_date' => 'date'];
+        return ['absence_date' => 'date', 'is_active' => 'boolean'];
     }
 
     public function internship()

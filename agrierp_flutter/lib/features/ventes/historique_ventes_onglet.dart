@@ -18,6 +18,7 @@ import '../../core/widgets/toast_agri.dart';
 import '../../core/temps/heure_benin.dart';
 import 'avoirs_repository.dart';
 import 'elements_ventes.dart';
+import 'facturation_repository.dart' show FactureNormaliseeRefusee, messageFactureNormalisee;
 import 'historique_ventes_repository.dart';
 
 /// Onglet « Historique des Ventes » du hub Ventes & Devis — `resources/views/livewire/ventes/historique-ventes.blade.php`
@@ -37,7 +38,7 @@ import 'historique_ventes_repository.dart';
 /// pas encore eu lieu au poste : l'écran l'écrit « … — le stock sera réintégré à la synchronisation. » (ÉCART ASSUMÉ).
 ///
 /// ⚠️ ÉCARTS ASSUMÉS (hors ligne) : « Télécharger PDF » exige le réseau (le ticket est produit par le serveur) et ENREGISTRE
-/// le fichier dans Documents\AgriERP au lieu de le télécharger dans un navigateur ; sous la pastille d'une vente pas encore
+/// le fichier dans Documents\LogiAgriERP au lieu de le télécharger dans un navigateur ; sous la pastille d'une vente pas encore
 /// reçue du serveur, la mention « Non envoyée » ; le bouton « Annuler » est grisé sans `manage-ventes` (le web 403 à
 /// l'envoi), comme `@lectureSeule` le grise quand l'exercice affiché est clos.
 class HistoriqueVentesOnglet extends StatefulWidget {
@@ -568,7 +569,20 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
             couleur: AgriColors.infoBlue,
             onPressed: () => setState(() => _voirId = v.id),
           ),
-          if (!l.annulee)
+          // MECEF-1 — facture normalisée : le cadenas remplace « Annuler » (même texte qu'au web).
+          if (!l.annulee && l.normalisee)
+            Tooltip(
+              message: messageFactureNormalisee,
+              child: Padding(
+                key: Key('vente-verrou-${v.id}'),
+                padding: const EdgeInsets.all(AgriSpacing.xs),
+                child: Icon(SymbolesAgri.lock, size: 18, color: AgriColors.outlineVariant),
+              ),
+            )
+          // Ticket CONF-4 (DV-20) — comme le web (`@can('manage-ventes')` autour de « Annuler ») : l'annulation d'une vente reste à
+          // `manage-ventes` SEUL ; le comptable, qui lit l'historique, corrige par l'avoir. La garde de `_confirmerAnnulation`
+          // demeure (défense en profondeur).
+          else if (!l.annulee && widget.peutGerer)
             LectureSeule.infobulle(
               motifLecture,
               boutonIconeTableau(
@@ -627,7 +641,14 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
       ToastAgri.afficher(context, HistoriqueVentesOnglet.refusDroit, type: TypeToast.erreur);
       return;
     }
-    final annulee = await widget.depot.annuler(id);
+    final bool annulee;
+    try {
+      annulee = await widget.depot.annuler(id);
+    } on FactureNormaliseeRefusee {
+      // MECEF-1 — même refus et même message qu'au web.
+      if (mounted) ToastAgri.afficher(context, messageFactureNormalisee, type: TypeToast.erreur);
+      return;
+    }
     if (!mounted) return;
     if (annulee) {
       ToastAgri.afficher(context, HistoriqueVentesOnglet.toastAnnuleeAuPoste, type: TypeToast.avertissement);
@@ -820,7 +841,7 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
     );
   }
 
-  /// `exportSaleTicketPdf()` : le ticket de la vente, produit par le serveur, enregistré dans Documents\AgriERP.
+  /// `exportSaleTicketPdf()` : le ticket de la vente, produit par le serveur, enregistré dans Documents\LogiAgriERP.
   Future<void> _telechargerPdf(String id) async {
     if (!widget.peutExporter) {
       ToastAgri.afficher(context, 'Votre rôle ne permet pas d\'exporter le ticket d\'une vente.', type: TypeToast.erreur);

@@ -162,7 +162,7 @@ class AlertesClocheTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $compte = fn (string $role) => tap(\App\Models\User::create([
             'name' => $role, 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]), fn ($u) => $u->assignRole($role));
         CompanySetting::create(['company_name' => 'Ferme']);
 

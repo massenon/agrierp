@@ -57,6 +57,12 @@ class Corbeille extends Component
 
     public string $confirmation = '';
 
+    public function mount(): void
+    {
+        // CONF-3 : jamais d'ouverture sans le droit de l'onglet (droit de toutes les actions, auparavant contrôlé au seul rendu).
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('manage-parametres'), 403);
+    }
+
     public function updatedTypeFiltre(): void
     {
         $this->resetPage('pageCorbeille');

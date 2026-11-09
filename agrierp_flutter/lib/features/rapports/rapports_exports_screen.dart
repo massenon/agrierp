@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
@@ -44,6 +46,19 @@ typedef EditeurClasseur =
 /// ⚠️ **QUATRE PAGES `rapport-*.html` NE SONT PAS DANS CE HUB** et ne sont donc pas portées ici :
 /// `rapport-bilan.html` et `rapport-mensuel.html` s'ouvrent depuis la comptabilité et le tableau de bord ;
 /// `rapport-recettes.html` et `rapport-depenses.html` sont des orphelines de la maquette.
+/// Période (et onglet) demandés à l'ouverture de Rapports & Exports par le Tableau de bord — l'équivalent de
+/// `/rapports-exports?tab=…&startDate=…&endDate=…` du web (`#[Url]` de `RapportsExportsHub`). L'écran la BORNE à
+/// l'exercice affiché, comme `RapportsExportsHub::mount()` (`ExerciceChoisi::bornerPeriode`).
+class PeriodeDemandee {
+  const PeriodeDemandee({required this.du, required this.au, this.onglet});
+
+  final DateTime du;
+  final DateTime au;
+
+  /// Libellé d'un onglet de [RapportsExportsScreen.onglets] (`tab` du web) ; `null` : le premier.
+  final String? onglet;
+}
+
 class RapportsExportsScreen extends StatefulWidget {
   const RapportsExportsScreen({
     super.key,
@@ -52,7 +67,11 @@ class RapportsExportsScreen extends StatefulWidget {
     this.imprimer,
     this.enregistrer,
     this.maintenant,
+    this.periodeDemandee,
   });
+
+  /// Période et onglet choisis au Tableau de bord ; `null` : le mois en cours dans l'exercice affiché (menu).
+  final PeriodeDemandee? periodeDemandee;
 
   final RapportsRepository depot;
 
@@ -100,7 +119,9 @@ class RapportsExportsScreen extends StatefulWidget {
 }
 
 class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
-  String _onglet = RapportsExportsScreen.onglets.first.$1;
+  late String _onglet = RapportsExportsScreen.onglets.any((o) => o.$1 == widget.periodeDemandee?.onglet)
+      ? widget.periodeDemandee!.onglet!
+      : RapportsExportsScreen.onglets.first.$1;
   String _tableauElevage = RapportsExportsScreen.tableauxElevage.first;
 
   /// Recherche des onglets Dettes et Stocks (`$search` de leur composant).
@@ -132,6 +153,16 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
         (debut: DateTime(aujourdHui.year, aujourdHui.month, 1), fin: DateTime(aujourdHui.year, aujourdHui.month + 1, 0));
     _du = defaut.debut;
     _au = defaut.fin;
+
+    // Période demandée par le Tableau de bord (`?startDate=&endDate=` du web) : reprise telle quelle, bornée à l'exercice
+    // affiché (`bornerPeriode`), qui est aussi ce que l'écran exporte (`_periode`, `_exporterPdf`).
+    final demandee = widget.periodeDemandee;
+    if (demandee != null) {
+      final bornee = PorteeExerciceChoisi.lire(context)?.bornerPeriode(demandee.du, demandee.au) ??
+          (debut: demandee.du, fin: demandee.au);
+      _du = bornee.debut;
+      _au = bornee.fin;
+    }
 
     _charger();
   }
@@ -1474,36 +1505,37 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(
-                        libelle.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: AgriTypography.gras,
-                          letterSpacing: 0.8,
-                          color: AgriColors.outline,
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(
+                          libelle.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: AgriTypography.gras,
+                            letterSpacing: 0.8,
+                            color: AgriColors.outline,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
             if (lignes.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(AgriSpacing.lg),
@@ -1548,6 +1580,7 @@ class _RapportsExportsScreenState extends State<RapportsExportsScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 }

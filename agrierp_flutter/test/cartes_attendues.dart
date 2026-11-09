@@ -152,6 +152,14 @@ int cartesAttendues(String page) =>
 /// compensaient presque. Sans relevé par panneau, un tel écran passe pour
 /// approximativement conforme alors qu'il ne l'est nulle part.
 const ecartsPanneaux = <String, (int, String)>{
+  'elevage-dashboard.html#dash-tab-synthese': (
+    9,
+    "➕ CINQ CARTES QUE LA MAQUETTE N'A PAS (+5 : 4 → 9). Ticket RELEVES-1 (décision du client du 08/11/2026) : "
+        "le bloc « Relevés de terrain » du Dashboard Élevage — « Référentiels à valider », « Fertilité moyenne », "
+        "« Éclosion moyenne », « Incubation observée », « Délai fournisseur » — est celui de "
+        "`dashboard-elevage.blade.php` (le web a construit le bloc d'abord), libellés lus dans le Blade par "
+        "`releve_terrain_poste_test.dart`.",
+  ),
   'elevage-dashboard.html#dash-tab-sanitaire': (
     3,
     "⚠️ TROIS CARTES QUE LA MAQUETTE N'A PAS. Son onglet sanitaire n'affiche "

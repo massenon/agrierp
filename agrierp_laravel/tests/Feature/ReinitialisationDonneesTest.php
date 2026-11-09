@@ -43,7 +43,7 @@ class ReinitialisationDonneesTest extends TestCase
 
         $this->admin = User::create([
             'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
 
@@ -205,7 +205,7 @@ class ReinitialisationDonneesTest extends TestCase
     {
         $caissier = User::create([
             'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
 
@@ -215,10 +215,8 @@ class ReinitialisationDonneesTest extends TestCase
 
         // ⚠️ On verifie la GARANTIE — rien n'est efface — plutot que la forme
         // du refus, qui depend du harnais Livewire.
-        Livewire::test(ReinitialisationDonnees::class)
-            ->set('confirmation', 'REINITIALISER')
-            ->call('reinitialiser')
-            ->assertForbidden();
+        // CONF-1 : l'onglet refuse désormais l'OUVERTURE (avant : seule l'action était refusée).
+        Livewire::test(ReinitialisationDonnees::class)->assertForbidden();
 
         $this->assertEquals(1, Sale::count(), 'la vente est intacte');
         $this->assertEquals(1, Supplier::count());

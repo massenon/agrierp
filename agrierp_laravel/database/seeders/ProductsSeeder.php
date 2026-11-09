@@ -33,9 +33,17 @@ class ProductsSeeder extends Seeder
         // Les deux noms de catégorie sont ceux du filtre de `gestion-stocks.html`
         // (Aliments, Animaux, Matériel, Médicaments, Produits transformés) —
         // jamais inventés.
-        $categoryLabels = ['Cuniculture', 'Aviculture', 'Porciculture', 'Maraîchage', 'Transformation', 'Équipements', 'Aliments', 'Médicaments'];
+        $categoryLabels = ['Cuniculture', 'Aviculture', 'Porciculture', 'Maraîchage', 'Transformation', 'Équipements', 'Aliments', 'Médicaments', 'Autre'];
         $categoryIds = [];
         foreach ($categoryLabels as $label) {
+            // « Autre » peut déjà exister (insérée par la migration
+            // 2026_10_26_000002_ajouter_categorie_autre_aux_produits) — on
+            // récupère son id plutôt que d'en créer un doublon.
+            $existing = DB::table('product_categories')->where('label', $label)->first();
+            if ($existing) {
+                $categoryIds[$label] = $existing->id;
+                continue;
+            }
             $id = (string) Str::uuid();
             DB::table('product_categories')->insert([
                 'id' => $id,
@@ -73,6 +81,8 @@ class ProductsSeeder extends Seeder
             ['sku' => 'AVI-001', 'name' => 'Poulet goliath (sujet vif)', 'cat' => 'Aviculture', 'stock' => 64, 'threshold' => 15, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4000, 'max' => 8000],
             ['sku' => 'AVI-002', 'name' => 'Œufs de table (plateau)', 'cat' => 'Aviculture', 'stock' => 118, 'threshold' => 30, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 2000, 'max' => 2500],
             ['sku' => 'AVI-003', 'name' => "Poussin d'un jour", 'cat' => 'Aviculture', 'stock' => 210, 'threshold' => 50, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 500, 'max' => 700],
+            // VOL-2 : le « Poussin d'un jour » reste une catégorie de reproducteurs ; ce produit alimente le stade « Poussin ponte » de la fiche Pondeuses.
+            ['sku' => 'AVI-007', 'name' => "Poussin d'un jour (ponte)", 'cat' => 'Aviculture', 'stock' => 0, 'threshold' => 0, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 500, 'max' => 700],
             ['sku' => 'AVI-004', 'name' => 'Poulet abattu frais', 'cat' => 'Aviculture', 'stock' => 30, 'threshold' => 10, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4000, 'max' => 6000],
             ['sku' => 'AVI-005', 'name' => 'Poulet fumé', 'cat' => 'Aviculture', 'stock' => 15, 'threshold' => 5, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4500, 'max' => 5500],
             ['sku' => 'AVI-006', 'name' => 'Poulet braisé', 'cat' => 'Aviculture', 'stock' => 12, 'threshold' => 5, 'unit' => 'u', 'pricing' => 'fourchette', 'min' => 4000, 'max' => 6000],
@@ -114,6 +124,10 @@ class ProductsSeeder extends Seeder
         ];
 
         foreach ($products as $p) {
+            $especeDuProduit = isset($produitEspece[$p['sku']])
+                ? $produitEspece[$p['sku']]
+                : ($categorySpecies[$p['cat']] ?? null);
+
             DB::table('products')->insert([
                 'id' => (string) Str::uuid(),
                 'sku' => $p['sku'],
@@ -129,6 +143,12 @@ class ProductsSeeder extends Seeder
                 'species_id' => isset($produitEspece[$p['sku']])
                     ? ($speciesIds[$produitEspece[$p['sku']]] ?? null)
                     : (isset($categorySpecies[$p['cat']]) ? ($speciesIds[$categorySpecies[$p['cat']]] ?? null) : null),
+                // Ticket VOL-1 : catégorie d'effectif par défaut des produits de l'aviculture (poussin d'un jour → poussin,
+                // poulet → jeune) ; null pour les autres (œufs, aliments…), jamais rangé au hasard.
+                // VOL-2 : un nom sans ambiguïté « pondeuse » (poulette, poule de réforme…) reçoit son stade de pondeuse.
+                'categorie_effectif' => $especeDuProduit === 'aviculture'
+                    ? (\App\Support\StadePondeuse::devinerDepuisLeNom($p['name']) ?? \App\Support\CategorieVolaille::devinerDepuisLeNom($p['name']))
+                    : null,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

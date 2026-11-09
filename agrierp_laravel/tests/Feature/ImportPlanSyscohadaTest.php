@@ -339,10 +339,10 @@ class ImportPlanSyscohadaTest extends TestCase
         $this->seed(ChartOfAccountsSeeder::class);
         Role::findOrCreate('caissier', 'web');
         $u = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $u->assignRole('caissier');
 
-        $jeton = $this->postJson('/api/auth/login', ['identifiant' => 'caisse', 'password' => 'AgriERP@2026', 'device_name' => 'poste-test'])->json('token');
+        $jeton = $this->postJson('/api/auth/login', ['identifiant' => 'caisse', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-test'])->json('token');
         $r = $this->withHeader('Authorization', 'Bearer '.$jeton)->getJson('/api/sync/pull');
         $r->assertOk();
 
@@ -425,7 +425,7 @@ class ImportPlanSyscohadaTest extends TestCase
         }
         $role = Role::findOrCreate('comptable', 'web');
         $role->givePermissionTo(['view-comptabilite', 'manage-comptabilite']);
-        $u = User::create(['name' => 'Comptable', 'email' => 'plan@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
+        $u = User::create(['name' => 'Comptable', 'email' => 'plan@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026')]);
         $u->assignRole($role);
         $this->actingAs($u);
 
@@ -690,7 +690,7 @@ class ImportPlanSyscohadaTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $comptable = User::create([
             'name' => 'Comptable', 'username' => 'compta-a2', 'email' => 'compta-a2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');
         $this->actingAs($comptable);

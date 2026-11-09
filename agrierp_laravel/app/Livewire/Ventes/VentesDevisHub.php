@@ -24,8 +24,19 @@ class VentesDevisHub extends Component
     #[Url]
     public string $tab = 'vente';
 
+    /**
+     * CONF-4 (DV-20) — « Enregistrer Vente » (la caisse) n'est montée qu'aux comptes `manage-ventes` : le comptable (LECTURE
+     * des ventes, `view-ventes`) ouvre le hub sur l'historique et ne voit pas cet onglet. Corrigé à chaque rendu : l'onglet
+     * peut venir de l'URL (`?tab=vente`) ou d'un `$set` forgé.
+     */
     public function render()
     {
-        return view('livewire.ventes.ventes-devis-hub', ['title' => 'Ventes & Devis']);
+        $peutEncaisser = \Illuminate\Support\Facades\Gate::allows('manage-ventes');
+
+        if (! $peutEncaisser && $this->tab === 'vente') {
+            $this->tab = 'historique';
+        }
+
+        return view('livewire.ventes.ventes-devis-hub', ['peutEncaisser' => $peutEncaisser, 'title' => 'Ventes & Devis']);
     }
 }

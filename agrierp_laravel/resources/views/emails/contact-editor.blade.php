@@ -2,10 +2,10 @@
 <html lang="fr">
 <head><meta charset="utf-8"></head>
 <body style="font-family: sans-serif; font-size: 14px; color: #191c1d;">
-    <h2 style="color:#052e16;">AgriERP — {{ $payload['type'] === 'bug' ? 'Signalement de bug' : 'Nouveau message' }}</h2>
+    <h2 style="color:#052e16;">LogiAgriERP — {{ $payload['type'] === 'bug' ? 'Signalement de bug' : 'Nouveau message' }}</h2>
     <p><strong>De :</strong> {{ $senderName }} ({{ $senderEmail }})</p>
     @if(!empty($payload['device']))
-        <p><strong>Appareil :</strong> {{ $payload['device'] }} (poste AgriERP Desktop)</p>
+        <p><strong>Appareil :</strong> {{ $payload['device'] }} (poste LogiAgriERP Desktop)</p>
     @endif
 
     @if($payload['type'] === 'bug')
@@ -23,6 +23,6 @@
     @endif
 
     <hr style="border:none;border-top:1px solid #bec9c2;margin:16px 0;">
-    <p style="color:#6f7973;font-size:11px;">Envoyé automatiquement depuis AgriERP — Ferme École Olouwachegoun.</p>
+    <p style="color:#6f7973;font-size:11px;">Envoyé automatiquement depuis LogiAgriERP — Ferme École Olouwachegoun.</p>
 </body>
 </html>

@@ -122,7 +122,12 @@ class ReinitialisationDonneesService
     public static function tablesTransactionnelles(): array
     {
         return [
+            // Ticket IMPORT-1 — journal de l'importation en masse (valeurs lues des lignes refusées comprises).
+            'import_batches',
             // Ventes et clientèle
+            // Ticket VC-1 : encaissements de créances reçus des postes (idempotence) — AVANT les créances et les clients
+            // qu'ils référencent (clés étrangères).
+            'receivable_payments',
             'sale_lines', 'sales', 'credit_notes', 'quotes', 'receivables',
             'advance_imputations', 'customer_advances', 'customer_reminders', 'customers',
             // Achats et fournisseurs
@@ -145,7 +150,7 @@ class ReinitialisationDonneesService
             'payslips', 'attendance_records', 'internship_absences',
             'internships', 'employees',
             // Comptabilité
-            'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures',
+            'accounting_entry_lines', 'accounting_entries', 'accounting_reference_sequences', 'periodic_closures', 'fiscal_closure_requests',
             'bank_statement_lines',
             // Administration — 🔴 Ticket 15.50 : la liste nommait `correspondences`, table qui n'existe pas :
             // les courriers s'appellent `mails`, et n'étaient JAMAIS vidés.
@@ -181,7 +186,7 @@ class ReinitialisationDonneesService
             'role_has_permissions', 'company_settings', 'modules_config',
             'chart_of_accounts', 'fiscal_years', 'treasury_accounts',
             'products', 'product_categories', 'livestock_species',
-            'feed_types', 'feed_ration_standards', 'prophylaxis_schedule_standards',
+            'feed_types', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'field_survey_entries',
             'cost_centers', 'income_tax_brackets',
             // Immobilisations semées en reprise d'antériorité (`FixedAssetsSeeder`) : paramètres de base. Celles
             // ACHETÉES dans l'application sont retirées par `remettreLesImmobilisations()` (ticket 15.50).
@@ -193,6 +198,11 @@ class ReinitialisationDonneesService
             // Ticket ARC1 — journal de la Corbeille (qui a restauré ou supprimé définitivement quoi) : une trace d'administration
             // comme `audit_logs`, utile précisément après une suppression irréversible. Ses éléments, eux, sont partis.
             'corbeille_operations',
+            // ATT-3 — numéros d'attestation FIGÉS (un par émission du poste ou du web) : le rang d'un numéro se compte sur
+            // `audit_logs`, préservé ; vider ceci laisserait un poste rejouer une émission et recevoir un AUTRE numéro.
+            'attestation_emissions',
+            // MDP-1 — code de secours de l'administrateur (empreinte seule) : doit survivre à une réinitialisation.
+            'recovery_codes',
         ];
     }
 

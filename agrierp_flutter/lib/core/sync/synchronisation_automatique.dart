@@ -3,8 +3,9 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show Listenable;
+import 'package:flutter/foundation.dart' show Listenable, debugPrint;
 
+import '../systeme/evenements_navigateur.dart';
 import 'sync_engine.dart';
 
 /// Ticket H13 (décisions D-SYNC-3 et B2 du 19/10/2026) — synchronisation déclenchée sans geste de l'utilisateur.
@@ -46,13 +47,20 @@ class SynchronisationAutomatique {
     this.gestes,
     this.delaiAgregation = delaiAgregationParDefaut,
     Future<bool> Function()? demandeDuServeur,
-  }) : // Paramètres NOMMÉS : Dart interdit `this._synchroniser` (voir `SyncEngine`).
+    this.evenementsNavigateur,
+    this.delaiAntiRebond = delaiAntiRebondParDefaut,
+    DateTime Function()? maintenant,
+    Future<bool> Function()? sondeur,
+  }) : _maintenant = maintenant ?? DateTime.now,
+        // Paramètres NOMMÉS : Dart interdit `this._synchroniser` (voir `SyncEngine`).
        // ignore: prefer_initializing_formals
        _synchroniser = synchroniser,
        // ignore: prefer_initializing_formals
        _changementsReseau = changementsReseau,
        // ignore: prefer_initializing_formals
-       _demandeDuServeur = demandeDuServeur;
+       _demandeDuServeur = demandeDuServeur,
+       // ignore: prefer_initializing_formals
+       _sondeur = sondeur;
 
   /// Ticket S-T6 — le serveur peut DEMANDER une synchronisation (bouton « Demander la synchronisation des postes »
   /// du web) : la session ouverte l'interroge à cet intervalle (`GET /api/sync/demande`, [SyncEngine.demandeDuServeur])
@@ -61,6 +69,23 @@ class SynchronisationAutomatique {
   /// ⚠️ SILENCIEUX : hors ligne (dernier état connu du réseau), la question n'est pas posée ; un échec rend « pas
   /// de demande ». Jamais d'erreur à l'écran, jamais de réessai programmé : la question revient d'elle-même.
   static const intervalleDemande = Duration(seconds: 30);
+
+  /// PWA-2b (navigateur) — déclencheurs propres au web : retour en ligne (événement `online`) et retour de focus de
+  /// l'onglet (`visibilitychange`). `null` ou flux vide au natif : comportement inchangé.
+  final Stream<EvenementNavigateur>? evenementsNavigateur;
+
+  /// PWA-2b — le retour de focus ne relance pas une synchronisation tentée il y a moins de ce délai (changer d'onglet
+  /// dix fois en une minute n'en fait pas dix). Le retour en ligne, lui, n'est jamais retenu.
+  /// PWA-2c — sondage léger du serveur (`SyncEngine.serveurJoignable`), joué AVANT de synchroniser sur `online` / retour de
+  /// focus. `null` : pas de sondage. Un échec laisse le poste hors ligne SANS erreur (rien n'est tiré ni envoyé).
+  final Future<bool> Function()? _sondeur;
+  bool _sondageEnCours = false;
+
+  final Duration delaiAntiRebond;
+  static const delaiAntiRebondParDefaut = Duration(seconds: 30);
+  final DateTime Function() _maintenant;
+  DateTime? _derniereTentative;
+  StreamSubscription<EvenementNavigateur>? _abonnementNavigateur;
 
   final Future<bool> Function()? _demandeDuServeur;
   Timer? _minuterieDemande;
@@ -138,6 +163,16 @@ class SynchronisationAutomatique {
       _enLigne = enLigne;
       if (retour) declencher();
     });
+    _abonnementNavigateur = evenementsNavigateur?.listen((e) {
+      switch (e) {
+        case EvenementNavigateur.retourEnLigne:
+          _enLigne = true;
+          _declencherApresSondage();
+        case EvenementNavigateur.ongletVisible:
+          final derniere = _derniereTentative;
+          if (derniere == null || _maintenant().difference(derniere) >= delaiAntiRebond) _declencherApresSondage();
+      }
+    });
     gestes?.addListener(_surGeste);
     if (aussitot) declencher();
     if (_demandeDuServeur != null) {
@@ -146,6 +181,25 @@ class SynchronisationAutomatique {
   }
 
   /// Ticket S-T6 — une interrogation du serveur ; déclenche une synchronisation s'il en demande une. Ne lève jamais.
+  /// PWA-2c — le serveur répond-il ? Oui : on synchronise. Non (ou délai dépassé) : on reste hors ligne, sans erreur et sans
+  /// réessai bruyant ; la minuterie ordinaire ou le prochain événement retentera. Jamais deux sondages à la fois.
+  Future<void> _declencherApresSondage() async {
+    final sonde = _sondeur;
+    if (sonde == null) return declencher();
+    if (_sondageEnCours || _enCours || _suspendue) return;
+    _sondageEnCours = true;
+    bool joignable;
+    try {
+      joignable = await sonde();
+    } catch (_) {
+      joignable = false;
+    } finally {
+      _sondageEnCours = false;
+    }
+    _enLigne = joignable;
+    if (joignable) await declencher();
+  }
+
   Future<void> interrogerLeServeur() async {
     final demande = _demandeDuServeur;
     // Hors ligne (dernier état connu), ou interrogation / synchronisation déjà en cours : rien à demander.
@@ -173,6 +227,8 @@ class SynchronisationAutomatique {
     gestes?.removeListener(_surGeste);
     _abonnement?.cancel();
     _abonnement = null;
+    _abonnementNavigateur?.cancel();
+    _abonnementNavigateur = null;
   }
 
   /// Ticket S-T3 — un geste important : une synchronisation après [delaiAgregation], qui emporte aussi les
@@ -196,13 +252,16 @@ class SynchronisationAutomatique {
   Future<void> declencher() async {
     if (_enCours || _suspendue) return;
     _enCours = true;
+    _derniereTentative = _maintenant();
     _reessai?.cancel();
     _reessai = null;
     try {
       final resultat = await _synchroniser();
       if (!resultat.horsLigne) _echecs = 0;
       onTermine?.call();
-    } catch (e) {
+    } catch (e, pile) {
+      // PWA-2c — la cause d'un échec silencieux reste lisible dans la console du navigateur (jamais à l'écran : hors ligne n'est pas une erreur).
+      debugPrint('Synchronisation automatique : $e\n$pile');
       if (e is EchecSynchronisation && e.estSessionRefusee) {
         _suspendre();
       } else if (estReessayable(e)) {

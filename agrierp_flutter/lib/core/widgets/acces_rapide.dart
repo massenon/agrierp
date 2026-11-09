@@ -20,8 +20,8 @@ import '../theme/symboles_agri.dart';
 /// ⚠️ Le web n'applique AUCUN filtre de rôle au panneau : toutes les entrées sont affichées, et c'est la route qui
 /// refuse. Au poste, `GardeEcran` refuse de même l'écran interdit.
 ///
-/// ⚠️ Le second bouton flottant du web, « Visite guidée » (`help`, bleu), n'a AUCUN gestionnaire : il est inerte.
-/// Il n'est pas porté tant qu'il ne fait rien (un bouton mort au poste serait pire qu'un bouton absent).
+/// Le créneau du second bouton flottant (ancien « Visite guidée » inerte, retiré le 26/10/2026) est repris depuis le ticket AIDE-1
+/// par le bouton d'aide (`aide_flottante.dart`, module « Assistant de démarrage » allumé), AU-DESSUS de celui-ci.
 class AccesRapide {
   AccesRapide._();
 

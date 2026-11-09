@@ -29,4 +29,4 @@
     <p><strong>Total TTC : {{ number_format($sale->total, 0, ',', ' ') }} FCFA</strong></p>
 </div>
 
-<p style="margin-top: 20px; text-align: center; font-size: 9px;">Document généré par AgriERP — Ferme École OLOUWACHEGOUN</p>
+<p style="margin-top: 20px; text-align: center; font-size: 9px;">Document généré par LogiAgriERP — Ferme École OLOUWACHEGOUN</p>

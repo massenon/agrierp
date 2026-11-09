@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 
@@ -7,16 +8,21 @@ import '../../core/audit/libelles_audit.dart';
 import '../../core/config/envoi_email_test.dart';
 import '../../core/config/parametres_smtp.dart';
 import '../../core/database/app_database.dart';
+import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
+import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 import 'appairage_poste.dart';
 import 'corbeille_repository.dart';
+import 'administration_locale.dart';
 import 'onglet_appairage.dart';
 import 'onglet_corbeille.dart';
 import 'onglet_email_smtp.dart';
 import 'onglet_reinitialisation.dart';
+import 'reglages_ferme_repository.dart';
+import 'reglages_ferme_ui.dart';
 import 'parametres_generaux_repository.dart';
 import 'reinitialisation_poste.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -65,9 +71,30 @@ class ParametresGenerauxScreen extends StatefulWidget {
     this.reinitialisation,
     this.corbeille,
     this.ongletInitial,
+    this.idUtilisateurConnecte,
+    this.reglages,
+    this.estAdmin = false,
+    this.admin,
+    this.surAssistantBascule,
   });
 
   final ParametresGenerauxRepository depot;
+
+  /// Ticket AIDE-1 — appelé après le basculement de la carte « Assistant de démarrage » : le socle relit le module.
+  final VoidCallback? surAssistantBascule;
+
+  /// Tickets PA-2/3/4/7/8 — les réglages de la ferme (entreprise, barème ITS, modes de paiement, rôles) écrits en
+  /// DEMANDES ; `null` : les onglets restent en consultation (vues du châssis sans session).
+  final ReglagesFermeRepository? reglages;
+
+  /// Tickets PA-1/5/6/8 — gestes d'administration EN LIGNE (sessions, postes appairés, sauvegardes) ; `null` : indisponibles.
+  final AdministrationLocale? admin;
+
+  /// Le compte connecté est administrateur (rôles, taux de paie et barème arrêtés).
+  final bool estAdmin;
+
+  /// Ticket UT-1 — le compte connecté sur ce poste : il ne peut pas s'archiver lui-même (règle du web).
+  final String? idUtilisateurConnecte;
 
   /// Ticket CFG-2 — réglages SMTP de ce poste et e-mail de test ; `null` : l'onglet le dit.
   final ParametresSmtp? smtp;
@@ -85,17 +112,21 @@ class ParametresGenerauxScreen extends StatefulWidget {
   /// Onglet ouvert à l'arrivée (« Appairage » depuis l'entrée « Paramètres du poste ») ; le premier sinon.
   final String? ongletInitial;
 
+  /// MECEF-3 — l'onglet de la facturation normalisée (mode, IFU, adresse de l'API, opérateur), à la place de celui du web.
+  static const ongletFacturationEmecef = 'Facturation normalisée (e-MECeF)';
   static const ongletEmailSmtp = 'Email (SMTP)';
   static const ongletAppairage = 'Appairage';
   static const ongletCorbeille = 'Corbeille';
   static const ongletReinitialisation = 'Réinitialisation';
+  static const ongletSauvegardes = 'Sauvegardes';
 
-  /// Les neuf onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
+  /// Les dix onglets du hub, dans son ordre : les six de la maquette, plus « Email (SMTP) » et
   /// « Appairage » (CFG-2) aux places des onglets « Email (SMTP) » et « Postes & Appairage » du web, et
   /// « Réinitialisation » (R-1) après « Audit Logs », avec l'icône du web (`restart_alt`).
   static const onglets = <(String, IconData)>[
     ('Rôles & Permissions', SymbolesAgri.admin_panel_settings),
     ("Données de l'Entreprise", SymbolesAgri.domain),
+    (ongletFacturationEmecef, SymbolesAgri.receipt_long),
     (ongletEmailSmtp, SymbolesAgri.mail),
     ('Modules Actifs', SymbolesAgri.tune),
     ('Gestion Utilisateurs', SymbolesAgri.manage_accounts),
@@ -104,6 +135,7 @@ class ParametresGenerauxScreen extends StatefulWidget {
     ('Audit Logs', SymbolesAgri.security),
     (ongletCorbeille, SymbolesAgri.restore_from_trash),
     (ongletReinitialisation, SymbolesAgri.restart_alt),
+    (ongletSauvegardes, SymbolesAgri.database),
   ];
 
   /// ⚠️⚠️ **ONZE COLONNES, PAS TROIS.** `roles-permissions.html` ne liste pas
@@ -160,6 +192,11 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       );
   DonneesParametresGeneraux? _donnees;
 
+  /// Sous-page de l'onglet « Données de l'Entreprise » : `bareme` (PA-7).
+  String? _sousPage;
+  List<String> _droits = const [];
+  String? _message;
+
   /// Ticket U14 — « Rechercher... » de l'onglet Audit Logs (`wire:model.live.debounce.300ms="search"`).
   final _rechercheAudit = TextEditingController();
   String _filtreAudit = '';
@@ -180,8 +217,12 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
 
   Future<void> _charger() async {
     final donnees = await widget.depot.charger();
+    final droits = await widget.reglages?.droits() ?? const <String>[];
     if (!mounted) return;
-    setState(() => _donnees = donnees);
+    setState(() {
+      _donnees = donnees;
+      _droits = droits;
+    });
   }
 
   @override
@@ -206,10 +247,14 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                       _barreOnglets(),
                       const SizedBox(height: AgriSpacing.lg),
                       switch (_onglet) {
+                        "Données de l'Entreprise" when _sousPage == 'bareme' && widget.reglages != null =>
+                          PageBaremeIts(depot: widget.reglages!, estAdmin: widget.estAdmin, surRetour: () => setState(() => _sousPage = null)),
                         "Données de l'Entreprise" => _ongletEntreprise(
                           d,
                           large,
                         ),
+                        ParametresGenerauxScreen.ongletFacturationEmecef =>
+                          _ongletFacturationEmecef(),
                         ParametresGenerauxScreen.ongletEmailSmtp =>
                           _ongletEmailSmtp(),
                         'Modules Actifs' => _ongletModules(d, large),
@@ -222,6 +267,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
                           _ongletCorbeille(),
                         ParametresGenerauxScreen.ongletReinitialisation =>
                           _ongletReinitialisation(),
+                        ParametresGenerauxScreen.ongletSauvegardes => _ongletSauvegardes(),
                         _ => _ongletRoles(d, large),
                       },
                     ],
@@ -334,7 +380,19 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
-      _sousTitre("Matrice des Droits d'Accès"),
+      Row(
+        children: [
+          Expanded(child: _sousTitre("Matrice des Droits d'Accès")),
+          if (widget.reglages != null && widget.estAdmin)
+            ElevatedButton.icon(
+              key: const Key('role-nouveau'),
+              onPressed: () => _ouvrirRole(null),
+              icon: const Icon(SymbolesAgri.add, size: 18),
+              style: ElevatedButton.styleFrom(backgroundColor: AgriColors.brandEmerald, foregroundColor: Colors.white, shape: const StadiumBorder()),
+              label: const Text('Nouveau Rôle', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
       const SizedBox(height: AgriSpacing.sm),
       _tableau(
         largeur: 1180,
@@ -358,26 +416,56 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               for (final permission
                   in ParametresGenerauxScreen.permissionsMatrice)
                 (_droit(_accorde(d.roles[i], permission)), 2),
-              (_actionInerte(), 2),
+              (_actionsRole(d.roles[i]), 2),
             ]),
         ],
       ),
       const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ LE NOMBRE DE RÔLES EST UNE CONTRADICTION CONNUE DU PROJET : le CDC
-      // en annonce 7, l'énumération 6, la matrice du CDC 5, la maquette en
-      // affiche 5 nommés (Directeur Général, Comptable, Caissière POS, Chef
-      // d'élevage, Support Technique) et le serveur en porte 4. Le poste montre
-      // CE QUE LE SERVEUR APPLIQUE — le reste est un arbitrage client ouvert
-      // qu'il n'appartient pas à un écran de trancher.
+      // ⚠️⚠️ LE NOMBRE DE RÔLES EST UNE CONTRADICTION CONNUE DU PROJET (CDC 7, énumération 6, matrice 5, serveur 4). Le poste montre
+      // CE QUE LE SERVEUR APPLIQUE. Créer, modifier ou supprimer un rôle est une DEMANDE réservée à l'administrateur ; les
+      // sauvegardes se génèrent et se téléchargent en ligne (ticket PA-6).
       _mentionPoste(
-        'La matrice montre les rôles que le SERVEUR applique réellement, avec '
-        'leurs permissions — la maquette, elle, en dessine cinq nommés. Cet '
-        'écart est un arbitrage client ouvert. Créer ou modifier un rôle, comme '
-        'générer une sauvegarde, se fait sur la surface web.',
+        'La matrice montre les rôles que le SERVEUR applique réellement, avec leurs permissions — la maquette, elle, en dessine '
+        'cinq nommés. Cet écart est un arbitrage client ouvert. Créer, modifier ou supprimer un rôle est réservé à '
+        "l'administrateur et s'applique à la prochaine synchronisation.",
         cle: 'roles',
       ),
     ],
   );
+
+  Widget _actionsRole(RolesApplicatif r) {
+    if (widget.reglages == null || !widget.estAdmin) return _actionInerte();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: Key('role-modifier-${r.name}'),
+          tooltip: 'Modifier',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _ouvrirRole(r),
+          icon: const Icon(SymbolesAgri.edit, size: 16, color: AgriColors.brandEmerald),
+        ),
+        if (!ReglagesFermeRepository.rolesFondamentaux.contains(r.name))
+          IconButton(
+            key: Key('role-supprimer-${r.name}'),
+            tooltip: 'Supprimer',
+            visualDensity: VisualDensity.compact,
+            onPressed: () async {
+              final motif = await widget.reglages!.supprimerRole(r.name, estAdmin: widget.estAdmin);
+              if (!mounted) return;
+              setState(() => _message = motif ?? 'Suppression demandée au serveur : elle sera appliquée à la prochaine synchronisation.');
+            },
+            icon: const Icon(SymbolesAgri.delete, size: 16, color: AgriColors.errorDeep),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _ouvrirRole(RolesApplicatif? role) async {
+    if (await ouvrirRole(context: context, depot: widget.reglages!, droits: _droits, existant: role, estAdmin: widget.estAdmin)) {
+      setState(() => _message = 'Rôle demandé au serveur : il sera appliqué à la prochaine synchronisation.');
+    }
+  }
 
   /// Un rôle accorde-t-il ce module ?
   ///
@@ -449,22 +537,46 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
             pied:
                 'Ces informations apparaissent sur toutes les factures '
                 'normalisées MeCeF et les documents officiels générés par '
-                'AgriERP.',
+                'LogiAgriERP.',
           ),
         ],
         const SizedBox(height: AgriSpacing.md),
-        // ⚠️⚠️ LE SMTP DU SITE NE DESCEND PAS : il porte un mot de passe, et le
-        // descendre ferait d'un poste volé une clé d'accès à la messagerie de la
-        // ferme. Comme au web depuis CFG-1, la configuration SMTP a son onglet ;
-        // celle du poste est LOCALE, mot de passe au coffre du système (CFG-2).
-        // Le logo et le favicon se téléversent — le poste n'a pas de canal pour
-        // remonter un fichier.
+        if (widget.reglages != null) ...[
+          Wrap(
+            spacing: AgriSpacing.sm,
+            runSpacing: AgriSpacing.sm,
+            children: [
+              ElevatedButton.icon(
+                key: const Key('entreprise-modifier'),
+                onPressed: () async {
+                  if (await ouvrirEntreprise(context: context, depot: widget.reglages!, existante: e, estAdmin: widget.estAdmin)) {
+                    setState(() => _message = 'Modifications demandées au serveur : elles seront appliquées à la prochaine synchronisation.');
+                  }
+                },
+                icon: const Icon(SymbolesAgri.edit, size: 18),
+                style: ElevatedButton.styleFrom(backgroundColor: AgriColors.brandEmerald, foregroundColor: Colors.white, shape: const StadiumBorder()),
+                label: const Text('Enregistrer les Modifications', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+              OutlinedButton.icon(
+                key: const Key('entreprise-bareme'),
+                onPressed: () => setState(() => _sousPage = 'bareme'),
+                icon: const Icon(SymbolesAgri.functions, size: 18),
+                label: const Text('Barème IR-PTS / ITS — tranches d\'imposition', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          if (_message != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AgriSpacing.sm),
+              child: Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+            ),
+          const SizedBox(height: AgriSpacing.md),
+        ],
+        // Le SMTP du site ne descend pas (mot de passe) : celui du poste est local, son onglet a son coffre (CFG-2). Logo et
+        // favicon se téléversent : ils se règlent sur la surface web.
         _mentionPoste(
-          "Le serveur d'envoi (SMTP) de ce poste se règle dans l'onglet Email "
-          '(SMTP) ; son mot de passe reste dans le coffre du système. Celui du '
-          'site, le logo et le favicon ne descendent pas au poste : le premier '
-          'porte un mot de passe, les deux autres se téléversent. Ils se règlent '
-          'sur la surface web.',
+          "Le serveur d'envoi (SMTP) de ce poste se règle dans l'onglet Email (SMTP) ; son mot de passe reste dans le coffre du "
+          'système. Le logo et le favicon se téléversent : ils se règlent sur la surface web.',
           cle: 'entreprise-technique',
         ),
       ],
@@ -531,6 +643,20 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     ),
   );
 
+  // ── Facturation normalisée (e-MECeF) — MECEF-3 ───────────────────────────
+
+  Widget _ongletFacturationEmecef() {
+    final reglages = widget.reglages;
+    if (reglages == null) {
+      return _mentionPoste(
+        'Facturation normalisée indisponible dans cette vue : elle se règle depuis le poste connecté.',
+        cle: 'facturation-emecef-indisponible',
+      );
+    }
+
+    return PageFacturationEmecef(depot: reglages, estAdmin: widget.estAdmin);
+  }
+
   // ── Onglet 3 : Email (SMTP) — ticket CFG-2 ───────────────────────────────
 
   Widget _ongletEmailSmtp() {
@@ -548,6 +674,17 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
 
   // ── Onglet 6 : Appairage — ticket CFG-2 ──────────────────────────────────
 
+  Widget _ongletSauvegardes() {
+    final admin = widget.admin;
+    if (admin == null || !admin.peut('manage-parametres')) {
+      return _mentionPoste(
+        'Les sauvegardes de ce poste se gèrent avec le droit de gérer les paramètres.',
+        cle: 'sauvegardes-indisponibles',
+      );
+    }
+    return OngletSauvegardes(admin: admin);
+  }
+
   Widget _ongletAppairage() {
     final appairage = widget.appairage;
     if (appairage == null) {
@@ -557,7 +694,17 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         cle: 'appairage-indisponible',
       );
     }
-    return OngletAppairage(appairage: appairage);
+    final admin = widget.admin;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OngletAppairage(appairage: appairage),
+        if (admin != null && admin.peut('manage-users')) ...[
+          const SizedBox(height: AgriSpacing.lg),
+          SectionCePoste(key: const Key('ce-poste-section'), admin: admin, identifiant: appairage.identifiant),
+        ],
+      ],
+    );
   }
 
   // ── Onglet « Corbeille » — ticket ARC4 ────────────────────────────────────
@@ -626,6 +773,70 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     ModuleEspece.porciculture: SymbolesAgri.pets,
     ModuleEspece.helico: SymbolesAgri.bug_report,
   };
+
+  bool _basculeAssistantEnCours = false;
+
+  /// `wire:click="toggleAssistant"` — module éteint par défaut, même toast que les espèces.
+  Future<void> _basculerAssistant(bool actif) async {
+    if (_basculeAssistantEnCours) return;
+    _basculeAssistantEnCours = true;
+    try {
+      await widget.depot.definirAssistant(actif: actif);
+      await _charger();
+      // Ticket AIDE-1 : le socle relit le module (bouton d'aide) tout de suite, sans attendre un tirage.
+      widget.surAssistantBascule?.call();
+      if (mounted) ToastAgri.afficher(context, messageModuleBascule);
+    } finally {
+      _basculeAssistantEnCours = false;
+    }
+  }
+
+  Widget _carteAssistant(DonneesParametresGeneraux d) => Container(
+    padding: const EdgeInsets.all(AgriSpacing.md),
+    decoration: BoxDecoration(
+      color: AgriColors.surfaceCard,
+      border: Border.all(color: AgriColors.outlineVariant),
+      borderRadius: BorderRadius.circular(AgriRadius.lg),
+      boxShadow: AgriShadows.sm,
+    ),
+    child: Row(
+      children: [
+        Icon(SymbolesAgri.checklist, size: 24, color: d.assistantActif ? AgriColors.brandEmerald : AgriColors.outline),
+        const SizedBox(width: AgriSpacing.md),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Assistant de démarrage',
+                style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Guide la mise en route de la ferme — désactivé par défaut',
+                style: TextStyle(fontSize: 10, color: AgriColors.outline),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AgriSpacing.sm),
+        InkWell(
+          key: const Key('bascule-module-assistant_demarrage'),
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => _basculerAssistant(!d.assistantActif),
+          child: Semantics(
+            toggled: d.assistantActif,
+            label: 'Activer ou désactiver Assistant de démarrage',
+            child: Icon(
+              d.assistantActif ? SymbolesAgri.toggle_on : SymbolesAgri.toggle_off,
+              size: 28,
+              color: d.assistantActif ? AgriColors.brandEmerald : AgriColors.outline,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _ongletModules(DonneesParametresGeneraux d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -722,6 +933,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
             ),
           ),
         ),
+      _carteAssistant(d),
       const SizedBox(height: AgriSpacing.sm),
       // ⚠️⚠️ CE RÉGLAGE PILOTE CE QUE LE POSTE MONTRE. Une espèce éteinte
       // disparaît des cartes de « Gestion Élevage » et des onglets de « Suivi
@@ -742,12 +954,15 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
 
   // ── Onglet 4 : Gestion Utilisateurs ───────────────────────────────────────
 
+  /// Ticket UT-1 — `gestion-utilisateurs.blade.php` : les deux cartes, le tableau à cinq colonnes, « Nouvel
+  /// Utilisateur », « Modifier », « Archiver » (confirmation) / « Réactiver ». Chaque geste s'écrit LOCALEMENT
+  /// (`pending`) et part à la prochaine synchronisation ; le serveur rejoue par `SaisieUtilisateurAction`.
   Widget _ongletUtilisateurs(DonneesParametresGeneraux d, bool large) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _entete(
         'Gestion des Utilisateurs',
-        "Administration des comptes d'accès à AgriERP.",
+        "Administration des comptes d'accès à LogiAgriERP.",
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -767,6 +982,32 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
         ),
       ]),
       const SizedBox(height: AgriSpacing.md),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: FilledButton.icon(
+          key: const Key('nouvel-utilisateur'),
+          onPressed: () => _ouvrirUtilisateur(d, null),
+          icon: const Icon(SymbolesAgri.add_circle, size: 18),
+          style: FilledButton.styleFrom(backgroundColor: AgriColors.brandEmerald),
+          label: const Text('Nouvel Utilisateur', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+        ),
+      ),
+      if (widget.admin != null && widget.admin!.peut('manage-users')) ...[
+        const SizedBox(height: AgriSpacing.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('vider-sessions'),
+            onPressed: () async {
+              if (await confirmerViderSessions(context: context, admin: widget.admin!, surMessage: (m) => _message = m) && mounted) setState(() {});
+            },
+            icon: const Icon(SymbolesAgri.logout, size: 18),
+            label: const Text('Déconnecter Toutes les Sessions', style: TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras)),
+          ),
+        ),
+        if (_message != null) Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+      ],
+      const SizedBox(height: AgriSpacing.md),
       _tableau(
         largeur: 900,
         colonnes: const [
@@ -776,18 +1017,26 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ('Statut', 3),
           ('Actions', 2),
         ],
-        vide: '— Aucun utilisateur synchronisé —',
+        vide: 'Aucun utilisateur pour le moment.',
         lignes: [
           for (var i = 0; i < d.utilisateurs.length; i++)
             _ligne(i, [
               (
-                Text(
-                  d.utilisateurs[i].name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontWeight: AgriTypography.gras,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      d.utilisateurs[i].name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: AgriTypography.xs,
+                        fontWeight: AgriTypography.gras,
+                      ),
+                    ),
+                    if (d.utilisateurs[i].username case final String identifiant)
+                      Text(identifiant, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: AgriColors.outline, fontFamily: 'monospace')),
+                  ],
                 ),
                 5,
               ),
@@ -801,7 +1050,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               ),
               (
                 Text(
-                  d.utilisateurs[i].role ?? '—',
+                  _libelleRole(d.utilisateurs[i].role),
                   overflow: TextOverflow.ellipsis,
                   style: _cellule,
                 ),
@@ -811,31 +1060,330 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
               // pas « Inactif ». Un compte désactivé n'est jamais supprimé :
               // l'archivage logique est la règle du projet.
               (
-                _pastille(
-                  d.utilisateurs[i].isActive ? 'Actif' : 'Désactivé',
-                  couleur: d.utilisateurs[i].isActive
-                      ? AgriColors.brandEmerald
-                      : AgriColors.outline,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: _pastille(
+                        d.utilisateurs[i].isActive ? 'Actif' : 'Désactivé',
+                        couleur: d.utilisateurs[i].isActive ? AgriColors.brandEmerald : AgriColors.outline,
+                      ),
+                    ),
+                    if (d.utilisateurs[i].syncStatus != SyncStatus.synced) ...[
+                      const SizedBox(width: AgriSpacing.xs),
+                      Flexible(
+                        child: _pastille(
+                          d.utilisateurs[i].syncStatus == SyncStatus.conflict ? 'Refusé' : 'Pas encore envoyé',
+                          couleur: d.utilisateurs[i].syncStatus == SyncStatus.conflict ? AgriColors.errorRed : AgriColors.accentYellow,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                // MDP-1 : comme le Blade — sous la pastille « Actif » d'un compte au mot de passe temporaire.
+                if (d.utilisateurs[i].isActive && d.utilisateurs[i].mustChangePassword)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AgriSpacing.xs),
+                    child: Text(
+                      'Mot de passe à changer',
+                      key: Key('utilisateur-mdp-a-changer-$i'),
+                      style: const TextStyle(fontSize: 10, color: AgriColors.outline),
+                    ),
+                  ),
+                  ],
                 ),
                 3,
               ),
-              (_actionInerte(), 2),
+              (
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      key: Key('utilisateur-modifier-$i'),
+                      onPressed: () => _ouvrirUtilisateur(d, d.utilisateurs[i]),
+                      icon: const Icon(SymbolesAgri.edit, size: 18, color: AgriColors.infoBlue),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
+                    if (d.utilisateurs[i].isActive)
+                      IconButton(
+                        key: Key('utilisateur-reinitialiser-$i'),
+                        tooltip: 'Réinitialiser le mot de passe',
+                        onPressed: () => _ouvrirReinitialisation(d.utilisateurs[i]),
+                        icon: const Icon(SymbolesAgri.lock_reset, size: 18, color: AgriColors.brandForest),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                    if (d.utilisateurs[i].isActive)
+                      IconButton(
+                        key: Key('utilisateur-archiver-$i'),
+                        onPressed: () => _confirmerArchivageUtilisateur(d.utilisateurs[i]),
+                        icon: const Icon(SymbolesAgri.archive, size: 18, color: AgriColors.errorRed),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      )
+                    else
+                      IconButton(
+                        key: Key('utilisateur-reactiver-$i'),
+                        onPressed: () => _gesteUtilisateur(
+                          () => widget.depot.reactiverUtilisateur(d.utilisateurs[i].id),
+                          'Utilisateur réactivé avec succès.',
+                        ),
+                        icon: const Icon(SymbolesAgri.restart_alt, size: 18, color: AgriColors.brandEmerald),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                  ],
+                ),
+                2,
+              ),
             ]),
         ],
       ),
       const SizedBox(height: AgriSpacing.md),
-      // ⚠️⚠️ NI MOT DE PASSE NI JETON NE DESCENDENT. La liste sert à savoir QUI
-      // travaille sur la ferme ; l'authentification du poste passe par
-      // `POST /api/auth/login`, contre le serveur.
+      // ⚠️⚠️ NI MOT DE PASSE NI JETON NE DESCENDENT ; un mot de passe saisi ici attend au coffre du système et part
+      // une fois. L'authentification du poste passe par `POST /api/auth/login`, contre le serveur.
       _mentionPoste(
-        'La liste dit qui travaille sur la ferme — jamais comment se '
-        'connecter : aucun mot de passe ni jeton ne descend. Créer un compte, '
-        'archiver un utilisateur ou réinitialiser un mot de passe se fait sur '
-        'la surface web.',
+        'Un compte créé, modifié, archivé ou réactivé ici part à la prochaine synchronisation ; il ne peut se '
+        "connecter qu'une fois reçu par le serveur. Aucun mot de passe ni jeton ne descend du serveur. "
+        '« Déconnecter toutes les sessions » se fait sur la surface web.',
         cle: 'utilisateurs',
       ),
     ],
   );
+
+  /// `User::ROLE_LABELS` du web (`role_label`) ; un rôle inconnu garde son nom, `null` → « — ».
+  static String _libelleRole(String? role) => switch (role) {
+    null || '' => '—',
+    'admin' => 'Administrateur',
+    'comptable' => 'Comptable',
+    'caissier' => 'Caissière POS',
+    'animalier' => "Chef d'Élevage",
+    final autre => autre,
+  };
+
+  Future<void> _gesteUtilisateur(Future<void> Function() geste, String succes) async {
+    try {
+      await geste();
+    } on RefusSaisieUtilisateur catch (e) {
+      if (mounted) ToastAgri.afficher(context, e.toString());
+      return;
+    }
+    if (!mounted) return;
+    ToastAgri.afficher(context, succes);
+    await _charger();
+  }
+
+  Future<void> _confirmerArchivageUtilisateur(Utilisateur u) async {
+    if (u.id == widget.idUtilisateurConnecte) {
+      ToastAgri.afficher(context, ParametresGenerauxRepository.messagePropreCompte);
+      return;
+    }
+    await afficherModale<void>(
+      context: context,
+      constructeur: (context) => ModaleConfirmation(
+        icone: SymbolesAgri.archive,
+        titre: "Archiver l'utilisateur",
+        message: '${u.name} sera archivé(e) : le compte ne pourra plus se connecter, sur le web comme sur les postes.',
+        couleurIcone: AgriColors.accentYellow,
+        actions: [
+          BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+          BoutonModalePrimaire(
+            libelle: 'Archiver',
+            couleur: AgriColors.errorRed,
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _gesteUtilisateur(
+                () => widget.depot.archiverUtilisateur(u.id, idConnecte: widget.idUtilisateurConnecte),
+                'Utilisateur archivé avec succès.',
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ticket MDP-1 — la fenêtre « Réinitialiser le mot de passe » de `gestion-utilisateurs.blade.php` (mêmes mots) : le propre
+  /// compte est refusé dès l'ouverture, comme au web (toast d'erreur) ; l'administrateur choisit un mot de passe TEMPORAIRE.
+  void _ouvrirReinitialisation(Utilisateur u) {
+    if (u.id == widget.idUtilisateurConnecte) {
+      ToastAgri.afficher(context, ParametresGenerauxRepository.messagePropreReinitialisation);
+      return;
+    }
+    final temporaire = TextEditingController();
+    var erreur = <String, String>{};
+
+    afficherModale<void>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, majModale) => ModaleAgri(
+          titre: 'Réinitialiser le mot de passe',
+          largeur: LargeurModale.sm,
+          contenu: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (erreur[''] != null) ...[
+                Text(erreur['']!, key: const Key('reinitialisation-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorRed)),
+                const SizedBox(height: AgriSpacing.sm),
+              ],
+              const Text(
+                "Choisissez un mot de passe temporaire et communiquez-le à la personne. Elle devra le changer à sa première connexion ; ses sessions et ses postes seront déconnectés. L'action est journalisée (jamais le mot de passe).",
+                style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+              ),
+              const SizedBox(height: AgriSpacing.md),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('Mot de passe temporaire *'.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+              ),
+              TextField(
+                key: const Key('reinitialisation-mot-de-passe'),
+                controller: temporaire,
+                obscureText: true,
+                decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), errorText: erreur['motDePasse']),
+                style: const TextStyle(fontSize: AgriTypography.sm),
+              ),
+            ],
+          ),
+          actions: [
+            BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+            BoutonModalePrimaire(
+              libelle: 'Réinitialiser',
+              onPressed: () async {
+                try {
+                  await widget.depot.reinitialiserMotDePasseUtilisateur(
+                    u.id,
+                    temporaire.text,
+                    idConnecte: widget.idUtilisateurConnecte,
+                  );
+                } on RefusSaisieUtilisateur catch (e) {
+                  majModale(() => erreur = e.champs);
+                  return;
+                }
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                if (mounted) {
+                  ToastAgri.afficher(this.context, 'Mot de passe réinitialisé : le compte devra le changer à sa prochaine connexion.');
+                }
+                await _charger();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// La modale « Nouvel Utilisateur » / « Modifier l'Utilisateur » de `gestion-utilisateurs.blade.php` — mêmes champs.
+  void _ouvrirUtilisateur(DonneesParametresGeneraux d, Utilisateur? u) {
+    final nom = TextEditingController(text: u?.name ?? '');
+    final identifiant = TextEditingController(text: u?.username ?? '');
+    final email = TextEditingController(text: u?.email ?? '');
+    final motDePasse = TextEditingController();
+    var role = u?.role ?? '';
+    var erreurs = <String, String>{};
+
+    Widget champ(String cle, TextEditingController c, {String? indication, String? erreur, bool secret = false}) => TextField(
+      key: Key(cle),
+      controller: c,
+      obscureText: secret,
+      decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), hintText: indication, errorText: erreur),
+      style: const TextStyle(fontSize: AgriTypography.sm),
+    );
+    Widget etiquette(String texte) => Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(texte.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+    );
+
+    afficherModale<void>(
+      context: context,
+      constructeur: (context) => StatefulBuilder(
+        builder: (context, majModale) => ModaleAgri(
+          titre: u == null ? 'Nouvel Utilisateur' : "Modifier l'Utilisateur",
+          contenu: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (erreurs[''] != null) ...[
+                Text(erreurs['']!, key: const Key('utilisateur-erreur'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorRed)),
+                const SizedBox(height: AgriSpacing.sm),
+              ],
+              etiquette('Nom complet *'),
+              champ('utilisateur-nom', nom, erreur: erreurs['nom']),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette("Nom d'utilisateur *"),
+              champ('utilisateur-identifiant', identifiant, indication: 'ex : compta', erreur: erreurs['identifiant']),
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text('Lettres, chiffres, point, tiret et souligne. Sans arobase.', style: TextStyle(fontSize: 10, color: AgriColors.outline)),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette('Email *'),
+              champ('utilisateur-email', email, erreur: erreurs['email']),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette('Rôle *'),
+              DropdownButtonFormField<String>(
+                key: const Key('utilisateur-role'),
+                initialValue: role,
+                isDense: true,
+                isExpanded: true,
+                decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), errorText: erreurs['role']),
+                style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('-- Sélectionner --')),
+                  for (final r in d.roles) DropdownMenuItem(value: r.name, child: Text(_majuscule(r.name))),
+                  if (role.isNotEmpty && !d.roles.any((r) => r.name == role)) DropdownMenuItem(value: role, child: Text(_majuscule(role))),
+                ],
+                onChanged: (v) => majModale(() => role = v ?? ''),
+              ),
+              const SizedBox(height: AgriSpacing.sm),
+              etiquette(u == null ? 'Mot de passe *' : 'Nouveau mot de passe'),
+              champ(
+                'utilisateur-mot-de-passe',
+                motDePasse,
+                indication: u == null ? 'Minimum 8 caractères' : 'Laisser vide pour conserver le mot de passe actuel',
+                erreur: erreurs['motDePasse'],
+                secret: true,
+              ),
+            ],
+          ),
+          actions: [
+            BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+            BoutonModalePrimaire(
+              libelle: 'Enregistrer',
+              onPressed: () async {
+                try {
+                  await widget.depot.enregistrerUtilisateur(
+                    id: u?.id,
+                    nom: nom.text,
+                    identifiant: identifiant.text,
+                    email: email.text,
+                    role: role,
+                    motDePasse: motDePasse.text,
+                  );
+                } on RefusSaisieUtilisateur catch (e) {
+                  majModale(() => erreurs = e.champs);
+                  return;
+                }
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                if (mounted) ToastAgri.afficher(this.context, u == null ? 'Utilisateur créé avec succès.' : 'Utilisateur modifié avec succès.');
+                await _charger();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// `ucfirst()` du Blade sur le nom du rôle.
+  static String _majuscule(String texte) => texte.isEmpty ? texte : '${texte[0].toUpperCase()}${texte.substring(1)}';
 
   // ── Onglet 5 : Modes de Paiement ──────────────────────────────────────────
 
@@ -908,19 +1456,51 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           for (final compte in d.comptesDe(type)) _carteCompte(compte),
         const SizedBox(height: AgriSpacing.md),
       ],
-      // ⚠️⚠️ UN VIREMENT ENTRE COMPTES PASSE UNE ÉCRITURE. La maquette permet
-      // d'ajouter un compte bancaire ou une ligne mobile money : c'est ouvrir
-      // un compte du plan SYSCOHADA, pas cocher une case — et le poste n'a
-      // aucun canal pour le remonter.
+      if (widget.reglages != null) ...[
+        Wrap(
+          spacing: AgriSpacing.sm,
+          runSpacing: AgriSpacing.sm,
+          children: [
+            for (final (cle, libelle, icone, geste) in [
+              ('paiement-banque', 'Ajouter un Compte Bancaire', SymbolesAgri.account_balance, 'banque'),
+              ('paiement-momo', 'Ajouter une Ligne Mobile Money', SymbolesAgri.smartphone, 'momo'),
+              ('paiement-virement', 'Virement Interne', SymbolesAgri.swap_horiz, 'virement'),
+            ])
+              OutlinedButton.icon(
+                key: Key(cle),
+                onPressed: () => _gestePaiement(geste, d),
+                icon: Icon(icone, size: 18),
+                label: Text(libelle, style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        if (_message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AgriSpacing.sm),
+            child: Text(_message!, key: const Key('reglage-message'), style: const TextStyle(fontSize: AgriTypography.xs, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+          ),
+        const SizedBox(height: AgriSpacing.md),
+      ],
       _mentionPoste(
-        'Les soldes sont ceux du dernier tirage. Ajouter un compte bancaire ou '
-        'une ligne mobile money ouvre un compte du plan SYSCOHADA, et un '
-        'virement entre comptes passe une écriture : les deux se font sur la '
-        'surface web.',
+        'Les soldes sont ceux du dernier tirage. Un compte ajouté ou un virement est une DEMANDE : le serveur ouvre le compte, '
+        'déplace les soldes et passe l\'écriture à la prochaine synchronisation.',
         cle: 'paiement',
       ),
     ],
   );
+
+  Future<void> _gestePaiement(String geste, DonneesParametresGeneraux d) async {
+    final depot = widget.reglages!;
+    final bool fait;
+    if (geste == 'banque') {
+      fait = await ouvrirBanque(context: context, depot: depot);
+    } else if (geste == 'momo') {
+      fait = await ouvrirMomo(context: context, depot: depot);
+    } else {
+      fait = await ouvrirVirement(context: context, depot: depot, comptes: d.comptes);
+    }
+    if (fait && mounted) setState(() => _message = 'Demande envoyée : elle sera appliquée à la prochaine synchronisation.');
+  }
 
   Widget _carteCompte(TreasuryAccount compte) => Padding(
     padding: const EdgeInsets.only(bottom: AgriSpacing.sm),
@@ -993,7 +1573,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
     children: [
       _entete(
         'Audit Logs & Sécurité',
-        'Historique horodaté des actions sensibles effectuées dans AgriERP.',
+        'Historique horodaté des actions sensibles effectuées dans LogiAgriERP.',
         large,
       ),
       const SizedBox(height: AgriSpacing.md),
@@ -1215,26 +1795,27 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(
-                        libelle.toUpperCase(),
-                        overflow: TextOverflow.ellipsis,
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(
+                          libelle.toUpperCase(),
+                          overflow: TextOverflow.ellipsis,
                         style: _enteteColonne,
                       ),
                     ),
@@ -1257,6 +1838,7 @@ class _ParametresGenerauxScreenState extends State<ParametresGenerauxScreen> {
           ],
         ),
       ),
+    ),
     ),
   );
 

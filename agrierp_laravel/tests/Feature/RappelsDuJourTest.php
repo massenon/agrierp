@@ -83,7 +83,7 @@ class RappelsDuJourTest extends TestCase
 
     private function utilisateur(string $role): User
     {
-        $u = User::create(['name' => ucfirst($role), 'email' => $role.'.pop@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
+        $u = User::create(['name' => ucfirst($role), 'email' => $role.'.pop@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026')]);
         $u->assignRole($role);
 
         return $u;

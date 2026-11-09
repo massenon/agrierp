@@ -1,8 +1,11 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
+import '../../core/auth/refus_droit.dart';
 import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -31,9 +34,13 @@ import '../../core/comptabilite/exercice_de_saisie.dart';
 /// attendant les règlements non encore acquittés, pour ne pas inviter à payer deux
 /// fois.
 class FournisseursScreen extends StatefulWidget {
-  const FournisseursScreen({super.key, required this.depot});
+  const FournisseursScreen({super.key, required this.depot, this.peutGerer = true});
 
   final FournisseursRepository depot;
+
+  /// Ticket CONF-4 (DV-20) — `manage-achats` : sans lui (comptable), créer, modifier, archiver un fournisseur et régler une
+  /// dette sont refusés par « Votre rôle ne permet pas cette action. » (le web : 403).
+  final bool peutGerer;
 
   @override
   State<FournisseursScreen> createState() => _FournisseursScreenState();
@@ -72,6 +79,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     if (_profil != null) {
       return ProfilFournisseurScreen(
         depot: widget.depot,
+        peutGerer: widget.peutGerer,
         fournisseurId: _profil!,
         onRetour: () {
           setState(() => _profil = null);
@@ -470,7 +478,27 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
                   ),
                   3,
                 ),
-                (_actionInerte(), 2),
+                (
+                  // Ticket AC-4 — « Régler » (web : `openPaymentModal($supplierId)`) : la modale s'ouvre sur CE fournisseur.
+                  d.dettes[i].montantDu > 0
+                      ? Align(
+                          alignment: Alignment.centerLeft,
+                          child: InkWell(
+                            key: Key('regler-dette-$i'),
+                            onTap: () => _ouvrirReglement(d, fournisseurId: d.dettes[i].dette.supplierId),
+                            child: const Text(
+                              'Régler',
+                              style: TextStyle(
+                                fontSize: AgriTypography.xs,
+                                fontWeight: AgriTypography.gras,
+                                color: AgriColors.brandEmerald,
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  2,
+                ),
               ]),
           ],
         ),
@@ -486,10 +514,11 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
     );
   }
 
-  Future<void> _ouvrirReglement(DonneesFournisseurs d) async {
+  Future<void> _ouvrirReglement(DonneesFournisseurs d, {String? fournisseurId}) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final enregistre = await afficherModale<bool>(
       context: context,
-      constructeur: (_) => _ModaleReglement(depot: widget.depot, donnees: d),
+      constructeur: (_) => _ModaleReglement(depot: widget.depot, donnees: d, fournisseurDepart: fournisseurId),
     );
     if (enregistre == true) await _charger();
   }
@@ -558,6 +587,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   );
 
   Future<void> _ouvrirFiche(Supplier? existant) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ecrit = await ouvrirFicheFournisseur(
       context: context,
       depot: widget.depot,
@@ -567,6 +597,7 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
   }
 
   Future<void> _archiver(Supplier fiche) async {
+    if (!RefusDroit.verifier(context, widget.peutGerer)) return;
     final ok = await confirmerArchivageFournisseur(
       context: context,
       depot: widget.depot,
@@ -659,42 +690,44 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
       border: Border.all(color: AgriColors.outlineVariant),
       borderRadius: BorderRadius.circular(AgriRadius.lg),
     ),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: largeur,
-        child: Column(
-          children: [
-            Container(
-              color: AgriColors.surfaceZebra,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AgriSpacing.md,
-                vertical: AgriSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  for (final (libelle, flex) in colonnes)
-                    Expanded(
-                      flex: flex,
-                      child: Text(libelle.toUpperCase(), style: _enteteColonne),
-                    ),
-                ],
-              ),
-            ),
-            if (lignes.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(AgriSpacing.lg),
-                child: Text(
-                  vide,
-                  style: const TextStyle(
-                    fontSize: AgriTypography.xs,
-                    fontStyle: FontStyle.italic,
-                    color: AgriColors.outline,
-                  ),
+    child: LayoutBuilder(
+      builder: (_, contraintes) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: max(largeur, contraintes.maxWidth),
+          child: Column(
+            children: [
+              Container(
+                color: AgriColors.surfaceZebra,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AgriSpacing.md,
+                  vertical: AgriSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    for (final (libelle, flex) in colonnes)
+                      Expanded(
+                        flex: flex,
+                        child: Text(libelle.toUpperCase(), style: _enteteColonne),
+                      ),
+                  ],
                 ),
               ),
-            ...lignes,
-          ],
+              if (lignes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AgriSpacing.lg),
+                  child: Text(
+                    vide,
+                    style: const TextStyle(
+                      fontSize: AgriTypography.xs,
+                      fontStyle: FontStyle.italic,
+                      color: AgriColors.outline,
+                    ),
+                  ),
+                ),
+              ...lignes,
+            ],
+          ),
         ),
       ),
     ),
@@ -712,14 +745,6 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
         for (final (contenu, flex) in cellules)
           Expanded(flex: flex, child: contenu),
       ],
-    ),
-  );
-
-  Widget _actionInerte() => const Opacity(
-    opacity: 0.4,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Icon(SymbolesAgri.visibility, size: 16, color: AgriColors.outline),
     ),
   );
 
@@ -774,10 +799,13 @@ class _FournisseursScreenState extends State<FournisseursScreen> {
 /// ⚠️ La saisie est refusée AVANT d'être écrite (montant, plafond du dû) : le
 /// message reste dans la modale, rien n'est effacé.
 class _ModaleReglement extends StatefulWidget {
-  const _ModaleReglement({required this.depot, required this.donnees});
+  const _ModaleReglement({required this.depot, required this.donnees, this.fournisseurDepart});
 
   final FournisseursRepository depot;
   final DonneesFournisseurs donnees;
+
+  /// Ticket AC-4 — fournisseur de la ligne « Régler » ; absent : le bouton d'en-tête, rien de choisi.
+  final String? fournisseurDepart;
 
   @override
   State<_ModaleReglement> createState() => _ModaleReglementState();
@@ -785,7 +813,7 @@ class _ModaleReglement extends StatefulWidget {
 
 class _ModaleReglementState extends State<_ModaleReglement> {
   final _montant = TextEditingController();
-  String _fournisseur = '';
+  late String _fournisseur = widget.fournisseurDepart ?? '';
   String _compte = '';
   DateTime _date = HeureBenin.aujourdhui();
   String? _erreur;

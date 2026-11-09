@@ -55,7 +55,7 @@ class AutorisationsEcrituresTest extends TestCase
         $u = User::create([
             'name' => 'Lecteur', 'username' => 'lecteur',
             'email' => 'lecteur@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole('lecteur');
 
@@ -96,6 +96,9 @@ class AutorisationsEcrituresTest extends TestCase
      */
     public function test_a_reader_cannot_change_the_ration_referential(): void
     {
+        // Les trois lignes des volailles reproductrices (VOL-1) existent déjà : le lecteur n'en ajoute aucune.
+        $avant = \App\Models\FeedRationStandard::count();
+
         Livewire::actingAs($this->lecteur())
             ->test(\App\Livewire\Elevage\ParametresElevage::class)
             ->set('ration_species_code', 'cuniculture')
@@ -104,7 +107,7 @@ class AutorisationsEcrituresTest extends TestCase
             ->call('saveRation')
             ->assertForbidden();
 
-        $this->assertEquals(0, \App\Models\FeedRationStandard::count());
+        $this->assertEquals($avant, \App\Models\FeedRationStandard::count());
     }
 
     /** ⚠️ Les données de l'entreprise figurent sur toutes les pièces émises. */
@@ -117,8 +120,7 @@ class AutorisationsEcrituresTest extends TestCase
 
         Livewire::actingAs($this->lecteur())
             ->test(\App\Livewire\Parametres\DonneesEntreprise::class)
-            ->call('save')
-            ->assertForbidden();
+            ->assertForbidden(); // CONF-1 : le refus tombe désormais dès l'ouverture de l'écran (avant tout geste).
     }
 
     /** ⚠️ Un stagiaire enregistré engage l'exploitation. */
@@ -148,7 +150,7 @@ class AutorisationsEcrituresTest extends TestCase
         $admin = User::create([
             'name' => 'Directeur', 'username' => 'admin',
             'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');
 

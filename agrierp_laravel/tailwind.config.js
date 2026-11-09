@@ -1,5 +1,5 @@
 /**
- * tailwind.config.js — AgriERP
+ * tailwind.config.js — LogiAgriERP
  *
  * Source de vérité : assets/js/tailwind-config.js du prototype
  * (agrisync_prototype.zip, 91 pages) — fait foi en premier pour chaque
@@ -58,7 +58,7 @@ export default {
                  * `brand-maize-ink` — le maïs de la marque, POSÉ SUR FOND CLAIR.
                  *
                  * ⚠️⚠️ #FFD55F SUR BLANC DONNE 1,41:1. WCAG AA exige 4,5:1 pour
-                 * du texte : le « ERP » de « AgriERP » était illisible sur la
+                 * du texte : le « ERP » de « LogiAgriERP » était illisible sur la
                  * page de connexion, et l'étiquette de catégorie de la recherche
                  * globale — 10 px, gras — l'était plus encore. Sur un écran bon
                  * marché en plein soleil, à Ikpinlè, le nom du produit se lisait

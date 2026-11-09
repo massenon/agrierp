@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import '../../core/auth/permissions_poste.dart';
@@ -6,6 +8,7 @@ import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/champs_date_agri.dart';
+import '../rapports/rapports_exports_screen.dart' show PeriodeDemandee, RapportsExportsScreen;
 import 'tableau_de_bord_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 
@@ -14,7 +17,7 @@ import '../../core/theme/symboles_agri.dart';
 /// Sections dans SON ordre, libellés au mot près (verrouillés par `test/tableau_de_bord_blade_test.dart`, qui
 /// les lit dans le Blade) :
 ///   1. en-tête « Bienvenue… » + deux actions (Enregistrer une Vente · Élevage) ;
-///   2. période « Du / au » DÉSACTIVÉE (mois courant) + sélecteur d'état (8 options) + bouton PDF ;
+///   2. période « Du / au » ÉDITABLE (mois courant par défaut, bornée à l'exercice affiché) + sélecteur d'état (8 options) + bouton PDF ;
 ///   3. huit cartes KPI ;
 ///   4. « CA vs Dépenses — 6 derniers mois » (8/12) + « Alertes Critiques » (4/12) ;
 ///   5. trois cartes espèces — Lapins · Volailles · Porcs ;
@@ -32,7 +35,9 @@ class TableauDeBordScreen extends StatefulWidget {
     this.onEnregistrerVente,
     this.onElevage,
     this.onOuvrir,
+    this.onOuvrirEtat,
     this.nomUtilisateur = 'M. Olouchègoun',
+    this.finDeTirage,
   });
 
   final TableauDeBordRepository depot;
@@ -42,7 +47,29 @@ class TableauDeBordScreen extends StatefulWidget {
   /// Ouvre un écran du poste : alerte cliquée, état choisi (bouton PDF), « Voir tout ». `null` : rien ne
   /// navigue (tests, aperçu).
   final ValueChanged<EcranPoste>? onOuvrir;
+
+  /// Bouton « PDF » : ouvre l'écran de l'ÉTAT choisi avec la période choisie (équivalent de
+  /// `/rapports-exports?tab=…&startDate=…&endDate=…`). Sans lui, le bouton ouvre l'écran par [onOuvrir], sans période.
+  final void Function(EcranPoste ecran, PeriodeDemandee periode)? onOuvrirEtat;
   final String nomUtilisateur;
+
+  /// PWA-2b — notifié à la FIN d'un tirage (synchronisation) : le tableau affiché pendant le tirage se relit SEUL, sans
+  /// changer d'écran ni perdre l'état saisi (période, état choisi, onglet). `null` : aucun rafraîchissement automatique.
+  final Listenable? finDeTirage;
+
+  /// Onglet de Rapports & Exports (libellé du poste) que l'adresse web [lien] vise par `?tab=` ; `null` : aucun.
+  static String? ongletDuLien(String lien) {
+    const parTab = {
+      'recettes-depenses': 'Recettes et Dépenses',
+      'tresorerie': 'État de Trésorerie',
+      'creances': 'Créances Clients',
+      'dettes': 'Dettes Fournisseurs',
+      'elevage-synth': 'Rapport Élevage',
+      'stocks-synth': 'Rapport de Stocks',
+    };
+    final onglet = parTab[Uri.tryParse(lien)?.queryParameters['tab']];
+    return RapportsExportsScreen.onglets.any((o) => o.$1 == onglet) ? onglet : null;
+  }
 
   /// Le `<select>` du Blade : `(libellé, adresse web)`, dans son ordre. Deux options pointent la même adresse
   /// (Recettes / Dépenses) : la valeur retenue à l'écran est donc le LIBELLÉ.
@@ -71,18 +98,50 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   /// État choisi dans le sélecteur (libellé), `null` : « -- Choisir un état / rapport -- ».
   String? _etat;
 
+  /// Période à imprimer : du 1er du mois à aujourd'hui, ramenée dans l'exercice affiché (`periodeParDefaut`) — comme
+  /// `Index::mount()` du web. Éditable ; l'état choisi s'ouvre avec elle.
+  DateTime? _du;
+  DateTime? _au;
+
+  static DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
+
   @override
   void initState() {
     super.initState();
+    widget.finDeTirage?.addListener(_surFinDeTirage);
     _charger();
   }
 
-  Future<void> _charger() async {
-    setState(() => _chargement = true);
+  @override
+  void didUpdateWidget(TableauDeBordScreen ancien) {
+    super.didUpdateWidget(ancien);
+    if (ancien.finDeTirage != widget.finDeTirage) {
+      ancien.finDeTirage?.removeListener(_surFinDeTirage);
+      widget.finDeTirage?.addListener(_surFinDeTirage);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.finDeTirage?.removeListener(_surFinDeTirage);
+    super.dispose();
+  }
+
+  /// Relecture silencieuse (pas de roue d'attente : l'écran reste affiché pendant la lecture).
+  void _surFinDeTirage() {
+    if (mounted) _charger(silencieux: true);
+  }
+
+  Future<void> _charger({bool silencieux = false}) async {
+    if (!silencieux) setState(() => _chargement = true);
     final donnees = await widget.depot.charger();
     if (!mounted) return;
+    final defaut = PorteeExerciceChoisi.lire(context)?.periodeParDefaut(_jour(donnees.debutPeriode), _jour(donnees.finPeriode)) ??
+        (debut: _jour(donnees.debutPeriode), fin: _jour(donnees.finPeriode));
     setState(() {
       _donnees = donnees;
+      _du ??= defaut.debut;
+      _au ??= defaut.fin;
       _chargement = false;
     });
   }
@@ -226,19 +285,50 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     return TableauDeBordRepository.ecranDuLien(adresse);
   }
 
-  /// ⚠️ **PÉRIODE DÉSACTIVÉE, COMME LE WEB** (`<input type="date" … disabled>`) : le tableau de bord est calé
-  /// sur le mois courant. Le sélecteur d'état navigue, comme `window.location.href = report`.
+  /// `du > au` : le bouton « PDF » reste désactivé (`:disabled="!report || !du || !au || du > au"` du web).
+  bool get _periodeInvalide => _du == null || _au == null || _du!.isAfter(_au!);
+
+  /// Calendrier borné à l'exercice affiché (`min` / `max` des `<input type="date">` du web).
+  Future<void> _choisirDate(DateTime valeur, ValueChanged<DateTime> quand) async {
+    final etat = PorteeExerciceChoisi.lire(context);
+    final choix = await showDatePicker(
+      context: context,
+      initialDate: etat?.borner(valeur) ?? valeur,
+      firstDate: etat?.bornes.debut ?? DateTime(2020),
+      lastDate: etat?.bornes.fin ?? DateTime(2100),
+      locale: const Locale('fr'),
+    );
+    if (choix != null) quand(_jour(choix));
+  }
+
+  /// Bouton « PDF » : ouvre l'état choisi avec la période choisie. L'impression elle-même se fait depuis l'écran de
+  /// l'état, qui affiche et exporte cette période.
+  void _ouvrirEtat(EcranPoste cible) {
+    final periode = PeriodeDemandee(
+      du: _du!,
+      au: _au!,
+      onglet: TableauDeBordScreen.ongletDuLien(TableauDeBordScreen.etats.firstWhere((e) => e.$1 == _etat).$2),
+    );
+    if (widget.onOuvrirEtat != null) {
+      widget.onOuvrirEtat!(cible, periode);
+    } else {
+      widget.onOuvrir?.call(cible);
+    }
+  }
+
+  /// ⚠️ **PÉRIODE ÉDITABLE** (demande du client du 07/11/2026 ; `<input type="date" x-model min max>` du web) : du premier
+  /// du mois à aujourd'hui par défaut, bornée à l'exercice affiché. Choisir un état puis « PDF » OUVRE l'état avec cette
+  /// période ; le bouton reste désactivé sans état (ou sans écran du poste pour lui) et tant que du > au.
   Widget _filtreEtExport(bool petit) {
-    final d = _donnees!;
     final dates = Row(
       children: [
         const Icon(SymbolesAgri.calendar_month, size: AgriChamps.iconePeriode, color: AgriColors.outline),
         const SizedBox(width: AgriSpacing.xs),
-        Expanded(child: _champDate(const Key('date-du'), d.debutPeriode)),
+        Expanded(child: _champDate(const Key('date-du'), _du!, (v) => setState(() => _du = v))),
         const SizedBox(width: AgriSpacing.xs),
         const Text('au', style: StylesChampsAgri.motPeriode),
         const SizedBox(width: AgriSpacing.xs),
-        Expanded(child: _champDate(const Key('date-au'), d.finPeriode)),
+        Expanded(child: _champDate(const Key('date-au'), _au!, (v) => setState(() => _au = v))),
       ],
     );
 
@@ -294,9 +384,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
           key: const Key('export-pdf'),
           icone: SymbolesAgri.picture_as_pdf,
           libelle: 'PDF',
-          onPressed: cible == null || widget.onOuvrir == null
+          onPressed: cible == null || _periodeInvalide || (widget.onOuvrir == null && widget.onOuvrirEtat == null)
               ? null
-              : () => widget.onOuvrir!(cible),
+              : () => _ouvrirEtat(cible),
         ),
       ],
     );
@@ -332,9 +422,9 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   Widget _largeurEtat({required bool petit, required Widget enfant}) =>
       petit ? SizedBox(width: AgriChamps.largeurChoixEtat, child: enfant) : Expanded(child: enfant);
 
-  /// Champ de date DÉSACTIVÉ : aucun sélecteur ne s'ouvre, fond grisé. `px-sm py-1.5 text-xs` (30 px).
-  Widget _champDate(Key cle, DateTime valeur) =>
-      ChampDateFiltre(cle: cle, valeur: valeur, compact: true, desactive: true);
+  /// Champ de date éditable : le sélecteur s'ouvre, borné à l'exercice. `px-sm py-1.5 text-xs` (30 px).
+  Widget _champDate(Key cle, DateTime valeur, ValueChanged<DateTime> quand) =>
+      ChampDateFiltre(cle: cle, valeur: valeur, compact: true, onTap: () => _choisirDate(valeur, quand));
 
   // ── 3. Les huit KPI ───────────────────────────────────────────────────────
 
@@ -822,8 +912,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
 
   /// Les cinq onglets du web, dans son ordre, avec leurs messages vides exacts.
   ///
-  /// ⚠️ ÉCART (donnée absente) : l'onglet Devis n'a pas de table au poste (`quotes` ne descend pas). Il reste
-  /// à sa place et affiche le message vide du web plutôt que de disparaître.
+  /// Depuis le ticket DEV, `quotes` descend au poste (table mixte) ; l'onglet Devis garde sa place et le message
+  /// vide du web quand la ferme n'a aucun devis.
   static const _ongletsTx = <(String, String)>[
     ('Vente', 'Aucune vente récente.'),
     ('Achat', 'Aucun achat récent.'),
@@ -1012,26 +1102,27 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
       titre: 'Top 5 Produits du Mois',
       enfant: top.isEmpty
           ? _messageVide('Aucune vente ce mois-ci.', centre: true)
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: 420,
-                child: Column(
-                  children: [
-                    Container(
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: AgriColors.outlineVariant),
+          : LayoutBuilder(
+              builder: (_, contraintes) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: max(420, contraintes.maxWidth),
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: AgriColors.outlineVariant),
+                          ),
                         ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AgriSpacing.xs,
-                      ),
-                      child: const Row(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: Text('Produit', style: _enteteTop),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AgriSpacing.xs,
+                        ),
+                        child: const Row(
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: Text('Produit', style: _enteteTop),
                           ),
                           Expanded(
                             child: Text(
@@ -1128,6 +1219,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
                   ],
                 ),
               ),
+            ),
             ),
     );
 

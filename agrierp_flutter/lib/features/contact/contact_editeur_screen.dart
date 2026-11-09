@@ -194,7 +194,7 @@ class _ContactEditeurScreenState extends State<ContactEditeurScreen> {
         const SizedBox(height: AgriSpacing.xs),
         const Text(
           "Assistance technique, suggestions et signalement d'anomalies pour "
-          'AgriERP.',
+          'LogiAgriERP.',
           style: TextStyle(
             fontSize: AgriTypography.xs,
             color: AgriColors.outline,

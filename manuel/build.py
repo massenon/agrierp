@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Construit le manuel d'utilisation AgriERP au format PDF.
+Construit le manuel d'utilisation LogiAgriERP au format PDF.
 
   1. assemble src/part*.html
   2. sépare la couverture (impression pleine page, sans en-tête ni pied)
@@ -123,12 +123,12 @@ doc.insert_pdf(cov)
 doc.insert_pdf(cor)
 doc.set_toc([[lvl, titre, page + cov.page_count] for lvl, titre, page in toc])
 doc.set_metadata({
-    'title': "AgriERP — Manuel d'utilisation",
+    'title': "LogiAgriERP — Manuel d'utilisation",
     'author': 'Dr MASSENON Rhodes, Docteur en Génie Logiciel et IA',
-    'subject': "Manuel d'utilisation d'AgriERP — Ferme École Olouwachegoun. Maîtrise d'ouvrage : PAEB. Accompagnement : Cabinet FAGUEZ SARL. Éditeur : Dr MASSENON Rhodes.",
-    'keywords': 'AgriERP, manuel, élevage, ventes, stocks, comptabilité, Bénin, PAEB, Cabinet FAGUEZ SARL, MASSENON Rhodes',
+    'subject': "Manuel d'utilisation d'LogiAgriERP — Ferme École Olouwachegoun. Maîtrise d'ouvrage : PAEB. Accompagnement : Cabinet FAGUEZ SARL. Éditeur : Dr MASSENON Rhodes.",
+    'keywords': 'LogiAgriERP, manuel, élevage, ventes, stocks, comptabilité, Bénin, PAEB, Cabinet FAGUEZ SARL, MASSENON Rhodes',
 })
-cible = os.path.join(os.path.dirname(RACINE), 'Manuel_Utilisation_AgriERP.pdf')
+cible = os.path.join(os.path.dirname(RACINE), 'Manuel_Utilisation_LogiAgriERP.pdf')
 doc.save(cible, garbage=4, deflate=True)
 print('\nPDF : %s' % cible)
 print('      %d pages, %d signets, %.2f Mo'

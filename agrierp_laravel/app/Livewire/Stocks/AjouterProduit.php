@@ -71,6 +71,9 @@ class AjouterProduit extends Component
 
     public float $alert_threshold = 0;
 
+    /** Ticket VOL-1 : catégorie d'effectif (reproducteur / jeune / poussin) d'un produit de l'aviculture ; '' = aucune. */
+    public string $categorie_effectif = '';
+
     public function mount(?string $product = null): void
     {
         if ($product) {
@@ -87,6 +90,7 @@ class AjouterProduit extends Component
             $this->tva_rate = (float) $existing->tva_rate;
             $this->stock_qty = (float) $existing->stock_qty;
             $this->alert_threshold = (float) $existing->alert_threshold;
+            $this->categorie_effectif = (string) $existing->categorie_effectif;
         }
     }
 
@@ -98,6 +102,24 @@ class AjouterProduit extends Component
     public function getSpeciesOptionsProperty()
     {
         return LivestockSpecies::enabled()->orderBy('label')->get();
+    }
+
+    /** Ticket VOL-1 : la catégorie d'effectif ne se propose que pour un produit de l'aviculture. */
+    public function getEstAvicultureProperty(): bool
+    {
+        return $this->species_id !== '' && LivestockSpecies::whereKey($this->species_id)->where('code', 'aviculture')->exists();
+    }
+
+    /**
+     * @return array<string, array<string, string>> groupe => [clé => libellé affiché] : volailles reproductrices
+     *         (Reproducteur, Jeune, Poussin) et volailles pondeuses (les quatre libellés du barème, Ticket VOL-2)
+     */
+    public function getCategoriesEffectifProperty(): array
+    {
+        return [
+            'Volailles reproductrices' => \App\Support\CategorieVolaille::LIBELLES,
+            'Volailles pondeuses' => \App\Support\StadePondeuse::LIBELLES,
+        ];
     }
 
     public function save(): void
@@ -123,6 +145,7 @@ class AjouterProduit extends Component
             'tva_rate' => $this->tva_rate,
             'stock_qty' => $this->stock_qty,
             'alert_threshold' => $this->alert_threshold,
+            'categorie_effectif' => $this->categorie_effectif !== '' ? $this->categorie_effectif : null,
         ];
 
         if ($this->productId) {

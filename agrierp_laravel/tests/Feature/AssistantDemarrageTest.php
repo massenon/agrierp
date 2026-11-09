@@ -32,13 +32,15 @@ class AssistantDemarrageTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $this->admin = $this->compte('admin');
         $this->travelTo(now()->setDate(2026, 10, 17));
+        // Module éteint par défaut : les tests de l'assistant l'allument d'abord.
+        ModuleConfig::definir(ModuleConfig::ASSISTANT_DEMARRAGE, true, null);
     }
 
     private function compte(string $role): User
     {
         $u = User::create([
             'name' => ucfirst($role), 'username' => $role, 'email' => $role.'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $u->assignRole($role);
 
@@ -61,7 +63,7 @@ class AssistantDemarrageTest extends TestCase
     public function test_sur_base_vide_les_etapes_manquantes_sont_constatees(): void
     {
         ChartOfAccount::query()->delete();
-        ModuleConfig::query()->update(['is_enabled' => false]);
+        ModuleConfig::query()->where('species_code', '!=', ModuleConfig::ASSISTANT_DEMARRAGE)->update(['is_enabled' => false]);
 
         $this->assertSame(
             ['entreprise' => false, 'plan' => false, 'exercice' => false, 'tresorerie' => false, 'modules' => false, 'utilisateurs' => false],
@@ -80,7 +82,7 @@ class AssistantDemarrageTest extends TestCase
     public function test_l_assistant_s_ouvre_pour_l_administrateur_seulement_et_se_reporte(): void
     {
         $this->actingAs($this->admin);
-        Livewire::test(AssistantDemarrage::class)->assertSet('afficher', true)->assertSee('Bienvenue dans AgriERP')
+        Livewire::test(AssistantDemarrage::class)->assertSet('afficher', true)->assertSee('Bienvenue dans LogiAgriERP')
             ->call('reporter')->assertSet('afficher', false);
         Livewire::test(AssistantDemarrage::class)->assertSet('afficher', false);
 
@@ -145,5 +147,42 @@ class AssistantDemarrageTest extends TestCase
     public function test_le_tableau_de_bord_monte_l_assistant(): void
     {
         $this->actingAs($this->admin)->get('/dashboard')->assertOk()->assertSeeLivewire(AssistantDemarrage::class);
+    }
+
+    public function test_le_module_est_eteint_par_defaut_et_se_bascule_depuis_modules_actifs(): void
+    {
+        ModuleConfig::query()->delete();
+        $this->assertFalse(ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE));
+
+        $this->actingAs($this->admin);
+        \Livewire\Livewire::test(\App\Livewire\Parametres\AssistantDemarrage::class)->assertSet('afficher', false);
+
+        \Livewire\Livewire::test(\App\Livewire\Parametres\ModulesActifs::class)->call('toggleAssistant');
+        $this->assertTrue(ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE));
+        \Livewire\Livewire::test(\App\Livewire\Parametres\AssistantDemarrage::class)->assertSet('afficher', true);
+
+        \Livewire\Livewire::test(\App\Livewire\Parametres\ModulesActifs::class)->call('toggleAssistant');
+        $this->assertFalse(ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE));
+    }
+
+    public function test_le_poste_peut_envoyer_le_module_assistant(): void
+    {
+        $r = app(\App\Actions\RecordModulesConfigFromDeviceAction::class)->execute(
+            [['id' => 'assistant_demarrage', 'species_code' => 'assistant_demarrage', 'is_enabled' => true]],
+            $this->admin,
+        );
+
+        $this->assertSame(['assistant_demarrage'], $r['accepted']);
+        $this->assertTrue(ModuleConfig::isEnabled(ModuleConfig::ASSISTANT_DEMARRAGE));
+    }
+
+    public function test_un_poste_neuf_lit_le_module_a_la_connexion(): void
+    {
+        \Laravel\Sanctum\Sanctum::actingAs($this->admin);
+
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('assistant_demarrage_actif', true);
+
+        ModuleConfig::definir(ModuleConfig::ASSISTANT_DEMARRAGE, false, null);
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('assistant_demarrage_actif', false);
     }
 }

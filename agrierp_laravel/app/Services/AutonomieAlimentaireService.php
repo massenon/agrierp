@@ -18,7 +18,7 @@ use App\Models\Product;
  */
 class AutonomieAlimentaireService
 {
-    /** En dessous de ce nombre de jours, l'autonomie est critique (même seuil que RaiseFeedAutonomyAlertAction). */
+    /** Valeur de DÉPART du seuil critique ; RELEVES-1 : le seuil en vigueur est lu de la règle « délai fournisseur ». */
     public const SEUIL_CRITIQUE_JOURS = 3.0;
 
     /**
@@ -62,7 +62,7 @@ class AutonomieAlimentaireService
             'product' => $produit,
             'stock_kg' => $stockKg,
             'autonomie_jours' => $autonomieJours,
-            'critique' => $rupture || $autonomieJours <= self::SEUIL_CRITIQUE_JOURS,
+            'critique' => $rupture || $autonomieJours <= \App\Services\Elevage\ReleveTerrainService::seuilCritiqueJours(),
             'rupture' => $rupture,
         ];
     }

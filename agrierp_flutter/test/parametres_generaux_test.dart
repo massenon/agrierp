@@ -1,5 +1,6 @@
 import 'package:agrierp/core/auth/permissions_poste.dart';
 import 'package:agrierp/core/database/app_database.dart';
+import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/core/widgets/carte_kpi.dart';
 import 'package:agrierp/features/elevage/gestion_elevage_repository.dart';
@@ -79,7 +80,11 @@ void main() {
       .insert(
         UtilisateursCompanion.insert(
           id: uuid(cle),
+          deviceId: 'serveur',
+          updatedAt: DateTime(2026, 1, 1),
+          syncStatus: const Value(SyncStatus.synced),
           name: nom,
+          username: Value(cle),
           email: Value('$cle@fermeolouwachegoun.com'),
           role: Value(role),
           isActive: Value(actif),
@@ -287,7 +292,7 @@ void main() {
     // Ticket CFG-2 — les six onglets de la maquette, plus « Email (SMTP) » et « Appairage » aux places que
     // le web donne à « Email (SMTP) » et « Postes & Appairage » (CFG-1). Ticket R-1 : « Réinitialisation » après
     // « Audit Logs », comme au web.
-    testWidgets('les dix onglets du hub sont présents, dans son ordre', (
+    testWidgets('les douze onglets du hub sont présents, dans son ordre', (
       tester,
     ) async {
       await fermeComplete();
@@ -296,6 +301,7 @@ void main() {
       expect(ParametresGenerauxScreen.onglets.map((o) => o.$1).toList(), [
         'Rôles & Permissions',
         "Données de l'Entreprise",
+        'Facturation normalisée (e-MECeF)',
         'Email (SMTP)',
         'Modules Actifs',
         'Gestion Utilisateurs',
@@ -304,6 +310,7 @@ void main() {
         'Audit Logs',
         'Corbeille',
         'Réinitialisation',
+        'Sauvegardes',
       ]);
 
       for (final (titre, _) in ParametresGenerauxScreen.onglets) {
@@ -426,7 +433,7 @@ void main() {
       }
       expect(find.text('FUTUR'), findsOne);
       expect(find.byIcon(SymbolesAgri.toggle_on), findsNWidgets(3));
-      expect(find.byIcon(SymbolesAgri.toggle_off), findsOne);
+      expect(find.byIcon(SymbolesAgri.toggle_off), findsNWidgets(2), reason: "héliciculture et assistant de démarrage (éteint par défaut)");
     });
 
     testWidgets('un utilisateur désactivé porte le mot de la maquette', (

@@ -193,6 +193,9 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
   /// Pesée TOTALE : grammes (lapins) ou kilos (porcs) ; `null` = rien de pesé.
   double? _pesee;
 
+  /// Estimation GMQ du poids moyen par animal (g). Chargée quand `_pesee == null`.
+  double? _poidsMoyenEstimeG;
+
   ProtocoleDuJour? _protocole;
   final _coches = <String>{};
   final _observations = TextEditingController();
@@ -266,6 +269,10 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
       codeEspece: _c.espece.codeEspece,
       quand: _jour,
     );
+    // Estimation GMQ : seulement si aucune pesée n'a été saisie pour ce jour.
+    final poidsMoyenEstimeG = fiche?.weightSampleAvgG == null
+        ? await widget.depot.poidsMoyenEstime(lotId: bande.id, jour: _jour)
+        : null;
     if (!mounted) return;
 
     setState(() {
@@ -275,6 +282,7 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
       _etat = etat;
       _fiche = fiche;
       _protocole = protocole;
+      _poidsMoyenEstimeG = poidsMoyenEstimeG;
       _coches.clear();
       // `preremplirDepartDepuisStade()` : seulement sans tête de chaîne.
       final depart = etat?.mode == 'sans_chaine'
@@ -862,11 +870,21 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
   /// Final (diviseur) », poids moyen `number_format(pesée ÷ effectif, 1).' Kg'`. « — » sans pesée ni effectif.
   Widget _blocPesee() {
     final p = _pesee;
+    final estim = _poidsMoyenEstimeG;
     final moyen = p == null || p == 0 || _effectifFinal <= 0
         ? '—'
         : (_c.peseeEnKg
               ? '${PmpService.nombre(p / _effectifFinal, 1, virgule: '.', milliers: ',')} Kg'
               : '${(p / _effectifFinal).round()} g');
+    // Indice dynamique : total estimé quand aucune pesée saisie et effectif connu.
+    final String indice;
+    if (p == null && estim != null && _effectifFinal > 0) {
+      indice = _c.peseeEnKg
+          ? '~${PmpService.nombre(estim * _effectifFinal / 1000, 1, virgule: '.', milliers: ',')} Kg (estimé)'
+          : '~${(estim * _effectifFinal).round()} g (estimé)';
+    } else {
+      indice = _c.peseeEnKg ? 'ex : 85' : 'ex : 3500';
+    }
     return FiletFiche(
       enfants: [
         GrilleFiche(
@@ -877,8 +895,11 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
               valeur: p,
               gras: true,
               decimal: _c.peseeEnKg,
-              indice: _c.peseeEnKg ? 'ex : 85' : 'ex : 3500',
-              onChange: (v) => setState(() => _pesee = v?.toDouble()),
+              indice: indice,
+              onChange: (v) => setState(() {
+                _pesee = v?.toDouble();
+                if (v != null) _poidsMoyenEstimeG = null;
+              }),
             ),
             ChampLectureFiche(
               libelle: _c.peseeEnKg ? 'Effectif Final' : 'Taille Échantillon',
@@ -897,6 +918,38 @@ class _FicheCategoriesVueState extends State<FicheCategoriesVue> {
             ),
           ],
         ),
+        if (p == null && estim != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              children: [
+                Icon(
+                  SymbolesAgri.trending_up,
+                  size: 14,
+                  color: AgriColors.outline,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Poids moyen estimé (GMQ) : ',
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.outline,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                Text(
+                  _c.peseeEnKg
+                      ? '${PmpService.nombre(estim / 1000, 2, virgule: '.', milliers: ',')} Kg / animal'
+                      : '${estim.round()} g / animal',
+                  style: TextStyle(
+                    fontSize: AgriTypography.xs,
+                    color: AgriColors.brandForest,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

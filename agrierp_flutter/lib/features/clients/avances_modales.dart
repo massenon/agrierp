@@ -6,6 +6,8 @@ import '../../core/widgets/modale_agri.dart';
 import 'clients_creances_repository.dart';
 import '../../core/theme/symboles_agri.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
+import '../../core/temps/heure_benin.dart';
+import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/toast_agri.dart';
 
 /// Ce que « Nouvel Acompte » rend à l'écran une fois l'avance ÉCRITE en local : de quoi
@@ -59,6 +61,53 @@ Future<bool> ouvrirImputation({
     context: context,
     constructeur: (_) =>
         _ModaleImputation(depot: depot, donnees: donnees, depart: depart),
+  );
+  return ok == true;
+}
+
+/// Ticket VC-4 — « Modifier l'Avance » (`modal-create-avance` du Blade `historique-avances`, mode modification) : « Client * »,
+/// « Montant (FCFA) * » (grisé, avec sa note, pour une avance entamée ou comptabilisée), « Date * » ; « Annuler » / « Enregistrer ».
+/// Retourne `true` quand la modification a été écrite en local (même une saisie identique : le web répond « Avance modifiée avec
+/// succès. » dans les deux cas).
+Future<bool> ouvrirModificationAvance({
+  required BuildContext context,
+  required ClientsCreancesRepository depot,
+  required DonneesClients donnees,
+  required LigneAvance ligne,
+}) async {
+  final premier = await depot.premierJourSaisissable();
+  if (!context.mounted) return false;
+  final ok = await afficherModale<bool>(
+    context: context,
+    constructeur: (_) => _ModaleModifierAvance(depot: depot, donnees: donnees, ligne: ligne, premierJour: premier),
+  );
+  return ok == true;
+}
+
+/// « Confirmer l'archivage » d'une avance (`x-modal-confirm-delete`, même texte que le web : « NOM — 40 000 FCFA sera marqué(e)
+/// comme archivé(e) (statut inactif). Aucune suppression définitive n'est effectuée. »). Retourne `true` à la confirmation ;
+/// l'archivage (et ses refus) sont l'affaire de l'écran, comme `archiveAdvance` du composant.
+Future<bool> confirmerArchivageAvance({required BuildContext context, required LigneAvance ligne}) async {
+  final ok = await afficherModale<bool>(
+    context: context,
+    confirmation: true,
+    constructeur: (contexte) => ModaleConfirmation(
+      titre: "Confirmer l'archivage",
+      message:
+          '${ligne.nomClient} — ${DocumentsAvances.formaterMontant(ligne.avance.amount)} FCFA sera marqué(e) comme archivé(e) '
+          "(statut inactif). Aucune suppression définitive n'est effectuée.",
+      icone: SymbolesAgri.archive,
+      couleurIcone: AgriColors.errorDeep,
+      actions: [
+        BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(contexte).pop(false)),
+        BoutonModalePrimaire(
+          key: const Key('archivage-avance-confirmer'),
+          libelle: 'Archiver',
+          couleur: AgriColors.errorRed,
+          onPressed: () => Navigator.of(contexte).pop(true),
+        ),
+      ],
+    ),
   );
   return ok == true;
 }
@@ -684,4 +733,161 @@ class _ModaleImputationState extends State<_ModaleImputation> {
       ),
     ],
   );
+}
+
+
+class _ModaleModifierAvance extends StatefulWidget {
+  const _ModaleModifierAvance({required this.depot, required this.donnees, required this.ligne, required this.premierJour});
+
+  final ClientsCreancesRepository depot;
+  final DonneesClients donnees;
+  final LigneAvance ligne;
+  final DateTime? premierJour;
+
+  @override
+  State<_ModaleModifierAvance> createState() => _ModaleModifierAvanceState();
+}
+
+class _ModaleModifierAvanceState extends State<_ModaleModifierAvance> {
+  late final TextEditingController _montant = TextEditingController(
+    text: widget.ligne.avance.amount == widget.ligne.avance.amount.roundToDouble()
+        ? widget.ligne.avance.amount.round().toString()
+        : widget.ligne.avance.amount.toString(),
+  );
+  late String _client = widget.ligne.avance.customerId;
+  late DateTime? _date = widget.ligne.avance.advanceDate;
+  Map<String, String> _erreurs = const {};
+  bool _envoi = false;
+
+  /// `@disabled($avanceFigee)` du Blade : entamée (servie ou imputation en attente) ou comptabilisée.
+  bool get _figee =>
+      widget.ligne.avance.amountUsed > 0 || widget.ligne.imputationEnAttente || widget.ligne.avance.treasuryAccountId != null;
+
+  @override
+  void dispose() {
+    _montant.dispose();
+    super.dispose();
+  }
+
+  Future<void> _choisirDate() async {
+    final aujourdhui = HeureBenin.maintenant();
+    final cal = ExerciceDeSaisie.calendrier(
+      premier: widget.premierJour,
+      repli: DateTime(2000),
+      dernier: DateTime(aujourdhui.year + 1, 12, 31),
+      initial: _date ?? aujourdhui,
+    );
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: cal.initial,
+      firstDate: cal.premier,
+      lastDate: DateTime(aujourdhui.year + 1, 12, 31),
+    );
+    if (choisie != null) setState(() => _date = choisie);
+  }
+
+  Future<void> _valider() async {
+    setState(() {
+      _envoi = true;
+      _erreurs = const {};
+    });
+    try {
+      await widget.depot.modifierAvance(
+        widget.ligne.avance.id,
+        clientId: _client,
+        montant: _montant.text,
+        date: _date,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on SaisieAvanceRefusee catch (e) {
+      if (!mounted) return;
+      setState(() => _envoi = false);
+      if (e.deFormulaire) {
+        setState(() => _erreurs = e.erreurs);
+      } else {
+        // `catch (ValidationException)` du composant : toast d'erreur, la modale reste ouverte.
+        ToastAgri.afficher(context, e.motif, type: TypeToast.erreur);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clients = [
+      for (final l in widget.donnees.clients) (l.client.id, l.client.name),
+      if (!widget.donnees.clients.any((l) => l.client.id == widget.ligne.avance.customerId))
+        (widget.ligne.avance.customerId, widget.ligne.nomClient),
+    ];
+
+    return ModaleAgri(
+      titre: "Modifier l'Avance",
+      largeur: LargeurModale.sm,
+      contenu: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _bloc(
+            'CLIENT *',
+            _liste(
+              cle: const Key('avance-modif-client'),
+              valeur: _client,
+              items: [
+                const DropdownMenuItem(value: '', child: Text('-- Sélectionner --')),
+                for (final (id, nom) in clients) DropdownMenuItem(value: id, child: Text(nom, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (v) => setState(() => _client = v),
+            ),
+            erreur: _erreurs['customerId'],
+          ),
+          _bloc(
+            'MONTANT (FCFA) *',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  key: const Key('avance-modif-montant'),
+                  controller: _montant,
+                  enabled: !_figee,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: AgriTypography.xs),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    filled: _figee,
+                    fillColor: AgriColors.surfaceZebra,
+                  ),
+                ),
+                if (_figee)
+                  const Padding(
+                    padding: EdgeInsets.only(top: AgriSpacing.xs),
+                    child: Text(
+                      "Le montant d'une avance entamée ou comptabilisée ne peut plus être modifié.",
+                      key: Key('avance-modif-montant-fige'),
+                      style: TextStyle(fontSize: 10, color: AgriColors.outline),
+                    ),
+                  ),
+              ],
+            ),
+            erreur: _erreurs['amount'],
+          ),
+          ChampDateFormulaire(
+            cle: const Key('avance-modif-date'),
+            etiquette: 'Date *',
+            valeur: _date,
+            onTap: _choisirDate,
+            erreur: _erreurs['advanceDate'],
+          ),
+        ],
+      ),
+      actions: [
+        BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop(false)),
+        BoutonModalePrimaire(
+          key: const Key('avance-modif-enregistrer'),
+          libelle: 'Enregistrer',
+          onPressed: _envoi ? null : _valider,
+        ),
+      ],
+    );
+  }
 }

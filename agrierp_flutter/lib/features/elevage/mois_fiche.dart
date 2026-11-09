@@ -89,7 +89,7 @@ class JourFiche {
   ///     Engraiss., Total, Taux Mort %, Poids Général (Kg), Traitements & Prophylaxie ;
   ///   • Escargots : Achat, Naissain Né, Mort, Vente, Don, Naissains, Engraiss., Bordés, Total, Taux Mort %, Poids
   ///     Général (g), Traitements & Prophylaxie ;
-  ///   • Reproducteurs : Couvés, Nés, Repro+Poulet+Poussin, Effectif Final, Taux Mort %, Poids Général (g).
+  ///   • Reproducteurs : Couvés, Nés, Reproducteur+Jeune+Poussin, Effectif Final, Taux Mort %, Poids Général (g).
   List<String> cellules(EspeceFiche espece) {
     final f = fiche;
     final poidsG = poidsGeneralG;

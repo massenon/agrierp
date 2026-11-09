@@ -2,15 +2,12 @@
 
 namespace App\Livewire\Elevage;
 
-use App\Actions\AdjustStockAction;
-use App\Actions\RecordSaleOnFicheElevageAction;
-use App\Models\AuditLog;
+use App\Actions\SaisieTransformationAction;
 use App\Models\LivestockLot;
 use App\Models\Product;
 use App\Models\Transformation;
 use Illuminate\Support\Facades\Auth;
-use App\Support\OrdreDesVerrous;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -104,55 +101,27 @@ class TransformationForm extends Component
     {
         $this->authorize('manage-elevage');
 
-        $this->validate([
-            'lotId' => ['required', 'exists:livestock_lots,id'],
-            'qtyAnimals' => ['required', 'integer', 'min:1'],
-            'productId' => ['required', 'exists:products,id'],
-            'qtyProduced' => ['required', 'numeric', 'min:0'],
-            'transformationDate' => ['required', 'date'],
-        ]);
+        $this->validate(SaisieTransformationAction::REGLES);
 
-        if ($this->selectedLot && $this->qtyAnimals > $this->selectedLot->current_quantity) {
-            $this->addError('qtyAnimals', "La quantité ne peut pas dépasser l'effectif disponible du lot ({$this->selectedLot->current_quantity}).");
+        // Point de passage unique, partagé avec l'envoi du poste (`SyncController::pushTransformations`) : effectif
+        // disponible, verrous, vente sur la fiche du jour, stock, audit. Le refus se lit sous le champ concerné.
+        try {
+            $transformation = app(SaisieTransformationAction::class)->enregistrer([
+                'lotId' => $this->lotId,
+                'qtyAnimals' => $this->qtyAnimals,
+                'productId' => $this->productId,
+                'qtyProduced' => $this->qtyProduced,
+                'transformationDate' => $this->transformationDate,
+            ], Auth::id());
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ, $messages[0]);
+            }
 
             return;
         }
 
-        $lot = $this->selectedLot;
-        $product = Product::findOrFail($this->productId);
-
-        // 🔴→✅ CORRECTIF « TRANSFORMATION EFFACÉE » — l'abattage faisait `decrement('current_quantity')` sans
-        // écrire dans la fiche du jour : la prochaine sauvegarde de fiche (ou une vente) réalignait la bande sur
-        // la dernière fiche et EFFAÇAIT la transformation. Décision client du 17/10/2026 : une transformation est
-        // une VENTE de sujets vifs. Elle passe donc par le même point d'entrée que la caisse : « Vente » de la
-        // fiche du jour de transformation, cascade des jours suivants, bande = dernière fiche.
-        DB::transaction(function () use ($lot, $product) {
-            // 🔴→✅ Ticket U14 — ORDRE DES VERROUS : le stock (produit fini, et ce que la fiche de la bande mouvemente)
-            // AVANT la fiche du jour, comme la caisse et l'envoi des postes (`OrdreDesVerrous`).
-            OrdreDesVerrous::stock([$product->id, ...OrdreDesVerrous::produitsDesFiches([$lot->id])]);
-
-            $transformation = Transformation::create([
-                'lot_id' => $this->lotId,
-                'product_id' => $this->productId,
-                'qty_animals' => $this->qtyAnimals,
-                'qty_produced' => $this->qtyProduced,
-                'operator_id' => Auth::id(),
-                'transformation_date' => $this->transformationDate,
-            ]);
-
-            // 1. Élevage — sortie des sujets, comme une vente, dans la fiche du jour.
-            app(RecordSaleOnFicheElevageAction::class)->execute(
-                [['lot_id' => $lot->id, 'qty' => (int) $this->qtyAnimals]],
-                \Carbon\Carbon::parse($this->transformationDate)->format('Y-m-d'),
-            );
-
-            // 2. Stock Produits Finis — Incrémentation
-            app(AdjustStockAction::class)->execute($product, (float) $this->qtyProduced, 'transformation', $transformation->id);
-
-            return $transformation;
-        });
-
-        AuditLog::record('transformation.recorded', 'elevage');
+        $product = $transformation->product;
         $this->dispatch('toast', message: "Transformation validée — {$this->qtyAnimals} sujet(s) transformé(s) en {$product->name}.", type: 'success');
         $this->reset(['lotId', 'qtyAnimals', 'productId', 'qtyProduced']);
         $this->qtyAnimals = 1;

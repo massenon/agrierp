@@ -4,7 +4,7 @@
             <span class="material-symbols-outlined text-outline-variant text-[56px]">lock</span>
             <h2 class="text-lg font-bold text-on-surface mt-md">Module Héliciculture non activé</h2>
             <p class="text-sm text-outline mt-xs">Ce module est disponible mais désactivé par défaut. Un administrateur peut l'activer depuis Paramètres &gt; Modules Actifs.</p>
-            <a href="{{ route('elevage.gestion') }}" class="inline-block mt-md text-xs font-bold text-brand-emerald hover:underline">← Retour à Gestion Élevage</a>
+            <a wire:navigate href="{{ route('elevage.gestion') }}" class="inline-block mt-md text-xs font-bold text-brand-emerald hover:underline">← Retour à Gestion Élevage</a>
         </div>
     @else
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
@@ -30,7 +30,7 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-center mb-lg">
             <span class="material-symbols-outlined text-outline-variant text-[44px]">inbox</span>
             <p class="text-sm font-semibold text-on-surface mt-sm">Aucune bande active en héliciculture pour le moment.</p>
-            <a href="{{ route('elevage.bandes') }}" class="text-xs font-bold text-brand-emerald mt-sm inline-block">Créer une bande depuis Bandes &amp; Sujets →</a>
+            <a wire:navigate href="{{ route('elevage.bandes') }}" class="text-xs font-bold text-brand-emerald mt-sm inline-block">Créer une bande depuis Bandes &amp; Sujets →</a>
         </div>
     @else
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm p-md lg:p-lg mb-lg">
@@ -194,7 +194,9 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Général Pesé (g)</label>
-                    <input wire:model.live="peseeTotal" type="number" min="0" placeholder="ex : 4500" class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
+                    <input wire:model.live="peseeTotal" type="number" min="0"
+                        placeholder="{{ $this->poidsMoyenEstime !== null && $this->effectifFinalCalc > 0 ? '~'.($this->poidsMoyenEstime * $this->effectifFinalCalc).' g (estimé)' : 'ex : 4500' }}"
+                        class="w-full h-10 px-md border border-outline-variant rounded-lg text-sm bg-white font-bold">
                 </div>
                 <div>
                     <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Poids Moyen Constaté <span class="text-outline normal-case font-normal">(Poids Général ÷ Effectif Final)</span></label>
@@ -203,6 +205,12 @@
                     </div>
                 </div>
             </div>
+            @if($this->poidsMoyenEstime !== null)
+                <p class="text-xs text-outline italic flex items-center gap-xs mt-xs">
+                    <span class="material-symbols-outlined text-[14px]">trending_up</span>
+                    Poids moyen estimé (GMQ) : <span class="font-bold text-brand-forest not-italic">{{ $this->poidsMoyenEstime }} g / animal</span>
+                </p>
+            @endif
 
             <div class="border-t border-outline-variant pt-md">
                 <p class="text-xs font-bold text-brand-forest uppercase mb-xs flex items-center gap-xs"><span class="material-symbols-outlined text-info-blue text-[18px]">thermostat</span>Entretien &amp; Hygrométrie</p>

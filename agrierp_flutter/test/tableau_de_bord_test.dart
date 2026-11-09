@@ -505,7 +505,7 @@ void main() {
     );
   });
 
-  /// Ticket H5 : le Blade fait foi — la période est le mois courant (champs désactivés) ; une vente du mois
+  /// Ticket H5 : le Blade fait foi — la période par défaut est le mois courant (éditable depuis le 07/11/2026) ; une vente du mois
   /// précédent ne compte que dans le sous-texte « Mois précédent ».
   testWidgets('une vente hors période ne compte pas dans le CA', (
     tester,

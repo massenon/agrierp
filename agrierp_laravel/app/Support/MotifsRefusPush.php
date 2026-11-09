@@ -80,7 +80,23 @@ class MotifsRefusPush
             'customer_advance_id' => 'avance client', 'receivable_id' => 'créance', 'sale_id' => 'vente',
             'expense_date' => 'date de la dépense', 'label' => 'libellé', 'category' => 'catégorie',
             'employee_id' => 'employé', 'attendance_date' => 'date de pointage', 'check_in' => 'heure d\'arrivée',
-            'check_out' => 'heure de départ', 'status' => 'statut', 'record_date' => 'date du soin',
+            'check_out' => 'heure de départ', 'status' => 'statut',
+            // Ticket VC-1 — encaissements de créances.
+            'customer_id' => 'client', 'receivable_id' => 'créance', 'treasury_account_id' => 'compte de trésorerie',
+            'amount' => 'montant', 'payment_date' => 'date du règlement',
+            'channel' => 'canal', 'message' => 'message', 'reminder_date' => 'date de la relance',
+            // Ticket AC-1 — bons de commande.
+            'expected_delivery_date' => 'date de livraison attendue', 'purchase_order_id' => 'bon de commande',
+            'lines.*.estimated_unit_price' => 'prix unitaire estimé de la ligne',
+            // Ticket UT-1 — comptes utilisateurs.
+            'name' => 'nom complet', 'username' => "nom d'utilisateur", 'role' => 'rôle',
+            'password' => 'mot de passe',
+            // Tickets RH-1, RH-2, RH-4.
+            'first_name' => 'prénom', 'last_name' => 'nom', 'position' => 'fonction', 'hire_date' => 'date d\'embauche',
+            'base_salary' => 'salaire de base', 'school' => 'établissement', 'start_date' => 'date de début', 'end_date' => 'date de fin',
+            'monthly_fee' => 'frais de stage', 'fee_paid' => 'frais réglés', 'internship_id' => 'stagiaire', 'absence_date' => 'date d\'absence',
+            'period_month' => 'période', 'requested_at' => 'instant de la demande', 'birth_date' => 'date de naissance',
+            'birth_place' => 'lieu de naissance', 'civilite' => 'civilité', 'record_date' => 'date du soin',
             'action_type' => 'type de soin', 'withdrawal_days' => 'jours de retrait',
             'product_id' => 'produit', 'type' => 'type', 'quantity' => 'quantité', 'reference_type' => 'type de référence',
             'client_ref' => 'référence du poste', 'movement_date' => 'date du mouvement', 'counted_quantity' => 'quantité comptée', 'counted_at' => 'instant du comptage', 'name' => 'nom', 'phone' => 'téléphone', 'email' => 'courriel',
@@ -104,6 +120,13 @@ class MotifsRefusPush
             'passage_sevre_jeune' => 'passage de stade',
             'cat_depart_repro' => 'effectif de départ reproducteurs', 'cat_depart_sevre' => 'effectif de départ sous-mères ou porcelets',
             'cat_depart_jeune' => 'effectif de départ jeunes lapins ou porcs marchands',
+            // Ticket VOL-1 — ventes par catégorie des volailles reproductrices.
+            'vente_repro' => 'ventes de reproducteurs', 'vente_sevre' => 'ventes de poussins', 'vente_jeune' => 'ventes de jeunes',
+            // Ticket VOL-2 — quatrième emplacement et passages des volailles pondeuses (libellés du barème).
+            'mort_4' => 'morts Poussin ponte', 'don_4' => 'dons Poussin ponte', 'vente_4' => 'ventes Poussin ponte',
+            'cat_depart_4' => 'effectif de départ Poussin ponte',
+            'passage_4_sevre' => 'passage Poussin ponte vers Poussin en croissance',
+            'passage_jeune_repro' => 'passage Poulette vers Pondeuse',
         ];
     }
 
@@ -148,17 +171,28 @@ class MotifsRefusPush
     // ====================================================================== Ticket 15.40 — ventilation par catégorie
 
     /** Les trois catégories d'une ventilation (morts ou dons) doivent être renseignées ensemble. */
-    public static function ventilationIncomplete(string $libelle): string
+    public static function ventilationIncomplete(string $libelle, bool $volailles = false, bool $pondeuses = false): string
     {
+        if ($pondeuses) {
+            return "Ventilation incomplète : les quatre stades des {$libelle} (Poussin ponte, Poussin en croissance, Poulette, Pondeuse) "
+                .'doivent être renseignés ensemble (0 si le stade est vide).';
+        }
+        if ($volailles) {
+            return "Ventilation incomplète : les trois catégories des {$libelle} (Reproducteur, Jeune, Poussin) "
+                .'doivent être renseignées ensemble (0 si la catégorie est vide).';
+        }
+
         return "Ventilation incomplète : les trois catégories des {$libelle} (reproducteurs, jeunes ou porcelets, "
             .'lapins de chair ou porcs marchands) doivent être renseignées ensemble (0 si la catégorie est vide).';
     }
 
     /** Le total de la fiche doit égaler la somme de sa ventilation. */
-    public static function ventilationIncoherente(string $libelle, int $total, int $somme): string
+    public static function ventilationIncoherente(string $libelle, int $total, int $somme, bool $pondeuses = false): string
     {
+        $parties = $pondeuses ? 'quatre stades' : 'trois catégories';
+
         return "Ventilation incohérente : les {$libelle} de la fiche ({$total}) ne correspondent pas à la somme "
-            ."des trois catégories ({$somme}).";
+            ."des {$parties} ({$somme}).";
     }
 
     /** D7 : un ancien poste envoie des morts/dons non ventilés sur une bande qui suit son effectif par catégorie. */
@@ -175,10 +209,69 @@ class MotifsRefusPush
         return "Effectif de départ refusé : effectif de départ déjà fixé le {$dateFr} pour cette bande.";
     }
 
-    /** L'effectif par catégorie n'est suivi que pour les lapins et les porcs. */
+    /** L'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles (reproductrices et pondeuses). */
     public static function departEspeceNonPrise(): string
     {
-        return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins et les porcs.";
+        return "Effectif de départ refusé : l'effectif par catégorie n'est suivi que pour les lapins, les porcs et les volailles.";
+    }
+
+    // ====================================================================== Ticket VOL-1 — volailles reproductrices
+
+    /** VOL-1 : une bande de volailles reproductrices doit avoir son départ par catégorie AVANT toute journée. */
+    public static function departRequisVolailles(string $bande): string
+    {
+        return "Fiche refusée : l'effectif de départ par catégorie (Reproducteur, Jeune, Poussin) de la bande {$bande} "
+            .'n\'est pas saisi. Saisissez-le d\'abord sur la fiche Volailles Reproducteurs, puis renvoyez la fiche.';
+    }
+
+    /** VOL-1 : un jour antérieur au départ n'est pas saisissable (jamais d'effectif inconnu affiché). */
+    public static function jourAvantLeDepart(string $dateFr): string
+    {
+        return "Fiche refusée : cette journée précède l'effectif de départ de la bande (fixé le {$dateFr}). "
+            .'Les jours antérieurs au départ ne sont pas saisissables.';
+    }
+
+    /** VOL-1 : la vente d'un produit sans catégorie d'effectif sur une bande de volailles reproductrices. */
+    public static function venteSansCategorie(string $produit): string
+    {
+        return "Vente refusée : le produit « {$produit} » n'a pas de catégorie d'effectif (Reproducteur, Jeune ou Poussin). "
+            .'Renseignez-la dans « Modifier un produit » avant de le vendre sur une bande de volailles reproductrices.';
+    }
+
+    /** VOL-1 : vente datée avant le départ d'une bande de volailles reproductrices. */
+    public static function venteAvantLeDepart(string $dateVente, string $dateDepart): string
+    {
+        return "Vente refusée : la date de la vente ({$dateVente}) précède l'effectif de départ de la bande (fixé le {$dateDepart}).";
+    }
+
+    // ====================================================================== Ticket VOL-2 — volailles pondeuses
+
+    /** VOL-2 : une bande de volailles pondeuses doit avoir son départ par stade AVANT toute journée. */
+    public static function departRequisPondeuses(string $bande): string
+    {
+        return "Fiche refusée : l'effectif de départ par stade (Poussin ponte, Poussin en croissance, Poulette, Pondeuse) de la bande {$bande} "
+            .'n\'est pas saisi. Saisissez-le d\'abord sur la fiche Pondeuses, puis renvoyez la fiche.';
+    }
+
+    /** VOL-2 : la vente d'un produit sans stade d'effectif sur une bande de volailles pondeuses. */
+    public static function venteSansStade(string $produit): string
+    {
+        return "Vente refusée : le produit « {$produit} » n'a pas de stade d'effectif de pondeuses (Poussin ponte, Poussin en croissance, Poulette ou Pondeuse). "
+            .'Renseignez-le dans « Modifier un produit » avant de le vendre sur une bande de pondeuses.';
+    }
+
+    /** VOL-2 : vente sur une bande de volailles pondeuses dont le départ n'est pas encore saisi. */
+    public static function venteSansDepartPondeuses(string $bande): string
+    {
+        return "Vente refusée : l'effectif de départ par stade de la bande {$bande} n'est pas saisi. "
+            .'Ouvrez la fiche Pondeuses et saisissez-le avant toute vente de cette bande.';
+    }
+
+    /** VOL-1 : vente sur une bande de volailles reproductrices dont le départ n'est pas encore saisi. */
+    public static function venteSansDepart(string $bande): string
+    {
+        return "Vente refusée : l'effectif de départ par catégorie de la bande {$bande} n'est pas saisi. "
+            .'Ouvrez la fiche Volailles Reproducteurs et saisissez-le avant toute vente de cette bande.';
     }
 
     /** Ticket S1 : un compte de vente envoie une fiche qui contient des saisies d'élevage. */
@@ -226,6 +319,15 @@ class MotifsRefusPush
             .'reconnectez-vous depuis ce poste. Les saisies en attente restent sur le poste.';
     }
 
+    /**
+     * CONF-4 (DV-20) — une vente envoyée au statut `annulee` par un compte qui n'a pas `manage-ventes` (le comptable : il
+     * lit les ventes et corrige par l'avoir, il n'encaisse ni n'annule). L'annulation reste à la caisse.
+     */
+    public static function annulationVenteRefusee(): string
+    {
+        return "Refusé : votre rôle ne permet pas d'annuler une vente (réservé aux comptes autorisés à encaisser). Pour corriger une vente, enregistrez un avoir depuis « Retours et Avoirs ».";
+    }
+
     /** Ticket S1 : l'utilisateur connecté au poste n'a pas le droit d'écrire cette table. */
     public static function roleInsuffisant(string $table): string
     {
@@ -247,6 +349,11 @@ class MotifsRefusPush
             'expenses' => 'enregistrer une dépense',
             'purchases' => 'enregistrer un achat',
             'attendance_records' => 'enregistrer un pointage',
+            // Tickets RH-1, RH-2, RH-4.
+            'employees' => 'créer, modifier ou archiver un employé',
+            'internships' => 'créer ou modifier un stagiaire',
+            'internship_absences' => 'noter ou archiver l\'absence d\'un stagiaire',
+            'payslip_requests' => 'valider le règlement d\'une paie',
             'sales' => 'enregistrer une vente',
             'quotes' => 'saisir un devis',
             'quote_conversions' => 'convertir un devis en facture (droits « ventes » et « facturation » requis)',
