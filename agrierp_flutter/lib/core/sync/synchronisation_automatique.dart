@@ -5,6 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show Listenable;
 
+import '../systeme/evenements_navigateur.dart';
 import 'sync_engine.dart';
 
 /// Ticket H13 (décisions D-SYNC-3 et B2 du 19/10/2026) — synchronisation déclenchée sans geste de l'utilisateur.
@@ -46,7 +47,11 @@ class SynchronisationAutomatique {
     this.gestes,
     this.delaiAgregation = delaiAgregationParDefaut,
     Future<bool> Function()? demandeDuServeur,
-  }) : // Paramètres NOMMÉS : Dart interdit `this._synchroniser` (voir `SyncEngine`).
+    this.evenementsNavigateur,
+    this.delaiAntiRebond = delaiAntiRebondParDefaut,
+    DateTime Function()? maintenant,
+  }) : _maintenant = maintenant ?? DateTime.now,
+        // Paramètres NOMMÉS : Dart interdit `this._synchroniser` (voir `SyncEngine`).
        // ignore: prefer_initializing_formals
        _synchroniser = synchroniser,
        // ignore: prefer_initializing_formals
@@ -61,6 +66,18 @@ class SynchronisationAutomatique {
   /// ⚠️ SILENCIEUX : hors ligne (dernier état connu du réseau), la question n'est pas posée ; un échec rend « pas
   /// de demande ». Jamais d'erreur à l'écran, jamais de réessai programmé : la question revient d'elle-même.
   static const intervalleDemande = Duration(seconds: 30);
+
+  /// PWA-2b (navigateur) — déclencheurs propres au web : retour en ligne (événement `online`) et retour de focus de
+  /// l'onglet (`visibilitychange`). `null` ou flux vide au natif : comportement inchangé.
+  final Stream<EvenementNavigateur>? evenementsNavigateur;
+
+  /// PWA-2b — le retour de focus ne relance pas une synchronisation tentée il y a moins de ce délai (changer d'onglet
+  /// dix fois en une minute n'en fait pas dix). Le retour en ligne, lui, n'est jamais retenu.
+  final Duration delaiAntiRebond;
+  static const delaiAntiRebondParDefaut = Duration(seconds: 30);
+  final DateTime Function() _maintenant;
+  DateTime? _derniereTentative;
+  StreamSubscription<EvenementNavigateur>? _abonnementNavigateur;
 
   final Future<bool> Function()? _demandeDuServeur;
   Timer? _minuterieDemande;
@@ -138,6 +155,16 @@ class SynchronisationAutomatique {
       _enLigne = enLigne;
       if (retour) declencher();
     });
+    _abonnementNavigateur = evenementsNavigateur?.listen((e) {
+      switch (e) {
+        case EvenementNavigateur.retourEnLigne:
+          _enLigne = true;
+          declencher();
+        case EvenementNavigateur.ongletVisible:
+          final derniere = _derniereTentative;
+          if (derniere == null || _maintenant().difference(derniere) >= delaiAntiRebond) declencher();
+      }
+    });
     gestes?.addListener(_surGeste);
     if (aussitot) declencher();
     if (_demandeDuServeur != null) {
@@ -173,6 +200,8 @@ class SynchronisationAutomatique {
     gestes?.removeListener(_surGeste);
     _abonnement?.cancel();
     _abonnement = null;
+    _abonnementNavigateur?.cancel();
+    _abonnementNavigateur = null;
   }
 
   /// Ticket S-T3 — un geste important : une synchronisation après [delaiAgregation], qui emporte aussi les
@@ -196,6 +225,7 @@ class SynchronisationAutomatique {
   Future<void> declencher() async {
     if (_enCours || _suspendue) return;
     _enCours = true;
+    _derniereTentative = _maintenant();
     _reessai?.cancel();
     _reessai = null;
     try {

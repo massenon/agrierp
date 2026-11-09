@@ -21,6 +21,7 @@ import 'core/sync/gestes_importants.dart';
 import 'core/widgets/navigation_poste.dart';
 import 'core/sync/modale_synchronisation.dart';
 import 'core/sync/synchronisation_automatique.dart';
+import 'core/systeme/evenements_navigateur.dart';
 import 'core/widgets/acces_rapide.dart';
 import 'core/widgets/aide_flottante.dart';
 import 'features/recherche/recherche_globale_champ.dart';
@@ -786,6 +787,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
   /// cours à chaque tirage.
   int _versionTirage = 0;
 
+  /// PWA-2b — signale la fin de chaque tirage aux écrans qui se relisent seuls (Tableau de bord), sans changer de clé.
+  final ValueNotifier<int> _finDeTirage = ValueNotifier<int>(0);
+
   /// Incrémenté par « Actualiser » du menu contextuel (clic droit) : force la
   /// reconstruction de l'écran courant sans changer d'écran.
   int _cleActualisation = 0;
@@ -879,6 +883,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     _lireMecef();
     _lireAssistant();
     setState(() => _versionTirage++);
+    _finDeTirage.value++;
     _exercice.charger();
   }
 
@@ -972,6 +977,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
       // Le tirage a pu apporter des notifications et vider la file : la barre et le Centre se relisent.
       onTermine: _apresTirage,
       gestes: widget.gestes,
+      // PWA-2b — navigateur seulement : retour en ligne (`online`) et retour de focus de l'onglet. Natif : flux vide.
+      evenementsNavigateur: evenementsDuNavigateur(),
     )..demarrer(aussitot: widget.synchroniserALOuverture);
     _cycleDeVie = AppLifecycleListener(
       onExitRequested: () async {
@@ -999,6 +1006,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
   @override
   void dispose() {
     _automatique?.arreter();
+    _finDeTirage.dispose();
     widget.demandeEcran?.removeListener(_ecranDemande);
     _cycleDeVie?.dispose();
     _exercice
@@ -1239,6 +1247,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
         // « Élevage » vers Gestion Élevage.
         EcranPoste.tableauDeBord => TableauDeBordScreen(
           depot: widget.tableauDeBord,
+          finDeTirage: _finDeTirage,
           nomUtilisateur:
               widget.auth.utilisateur?.nom ?? 'M. Olouchègoun',
           onEnregistrerVente: () => setState(() => _ecran = EcranPoste.caisse),

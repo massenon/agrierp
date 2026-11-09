@@ -54,6 +54,24 @@ class PostePwa2Test extends TestCase
         $this->assertStringContainsString("{ cache: 'reload' }", $sw);
     }
 
+    public function test_la_mise_a_jour_du_poste_est_controlee_jamais_forcee(): void
+    {
+        $boot = $this->lire('../agrierp_flutter/web/flutter_bootstrap.js');
+
+        // PWA-2b : bandeau « Nouvelle version disponible — Recharger », hors du canevas Flutter.
+        $this->assertStringContainsString('Nouvelle version disponible', $boot);
+        $this->assertStringContainsString('Recharger', $boot);
+        // SKIP_WAITING n'est envoyé QUE par le clic du bouton ; le rechargement n'a lieu qu'après ce clic.
+        $this->assertSame(1, preg_match_all("/postMessage\('SKIP_WAITING'\)/", $boot), 'SKIP_WAITING seulement au clic.');
+        $this->assertSame(1, preg_match_all('/location\.reload\(\)/', $boot), 'Un seul rechargement, conditionné au clic.');
+        $this->assertMatchesRegularExpression('/if \(window\.__rechargerApresMiseAJour\) window\.location\.reload\(\)/', $boot);
+        // Une première installation n'est pas une mise à jour.
+        $this->assertStringContainsString('navigator.serviceWorker.controller', $boot);
+        // Jamais de désinscription ni de service worker de Flutter.
+        $this->assertStringNotContainsString('.unregister(', $boot);
+        $this->assertStringNotContainsString("register('flutter_service_worker", $boot);
+    }
+
     public function test_le_service_worker_du_poste_a_sa_propre_portee_et_n_empiete_pas_sur_sw_js(): void
     {
         $sw = $this->lire('../agrierp_flutter/web/poste_sw.js');

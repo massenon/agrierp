@@ -12,6 +12,7 @@ import '../../core/demarrage/dossier_donnees.dart';
 import '../../core/systeme/plateforme_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
+import 'sauvegarde_complete_json.dart';
 import '../../core/widgets/modale_agri.dart';
 
 /// Refus d'un geste d'administration : le motif, en français.
@@ -126,8 +127,9 @@ class AdministrationLocale {
 
   /// PWA-2 — motif des gestes qui exigent le disque de Windows (sauvegarde complète, copie, restauration, ré-import).
   static const motifNavigateur =
-      "Les sauvegardes de fichiers ne sont pas disponibles dans le navigateur : la base reste conservée par le navigateur. "
-      'Utilisez la sauvegarde du serveur (web de gestion) ou le poste Windows.';
+      "La copie, la restauration et le ré-import de sauvegardes ne sont pas disponibles dans le navigateur : la base reste conservée "
+      'par le navigateur (« Sauvegarde complète » la télécharge). Pour restaurer, utilisez la sauvegarde du serveur (web de gestion) '
+      'ou le poste Windows.';
 
   Future<List<FichierSauvegarde>> sauvegardes() async {
     if (PlateformePoste.navigateur) return const [];
@@ -178,10 +180,16 @@ class AdministrationLocale {
     return 'Export du module « ${definition.libelle} » généré : ${p.basename(f.path)}';
   }
 
-  /// Navigateur : seul l'export JSON d'un module se fait, par TÉLÉCHARGEMENT ; la sauvegarde complète (`VACUUM INTO` écrit un
-  /// fichier) est refusée avec son motif.
+  /// Navigateur : la sauvegarde complète (toutes les tables, JSON) et l'export JSON d'un module se font par TÉLÉCHARGEMENT ;
+  /// la copie, la restauration et le ré-import (qui exigent le disque) restent refusés avec leur motif.
   Future<String> _exporterModuleNavigateur(String? module) async {
-    if (module == null) throw const RefusAdministration(motifNavigateur);
+    if (module == null) {
+      // PWA-2b — SAUVEGARDE COMPLÈTE : toutes les tables en JSON, téléchargées (voir [SauvegardeCompleteJson]).
+      final octets = await SauvegardeCompleteJson.exporter(database, maintenant: _maintenant());
+      final nom = 'agrierp_${_horodatage()}_complete.json';
+      await PlateformePoste.livreurNavigateur(nom, octets);
+      return 'Sauvegarde complète téléchargée : $nom';
+    }
     final definition = modules[module];
     if (definition == null) throw const RefusAdministration('Module inconnu.');
     final presentes = await _tablesPresentes();

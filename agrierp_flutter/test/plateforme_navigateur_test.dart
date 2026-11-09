@@ -114,9 +114,9 @@ void main() {
       expect(await admin.sauvegardes(), isEmpty);
     });
 
-    test('⚠️ la sauvegarde complète (VACUUM INTO) et la copie disque sont refusées avec leur motif', () async {
+    test('⚠️ la copie disque, la restauration et le ré-import sont refusés avec leur motif', () async {
       await expectLater(
-        admin.generer(),
+        admin.copier('x_complete.sqlite'),
         throwsA(isA<RefusAdministration>().having((e) => e.message, 'motif', AdministrationLocale.motifNavigateur)),
       );
       await expectLater(admin.copier('x_complete.sqlite'), throwsA(isA<RefusAdministration>()));
@@ -148,8 +148,7 @@ void main() {
   });
 
   group('justificatifs et logo', () {
-    test('un justificatif n\'est pas joint au navigateur (motif français à l\'écran)', () async {
-      expect(await choisirEtCopierJustificatif(), isNull);
+    test('un justificatif se joint au navigateur (magasin local, voir justificatifs_navigateur_test)', () {
       expect(motifJustificatifNavigateur, contains('navigateur'));
     });
 

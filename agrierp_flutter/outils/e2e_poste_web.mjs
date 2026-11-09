@@ -70,6 +70,7 @@ const NOM = 'Fournisseur Hors Ligne E2E';
 let contexte;
 let page;
 let echec = null;
+let pulls = 0;
 
 const ouvrir = async (horsLigne = false) => {
   contexte = await chromium.launchPersistentContext(profil, { headless: true, args: ['--no-sandbox'], viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, locale: 'fr-FR', timezoneId: 'Africa/Porto-Novo' });
@@ -115,7 +116,7 @@ const capture = (page, nom) => page.screenshot({ path: path.join(captures, nom) 
 try {
   // ─── 1. Démarrage à froid, connexion, PIN, tirage ───
   page = await ouvrir();
-  let pulls = 0; let pushes = [];
+  pulls = 0; let pushes = [];
   const surReponse = (r) => { const u = r.url(); if (process.env.E2E_DEBUG && u.includes('/api/')) console.log('  [api]', new Date().toISOString().slice(14, 23), r.status(), r.request().method(), u.replace(base, '').slice(0, 60)); if (u.includes('/api/sync/pull')) pulls++; if (u.includes('/api/sync/push')) pushes.push(r.status()); };
   page.on('response', surReponse);
   mesures.demarrage_froid_ms = await charger(page, `${base}/poste/`);
@@ -136,13 +137,12 @@ try {
   mesures.pages_de_tirage = pulls;
   assert.ok(pulls >= 7, `tirage incomplet (${pulls} pages)`);
   ok(`connexion + PIN + tirage complet (${pulls} pages) en ${mesures.connexion_pin_tirage_ms} ms`);
-  // Le tableau de bord affiché pendant le tirage ne se rafraîchit pas seul : on rouvre l'écran (comportement du poste Windows aussi).
-  await page.mouse.click(92, 570); await pause(2000);
-  await page.mouse.click(92, 148); await pause(3000);
+  // PWA-2b — le tableau de bord affiché PENDANT le tirage se rafraîchit SEUL à la fin du tirage (aucun changement d'écran).
+  { const t = Date.now(); while (!/312/.test(await textes(page)) && Date.now() - t < 40000) await pause(500); mesures.tableau_de_bord_rafraichi_seul_ms = Date.now() - t; }
   await fermerRappels(page);
   await capture(page, '2_tableau_de_bord.png');
   assert.match(await textes(page), /312/, 'les données du serveur sont affichées (312 têtes)');
-  ok('le tableau de bord affiche les données du serveur (effectif 312)');
+  ok(`le tableau de bord affiche les données du serveur (effectif 312) SANS changer d'écran (${mesures.tableau_de_bord_rafraichi_seul_ms} ms après la fin du tirage)`);
 
   // ─── 2. Service worker du poste ───
   const sw = await page.evaluate(async () => {
@@ -199,22 +199,77 @@ try {
   ok('fournisseur créé HORS LIGNE : visible dans la liste locale, absent du serveur');
   await capture(page, '7_fournisseur_cree_hors_ligne.png');
 
+
+  // ─── 4b. VENTE DE CAISSE hors ligne (PWA-2b) : produit « Cage galvanisée 4 compartiments » (vente à la pièce, montant global) ───
+  const avant = {
+    ventes: Number(sql("select count(*) from sales")),
+    stock: Number(sql("select stock_qty from products where sku='EQP-001'")),
+    caisse: Number(sql("select balance from treasury_accounts where label='Caisse Principale'")),
+    mouvements: Number(sql("select count(*) from stock_movements")),
+  };
+  await page.mouse.click(92, 148); await pause(2500); // Tableau de bord
+  await page.mouse.click(1050, 117); await attendreTexte(page, /Panier de Vente/, 15000); await pause(1500);
+  await page.mouse.click(613, 480); await attendreTexte(page, /Ajouter au panier/, 10000); await pause(800);
+  await page.mouse.click(640, 484); await pause(600); await page.keyboard.type('25000', { delay: 40 }); await pause(600);
+  await page.mouse.click(770, 549); await pause(1500);
+  await capture(page, '7d_vente_panier_hors_ligne.png');
+  await page.mouse.click(1110, 861);
+  await attendreTexte(page, /Vente Enregistrée/, 20000);
+  await capture(page, '7e_vente_enregistree_hors_ligne.png');
+  assert.equal(sql("select count(*) from sales"), String(avant.ventes), 'aucune vente côté serveur tant que hors ligne');
+  ok('VENTE DE CAISSE créée HORS LIGNE (produit, quantité, montant, espèces) : « Vente Enregistrée », absente du serveur');
+  await page.mouse.click(640, 566); await pause(800); // « Nouvelle Vente »
+
   // ─── 5. Reconnexion et synchronisation unique ───
   pushes = [];
   contexteHorsLigne = false;
   await contexte.setOffline(false);
   const t3 = Date.now();
   let poussee = false;
-  for (let i = 0; i < 60 && !poussee; i++) { if (pushes.includes(200)) poussee = true; else await pause(500); }
-  if (!poussee) { await page.mouse.click(909, 32); await pause(2000); await capture(page, '7b_synchronisation.png'); await page.mouse.click(777, 597); for (let i = 0; i < 240 && !pushes.includes(200); i++) await pause(500); mesures.synchro = 'manuelle (« Synchroniser maintenant »)'; await pause(2500); await capture(page, '7c_apres_synchronisation.png'); await page.mouse.click(518, 597); await pause(500); } else mesures.synchro = 'automatique';
+  for (let i = 0; i < 360 && !poussee; i++) { if (pushes.includes(200)) poussee = true; else await pause(500); }
+  if (!poussee) { await page.mouse.click(909, 32); await pause(2000); await capture(page, '7b_synchronisation.png'); await page.mouse.click(777, 597); for (let i = 0; i < 240 && !pushes.includes(200); i++) await pause(500); mesures.synchro = 'manuelle (« Synchroniser maintenant »)'; await pause(2500); await capture(page, '7c_apres_synchronisation.png'); await page.mouse.click(518, 597); await pause(500); } else mesures.synchro = 'automatique (événement navigateur « online »)';
   assert.ok(pushes.includes(200), `aucun POST /api/sync/push réussi (${JSON.stringify(pushes)})`);
   mesures.reconnexion_vers_push_ms = Date.now() - t3;
+  // « synchronisé » = les deux lignes sont chez le serveur ET le tirage de la même passe est fini
+  for (let i = 0; i < 120 && sql("select count(*) from sales") === String(avant.ventes); i++) await pause(500);
+  mesures.reconnexion_vers_synchronise_ms = Date.now() - t3;
   await pause(1500);
   assert.equal(sql(`select count(*) from suppliers where name='${NOM}'`), '1', 'exactement UNE ligne côté serveur');
-  ok(`reconnexion : synchronisation ${mesures.synchro}, UNE ligne « ${NOM} » côté serveur (${mesures.reconnexion_vers_push_ms} ms)`);
-  await page.mouse.click(909, 32); await pause(1500); await page.mouse.click(777, 597); await pause(6000); await page.mouse.click(518, 597); await pause(500); // une synchro de plus ne doit rien dupliquer
+  ok(`reconnexion : synchronisation ${mesures.synchro}, UNE ligne « ${NOM} » côté serveur (envoi en ${mesures.reconnexion_vers_push_ms} ms, tout synchronisé en ${mesures.reconnexion_vers_synchronise_ms} ms)`);
+  // La vente de caisse : UNE vente, stock et trésorerie mis à jour PAR LE SERVEUR
+  const apres = () => ({
+    ventes: Number(sql("select count(*) from sales")),
+    stock: Number(sql("select stock_qty from products where sku='EQP-001'")),
+    caisse: Number(sql("select balance from treasury_accounts where label='Caisse Principale'")),
+    mouvements: Number(sql("select count(*) from stock_movements")),
+  });
+  const a1 = apres();
+  assert.equal(a1.ventes, avant.ventes + 1, 'exactement UNE vente de plus côté serveur');
+  assert.equal(a1.stock, avant.stock - 1, 'stock décrémenté par le serveur');
+  assert.ok(Math.abs(a1.caisse - (avant.caisse + 25000)) < 0.01, `trésorerie créditée de 25 000 (avant ${avant.caisse}, après ${a1.caisse})`);
+  assert.ok(a1.mouvements >= avant.mouvements + 1, 'un mouvement de stock écrit par le serveur');
+  mesures.vente_hors_ligne = { avant, apres: a1 };
+  ok(`vente de caisse hors ligne synchronisée : ventes ${avant.ventes} → ${a1.ventes}, stock ${avant.stock} → ${a1.stock}, Caisse Principale ${avant.caisse} → ${a1.caisse}`);
+  await capture(page, '7f_apres_synchronisation_vente.png');
+  await page.mouse.click(909, 32); await pause(1500); await page.mouse.click(777, 597); await pause(8000); await page.mouse.click(518, 597); await pause(500); // une synchro de plus ne doit rien dupliquer
   assert.equal(sql(`select count(*) from suppliers where name='${NOM}'`), '1', 'toujours UNE ligne');
-  ok('une synchronisation supplémentaire ne crée aucun doublon');
+  assert.deepEqual(apres(), a1, 'un second « synchroniser » ne double ni la vente, ni le stock, ni la trésorerie');
+  ok('une synchronisation supplémentaire ne double rien (vente, stock, trésorerie, fournisseur)');
+
+  // ─── 5b. Retour de focus de l'onglet (visibilitychange) : anti-rebond de 30 s, puis nouvelle synchronisation ───
+  // Chromium sans fenêtre ne change pas la visibilité : l'événement est émis à la main (la même écoute que le vrai).
+  const focus = () => page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await pause(32000); // > 30 s depuis la dernière tentative automatique
+  const p0 = pulls;
+  await focus();
+  for (let i = 0; i < 60 && pulls === p0; i++) await pause(500);
+  assert.ok(pulls > p0, 'retour de focus après plus de 30 s : une synchronisation part');
+  ok('retour de focus après plus de 30 s : une synchronisation automatique part (pull puis push)');
+  await pause(15000); // laisse finir le tirage (plusieurs pages)
+  const p1 = pulls;
+  await focus(); await pause(4000);
+  assert.equal(pulls, p1, 'retour de focus moins de 30 s après cette synchronisation : anti-rebond, aucun tirage');
+  ok('retour de focus moins de 30 s après une synchronisation : retenu par l\'anti-rebond');
 
   // ─── 6. Fermeture / réouverture du navigateur ───
   await contexte.close();

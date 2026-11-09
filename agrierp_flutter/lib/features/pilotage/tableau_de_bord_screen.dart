@@ -37,6 +37,7 @@ class TableauDeBordScreen extends StatefulWidget {
     this.onOuvrir,
     this.onOuvrirEtat,
     this.nomUtilisateur = 'M. Olouchègoun',
+    this.finDeTirage,
   });
 
   final TableauDeBordRepository depot;
@@ -51,6 +52,10 @@ class TableauDeBordScreen extends StatefulWidget {
   /// `/rapports-exports?tab=…&startDate=…&endDate=…`). Sans lui, le bouton ouvre l'écran par [onOuvrir], sans période.
   final void Function(EcranPoste ecran, PeriodeDemandee periode)? onOuvrirEtat;
   final String nomUtilisateur;
+
+  /// PWA-2b — notifié à la FIN d'un tirage (synchronisation) : le tableau affiché pendant le tirage se relit SEUL, sans
+  /// changer d'écran ni perdre l'état saisi (période, état choisi, onglet). `null` : aucun rafraîchissement automatique.
+  final Listenable? finDeTirage;
 
   /// Onglet de Rapports & Exports (libellé du poste) que l'adresse web [lien] vise par `?tab=` ; `null` : aucun.
   static String? ongletDuLien(String lien) {
@@ -103,11 +108,32 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
   @override
   void initState() {
     super.initState();
+    widget.finDeTirage?.addListener(_surFinDeTirage);
     _charger();
   }
 
-  Future<void> _charger() async {
-    setState(() => _chargement = true);
+  @override
+  void didUpdateWidget(TableauDeBordScreen ancien) {
+    super.didUpdateWidget(ancien);
+    if (ancien.finDeTirage != widget.finDeTirage) {
+      ancien.finDeTirage?.removeListener(_surFinDeTirage);
+      widget.finDeTirage?.addListener(_surFinDeTirage);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.finDeTirage?.removeListener(_surFinDeTirage);
+    super.dispose();
+  }
+
+  /// Relecture silencieuse (pas de roue d'attente : l'écran reste affiché pendant la lecture).
+  void _surFinDeTirage() {
+    if (mounted) _charger(silencieux: true);
+  }
+
+  Future<void> _charger({bool silencieux = false}) async {
+    if (!silencieux) setState(() => _chargement = true);
     final donnees = await widget.depot.charger();
     if (!mounted) return;
     final defaut = PorteeExerciceChoisi.lire(context)?.periodeParDefaut(_jour(donnees.debutPeriode), _jour(donnees.finPeriode)) ??

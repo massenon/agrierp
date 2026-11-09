@@ -14,7 +14,6 @@ import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/systeme/justificatif_local.dart';
-import '../../core/systeme/plateforme_poste.dart';
 import '../stocks/produits_repository.dart';
 import 'achats_creation_rapide.dart';
 import 'achats_modales.dart';
@@ -1077,12 +1076,13 @@ class _AchatsCommandesScreenState extends State<AchatsCommandesScreen> {
       return InkWell(
         key: const Key('achat-recu-choisir'),
         onTap: () async {
-          if (PlateformePoste.navigateur) {
-            ToastAgri.afficher(context, motifJustificatifNavigateur, type: TypeToast.erreur);
-            return;
-          }
           final choisi = await widget.choisirJustificatif();
-          if (choisi != null && mounted) setState(() => _justificatif = choisi);
+          if (!mounted) return;
+          if (choisi != null) {
+            setState(() => _justificatif = choisi);
+          } else if (dernierRefusJustificatif != null) {
+            ToastAgri.afficher(context, dernierRefusJustificatif!, type: TypeToast.erreur);
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(AgriSpacing.md),

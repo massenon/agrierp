@@ -11,7 +11,9 @@ import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visible
 import '../config/fichiers_entreprise.dart';
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import '../systeme/justificatifs_navigateur.dart';
 import '../systeme/plateforme_poste.dart';
+import '../systeme/verrou_onglets.dart';
 import '../temps/heure_benin.dart';
 import 'fusion_referentiels.dart';
 import 'perimetre_tirage.dart';
@@ -264,8 +266,13 @@ class SyncEngine {
   /// inactivité attend sa fin au lieu de l'interrompre.
   bool get enCours => _tentativeEnCours != null;
 
+  /// PWA-2b — UNE synchronisation à la fois, TOUS ONGLETS confondus (verrou `navigator.locks` au navigateur ; aucun verrou au natif).
+  /// Remplaçable en test.
+  @visibleForTesting
+  static Future<SyncOutcome> Function(Future<SyncOutcome> Function() action) verrouEntreOnglets = sousVerrouEntreOnglets<SyncOutcome>;
+
   Future<SyncOutcome> synchroniser() => _tentativeEnCours ??=
-      _synchroniserUneFois().whenComplete(() => _tentativeEnCours = null);
+      verrouEntreOnglets(_synchroniserUneFois).whenComplete(() => _tentativeEnCours = null);
 
   Future<SyncOutcome> _synchroniserUneFois() async {
     if (!await estEnLigne()) {
@@ -633,7 +640,6 @@ class SyncEngine {
     String? jeton;
 
     for (var page = 1; ; page++) {
-      final swR = Stopwatch()..start();
       final reponse = await _client.get<Map<String, dynamic>>(
         '/api/sync/pull',
         queryParameters: {
@@ -643,8 +649,6 @@ class SyncEngine {
         },
       );
 
-      // ignore: avoid_print
-      print('BENCH reseau+decode page $page: ${swR.elapsedMilliseconds} ms since=$since');
       corps = reponse.data ?? const <String, dynamic>{};
       pagine = corps.containsKey('page_suivante');
       final servies = PerimetreTirage.depuisReponse(corps);
@@ -698,12 +702,9 @@ class SyncEngine {
       cles.addAll(corps.keys);
 
       final aAbsorber = corps;
-      final swA = Stopwatch()..start();
       await _db.transaction(() async {
         recus += await _absorberPage(aAbsorber);
       });
-      // ignore: avoid_print
-      print('BENCH absorber page $page: ${swA.elapsedMilliseconds} ms lignes=$recus');
 
       final suivante = corps['page_suivante'];
       if (!pagine || suivante == null) break;
@@ -831,74 +832,6 @@ class SyncEngine {
   /// Ticket S-T4 — une page du tirage, absorbée table par table dans l'ordre des dépendances (l'appelant
   /// l'enveloppe dans UNE transaction). Une clé ABSENTE (table non servie à ce compte, ou pas sur cette page) ne
   /// touche à rien : chaque absorbeur l'ignore.
-  Future<int> _absorberCategories(Object? a,[Object? b,Object? c]) => _m('_absorberCategories',()=>_absorberCategories_o(a));
-  Future<int> _absorberProduits(Object? a,[Object? b,Object? c]) => _m('_absorberProduits',()=>_absorberProduits_o(a));
-  Future<int> _absorberBandes(Object? a,[Object? b,Object? c]) => _m('_absorberBandes',()=>_absorberBandes_o(a));
-  Future<int> _absorberTransferts(Object? a,[Object? b,Object? c]) => _m('_absorberTransferts',()=>_absorberTransferts_o(a));
-  Future<int> _absorberTransformations(Object? a,[Object? b,Object? c]) => _m('_absorberTransformations',()=>_absorberTransformations_o(a));
-  Future<int> _absorberInfirmerie(Object? a,[Object? b,Object? c]) => _m('_absorberInfirmerie',()=>_absorberInfirmerie_o(a));
-  Future<int> _absorberCalendrierVeterinaire(Object? a,[Object? b,Object? c]) => _m('_absorberCalendrierVeterinaire',()=>_absorberCalendrierVeterinaire_o(a));
-  Future<int> _absorberFichesJournalieres(Object? a,[Object? b,Object? c]) => _m('_absorberFichesJournalieres',()=>_absorberFichesJournalieres_o(a));
-  Future<int> _absorberProvendes(Object? a,[Object? b,Object? c]) => _m('_absorberProvendes',()=>_absorberProvendes_o(a));
-  Future<int> _absorberNumerotation(Object? a,[Object? b,Object? c]) => _m('_absorberNumerotation',()=>_absorberNumerotation_o(a));
-  Future<int> _absorberRations(Object? a,[Object? b,Object? c]) => _m('_absorberRations',()=>_absorberRations_o(a));
-  Future<int> _absorberReleves(Object? a,[Object? b,Object? c]) => _m('_absorberReleves',()=>_absorberReleves_o(a));
-  Future<int> _absorberObjectifsCroissance(Object? a,[Object? b,Object? c]) => _m('_absorberObjectifsCroissance',()=>_absorberObjectifsCroissance_o(a));
-  Future<int> _absorberProphylaxie(Object? a,[Object? b,Object? c]) => _m('_absorberProphylaxie',()=>_absorberProphylaxie_o(a));
-  Future<int> _absorberRemanences(Object? a,[Object? b,Object? c]) => _m('_absorberRemanences',()=>_absorberRemanences_o(a));
-  Future<int> _absorberReproduction(Object? a,[Object? b,Object? c]) => _m('_absorberReproduction',()=>_absorberReproduction_o(a));
-  Future<int> _absorberClients(Object? a,[Object? b,Object? c]) => _m('_absorberClients',()=>_absorberClients_o(a));
-  Future<int> _absorberCreances(Object? a,[Object? b,Object? c]) => _m('_absorberCreances',()=>_absorberCreances_o(a));
-  Future<int> _absorberAvances(Object? a,[Object? b,Object? c]) => _m('_absorberAvances',()=>_absorberAvances_o(a));
-  Future<int> _absorberFournisseurs(Object? a,[Object? b,Object? c]) => _m('_absorberFournisseurs',()=>_absorberFournisseurs_o(a));
-  Future<int> _absorberPlanComptable(Object? a,[Object? b,Object? c]) => _m('_absorberPlanComptable',()=>_absorberPlanComptable_o(a));
-  Future<int> _absorberImmobilisations(Object? a,[Object? b,Object? c]) => _m('_absorberImmobilisations',()=>_absorberImmobilisations_o(a));
-  Future<int> _absorberExercices(Object? a,[Object? b,Object? c]) => _m('_absorberExercices',()=>_absorberExercices_o(a));
-  Future<int> _absorberClotures(Object? a,[Object? b,Object? c]) => _m('_absorberClotures',()=>_absorberClotures_o(a));
-  Future<int> _absorberJournal(Object? a,[Object? b,Object? c]) => _m('_absorberJournal',()=>_absorberJournal_o(a,b,c));
-  Future<int> _absorberEntreprise(Object? a,[Object? b,Object? c]) => _m('_absorberEntreprise',()=>_absorberEntreprise_o(a));
-  Future<int> _absorberModules(Object? a,[Object? b,Object? c]) => _m('_absorberModules',()=>_absorberModules_o(a));
-  Future<int> _absorberRoles(Object? a,[Object? b,Object? c]) => _m('_absorberRoles',()=>_absorberRoles_o(a));
-  Future<int> _absorberRelevesBancaires(Object? a,[Object? b,Object? c]) => _m('_absorberRelevesBancaires',()=>_absorberRelevesBancaires_o(a));
-  Future<int> _absorberDroits(Object? a,[Object? b,Object? c]) => _m('_absorberDroits',()=>_absorberDroits_o(a));
-  Future<int> _absorberUtilisateurs(Object? a,[Object? b,Object? c]) => _m('_absorberUtilisateurs',()=>_absorberUtilisateurs_o(a));
-  Future<int> _absorberAudit(Object? a,[Object? b,Object? c]) => _m('_absorberAudit',()=>_absorberAudit_o(a));
-  Future<int> _absorberNotifications(Object? a,[Object? b,Object? c]) => _m('_absorberNotifications',()=>_absorberNotifications_o(a));
-  Future<int> _absorberRevenusDeBande(Object? a,[Object? b,Object? c]) => _m('_absorberRevenusDeBande',()=>_absorberRevenusDeBande_o(a));
-  Future<int> _absorberEspeces(Object? a,[Object? b,Object? c]) => _m('_absorberEspeces',()=>_absorberEspeces_o(a));
-  Future<int> _absorberSujets(Object? a,[Object? b,Object? c]) => _m('_absorberSujets',()=>_absorberSujets_o(a));
-  Future<int> _absorberModelesAttestation(Object? a,[Object? b,Object? c]) => _m('_absorberModelesAttestation',()=>_absorberModelesAttestation_o(a));
-  Future<int> _absorberCompteursAttestation(Object? a,[Object? b,Object? c]) => _m('_absorberCompteursAttestation',()=>_absorberCompteursAttestation_o(a));
-  Future<int> _absorberCourriers(Object? a,[Object? b,Object? c]) => _m('_absorberCourriers',()=>_absorberCourriers_o(a));
-  Future<int> _absorberDocuments(Object? a,[Object? b,Object? c]) => _m('_absorberDocuments',()=>_absorberDocuments_o(a));
-  Future<int> _absorberArchives(Object? a,[Object? b,Object? c]) => _m('_absorberArchives',()=>_absorberArchives_o(a));
-  Future<int> _absorberEmployes(Object? a,[Object? b,Object? c]) => _m('_absorberEmployes',()=>_absorberEmployes_o(a));
-  Future<int> _absorberStagiaires(Object? a,[Object? b,Object? c]) => _m('_absorberStagiaires',()=>_absorberStagiaires_o(a));
-  Future<int> _absorberAbsencesStagiaires(Object? a,[Object? b,Object? c]) => _m('_absorberAbsencesStagiaires',()=>_absorberAbsencesStagiaires_o(a));
-  Future<int> _absorberBaremeIts(Object? a,[Object? b,Object? c]) => _m('_absorberBaremeIts',()=>_absorberBaremeIts_o(a));
-  Future<int> _absorberPointages(Object? a,[Object? b,Object? c]) => _m('_absorberPointages',()=>_absorberPointages_o(a));
-  Future<int> _absorberVentes(Object? a,[Object? b,Object? c]) => _m('_absorberVentes',()=>_absorberVentes_o(a));
-  Future<int> _absorberLignesDeVente(Object? a,[Object? b,Object? c]) => _m('_absorberLignesDeVente',()=>_absorberLignesDeVente_o(a,b));
-  Future<int> _absorberLignesDAchat(Object? a,[Object? b,Object? c]) => _m('_absorberLignesDAchat',()=>_absorberLignesDAchat_o(a,b));
-  Future<int> _absorberMouvementsStock(Object? a,[Object? b,Object? c]) => _m('_absorberMouvementsStock',()=>_absorberMouvementsStock_o(a));
-  Future<int> _absorberRetoursDAchat(Object? a,[Object? b,Object? c]) => _m('_absorberRetoursDAchat',()=>_absorberRetoursDAchat_o(a,b));
-  Future<int> _absorberDettes(Object? a,[Object? b,Object? c]) => _m('_absorberDettes',()=>_absorberDettes_o(a));
-  Future<int> _absorberBonsCommande(Object? a,[Object? b,Object? c]) => _m('_absorberBonsCommande',()=>_absorberBonsCommande_o(a));
-  Future<int> _absorberAchats(Object? a,[Object? b,Object? c]) => _m('_absorberAchats',()=>_absorberAchats_o(a));
-  Future<int> _absorberCreancesFournisseurs(Object? a,[Object? b,Object? c]) => _m('_absorberCreancesFournisseurs',()=>_absorberCreancesFournisseurs_o(a));
-  Future<int> _absorberRelances(Object? a,[Object? b,Object? c]) => _m('_absorberRelances',()=>_absorberRelances_o(a));
-  Future<int> _absorberComptesTresorerie(Object? a,[Object? b,Object? c]) => _m('_absorberComptesTresorerie',()=>_absorberComptesTresorerie_o(a));
-  Future<int> _absorberCategoriesDepense(Object? a,[Object? b,Object? c]) => _m('_absorberCategoriesDepense',()=>_absorberCategoriesDepense_o(a));
-  Future<int> _absorberDepenses(Object? a,[Object? b,Object? c]) => _m('_absorberDepenses',()=>_absorberDepenses_o(a,b));
-  Future<int> _absorberCentresDeCout(Object? a,[Object? b,Object? c]) => _m('_absorberCentresDeCout',()=>_absorberCentresDeCout_o(a));
-  Future<int> _absorberAvoirs(Object? a,[Object? b,Object? c]) => _m('_absorberAvoirs',()=>_absorberAvoirs_o(a));
-  Future<int> _absorberCorbeille(Object? a,[Object? b,Object? c]) => _m('_absorberCorbeille',()=>_absorberCorbeille_o(a));
-  Future<int> _absorberDevis(Object? a,[Object? b,Object? c]) => _m('_absorberDevis',()=>_absorberDevis_o(a));
-  Future<int> _absorberPaie(Object? a,[Object? b,Object? c]) => _m('_absorberPaie',()=>_absorberPaie_o(a));
-  Future<int> _absorberSoins(Object? a,[Object? b,Object? c]) => _m('_absorberSoins',()=>_absorberSoins_o(a));
-  static final Map<String,int> mesuresUs = {};
-  static final Map<String,int> mesuresN = {};
-  Future<int> _m(String n, Future<int> Function() f) async { final sw=Stopwatch()..start(); final r=await f(); mesuresUs[n]=(mesuresUs[n]??0)+sw.elapsedMicroseconds; mesuresN[n]=(mesuresN[n]??0)+r; if (sw.elapsedMilliseconds>40) { print('BENCH absorbeur $n ${sw.elapsedMilliseconds} ms ($r lignes)'); } return r; }
   Future<int> _absorberPage(Map<String, dynamic> corps) async {
     var recus = 0;
 
@@ -1013,7 +946,7 @@ class SyncEngine {
     return recus;
   }
 
-  Future<int> _absorberCategories_o(Object? brut) async {
+  Future<int> _absorberCategories(Object? brut) async {
     final lignes = _lignes(brut);
 
     await _db.batch((b) {
@@ -1054,7 +987,7 @@ class SyncEngine {
     return lignes.length;
   }
 
-  Future<int> _absorberProduits_o(Object? brut) async {
+  Future<int> _absorberProduits(Object? brut) async {
     final lignes = _lignes(brut);
 
     // ⚠️⚠️ UN PRODUIT `pending` OU `conflict` N'EST PAS ÉCRASÉ PAR LE TIRAGE : il
@@ -1116,7 +1049,7 @@ class SyncEngine {
   /// (`synced`) prend la dernière version du serveur (cascade des fiches, modification ou archivage au web).
   ///
   /// Les clés facultatives absentes (serveur antérieur) laissent la valeur locale.
-  Future<int> _absorberBandes_o(Object? brut) async {
+  Future<int> _absorberBandes(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Bande';
@@ -1186,7 +1119,7 @@ class SyncEngine {
   /// Ticket 15.46 — transferts entre bandes, FUSIONNÉS par identifiant. Un transfert `pending` ou en
   /// `conflict` (créé ou annulé sur ce poste, pas encore acquitté) n'est jamais écrasé. Strict : un élément
   /// illisible ou une bande inconnue refuse le lot entier (le curseur n'avance pas).
-  Future<int> _absorberTransferts_o(Object? brut) async {
+  Future<int> _absorberTransferts(Object? brut) async {
     if (brut == null) return 0;
     final lignes = _lignes(brut);
     if (lignes.isEmpty) return 0;
@@ -1263,7 +1196,7 @@ class SyncEngine {
   /// TOUT le tirage (le curseur n'avance pas). Une transformation `pending` / `conflict` (saisie ici, pas encore acquittée)
   /// n'est JAMAIS écrasée. Une bande ou un produit inconnu du poste n'est pas un refus : c'est un historique (la bande a pu
   /// être archivée côté serveur), l'écran écrit alors « — » comme le web sans relation.
-  Future<int> _absorberTransformations_o(Object? brut) async {
+  Future<int> _absorberTransformations(Object? brut) async {
     if (brut == null) return 0;
     final lignes = _lignes(brut);
     if (lignes.isEmpty) return 0;
@@ -1314,7 +1247,7 @@ class SyncEngine {
   /// effacerait une réintégration saisie hors ligne. Un élément illisible (identifiant, bande, motif, date),
   /// un statut hors de l'enum du serveur (`en_cours`, `reintegre`, `deces`) ou une bande inconnue du poste
   /// refuse le lot entier ([FormatException], rien n'est écrit, le curseur n'avance pas).
-  Future<int> _absorberInfirmerie_o(Object? brut) async {
+  Future<int> _absorberInfirmerie(Object? brut) async {
     if (brut == null) return 0;
     final lignes = _lignes(brut);
     if (lignes.isEmpty) return 0;
@@ -1388,7 +1321,7 @@ class SyncEngine {
   /// ⚠️⚠️ **STRICT**, même règle que [_absorberInfirmerie] : une intervention planifiée ou confirmée sur ce
   /// poste (`pending`, `conflict`) n'est jamais écrasée ; statut hors de l'enum du serveur (`planned`, `done`,
   /// `late`, `inprogress`), élément illisible ou bande inconnue → [FormatException], rien n'est écrit.
-  Future<int> _absorberCalendrierVeterinaire_o(Object? brut) async {
+  Future<int> _absorberCalendrierVeterinaire(Object? brut) async {
     if (brut == null) return 0;
     final lignes = _lignes(brut);
     if (lignes.isEmpty) return 0;
@@ -1489,7 +1422,7 @@ class SyncEngine {
   ///
   /// ⚠️ COLONNE DU SERVEUR TOUJOURS NON PORTÉE : `feed_product_id`. Le poste n'envoie aucune de ces six colonnes :
   /// `fill()` du serveur ne réécrit que les clés reçues, elles y restent intactes.
-  Future<int> _absorberFichesJournalieres_o(Object? brut) async {
+  Future<int> _absorberFichesJournalieres(Object? brut) async {
     if (brut == null) return 0;
     if (brut is! List) {
       throw const FormatException(
@@ -1927,7 +1860,7 @@ class SyncEngine {
   /// ⚠️ Avant H9b la table était vidée puis réécrite : un type créé au poste et pas encore acquitté aurait
   /// disparu au tirage suivant. Le libellé de l'espèce voyage avec le type (le poste n'a pas de table des
   /// espèces désactivées).
-  Future<int> _absorberProvendes_o(Object? brut) async {
+  Future<int> _absorberProvendes(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignesStrictes(brut, 'Type de provende');
@@ -1989,7 +1922,7 @@ class SyncEngine {
   ///
   /// Ticket H9b — STRICTE (un format qui n'est pas un texte refuse la ligne) et PROTÉGÉE (des formats
   /// enregistrés au poste et pas encore acquittés ne sont pas écrasés).
-  Future<int> _absorberNumerotation_o(Object? brut) async {
+  Future<int> _absorberNumerotation(Object? brut) async {
     if (brut == null) return 0;
     if (brut is! Map) {
       throw FormatException('Numérotation refusée : objet attendu ($brut).');
@@ -2034,7 +1967,7 @@ class SyncEngine {
   ///
   /// 🔴→✅ Avant H9b, une ration ARCHIVÉE sur le web (ticket 14.55 : elle ne descend plus) restait active sur
   /// le poste pour toujours — l'absorbeur ne faisait qu'ajouter. Elle s'archive désormais ici aussi.
-  Future<int> _absorberRations_o(Object? brut) async {
+  Future<int> _absorberRations(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignesStrictes(brut, 'Ration');
@@ -2084,7 +2017,7 @@ class SyncEngine {
   /// `a_valider` | `valide`, des valeurs qui ne sont pas un objet ou un `is_active` illisible refusent TOUT le tirage
   /// (rien n'est écrit, le curseur n'avance pas). Une ligne `pending` / `conflict` (saisie ou validée ici, pas encore
   /// acquittée) n'est JAMAIS écrasée : une validation faite hors ligne ne revient pas à « À valider » au tirage.
-  Future<int> _absorberReleves_o(Object? brut) async {
+  Future<int> _absorberReleves(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignesStrictes(brut, 'Relevé de terrain');
@@ -2154,7 +2087,7 @@ class SyncEngine {
   ///
   /// Une réponse SANS la clé (serveur antérieur à U2) ne touche à rien ; une liste VIDE est une réponse : aucun
   /// barème, les cartes disent « Objectif : — ».
-  Future<int> _absorberObjectifsCroissance_o(Object? brut) async {
+  Future<int> _absorberObjectifsCroissance(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Objectif de croissance';
@@ -2220,7 +2153,7 @@ class SyncEngine {
   /// ⚠️ Les bornes de cycle ABSENTES restent NULLES, JAMAIS ZÉRO : le serveur les laisse vides pour les
   /// entrées calendaires (« Le 1er du mois ») dont la base de calcul n'est pas le jour de cycle. Les remplacer
   /// par 0 les rendrait dues au premier jour de chaque bande. `created_at` sert au tri du web (H9).
-  Future<int> _absorberProphylaxie_o(Object? brut) async {
+  Future<int> _absorberProphylaxie(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignesStrictes(brut, 'Échéance de prophylaxie');
@@ -2302,7 +2235,7 @@ class SyncEngine {
   ///
   /// ⚠️ Une réponse SANS la clé laisse l'existant intact plutôt que de tout
   /// effacer : un serveur plus ancien ne doit pas lever un blocage sanitaire.
-  Future<int> _absorberRemanences_o(Object? brut) async {
+  Future<int> _absorberRemanences(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2335,7 +2268,7 @@ class SyncEngine {
   /// Vider la table avant d'insérer effacerait donc tout l'historique clos dès
   /// le premier tirage incrémental — l'écran perdrait ses mises bas passées
   /// sans que rien ne le signale.
-  Future<int> _absorberReproduction_o(Object? brut) async {
+  Future<int> _absorberReproduction(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2393,7 +2326,7 @@ class SyncEngine {
   ///
   /// ⚠️ Une fiche `pending` ou `conflict` n'existe (ou n'a changé) que sur ce poste : le
   /// tirage ne l'écrase jamais.
-  Future<int> _absorberClients_o(Object? brut) async {
+  Future<int> _absorberClients(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2444,7 +2377,7 @@ class SyncEngine {
   /// `since`.** Une créance soldée entre deux tirages arrive donc UNE fois (soldée, parce
   /// qu'elle a changé), puis cesse d'être servie : elle est alors supprimée. La laisser
   /// à l'encours du poste ferait relancer un débiteur pour une facture déjà payée.
-  Future<int> _absorberCreances_o(Object? brut) async {
+  Future<int> _absorberCreances(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2484,7 +2417,7 @@ class SyncEngine {
   /// ⚠️ **LE SERVEUR SERT LES AVANCES ACTIVES SANS FILTRE `since`** (`SyncController`) :
   /// une avance `synced` absente du tirage a donc été archivée côté serveur — elle est
   /// supprimée. `amount_used` vient toujours du serveur, jamais du poste.
-  Future<int> _absorberAvances_o(Object? brut) async {
+  Future<int> _absorberAvances(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2539,7 +2472,7 @@ class SyncEngine {
   /// ⚠️ **REMPLACEMENT COMPLET.** Un fournisseur archivé côté serveur disparaît
   /// du tirage : le garder proposerait à l'acheteur un partenaire que le
   /// serveur refuserait à l'envoi, sans qu'il comprenne pourquoi.
-  Future<int> _absorberFournisseurs_o(Object? brut) async {
+  Future<int> _absorberFournisseurs(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2587,7 +2520,7 @@ class SyncEngine {
   /// ⚠️⚠️ **UN COMPTE `pending` / `conflict` N'EST JAMAIS ÉCRASÉ NI RETIRÉ** : créé, modifié ou archivé au poste, il n'est pas
   /// encore connu du serveur. Les comptes ACQUITTÉS sont remplacés par ce que sert le serveur (qui ne sert que les comptes
   /// actifs) ; ceux qu'il ne sert plus (archivés ailleurs) sont retirés, comme avant.
-  Future<int> _absorberPlanComptable_o(Object? brut) async {
+  Future<int> _absorberPlanComptable(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2610,18 +2543,24 @@ class SyncEngine {
         await (_db.delete(_db.chartOfAccounts)..where((t) => t.id.isIn(disparus))).go();
       }
 
-      for (final l in lignes) {
-        final id = l['id'] as String;
-        final statut = locaux[id];
-        if (statut != null && statut != SyncStatus.synced) continue;
-        final compte = ChartOfAccountsCompanion.insert(
-          id: id,
-          code: (l['code'] ?? '') as String,
-          label: (l['label'] ?? '') as String,
-          accountClass: Value(_entier(l['class'])),
-        );
-        await _db.into(_db.chartOfAccounts).insert(compte, onConflict: DoUpdate((_) => compte));
-      }
+      // PWA-2b — UNE rafale `batch` (un seul aller-retour vers le moteur SQLite) au lieu d'un `await insert` par compte :
+      // sur le navigateur chaque instruction attendue est un message vers le worker (≈ 55 ms) — 1 337 comptes = 73 s
+      // mesurés (la table est servie en entier à chaque tirage, y compris incrémental). Sémantique inchangée : un
+      // compte `pending` / `conflict` n'est jamais écrasé.
+      await _db.batch((b) {
+        for (final l in lignes) {
+          final id = l['id'] as String;
+          final statut = locaux[id];
+          if (statut != null && statut != SyncStatus.synced) continue;
+          final compte = ChartOfAccountsCompanion.insert(
+            id: id,
+            code: (l['code'] ?? '') as String,
+            label: (l['label'] ?? '') as String,
+            accountClass: Value(_entier(l['class'])),
+          );
+          b.insert(_db.chartOfAccounts, compte, onConflict: DoUpdate((_) => compte));
+        }
+      });
     });
 
     return lignes.length;
@@ -2630,7 +2569,7 @@ class SyncEngine {
   /// Ticket CP-3 — registre des immobilisations du serveur (table MIXTE). STRICT : un identifiant servi deux fois refuse TOUT
   /// le tirage. Un bien `pending` / `conflict` n'est jamais écrasé ; un bien acquitté qui n'est plus servi (réinitialisation)
   /// disparaît.
-  Future<int> _absorberImmobilisations_o(Object? brut) async {
+  Future<int> _absorberImmobilisations(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2679,7 +2618,7 @@ class SyncEngine {
   }
 
   /// Exercices comptables — référentiel remplacé à chaque tirage.
-  Future<int> _absorberExercices_o(Object? brut) async {
+  Future<int> _absorberExercices(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2709,7 +2648,7 @@ class SyncEngine {
   }
 
   /// Ticket CP-4 — clôtures de mois : référentiel remplacé à chaque tirage (les demandes en attente restent dans leur table).
-  Future<int> _absorberClotures_o(Object? brut) async {
+  Future<int> _absorberClotures(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -2774,7 +2713,7 @@ class SyncEngine {
   /// n'est pas servie, écriture servie mais absente des actives). Le curseur n'avance pas ; le prochain
   /// tirage repart du même point. Un montant absent n'est jamais lu comme 0, une date illisible jamais
   /// remplacée par « aujourd'hui ».
-  Future<int> _absorberJournal_o(
+  Future<int> _absorberJournal(
     Object? ecrituresBrut,
     Object? idsActifsBrut,
     Object? lignesBrut,
@@ -3037,7 +2976,7 @@ class SyncEngine {
   /// ([FormatException], rien n'est écrit). ⚠️ Un délai réglé sur ce poste et pas encore acquitté (`pending`,
   /// `conflict`) n'est JAMAIS écrasé ; l'identité de la ferme, elle, se met à jour. Clé absente (serveur
   /// antérieur à H9b) : le délai local est laissé tel quel.
-  Future<int> _absorberEntreprise_o(Object? brut) async {
+  Future<int> _absorberEntreprise(Object? brut) async {
     if (brut is! Map) return 0;
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
@@ -3126,7 +3065,7 @@ class SyncEngine {
   /// ⚠️⚠️ **C'EST CE QUI DÉCIDE DES ESPÈCES VISIBLES.** Une ferme qui éteint
   /// l'héliciculture ne doit plus voir la fiche Escargots : la maquette masque
   /// les blocs `data-module`, le poste filtre ses cartes d'espèce.
-  Future<int> _absorberModules_o(Object? brut) async {
+  Future<int> _absorberModules(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3174,7 +3113,7 @@ class SyncEngine {
   }
 
   /// Rôles applicatifs — référentiel remplacé à chaque tirage.
-  Future<int> _absorberRoles_o(Object? brut) async {
+  Future<int> _absorberRoles(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3204,7 +3143,7 @@ class SyncEngine {
 
   /// Ticket CP-5 — lignes de relevé bancaire : référentiel remplacé à chaque tirage (les demandes d'import en attente restent
   /// dans leur table, jamais touchées).
-  Future<int> _absorberRelevesBancaires_o(Object? brut) async {
+  Future<int> _absorberRelevesBancaires(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3237,7 +3176,7 @@ class SyncEngine {
   }
 
   /// Ticket PA-2 — droits existants : référentiel remplacé à chaque tirage (clé servie au seul administrateur).
-  Future<int> _absorberDroits_o(Object? brut) async {
+  Future<int> _absorberDroits(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3259,7 +3198,7 @@ class SyncEngine {
 
   /// Utilisateurs — référentiel remplacé à chaque tirage.
   /// Ticket UT-1 — fusion STRICTE : un compte `pending` / `conflict` de ce poste n'est jamais écrasé par le tirage.
-  Future<int> _absorberUtilisateurs_o(Object? brut) async {
+  Future<int> _absorberUtilisateurs(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3292,7 +3231,7 @@ class SyncEngine {
   }
 
   /// Journal d'audit — les deux cents dernières actions (U14 : la liste du web), remplacées à chaque tirage.
-  Future<int> _absorberAudit_o(Object? brut) async {
+  Future<int> _absorberAudit(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3329,7 +3268,7 @@ class SyncEngine {
   ///
   /// ⚠️ **ABSORBEUR STRICT** : une ligne sans identifiant ou sans message est
   /// REFUSÉE (l'exception remonte), jamais comblée par un texte inventé.
-  Future<int> _absorberNotifications_o(Object? brut) async {
+  Future<int> _absorberNotifications(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3370,7 +3309,7 @@ class SyncEngine {
   /// elle, le poste ne distinguerait pas « aucune vente » de « revenus jamais
   /// reçus », et afficherait « aucune vente » juste après une mise à jour, avant
   /// la première synchronisation.
-  Future<int> _absorberRevenusDeBande_o(Object? brut) async {
+  Future<int> _absorberRevenusDeBande(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3411,7 +3350,7 @@ class SyncEngine {
   ///
   /// ⚠️ Un tirage sans ce bloc ne vide rien (serveur plus ancien). Une liste VIDE
   /// est une réponse : aucun module d'espèce n'est actif.
-  Future<int> _absorberEspeces_o(Object? brut) async {
+  Future<int> _absorberEspeces(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3446,7 +3385,7 @@ class SyncEngine {
   /// encore acquitté, ou refusé et en attente de correction) : le tirage précède toujours l'envoi. Les sujets acquittés
   /// (`synced`) sont remplacés par l'ensemble servi : un sujet absent du tirage disparaît, un sujet servi prend la dernière
   /// version du serveur.
-  Future<int> _absorberSujets_o(Object? brut) async {
+  Future<int> _absorberSujets(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Sujet';
@@ -3507,7 +3446,7 @@ class SyncEngine {
   /// ⚠️ Un tirage sans ce bloc ne vide rien (serveur plus ancien). Absorbeur
   /// STRICT : un modèle sans identifiant ou sans texte est refusé, jamais comblé
   /// par un texte inventé — un modèle fait foi sur un document officiel.
-  Future<int> _absorberModelesAttestation_o(Object? brut) async {
+  Future<int> _absorberModelesAttestation(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3556,7 +3495,7 @@ class SyncEngine {
   /// Le poste ne détient que les deux cents dernières lignes d'audit de la ferme : il
   /// ne peut pas recompter. Le serveur compte sur l'historique entier ; le poste
   /// garde ce nombre tel quel, dans `app_settings`.
-  Future<int> _absorberCompteursAttestation_o(Object? brut) async {
+  Future<int> _absorberCompteursAttestation(Object? brut) async {
     if (brut is! Map) return 0;
 
     var n = 0;
@@ -3596,7 +3535,7 @@ class SyncEngine {
   ///
   /// ⚠️ **STRICT** : une ligne sans identifiant, sans objet, de type inconnu ou de date
   /// illisible est REFUSÉE (la transaction entière est annulée) — jamais comblée.
-  Future<int> _absorberCourriers_o(Object? brut) async {
+  Future<int> _absorberCourriers(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3693,7 +3632,7 @@ class SyncEngine {
   /// vides, date absente ou illisible, statut hors {signe, en_attente} → REFUSÉ (la transaction
   /// entière est annulée), jamais comblé. Un type hors de la liste proposée (texte libre) est
   /// conservé tel quel.
-  Future<int> _absorberDocuments_o(Object? brut) async {
+  Future<int> _absorberDocuments(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3806,7 +3745,7 @@ class SyncEngine {
   /// ⚠️ **STRICT** : identifiant ≠ 36 caractères, titre ou catégorie absents ou vides, date
   /// d'archivage absente ou illisible, échéance illisible → REFUSÉ (la transaction entière
   /// est annulée), jamais comblé.
-  Future<int> _absorberArchives_o(Object? brut) async {
+  Future<int> _absorberArchives(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -3901,7 +3840,7 @@ class SyncEngine {
   /// ⚠️⚠️ **STRICT** comme les devis : identifiant invalide ou servi deux fois, nom absent → [FormatException], rien n'est
   /// écrit. Archivés compris (`is_active`) : un employé archivé au web cesse d'être pointable ici. Une ligne tirée garde
   /// `device_id = 'serveur'` ; un employé acquitté de CE poste garde son origine.
-  Future<int> _absorberEmployes_o(Object? brut) async {
+  Future<int> _absorberEmployes(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Employé';
@@ -3940,7 +3879,7 @@ class SyncEngine {
   }
 
   /// Stagiaires — table MIXTE depuis RH-2 (mêmes règles que [_absorberEmployes]).
-  Future<int> _absorberStagiaires_o(Object? brut) async {
+  Future<int> _absorberStagiaires(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Stagiaire';
@@ -3982,7 +3921,7 @@ class SyncEngine {
   }
 
   /// Ticket RH-2 — absences de stagiaire : table MIXTE, archivées comprises (`is_active`).
-  Future<int> _absorberAbsencesStagiaires_o(Object? brut) async {
+  Future<int> _absorberAbsencesStagiaires(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Absence de stagiaire';
@@ -4021,7 +3960,7 @@ class SyncEngine {
   }
 
   /// Ticket RH-4 — barème ITS (tranches actives) : référentiel remplacé à chaque tirage.
-  Future<int> _absorberBaremeIts_o(Object? brut) async {
+  Future<int> _absorberBaremeIts(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Tranche ITS';
@@ -4088,7 +4027,7 @@ class SyncEngine {
   /// ⚠️⚠️ **CE QUI N'EST PAS PARTI N'EST PAS ÉCRASÉ.** Le pointage de ce matin
   /// n'existe que sur ce poste : l'effacer perdrait la seule trace de la
   /// présence, et la paie du mois se calcule dessus.
-  Future<int> _absorberPointages_o(Object? brut) async {
+  Future<int> _absorberPointages(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4137,7 +4076,7 @@ class SyncEngine {
   /// retransmission réussie depuis le web touche `updated_at`, la facture
   /// redescend donc avec son nouveau statut. C'est la seule façon pour le poste
   /// d'apprendre qu'une transmission en erreur a été rattrapée.
-  Future<int> _absorberVentes_o(Object? brut) async {
+  Future<int> _absorberVentes(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4222,7 +4161,7 @@ class SyncEngine {
   ///    poste → [FormatException], rien n'est écrit, le curseur n'avance pas ;
   ///  - `manual_total_amount` est la source de vérité du montant ; `unit_price` est gardé tel que servi.
   /// Clé absente (serveur antérieur à U4) : rien n'est touché.
-  Future<int> _absorberLignesDeVente_o(Object? brutPieces, Object? brut) =>
+  Future<int> _absorberLignesDeVente(Object? brutPieces, Object? brut) =>
       _remplacerLignesDePieces<SaleLinesCompanion>(
         quoi: 'Ligne de vente',
         brutPieces: brutPieces,
@@ -4266,7 +4205,7 @@ class SyncEngine {
   /// Ticket U4 (D-U4) — LIGNES DES ACHATS servies par le tirage (`purchase_lines`). Mêmes règles que
   /// [_absorberLignesDeVente] : un achat `pending` ou en `conflict` garde ses lignes (elles partent avec lui à
   /// l'envoi). Elles rendent le PMP calculable au poste (`Product::computePmp()` : TOUTES les lignes d'achat).
-  Future<int> _absorberLignesDAchat_o(Object? brutPieces, Object? brut) =>
+  Future<int> _absorberLignesDAchat(Object? brutPieces, Object? brut) =>
       _remplacerLignesDePieces<PurchaseLinesCompanion>(
         quoi: "Ligne d'achat",
         brutPieces: brutPieces,
@@ -4317,7 +4256,7 @@ class SyncEngine {
   ///
   /// Clé absente (serveur antérieur à U9) : rien n'est touché. Les saisies EN ATTENTE du poste n'y sont jamais
   /// écrites : `JournalStocks` les ajoute à la lecture, et les retire dès que leur mouvement est redescendu.
-  Future<int> _absorberMouvementsStock_o(Object? brut) async {
+  Future<int> _absorberMouvementsStock(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Mouvement de stock';
@@ -4412,7 +4351,7 @@ class SyncEngine {
   ///    d'une demande locale `pending`/`conflict`, date illisible → [FormatException], rien n'est écrit, le
   ///    curseur n'avance pas.
   /// Clé absente (serveur antérieur à U8) : rien n'est touché.
-  Future<int> _absorberRetoursDAchat_o(Object? brutPieces, Object? brut) async {
+  Future<int> _absorberRetoursDAchat(Object? brutPieces, Object? brut) async {
     if (brut == null) return 0;
     final lignes = _lignes(brut);
     final servis = {
@@ -4595,7 +4534,7 @@ class SyncEngine {
   /// qui reste dû : une dette réglée entre deux tirages DISPARAÎT de la charge.
   /// La fusionner la laisserait éternellement à l'ardoise du poste — et la
   /// ferme croirait devoir une somme déjà payée.
-  Future<int> _absorberDettes_o(Object? brut) async {
+  Future<int> _absorberDettes(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4629,7 +4568,7 @@ class SyncEngine {
   /// ⚠️⚠️ **UN BON `pending` / `conflict` N'EST JAMAIS ÉCRASÉ** : il n'existe que sur ce poste (fournisseur appelé, livraison
   /// attendue) et le tirage ne le connaît pas encore. Les bons ACQUITTÉS sont remplacés par ce que sert le serveur — lignes
   /// comprises —, et ceux que le serveur ne sert plus (réinitialisation, base restaurée) sont retirés, comme avant.
-  Future<int> _absorberBonsCommande_o(Object? brut) async {
+  Future<int> _absorberBonsCommande(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4699,7 +4638,7 @@ class SyncEngine {
   ///
   /// Ticket U4 (D-U4) — les lignes descendent à part, avec leur pièce : voir
   /// [_absorberLignesDAchat]. Celles d'un achat local non acquitté restent intactes.
-  Future<int> _absorberAchats_o(Object? brut) async {
+  Future<int> _absorberAchats(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4753,7 +4692,7 @@ class SyncEngine {
   /// VIDE vide donc la table ; une clé ABSENTE (serveur plus ancien) ne touche à rien. La
   /// table n'a aucune écriture locale : rien de `pending` à protéger (les remboursements en
   /// attente vivent dans `supplier_refunds` et se déduisent à la lecture).
-  Future<int> _absorberCreancesFournisseurs_o(Object? brut) async {
+  Future<int> _absorberCreancesFournisseurs(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4785,7 +4724,7 @@ class SyncEngine {
   /// la plus visible pour un client, et la seule qu'il raconte.
   /// Ticket VC-2 — fusion STRICTE : une relance `pending` / `conflict` de ce poste n'est jamais écrasée par le tirage ;
   /// ce que le serveur sert (toutes les relances de la ferme, web compris) est fusionné par identifiant.
-  Future<int> _absorberRelances_o(Object? brut) async {
+  Future<int> _absorberRelances(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4821,7 +4760,7 @@ class SyncEngine {
   /// ⚠️ REMPLACEMENT COMPLET, PAS UNE FUSION. Un compte cloture cote serveur
   /// disparait du tirage : le garder proposerait un payeur qui n'existe plus,
   /// et la depense serait rejetee a l'envoi sans que l'animalier comprenne.
-  Future<int> _absorberComptesTresorerie_o(Object? brut) async {
+  Future<int> _absorberComptesTresorerie(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -4859,7 +4798,7 @@ class SyncEngine {
   /// ⚠️ MEME RAISON : la liste vit cote serveur (`Expense::CATEGORIES`) et un
   /// compte retire doit disparaitre du poste, sinon la depense part vers une
   /// imputation refusee.
-  Future<int> _absorberCategoriesDepense_o(Object? brut) async {
+  Future<int> _absorberCategoriesDepense(Object? brut) async {
     if (brut is! List) return 0;
 
     final libelles = brut.whereType<String>().toList();
@@ -4896,7 +4835,7 @@ class SyncEngine {
   /// refusée et en attente de correction) : le tirage précède toujours l'envoi. Une dépense acquittée (`synced`) prend
   /// la dernière version du serveur (modification ou archivage au web) et garde son `device_id` d'origine.
   /// Clé absente (serveur antérieur à U13, ou table non servie) : rien n'est touché.
-  Future<int> _absorberDepenses_o(Object? brut, [Object? lignesBrutes]) async {
+  Future<int> _absorberDepenses(Object? brut, [Object? lignesBrutes]) async {
     if (brut == null) return 0;
 
     const quoi = 'Dépense';
@@ -5065,7 +5004,7 @@ class SyncEngine {
   /// Ticket DEP4 — centres de coût (filières) servis par le serveur : référentiel, LE SERVEUR GAGNE (jamais écrit au
   /// poste). Strict : un élément illisible refuse le lot. Clé absente (compte sans `view-achats` / `view-comptabilite`,
   /// ou serveur antérieur) : rien n'est touché.
-  Future<int> _absorberCentresDeCout_o(Object? brut) async {
+  Future<int> _absorberCentresDeCout(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Centre de coût';
@@ -5111,7 +5050,7 @@ class SyncEngine {
   /// ⚠️⚠️ **STRICT** : identifiant invalide ou servi deux fois, vente ou produit inconnu du poste, montant absent ou
   /// négatif, quantité négative, décision ou statut illisible, date illisible → [FormatException], rien n'est écrit, le
   /// curseur n'avance pas. Clé absente (serveur antérieur, ou table non servie à ce compte) : rien n'est touché.
-  Future<int> _absorberAvoirs_o(Object? brut) async {
+  Future<int> _absorberAvoirs(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Avoir client';
@@ -5219,7 +5158,7 @@ class SyncEngine {
   ///
   /// Les demandes ACQUITTÉES (`synced`) s'effacent avec l'ancien instantané : le nouveau dit ce qui reste archivé. Une
   /// demande `pending` ou `conflict` n'est jamais touchée.
-  Future<int> _absorberCorbeille_o(Object? brut) async {
+  Future<int> _absorberCorbeille(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Corbeille';
@@ -5307,7 +5246,7 @@ class SyncEngine {
   /// et en attente de correction) : le tirage précède toujours l'envoi. Un devis acquitté (`synced`) prend la dernière
   /// version du serveur et garde son `device_id` d'origine. Clé absente (table non servie à ce compte, serveur antérieur à
   /// DEV) : rien n'est touché.
-  Future<int> _absorberDevis_o(Object? brut) async {
+  Future<int> _absorberDevis(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Devis';
@@ -5410,7 +5349,7 @@ class SyncEngine {
   /// ⚠️⚠️ **STRICT** : identifiant invalide ou servi deux fois, net absent, illisible ou négatif, instant illisible,
   /// nom qui n'est pas un texte → [FormatException], rien n'est écrit. Aucune écriture locale à protéger : la table ne
   /// s'écrit jamais au poste.
-  Future<int> _absorberPaie_o(Object? brut) async {
+  Future<int> _absorberPaie(Object? brut) async {
     if (brut == null) return 0;
 
     const quoi = 'Bulletin de paie';
@@ -5479,7 +5418,7 @@ class SyncEngine {
   /// ⚠️⚠️ **UNE LIGNE LOCALE `pending` OU `conflict` N'EST JAMAIS ÉCRASÉE** (soin saisi ou archivé ici, pas encore
   /// acquitté) : l'upsert aveugle d'avant aurait annulé un archivage fait hors ligne — le tirage précède toujours
   /// l'envoi.
-  Future<int> _absorberSoins_o(Object? brut) async {
+  Future<int> _absorberSoins(Object? brut) async {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
@@ -7049,17 +6988,29 @@ class SyncEngine {
 
   /// `true` : fini (envoyé, ou impossible à jamais) ; `null` : à réessayer plus tard.
   Future<bool?> _envoyerUnJustificatif(String table, String id, String chemin, String quoi) async {
-    final fichier = File(chemin);
-    // PWA-2 : aucun justificatif n'est joint dans le navigateur (pas de chemin) ; si un chemin venu d'ailleurs arrive, il n'existe pas.
-    if (PlateformePoste.navigateur || !fichier.existsSync()) {
+    // PWA-2b — navigateur : la colonne porte une référence `navigateur:<clé>/<nom>` ; les octets viennent du magasin local.
+    final ref = JustificatifsNavigateur.decoder(chemin);
+    Uint8List? octets;
+    if (ref != null) {
+      octets = await JustificatifsNavigateur.magasin.lire(ref.cle);
+      if (octets == null) {
+        _avertissements.add('Justificatif de $quoi introuvable sur ce poste (fichier déplacé ou supprimé) : il ne sera pas envoyé.');
+        return true;
+      }
+    } else if (PlateformePoste.navigateur || !File(chemin).existsSync()) {
+      // Un chemin disque venu d'ailleurs n'existe pas dans le navigateur.
       _avertissements.add('Justificatif de $quoi introuvable sur ce poste (fichier déplacé ou supprimé) : il ne sera pas envoyé.');
       return true;
     }
     try {
-      final nom = chemin.split(RegExp(r'[\\/]')).last;
+      final nom = ref?.nom ?? chemin.split(RegExp(r'[\\/]')).last;
       await _client.post<Map<String, dynamic>>(
         '/api/sync/receipts',
-        data: FormData.fromMap({'table': table, 'id': id, 'file': await MultipartFile.fromFile(chemin, filename: nom)}),
+        data: FormData.fromMap({
+          'table': table,
+          'id': id,
+          'file': octets != null ? MultipartFile.fromBytes(octets, filename: nom) : await MultipartFile.fromFile(chemin, filename: nom),
+        }),
       );
       return true;
     } on DioException catch (e) {
