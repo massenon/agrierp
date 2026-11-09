@@ -120,4 +120,60 @@ $sortie['validation_lignes'] = [
     'montant_texte' => $val(['qty' => 1, 'manual_total_amount' => 'abc']),
 ];
 
+// 7. PWA-1b — LIVRAISON : la caisse web (`PosInterface`, frais retenus et total) et l'acceptation du total par le serveur.
+foreach ($entree['livraisons'] ?? [] as $i => $cas) {
+    $caisse = new PosInterface();
+    $caisse->cart = array_map(fn ($l) => ['product_id' => 'p', 'montant' => $l['montant'], 'qty' => $l['qty']], $cas['lignes']);
+    $caisse->discount = (float) $cas['remise'];
+    $caisse->deliveryConcerned = (bool) $cas['concernee'];
+    $caisse->deliveryMode = $cas['mode'];
+    $caisse->deliveryFrais = $cas['frais'] === null ? null : (float) $cas['frais'];
+    $res = ['retenue' => $caisse->getLivraisonRetenueProperty(), 'total' => $caisse->getTotalProperty()];
+
+    $v = new ReflectionMethod(SyncController::class, 'verifierCoherenceDuTotal');
+    $v->setAccessible(true);
+    $payload = [
+        'discount' => $cas['remise'], 'total' => $cas['total_js'],
+        'delivery_mode' => $cas['concernee'] ? $cas['mode'] : null, 'delivery_fee' => $cas['fee_js'],
+        'lines' => array_map(fn ($l) => ['manual_total_amount' => $l['montant']], $cas['lignes']),
+    ];
+    try {
+        $v->invoke((new ReflectionClass(SyncController::class))->newInstanceWithoutConstructor(), $payload);
+        $res['total_accepte'] = true;
+    } catch (ValidationException $e) {
+        $res['total_accepte'] = false;
+    }
+    $sortie['livraisons'][$i] = $res;
+}
+
+// 8. PWA-1b — CLIENT CRÉÉ HORS LIGNE : les règles de `CustomerCatalogService` et les messages de `MotifsRefusPush` (nom, téléphone, IFU).
+foreach ($entree['clients'] ?? [] as $i => $donnees) {
+    $regles = array_intersect_key(app(\App\Services\CustomerCatalogService::class)->regles(), array_flip(['name', 'phone', 'ifu']));
+    $validateur = validator($donnees, $regles, MotifsRefusPush::messages(), MotifsRefusPush::attributs());
+    $sortie['clients'][$i] = $validateur->fails()
+        ? ['ok' => false, 'champ' => array_key_first($validateur->errors()->toArray()), 'motif' => $validateur->errors()->first()]
+        : ['ok' => true];
+}
+
+// 9. PWA-1b — motifs : vente sur avance (phrase littérale de la caisse web) et champs de livraison (règles de `pushSales`, lues dans sa source).
+$sortie['motifs']['venteSurAvance'] = str_contains($caisseSource, "'Une vente sur avance exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».'")
+    ? 'Une vente sur avance exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».' : null;
+$sync = file_get_contents($racine.'/app/Http/Controllers/Api/SyncController.php');
+$reglesLivraison = [
+    'delivery_mode' => ['nullable', 'in:gratuite,client,incluse,facturee'],
+    'delivery_fee' => ['nullable', 'integer', 'min:0'],
+    'delivery_address' => ['nullable', 'string', 'max:255'],
+    'delivery_contact' => ['nullable', 'string', 'max:255'],
+];
+foreach ($reglesLivraison as $champ => $regle) {
+    $sortie['regles_livraison_dans_pushsales'][$champ] = str_contains($sync, "'{$champ}' => ['".implode("', '", $regle)."']");
+}
+$msg = fn (array $d) => ($v = validator($d, $reglesLivraison, MotifsRefusPush::messages(), MotifsRefusPush::attributs()))->fails() ? $v->errors()->first() : null;
+$sortie['livraison_motifs'] = [
+    'mode' => $msg(['delivery_mode' => 'drone']),
+    'frais' => $msg(['delivery_fee' => 'abc']),
+    'adresse' => $msg(['delivery_address' => str_repeat('a', 256)]),
+    'contact' => $msg(['delivery_contact' => str_repeat('a', 256)]),
+];
+
 echo json_encode($sortie, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);

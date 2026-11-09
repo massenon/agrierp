@@ -213,7 +213,9 @@ test('synchro : tire d\'abord (pages), garde seulement les tables de la caisse, 
     assert.equal(pulls[0].auth, 'Bearer JETON');
     assert.equal(pulls[0].credentials, 'omit');
     assert.equal(await base.meta('curseur'), '2026-11-08T14:43:00+01:00', 'curseur = server_time de la DERNIÈRE page');
-    assert.deepEqual((await base.tout('referentiels')).map((l) => l.table).sort(), [...TABLES_GARDEES].sort());
+    // Seules les tables que le compte lit (`tables_servies`) sont gardées : ici, celles de la caisse.
+    assert.deepEqual((await base.tout('referentiels')).map((l) => l.table).sort(), ['company_settings', 'customers', 'product_categories', 'products']);
+    assert.ok(TABLES_GARDEES.includes('livestock_lots') && TABLES_GARDEES.includes('livestock_daily_entries') && TABLES_GARDEES.includes('veterinary_withdrawal_periods'));
     const entreprise = await dechiffrer(cle, await base.lire('referentiels', 'company_settings'));
     assert.deepEqual(entreprise[0], { id: 'entreprise', company_name: 'Ferme', tva_enabled: true, tva_default_rate: null, mecef_actif: true });
     assert.ok(!JSON.stringify(await base.tout('referentiels')).includes('NE-DOIT-PAS'));

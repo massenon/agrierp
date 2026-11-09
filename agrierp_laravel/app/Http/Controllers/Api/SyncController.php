@@ -3636,13 +3636,41 @@ class SyncController extends Controller
      * un client Dart. Exiger l'egalite stricte ferait rejeter des ventes
      * parfaitement saines pour un arrondi de representation.
      */
+    /**
+     * PWA-1b — les colonnes de livraison d'une vente reçue : le MODE, l'adresse et le contact tels que saisis ; les FRAIS
+     * seulement pour une livraison facturée (entier, jamais négatif) ; `delivery_in_total` posé par le serveur, jamais lu.
+     * Sans `delivery_mode` (poste Flutter) : rien n'est écrit, les valeurs par défaut de la table restent.
+     *
+     * @return array<string, mixed>
+     */
+    private function livraisonDeLaVente(array $saleData): array
+    {
+        $mode = $saleData['delivery_mode'] ?? null;
+        $frais = $mode === 'facturee'
+            ? max(0, \App\Services\Mecef\MecefFactureBuilder::arrondi($saleData['delivery_fee'] ?? 0))
+            : 0;
+
+        $colonnes = ['delivery_fee' => $frais];
+        if ($mode !== null) {
+            $colonnes += [
+                'delivery_in_total' => $frais > 0,
+                'delivery_mode' => $mode,
+                'delivery_address' => ($saleData['delivery_address'] ?? null) ?: null,
+                'delivery_contact' => ($saleData['delivery_contact'] ?? null) ?: null,
+            ];
+        }
+
+        return $colonnes;
+    }
+
     private function verifierCoherenceDuTotal(array $saleData): void
     {
         $lignes = collect($saleData['lines'] ?? [])
             ->sum(fn ($l) => (float) ($l['manual_total_amount'] ?? 0));
 
         $remise = (float) ($saleData['discount'] ?? 0);
-        $attendu = round($lignes - $remise, 2);
+        // PWA-1b — une livraison « facturée » entre dans le total (comme `PosInterface::getTotalProperty`).
+        $attendu = round($lignes - $remise + $this->livraisonDeLaVente($saleData)['delivery_fee'], 2);
         $annonce = round((float) ($saleData['total'] ?? 0), 2);
 
         if (abs($attendu - $annonce) < 0.01) {
@@ -6686,6 +6714,11 @@ class SyncController extends Controller
                     'subtotal' => ['required', 'numeric', 'min:0'],
                     'discount' => ['nullable', 'numeric', 'min:0'],
                     'total' => ['required', 'numeric', 'min:0'],
+                    // PWA-1b — livraison (facultative : absente des postes qui ne la saisissent pas).
+                    'delivery_mode' => ['nullable', 'in:gratuite,client,incluse,facturee'],
+                    'delivery_fee' => ['nullable', 'integer', 'min:0'],
+                    'delivery_address' => ['nullable', 'string', 'max:255'],
+                    'delivery_contact' => ['nullable', 'string', 'max:255'],
                     // 🔴→✅ TICKET 14.71 — DATE REELLE DE LA VENTE. Sans elle,
                     // le serveur datait tout du TIRAGE : ecriture SYSCOHADA
                     // sur la mauvaise periode, fiche d'elevage du mauvais
@@ -6753,7 +6786,7 @@ class SyncController extends Controller
                         Arr::only($saleData, self::VENTE_CHAMPS_DU_POSTE),
                         fn ($valeur, $champ) => $champ !== 'status' || $valeur !== null,
                         ARRAY_FILTER_USE_BOTH,
-                    ) + $choix);
+                    ) + $choix + $this->livraisonDeLaVente($saleData));
                     $sale->save();
 
                     foreach ($saleData['lines'] as $line) {

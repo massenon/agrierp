@@ -287,3 +287,11 @@ Mettre `/api/` ou `/livewire/` dans un cache ; intercepter un `POST` ; stocker u
 ## 10. Contrôle de ce fichier
 
 Chemins cités vérifiés par `ls` à la rédaction (07/11/2026) : `agrierp_laravel/public/sw.js`, `manifest.webmanifest`, `offline.html`, `agrierp_laravel/resources/views/components/pwa-install.blade.php`, `agrierp_laravel/tests/Feature/PwaEtPolicesLocalesTest.php`, `agrierp_laravel/config/sanctum.php`, `agrierp_laravel/tests/Js/verrou-logique.test.mjs`, `agrierp_flutter/lib/core/sync/modale_synchronisation.dart`, `agrierp_flutter/test/essai_multipostes_test.dart`, `/opt/pw-browsers/chromium-1194`. **Non vérifiés (n'existent pas encore, à créer)** : `docs/PWA_DECISION.md`, `public/caisse-hors-ligne.html`, `resources/js/hors-ligne/calculs-caisse.js`, `tests/Js/calculs-caisse.test.mjs` (noms proposés). Aucun essai de compilation web de `logialvia_app/` n'a été fait.
+
+---
+
+## Suite de PWA-1 (09 et 10/11/2026) : PWA-1b et socle de PWA-3
+
+- **PWA-1b** (caisse complète de la PWA JS ; ⚠️ « PWA-2 » désigne désormais le poste Flutter web) : livraison facturée, vente sur avance, client créé hors ligne ET produits rattachés à une espèce (bande source, rémanence tirée, refus du web, effet sur la fiche du jour) sont construits, avec parité exécutée contre le PHP. Détail et preuves : `docs/PLAN_FINALISATION.md` (section PWA-1b) et `agrierp_laravel/CLAUDE.md`.
+- **PWA-3** : aucune fiche n'est livrée. Livré et prouvé contre le PHP : le calcul d'une journée (`effectif-categories.js`), la chaîne d'une bande (`chaine-effectif.js`), la provende du jour des lapins (`fiche-lapins-calculs.js`) et le tirage des bandes, fiches, rémanences, barèmes, prophylaxie, soins, transferts, provendes et exercices (É1, 11/11). La fiche LAPINS elle-même (écran, saisie, file d'envoi, autonomie alimentaire : É2 à É5) reste à faire, puis escargots, porcs, volailles.
+- Décisions CAISSE-1/2/3 (appareil/PIN renforcé, reçu provisoire, refus au-delà d'un seuil de prix) : toujours des propositions, non validées par le client, non bâties.

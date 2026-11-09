@@ -64,7 +64,9 @@ test('ligne : quantité entière ≥ 1, montant entier ≥ 0, produit vendable',
     assert.equal(validerLigne({ produit: p, qty: '1', montant: '' }).motif, MOTIFS.montant);
     assert.equal(validerLigne({ produit: p, qty: '1', montant: '10,5' }).motif, MOTIFS.montantEntier);
     assert.equal(validerLigne({ produit: { ...p, pricing_mode: 'quote' }, qty: '1', montant: '1' }).motif, MOTIFS.produitSurDevis);
-    assert.equal(validerLigne({ produit: { ...p, species_id: 'x' }, qty: '1', montant: '1' }).motif, MOTIFS.produitSansBande);
+    // PWA-1b : un sujet vivant exige sa bande source (phrase de la caisse web) ; avec elle, la ligne passe.
+    assert.equal(validerLigne({ produit: { ...p, species_id: 'x' }, qty: '1', montant: '1' }).motif, 'La bande source est obligatoire pour un sujet vivant.');
+    assert.equal(validerLigne({ produit: { ...p, species_id: 'x' }, qty: '1', montant: '1', lotId: 'b1' }).ok, true);
     assert.equal(validerLigne({ produit: null, qty: '1', montant: '1' }).motif, MOTIFS.produitInconnu);
 });
 
@@ -99,7 +101,9 @@ test('refus : panier vide, crédit sans client, remise trop grande, espèces ins
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'credit' }).motif, MOTIFS.venteACredit);
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], remise: 101 }).motif, MOTIFS.remiseTropGrande);
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], especesRecues: 50 }).motif, MOTIFS.especesInsuffisantes);
-    assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'avance' }).champ, 'payment_mode');
+    assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'cheque' }).champ, 'payment_mode');
+    // PWA-1b : « Déduire de l'avance » est un mode connu ; il exige un client, comme le crédit.
+    assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'avance' }).champ, 'customer_id');
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'credit', clientId: 'c' }).ok, true);
 });
 

@@ -92,7 +92,7 @@ return [
             'puces' => [
                 "Permet de vendre à la caisse sans réseau depuis ce navigateur : les ventes restent sur l'appareil, puis partent seules au retour de la liaison.",
                 "« Activer » demande votre mot de passe (non conservé) et un PIN de 4 à 6 chiffres qui protège les données de l'appareil.",
-                "Seule la caisse est couverte (produits, panier, facture simple ou normalisée, paiement) ; comptabilité et élevage exigent le réseau.",
+                "Seule la caisse est couverte (produits dont sujets vivants sur bande source, panier, livraison, nouveau client, facture, paiement) ; comptabilité et élevage exigent le réseau.",
                 "« Désactiver cet appareil » efface les données locales ; un administrateur peut aussi le révoquer dans Postes & Appairage.",
             ],
         ],
