@@ -10,10 +10,11 @@ import { ouvrirBase, ErreurBase } from './base-locale.js';
 import { etatAppareil, deverrouiller, desactiver, purgerLocal, lireMarqueur, noterEnAttente, MARQUEUR_ACTIVE, MARQUEUR_EN_ATTENTE } from './appairage.js';
 import { ErreurPin, dechiffrer } from './coffre.js';
 import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.js';
+import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
 import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, messageBandeauPrix, messageConfirmationVente, niveauPrixPerimes, NIVEAUX_PRIX, LIBELLES_STATUT } from './catalogue.js';
-import { construireVente, validerLigne, validerChoixFacture, sousTotal, totalVente, monnaieARendre, tvaIncluse, formaterFcfa, lireEntier, LIBELLES_PAIEMENT } from './calculs-caisse.js';
+import { construireVente, validerLigne, validerChoixFacture, validerLivraison, livraisonRetenue, lireNombre, sousTotal, totalVente, monnaieARendre, tvaIncluse, formaterFcfa, lireEntier, MODES_LIVRAISON } from './calculs-caisse.js';
 import { decider, DUREE_PAR_DEFAUT } from '../verrou-logique.js';
 
 const $ = (id) => document.getElementById(id);
@@ -29,6 +30,7 @@ const h = (tag, attrs = {}, ...enfants) => {
 const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
+    livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
     lectureSeule: false, derniereActivite: Date.now(), minutesVerrou: DUREE_PAR_DEFAUT, requetes: 0,
@@ -133,7 +135,8 @@ async function chargerReferentiels() {
     const lire = async (t) => { const l = await app.base.lire('referentiels', t); return l ? dechiffrer(app.ctx.cle, l) : []; };
     app.produits = await lire('products');
     app.categories = await lire('product_categories');
-    app.clients = (await lire('customers')).filter((c) => c.is_active !== false);
+    // PWA-1b : les clients du tirage, puis ceux créés sur cet appareil et pas encore acquittés.
+    app.clients = clientsVisibles(await lire('customers'), await clientsEnAttente(app.ctx));
     app.entreprise = (await lire('company_settings'))[0] ?? null;
     app.serverTime = (await app.base.meta('curseur')) ?? null;
     app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
@@ -218,7 +221,11 @@ function dessinerPanier() {
         h('td', { 'data-label': '' }, h('button', { type: 'button', class: 'btn danger', 'aria-label': 'Retirer du panier', onclick: () => { app.panier.splice(i, 1); dessinerPanier(); } }, h('span', { class: 'material-symbols-outlined' }, 'close'))))));
     const remise = lireEntier($('remise').value || '0') ?? 0;
     const lignes = lignesCalcul();
-    const total = totalVente(lignes, remise);
+    const livraison = livraisonRetenue(app.livraison);
+    const total = totalVente(lignes, remise, livraison);
+    $('ligne-livraison').hidden = livraison === 0;
+    $('frais-livraison').textContent = formaterFcfa(livraison);
+    $('resume-livraison').textContent = app.livraison.concernee ? MODES_LIVRAISON[app.livraison.mode] ?? '' : '';
     $('sous-total').textContent = formaterFcfa(sousTotal(lignes));
     $('total').textContent = formaterFcfa(total);
     $('tva').textContent = formaterFcfa(tvaIncluse(lignes, remise > sousTotal(lignes) ? 0 : remise, Boolean(app.entreprise?.tva_enabled)).tva);
@@ -301,13 +308,14 @@ $('btn-valider').addEventListener('click', async () => {
     const decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
     const type = $('bloc-facture').hidden ? 'simple' : $('facture-type').value;
     const r = construireVente({
-        panier: app.panier, remise: lireEntier($('remise').value || '0') ?? -1, modePaiement: $('mode').value, clientId: $('client').value || null,
+        panier: app.panier, remise: lireEntier($('remise').value || '0') ?? -1, modePaiement: $('mode').value, clientId: $('client').value || null, livraison: app.livraison,
         especesRecues: $('mode').value === 'especes' && $('recu').value !== '' ? lireEntier($('recu').value) : null,
         facture: type === 'normalisee' ? { ...app.facture, facture_type: 'normalisee' } : { facture_type: 'simple' },
         id: crypto.randomUUID(), instant: new Date(Date.now() + decalage).toISOString(), deviceId: app.appareil.deviceName,
     });
     if (!r.ok) {
         if (r.champ === 'customer_id') $('erreur-client').textContent = r.motif; else $('erreur-vente').textContent = r.motif;
+        if (r.champ.startsWith('delivery_')) ouvrirLivraison(r.motif);
         if (['client_nom_facture', 'client_ifu', 'aib_taux'].includes(r.champ)) ouvrirFacture();
         return;
     }
@@ -322,10 +330,62 @@ $('btn-valider').addEventListener('click', async () => {
         return; // refus de valider : le panier est gardé
     }
     app.panier = []; $('remise').value = '0'; $('recu').value = ''; $('client').value = ''; $('facture-type').value = 'simple';
+    app.livraison = { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' };
     app.facture = { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' };
     avis(`Vente enregistrée sur cet appareil (${formaterFcfa(r.vente.total)}) — pas encore envoyée.`, 'info', 6000);
     demanderSynchroEnArrierePlan();
     await dessiner();
+    lancerSynchro({ manuel: false });
+});
+
+// ------------------------------------------------------------------------------- livraison et client (PWA-1b)
+
+function ouvrirLivraison(motif = '') {
+    const l = app.livraison;
+    $('liv-concernee').checked = l.concernee; $('liv-mode').value = l.mode; $('liv-frais').value = l.frais ?? ''; $('liv-adresse').value = l.adresse; $('liv-contact').value = l.contact;
+    $('erreur-livraison').textContent = motif;
+    majChampsLivraison();
+    if (!$('dlg-livraison').open) $('dlg-livraison').showModal();
+}
+function majChampsLivraison() {
+    $('liv-champs').hidden = !$('liv-concernee').checked;
+    $('liv-frais').hidden = $('liv-mode').value !== 'facturee';
+}
+$('btn-livraison').addEventListener('click', () => ouvrirLivraison());
+$('liv-concernee').addEventListener('change', majChampsLivraison);
+$('liv-mode').addEventListener('change', majChampsLivraison);
+$('liv-valider').addEventListener('click', () => {
+    const l = { concernee: $('liv-concernee').checked, mode: $('liv-mode').value, frais: $('liv-frais').value === '' ? null : lireNombre($('liv-frais').value), adresse: $('liv-adresse').value, contact: $('liv-contact').value };
+    if ($('liv-frais').value !== '' && l.frais === null) l.frais = Number.NaN; // saisie illisible : refusée par validerLivraison
+    const r = validerLivraison(l);
+    if (!r.ok) { $('erreur-livraison').textContent = r.motif; return; }
+    app.livraison = l;
+    $('dlg-livraison').close();
+    dessinerPanier();
+});
+
+$('btn-nouveau-client').addEventListener('click', () => {
+    for (const id of ['client-nom', 'client-tel', 'client-ifu']) $(id).value = '';
+    for (const id of ['erreur-client-nom', 'erreur-client-tel', 'erreur-client-ifu']) $(id).textContent = '';
+    $('dlg-client').showModal();
+});
+$('client-enregistrer').addEventListener('click', async () => {
+    for (const id of ['erreur-client-nom', 'erreur-client-tel', 'erreur-client-ifu']) $(id).textContent = '';
+    const r = validerClient({ name: $('client-nom').value, phone: $('client-tel').value, ifu: $('client-ifu').value });
+    if (!r.ok) { $({ name: 'erreur-client-nom', phone: 'erreur-client-tel', ifu: 'erreur-client-ifu' }[r.champ]).textContent = r.motif; return; }
+    const decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
+    let client;
+    try {
+        client = await ajouterClient(app.ctx, { id: crypto.randomUUID(), valeurs: r.valeurs, instant: new Date(Date.now() + decalage).toISOString(), deviceId: app.appareil.deviceName });
+    } catch (e) {
+        $('erreur-client-nom').textContent = e?.message ?? "Le stockage de l'appareil a refusé le client : il n'est PAS créé.";
+        return;
+    }
+    $('dlg-client').close();
+    await chargerReferentiels();
+    dessinerCatalogue();
+    $('client').value = client.id;
+    avis('Client ajouté sur cet appareil — il sera envoyé au serveur à la synchronisation.', 'info', 6000);
     lancerSynchro({ manuel: false });
 });
 

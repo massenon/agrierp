@@ -67,7 +67,8 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-xs text-outline space-y-sm">
             <p class="text-sm font-bold text-brand-forest uppercase">Ce que couvre ce mode</p>
             <ul class="list-disc pl-md space-y-xs">
-                <li>Ventes de caisse : produits du catalogue, panier, facture simple ou normalisée, paiement.</li>
+                <li>Ventes de caisse : produits du catalogue, panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
+                <li>Création d'un client avec le bouton « + » (nom, téléphone, IFU facultatif) ; il est envoyé au serveur à la synchronisation, qui peut le rapprocher d'une fiche déjà connue.</li>
                 <li>Consultation du catalogue et des clients copiés sur l'appareil.</li>
             </ul>
             <p class="text-sm font-bold text-brand-forest uppercase pt-sm">Ce qu'il ne couvre pas</p>

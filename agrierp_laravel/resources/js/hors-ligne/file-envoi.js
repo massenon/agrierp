@@ -77,6 +77,23 @@ export function remettreEnFile(ctx, id) {
     ]);
 }
 
+/**
+ * PWA-1b — le serveur a FUSIONNÉ un client créé hors ligne avec une fiche qu'il connaissait déjà (`customers.merged`) : les ventes
+ * encore sur l'appareil (jamais les `synced`) passent à l'identifiant du serveur, sinon il les refuserait (client inconnu).
+ */
+export async function reaffecterClient(ctx, ancien, nouveau) {
+    let n = 0;
+    for (const l of await ctx.base.tout('ventes')) {
+        if (l.sync_status === 'synced') continue;
+        const { vente } = await dechiffrer(ctx.cle, l);
+        if (vente.customer_id === ancien) {
+            await remplacer(ctx, l.id, (entete, contenu) => [entete, { ...contenu, vente: { ...contenu.vente, customer_id: nouveau } }]);
+            n++;
+        }
+    }
+    return n;
+}
+
 export async function abandonner(ctx, id) {
     await ctx.base.supprimer('ventes', id);
 }

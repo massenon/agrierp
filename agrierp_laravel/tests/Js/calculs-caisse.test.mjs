@@ -99,7 +99,9 @@ test('refus : panier vide, crédit sans client, remise trop grande, espèces ins
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'credit' }).motif, MOTIFS.venteACredit);
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], remise: 101 }).motif, MOTIFS.remiseTropGrande);
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], especesRecues: 50 }).motif, MOTIFS.especesInsuffisantes);
-    assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'avance' }).champ, 'payment_mode');
+    assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'cheque' }).champ, 'payment_mode');
+    // PWA-1b : « Déduire de l'avance » est un mode connu ; il exige un client, comme le crédit.
+    assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'avance' }).champ, 'customer_id');
     assert.equal(construireVente({ ...base, panier: [{ product_id: 'a', qty: 1, montant: 100 }], modePaiement: 'credit', clientId: 'c' }).ok, true);
 });
 

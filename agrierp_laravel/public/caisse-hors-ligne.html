@@ -90,7 +90,10 @@
             </table>
 
             <label class="champ" for="client">Client</label>
-            <select id="client"><option value="">Client Anonyme</option></select>
+            <div class="groupe" style="flex-wrap:nowrap">
+                <select id="client"><option value="">Client Anonyme</option></select>
+                <button id="btn-nouveau-client" type="button" class="btn" aria-label="Nouveau client" title="Nouveau client">+</button>
+            </div>
 
             <label class="champ" for="mode">Mode de Règlement</label>
             <select id="mode">
@@ -98,6 +101,7 @@
                 <option value="mobile_money">Mobile Money</option>
                 <option value="virement">Virement bancaire</option>
                 <option value="credit">Crédit / À terme</option>
+                <option value="avance">Déduire de l'avance</option>
             </select>
             <div id="erreur-client" class="erreur-champ" role="alert"></div>
 
@@ -110,6 +114,11 @@
                 <p id="aide-facture" class="muted" style="font-size:11px;margin:6px 0 0">Facture normalisée demandée — en attente : elle sera transmise à la DGI par le serveur à la synchronisation.</p>
             </div>
 
+            <div class="groupe" style="margin-top:12px">
+                <button id="btn-livraison" type="button" class="btn">Livraison</button>
+                <span id="resume-livraison" class="muted" style="font-size:11px"></span>
+            </div>
+
             <label class="champ" for="remise">Remise (FCFA)</label>
             <input id="remise" type="number" min="0" step="1" value="0" inputmode="numeric">
             <div id="bloc-especes">
@@ -118,6 +127,7 @@
             </div>
             <div class="totaux">
                 <div><span>Sous-total</span><b id="sous-total">0 FCFA</b></div>
+                <div id="ligne-livraison" hidden><span>Frais de livraison</span><b id="frais-livraison">0 FCFA</b></div>
                 <div id="ligne-tva" class="muted"><span>dont TVA (indicatif)</span><span id="tva">0 FCFA</span></div>
                 <div id="ligne-monnaie"><span>Monnaie à Rendre</span><b id="monnaie">0 FCFA</b></div>
                 <div class="total"><span>Total à Payer</span><span id="total">0 FCFA</span></div>
@@ -140,6 +150,45 @@
     <div class="pied-dialog">
         <button type="button" class="btn" data-fermer="dlg-piece">Annuler</button>
         <button type="button" id="piece-ajouter" class="btn plein">Ajouter au panier</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-client">
+    <h3>Nouveau Client</h3>
+    <label class="champ" for="client-nom">Nom complet *</label>
+    <input id="client-nom" type="text" maxlength="150">
+    <div class="erreur-champ" id="erreur-client-nom" role="alert"></div>
+    <label class="champ" for="client-tel">Téléphone</label>
+    <input id="client-tel" type="tel" maxlength="30">
+    <div class="erreur-champ" id="erreur-client-tel" role="alert"></div>
+    <label class="champ" for="client-ifu">IFU du client</label>
+    <input id="client-ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres">
+    <p class="muted" style="font-size:11px;margin:4px 0 0">Laissez vide pour un client sans IFU (client particulier).</p>
+    <div class="erreur-champ" id="erreur-client-ifu" role="alert"></div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">Le client est créé sur cet appareil et envoyé au serveur à la synchronisation ; le serveur peut le rapprocher d'une fiche déjà connue.</p>
+    <div class="pied-dialog">
+        <button type="button" class="btn" data-fermer="dlg-client">Annuler</button>
+        <button type="button" class="btn plein" id="client-enregistrer">Enregistrer</button>
+    </div>
+</dialog>
+
+<dialog id="dlg-livraison">
+    <h3>Livraison</h3>
+    <label class="groupe" style="font-size:12px"><input id="liv-concernee" type="checkbox" style="width:auto"> Livraison concernée (cages, sujets volumineux)</label>
+    <div id="liv-champs" hidden>
+        <select id="liv-mode">
+            <option value="gratuite">Livraison gratuite (offerte)</option>
+            <option value="client">Livraison assurée par le client</option>
+            <option value="incluse">Prix de livraison inclus dans le montant</option>
+            <option value="facturee">Livraison facturée (ajoutée au total de la vente)</option>
+        </select>
+        <input id="liv-frais" type="number" step="1" placeholder="Frais de livraison (FCFA), inclus dans le total" inputmode="numeric" hidden>
+        <input id="liv-adresse" type="text" maxlength="255" placeholder="Adresse de livraison">
+        <input id="liv-contact" type="text" maxlength="255" placeholder="Contact du transporteur">
+    </div>
+    <div class="erreur-champ" id="erreur-livraison" role="alert"></div>
+    <div class="pied-dialog">
+        <button type="button" class="btn plein" id="liv-valider">Valider</button>
     </div>
 </dialog>
 

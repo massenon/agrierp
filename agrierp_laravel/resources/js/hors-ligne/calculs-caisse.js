@@ -7,8 +7,8 @@
  *
  *   - le montant d'une ligne est `manual_total_amount`, SOURCE DE VÉRITÉ (jamais prix unitaire × quantité) ;
  *   - tous les montants sont des ENTIERS en FCFA ; la quantité est un entier ≥ 1 (modale « Vente à la Pièce ») ;
- *   - sous-total = somme des lignes ; total = max(0, sous-total − remise) (la livraison facturée n'est PAS reprise
- *     dans ce premier périmètre : voir `docs/PLAN_FINALISATION.md`, PWA-2) ;
+ *   - sous-total = somme des lignes ; total = max(0, sous-total − remise) + livraison facturée (PWA-1b : `PosInterface::
+ *     getLivraisonRetenueProperty`, FCFA entiers, jamais négative, seulement pour une livraison « facturée ») ;
  *   - prix unitaire d'affichage = arrondi à 2 décimales de montant / quantité (`round(montant / qty, 2)`) ;
  *   - TVA incluse : ligne à ligne (`VatDeclarationService::ht/tva`), remise répartie au prorata, exactement comme
  *     `RecordSaleAccountingEntryAction::ventilerHtEtTva` — affichage INDICATIF, la comptabilité reste au serveur ;
@@ -20,14 +20,24 @@
  * rouge. Les valeurs de `tests/Js/calculs-caisse.test.mjs` sont calculées à la main.
  */
 
-export const MODES_PAIEMENT = ['especes', 'mobile_money', 'virement', 'credit'];
+export const MODES_PAIEMENT = ['especes', 'mobile_money', 'virement', 'credit', 'avance'];
 
 export const LIBELLES_PAIEMENT = {
     especes: 'Espèces',
     mobile_money: 'Mobile Money',
     virement: 'Virement',
     credit: 'Crédit',
+    avance: "Déduire de l'avance",
 };
+
+/** Modes de livraison de la modale « Livraison » de la caisse web (`PosInterface::$deliveryMode`) et leurs libellés. */
+export const MODES_LIVRAISON = {
+    gratuite: 'Livraison gratuite (offerte)',
+    client: 'Livraison assurée par le client',
+    incluse: 'Prix de livraison inclus dans le montant',
+    facturee: 'Livraison facturée (ajoutée au total de la vente)',
+};
+export const LIVRAISON_TEXTE_MAX = 255;
 
 export const FACTURE_SIMPLE = 'simple';
 export const FACTURE_NORMALISEE = 'normalisee';
@@ -39,6 +49,11 @@ export const NOM_FACTURE_MAX = 150;
 export const MOTIFS = {
     panierVide: 'Le panier est vide.',
     venteACredit: 'Une vente à crédit exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».',
+    venteSurAvance: 'Une vente sur avance exige un client : choisissez-le dans la liste ou créez-le avec le bouton « + ».',
+    livraisonMode: "La valeur du champ mode de livraison n'est pas autorisée.",
+    livraisonFrais: 'Le champ frais de livraison doit être un nombre entier.',
+    livraisonAdresse: 'Le champ adresse de livraison dépasse le maximum autorisé (255).',
+    livraisonContact: 'Le champ contact du transporteur dépasse le maximum autorisé (255).',
     modeInconnu: "La valeur du champ mode de règlement n'est pas autorisée.",
     factureType: 'Type de facture inconnu : choisissez « Facture simple » ou « Facture normalisée ».',
     factureNom: 'Le nom et prénom du client sont obligatoires pour une facture normalisée.',
@@ -121,9 +136,32 @@ export function sousTotal(lignes) {
     return lignes.reduce((somme, ligne) => somme + montantLigne(ligne), 0);
 }
 
-/** `PosInterface::getTotalProperty()` hors livraison : `max(0, sous-total − remise)`. */
-export function totalVente(lignes, remise = 0) {
-    return Math.max(0, sousTotal(lignes) - remise);
+/**
+ * `PosInterface::getLivraisonRetenueProperty()` : les frais d'une livraison « facturée » (FCFA entiers, la demi-unité vers le haut
+ * comme `MecefFactureBuilder::arrondi`), jamais négatifs ; les autres modes n'ajoutent rien. `frais` : nombre ou `null`.
+ */
+export function livraisonRetenue({ concernee = false, mode = 'gratuite', frais = null } = {}) {
+    if (!concernee || mode !== 'facturee' || frais === null || frais === undefined || !Number.isFinite(frais)) {
+        return 0;
+    }
+    return Math.max(0, arrondiPhp(frais));
+}
+
+/** Nombre saisi (virgule ou point) ; `null` si vide ou illisible. Négatifs admis (le total les ramène à 0, comme la caisse web). */
+export function lireNombre(saisie) {
+    if (typeof saisie === 'number') {
+        return Number.isFinite(saisie) ? saisie : null;
+    }
+    if (typeof saisie !== 'string') {
+        return null;
+    }
+    const net = saisie.replace(/[\s  ]/g, '').replace(',', '.');
+    return /^-?\d+(\.\d+)?$/.test(net) ? Number(net) : null;
+}
+
+/** `PosInterface::getTotalProperty()` : `max(0, sous-total − remise) + livraison retenue`. */
+export function totalVente(lignes, remise = 0, livraison = 0) {
+    return Math.max(0, sousTotal(lignes) - remise) + livraison;
 }
 
 /** `PosInterface::getChangeDueProperty()` : seulement en espèces, jamais négative. */
@@ -238,6 +276,28 @@ export function validerChoixFacture(donnees = {}) {
     };
 }
 
+const texteOuNull = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+
+/** La modale « Livraison » : mode connu, frais numériques pour une livraison facturée, adresse et contact de 255 caractères au plus. */
+export function validerLivraison(livraison = {}) {
+    if (!livraison.concernee) {
+        return { ok: true };
+    }
+    if (!Object.hasOwn(MODES_LIVRAISON, livraison.mode)) {
+        return { ok: false, champ: 'delivery_mode', motif: MOTIFS.livraisonMode };
+    }
+    if (livraison.mode === 'facturee' && livraison.frais !== null && livraison.frais !== undefined && !Number.isFinite(livraison.frais)) {
+        return { ok: false, champ: 'delivery_fee', motif: MOTIFS.livraisonFrais };
+    }
+    if ([...(livraison.adresse ?? '')].length > LIVRAISON_TEXTE_MAX) {
+        return { ok: false, champ: 'delivery_address', motif: MOTIFS.livraisonAdresse };
+    }
+    if ([...(livraison.contact ?? '')].length > LIVRAISON_TEXTE_MAX) {
+        return { ok: false, champ: 'delivery_contact', motif: MOTIFS.livraisonContact };
+    }
+    return { ok: true };
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // La vente complète.
 // ---------------------------------------------------------------------------------------------------------------
@@ -252,13 +312,14 @@ export function validerChoixFacture(donnees = {}) {
  * @param {?string} entree.clientId
  * @param {?number} entree.especesRecues
  * @param {object} entree.facture  { facture_type, client_ifu, client_nom_facture, aib_taux }
+ * @param {object} [entree.livraison]  { concernee, mode, frais, adresse, contact } — la modale « Livraison » (PWA-1b)
  * @param {string} entree.id  UUID généré par le navigateur (clé d'idempotence)
  * @param {string} entree.instant  ISO 8601 : l'instant de SAISIE (devient `sold_at` et `updated_at`)
  * @param {string} entree.deviceId  nom du jeton (« pwa-<uuid> »)
  * @returns {{ok:true, vente:object}|{ok:false, champ:string, motif:string}}
  */
 export function construireVente(entree) {
-    const { panier, remise = 0, modePaiement, clientId = null, especesRecues = null, facture = {}, id, instant, deviceId } = entree;
+    const { panier, remise = 0, modePaiement, clientId = null, especesRecues = null, facture = {}, livraison = {}, id, instant, deviceId } = entree;
 
     if (!Array.isArray(panier) || panier.length === 0) {
         return { ok: false, champ: 'panier', motif: MOTIFS.panierVide };
@@ -276,6 +337,9 @@ export function construireVente(entree) {
     }
     if (modePaiement === 'credit' && !clientId) {
         return { ok: false, champ: 'customer_id', motif: MOTIFS.venteACredit };
+    }
+    if (modePaiement === 'avance' && !clientId) {
+        return { ok: false, champ: 'customer_id', motif: MOTIFS.venteSurAvance };
     }
     if (!Number.isInteger(remise) || remise < 0) {
         return { ok: false, champ: 'discount', motif: Number.isInteger(remise) ? MOTIFS.remise : MOTIFS.remiseEntiere };
@@ -298,7 +362,13 @@ export function construireVente(entree) {
         return choix;
     }
 
-    const total = totalVente(lignes, remise);
+    const livraisonOk = validerLivraison(livraison);
+    if (!livraisonOk.ok) {
+        return livraisonOk;
+    }
+    const fraisRetenus = livraisonRetenue(livraison);
+
+    const total = totalVente(lignes, remise, fraisRetenus);
     if (modePaiement === 'especes' && especesRecues !== null && especesRecues !== undefined && especesRecues < total) {
         return { ok: false, champ: 'cash_received', motif: MOTIFS.especesInsuffisantes };
     }
@@ -320,6 +390,12 @@ export function construireVente(entree) {
             sold_at: instant,
             updated_at: instant,
             ...choix.choix,
+            // PWA-1b — les colonnes de livraison de la caisse web ; le serveur RECALCULE les frais et le drapeau (jamais lus tels quels).
+            delivery_mode: livraison.concernee ? livraison.mode : null,
+            delivery_fee: fraisRetenus,
+            delivery_in_total: fraisRetenus > 0,
+            delivery_address: livraison.concernee ? (texteOuNull(livraison.adresse)) : null,
+            delivery_contact: livraison.concernee ? (texteOuNull(livraison.contact)) : null,
             lines: lignes,
         },
     };

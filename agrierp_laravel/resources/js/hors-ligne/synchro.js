@@ -14,7 +14,8 @@
  * Ce module ne contient AUCUNE règle métier : le serveur décide, numérote, écrit stock et comptabilité.
  */
 
-import { lotAEnvoyer, marquerSynced, marquerConflit, compterTentative, nettoyerSynced } from './file-envoi.js';
+import { lotAEnvoyer, marquerSynced, marquerConflit, compterTentative, nettoyerSynced, reaffecterClient, journaliser } from './file-envoi.js';
+import { clientsEnAttente, aEnvoyer, retirerClients, refuserClient, clientEnJson } from './clients-hors-ligne.js';
 import { chiffrer, dechiffrer } from './coffre.js';
 import { classerReponse, delaiDeReessai, heureDuServeur } from './etat.js';
 
@@ -194,6 +195,42 @@ export function creerSynchro({
         return dechiffrer(cle, ligne);
     }
 
+    /**
+     * PWA-1b — les clients créés hors ligne partent AVANT les ventes (le serveur traite `customers` avant `sales`). Accusés : retirés de
+     * la file ; fusionnés avec une fiche déjà connue : les ventes en file passent à l'identifiant du serveur ; refusés : gardés avec
+     * leur motif français (journal), jamais renvoyés en boucle.
+     */
+    async function envoyerClients() {
+        const liste = aEnvoyer(await clientsEnAttente(ctx));
+        if (liste.length === 0) return { statut: 'ok', clients: 0 };
+        const corps = { device_id: deviceName, customers: liste.map(clientEnJson) };
+        const reset = await base.meta('data_reset_at');
+        if (reset) corps.data_reset_at = reset;
+
+        let r;
+        try {
+            r = await appel('POST', '/api/sync/push', corps);
+        } catch {
+            return { statut: 'hors_ligne', message: MESSAGES.injoignable };
+        }
+        const classe = classerReponse(r.statut);
+        if (classe === 'suspendre') return suspendre();
+        if (classe !== 'ok') return { statut: 'erreur', message: r.json?.message ?? `Le serveur n'a pas pu recevoir les nouveaux clients (${r.statut}).` };
+
+        const c = r.json?.customers ?? { accepted: [], rejected: [], merged: [] };
+        const acceptes = new Set(c.accepted ?? []);
+        for (const m of c.merged ?? []) {
+            if (m?.id && m?.id_serveur) await reaffecterClient(ctx, m.id, m.id_serveur);
+        }
+        await retirerClients(ctx, [...acceptes], maintenant);
+        for (const x of c.rejected ?? []) {
+            const motif = x.reason || 'Client refusé par le serveur.';
+            await refuserClient(ctx, x.id, motif, maintenant);
+            await journaliser(ctx, { vente_id: x.id, motif: `Client refusé : ${motif}` }, maintenant);
+        }
+        return { statut: 'ok', clients: acceptes.size };
+    }
+
     async function envoyer() {
         let taille = tailleLot;
         let envoyes = 0;
@@ -268,6 +305,12 @@ export function creerSynchro({
             if (e?.name === 'ErreurBase') throw e;
             etat.essai++;
             return { statut: 'hors_ligne', message: MESSAGES.injoignable, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
+        }
+        const cl = await envoyerClients();
+        if (cl.statut === 'suspendu') return cl;
+        if (cl.statut !== 'ok') {
+            etat.essai++;
+            return { ...cl, recus, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
         }
         const e = await envoyer();
         if (e.statut === 'suspendu') return e;

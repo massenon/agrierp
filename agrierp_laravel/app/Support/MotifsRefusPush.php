@@ -67,6 +67,9 @@ class MotifsRefusPush
             'lines.*.product_id' => 'produit de la ligne', 'lines.*.lot_id' => 'bande de la ligne',
             'lines.*.qty' => 'quantité de la ligne', 'lines.*.unit_price' => 'prix unitaire de la ligne',
             'lines.*.manual_total_amount' => 'montant de la ligne',
+            // PWA-1b — livraison de la caisse hors ligne du navigateur.
+            'delivery_mode' => 'mode de livraison', 'delivery_fee' => 'frais de livraison',
+            'delivery_address' => 'adresse de livraison', 'delivery_contact' => 'contact du transporteur',
             'code' => 'code', 'species_id' => 'espèce', 'stage' => 'stade', 'created_date' => 'date de création',
             'initial_quantity' => 'effectif initial', 'acquisition_cost' => 'coût d\'acquisition',
             'effectif_corrige' => 'effectif actuel',
