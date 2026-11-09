@@ -19,6 +19,7 @@ export const ESPECE = 'cuniculture';
 
 /** Libellés et ordre du Blade (garde : `fiche-lapins-ecran.test.mjs`). */
 /** Libellés de l'écran des lapins (communs + propres aux lapins), lus dans le Blade par la garde de sources. */
+export const MODULE_DESACTIVE = { titre: 'Module Héliciculture non activé', texte: "Ce module est disponible mais désactivé par défaut. Un administrateur peut l'activer depuis Paramètres > Modules Actifs." };
 export const ECRAN = { ...ECRAN_COMMUN, ...LAPINS_F.ecran };
 
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -106,7 +107,9 @@ export function tauxMortaliteFiche(fiche, veille) {
  * @param {{bandeId:?string, date:string, aujourdhui:string}} etat  `aujourdhui` : le jour du Bénin (AAAA-MM-JJ)
  */
 export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille = FAMILLE_PAR_DEFAUT }) {
-    const lots = donnees.lots.filter((l) => l.species_code === famille.espece && l.status === 'actif' && l.is_active !== false);
+    // Escargots : sans le module `helico` activé (`modules_config`), aucune bande (`FicheEscargots::getLotsProperty`).
+    const moduleDesactive = Boolean(famille.module) && !(donnees.modules ?? []).some((x) => x.species_code === famille.module && x.is_enabled);
+    const lots = moduleDesactive ? [] : donnees.lots.filter((l) => l.species_code === famille.espece && l.status === 'actif' && l.is_active !== false);
     const bande = (bandeId !== null ? lots.find((l) => l.id === bandeId) : null) ?? lots[0] ?? null;
     const dateChoisie = dateValide(date) ? date : null; // sans date lisible : aucun jour surligné, aucun transfert (comme le composant)
     const dateAffichee = dateChoisie ?? aujourdhui;
@@ -123,7 +126,11 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille
     const totalMorts = sommeNum(moisDesLots, (e) => e.mort);
     const totalDepart = moisDesLots.reduce((s, e) => s + effectifVeille(donnees.lots.find((l) => l.id === e.lot_id), donnees.fiches.filter((f) => f.lot_id === e.lot_id), jourDe(e), e.id), 0);
     const taux = totalDepart > 0 ? arrondiPhp((totalMorts / totalDepart) * 100, 1) : 0;
-    const kpis = famille.id === 'porcs'
+    const totalOeufs = sommeNum(moisDesLots, (e) => e.ponte_total);
+    const naissains = sommeNum(moisDesLots, (e) => e.ne);
+    const kpis = famille.id === 'escargots'
+        ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), naissains_mois: naissains, taux_eclosion: totalOeufs > 0 ? arrondiPhp((naissains / totalOeufs) * 100, 1) : null, taux_mortalite_mois: taux }
+        : famille.id === 'porcs'
         ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), truies: sommeNum(derniereParLot, (e) => e.effectif_f), verrats: sommeNum(derniereParLot, (e) => e.effectif_m), porcelets_sous_mere: sommeNum(derniereParLot, (e) => e.effectif_sevres), taux_mortalite_mois: taux }
         : { effectif_total: sommeNum(lots, (l) => l.current_quantity), geniteurs_m: sommeNum(derniereParLot, (e) => e.effectif_m), geniteurs_f: sommeNum(derniereParLot, (e) => e.effectif_f), naissances_mois: sommeNum(moisDesLots, (e) => e.ne), taux_mortalite_mois: taux };
 
@@ -165,7 +172,7 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille
     const t = (c) => Math.trunc(Number(duJour?.[c] ?? 0)) || 0;
 
     return {
-        famille, lots, bande, dateAffichee, debutMois: debut,
+        famille, moduleDesactive, lots, bande, dateAffichee, debutMois: debut,
         libelleMois: `${MOIS[moisNum - 1][0].toUpperCase()}${MOIS[moisNum - 1].slice(1)} ${annee}`,
         estMoisCourant: debut.slice(0, 7) >= aujourdhui.slice(0, 7),
         kpis, jours,
@@ -193,6 +200,9 @@ export function rendreFiche(m, h, actions) {
     const E = { ...ECRAN_COMMUN, ...F.ecran };
     const kpi = (libelle, valeur, icone, couleur) => h('div', { class: `kpi fiche-kpi ${couleur}` }, h('div', { class: 'groupe', style: 'justify-content:space-between' }, h('span', { class: 'kpi-libelle' }, libelle), h('span', { class: 'material-symbols-outlined' }, icone)), h('span', { class: 'kpi-valeur' }, valeur));
 
+    if (m.moduleDesactive) {
+        return [h('div', { class: 'carte', id: 'fiche-module-desactive', style: 'text-align:center' }, h('span', { class: 'material-symbols-outlined', style: 'font-size:56px;color:#9ca3af' }, 'lock'), h('h2', {}, MODULE_DESACTIVE.titre), h('p', { class: 'muted' }, MODULE_DESACTIVE.texte))];
+    }
     const noeuds = [
         h('div', { class: 'fiche-entete' },
             h('div', {}, h('h2', {}, h('span', { class: 'material-symbols-outlined' }, F.icone), E.titre), h('p', { class: 'muted' }, E.sousTitre)),

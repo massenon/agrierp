@@ -25,6 +25,8 @@ app()->setLocale('fr');
 
 use App\Livewire\Elevage\FicheLapins;
 use App\Livewire\Elevage\FichePorcs;
+use App\Livewire\Elevage\FicheEscargots;
+use App\Models\ModuleConfig;
 use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
@@ -71,7 +73,13 @@ foreach ($entree['scenarios'] as $i => $s) {
             $soin->save();
         }
 
-        $c = $s['famille'] === 'porcs' ? new FichePorcs : new FicheLapins;
+        if ($s['famille'] === 'escargots' && $s['module'] !== null) {
+            ModuleConfig::create(['species_code' => 'helico', 'is_enabled' => $s['module']]);
+        }
+        $c = match ($s['famille']) { 'porcs' => new FichePorcs, 'escargots' => new FicheEscargots, default => new FicheLapins };
+        if ($c instanceof FicheEscargots) {
+            $c->moduleEnabled = ModuleConfig::isEnabled('helico');   // `mount()` le lit ; ici on ne monte pas le composant
+        }
         $c->selectedDate = $s['date'];
         $c->bandeId = $s['bandeId'];
         $kpis = $c->getKpisProperty();

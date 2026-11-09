@@ -29,7 +29,7 @@ test('espèce et filière : porciculture, « porcine »', () => {
     assert.equal(familleDuLot({ species_code: 'porciculture' }), PORCS_F);
     assert.equal(familleDuLot({ species_code: 'cuniculture' }), LAPINS_F);
     assert.equal(familleDuLot({ species_code: 'aviculture' }), null);
-    assert.deepEqual(Object.keys(FAMILLES), ['lapins', 'porcs']);
+    assert.deepEqual(Object.keys(FAMILLES), ['lapins', 'porcs', 'escargots']);
 });
 
 test('écran : titre, KPI (libellés, valeurs), message sans bande, titre de saisie', () => {

@@ -22,7 +22,7 @@ export const ECRAN_COMMUN = {
     vide: '—',
 };
 
-const GROUPES = (poids) => [['Date', 'rowspan'], ['Entrées', 2], ['Sorties', 3], ['Effectif Final du Jour', 5], ['Taux Mort %', 'rowspan'], [poids, 'rowspan'], ['Traitements & Prophylaxie', 'rowspan']];
+const GROUPES = (poids, colonnes = 5) => [['Date', 'rowspan'], ['Entrées', 2], ['Sorties', 3], ['Effectif Final du Jour', colonnes], ['Taux Mort %', 'rowspan'], [poids, 'rowspan'], ['Traitements & Prophylaxie', 'rowspan']];
 const nombre = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const virgule = (n) => Number(n).toFixed(1).replace('.', ',');
 
@@ -114,7 +114,30 @@ export const PORCS_F = {
     categories: (r) => [r.repro, r.sevre, r.jeune],
 };
 
-export const FAMILLES = { lapins: LAPINS_F, porcs: PORCS_F };
+/**
+ * Escargots / héliciculture : PAS la vue commune. Pas de chaîne d'effectif par catégorie (`calcul: null`), pas de rationnement, de prophylaxie ni
+ * d'autonomie au web ; la saisie est celle de `fiche-escargots.js`. Le module `helico` doit être activé (`modules_config`).
+ */
+export const ESCARGOTS_F = {
+    id: 'escargots', espece: 'helico', calcul: null, filiere: null, bouton: 'Fiches Escargots', icone: 'bug_report', kg: false, escargots: true, module: 'helico',
+    ecran: {
+        titre: 'Fiches Escargots - Héliciculture',
+        sousTitre: "Suivi mensuel du cheptel d'escargots — ponte en terre, éclosion des naissains et engraissement.",
+        kpis: ['Effectif Total Vivant', 'Naissains Nés (mois)', "Taux d'Éclosion Naissains", 'Taux de Mortalité'],
+        kpiIcones: ['bug_report', 'child_care', 'egg_alt', 'trending_down'],
+        aucuneBande: 'Aucune bande active en héliciculture pour le moment.',
+        saisieTitre: 'Saisie Journalière du Cheptel',
+        groupes: GROUPES('Poids Général (g)', 4),
+        sousColonnes: ['Achat', 'Naissain Né', 'Mort', 'Vente', 'Don', 'Naissains', 'Engraiss.', 'Bordés', 'Total'],
+        colonnesEffectif: ['effectif_m', 'effectif_f', 'effectif_sevres'],
+    },
+    kpiValeurs: (k) => [nombre(k.effectif_total), String(k.naissains_mois), k.taux_eclosion === null ? '—' : `${virgule(k.taux_eclosion)} %`, `${virgule(k.taux_mortalite_mois)} %`],
+    motifs: { aucuneBande: "Aucune bande active en héliciculture. Créez d'abord une bande." },
+    libelles: {},
+    prophylaxie: null,
+};
+
+export const FAMILLES = { lapins: LAPINS_F, porcs: PORCS_F, escargots: ESCARGOTS_F };
 export const FAMILLE_PAR_DEFAUT = LAPINS_F;
 /** La famille d'une bande (par le code de son espèce), `null` si ni lapins ni porcs. */
 export const familleDuLot = (lot) => Object.values(FAMILLES).find((f) => f.espece === lot?.species_code) ?? null;

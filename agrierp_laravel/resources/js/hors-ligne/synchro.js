@@ -34,11 +34,13 @@ export const TABLES_GARDEES = [
     'purchase_orders', 'purchases',
     // PWA-3 (prophylaxie du jour) — saillies : le jour de cycle d'une bande en reproduction se compte depuis la dernière.
     'livestock_reproduction_events',
+    // PWA-3 (fiche escargots) — le module Héliciculture est-il activé ? (`modules_config`, petit référentiel servi en entier)
+    'modules_config',
 ];
 /** Familles PAGINÉES par le serveur : leurs lignes arrivent sur TOUTES les pages (les autres tables, sur la première seulement). */
 export const TABLES_PAGINEES = ['livestock_daily_entries', 'veterinary_records', 'livestock_transfers', 'purchases', 'livestock_reproduction_events'];
 /** Tables servies EN ENTIER à chaque tirage (jamais incrémentales) : leur copie est remplacée, une rémanence levée disparaît. */
-export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years', 'field_survey_entries', 'purchase_orders'];
+export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years', 'field_survey_entries', 'purchase_orders', 'modules_config'];
 const COLONNES_ENTREPRISE = ['company_name', 'tva_enabled', 'tva_default_rate', 'mecef_actif'];
 export const TAILLE_LOT = 20;
 const TIMEOUT_MS = 30_000;

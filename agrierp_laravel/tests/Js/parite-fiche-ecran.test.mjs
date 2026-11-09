@@ -20,10 +20,12 @@ const deux = (n) => String(n).padStart(2, '0');
 const AUJOURDHUI = ['2026-11-09', '2026-01-31', '2026-03-01', '2027-02-15'];
 let compteur = 0;
 const scenarios = [];
-for (let i = 0; i < 240; i++) {
-    const famille = i % 2 === 0 ? 'lapins' : 'porcs'; // une moitié des scénarios par fiche
-    const espece = famille === 'porcs' ? 'porciculture' : 'cuniculture';
+for (let i = 0; i < 360; i++) {
+    const famille = ['lapins', 'porcs', 'escargots'][i % 3]; // un tiers des scénarios par fiche
+    const espece = { lapins: 'cuniculture', porcs: 'porciculture', escargots: 'helico' }[famille];
     const autre = famille === 'porcs' ? 'cuniculture' : 'porciculture';
+    // Escargots : le module `helico` activé, désactivé ou jamais configuré.
+    const module = famille === 'escargots' ? [true, true, true, false, null][alea(5)] : null;
     const aujourdhui = AUJOURDHUI[i % AUJOURDHUI.length];
     const annee = Number(aujourdhui.slice(0, 4));
     const produits = [{ id: uuid(++compteur), name: 'Vermifuge' }, { id: uuid(++compteur), name: 'Anticoccidien' }];
@@ -47,7 +49,7 @@ for (let i = 0; i < 240; i++) {
                 const date = `${base.getUTCFullYear()}-${deux(base.getUTCMonth() + 1)}-${deux(d)}`;
                 fiches.push({
                     id: uuid(++compteur), lot_id: lot.id, entry_date: date, achat: alea(4) === 0 ? alea(5) : 0, ne: alea(12), mort: alea(5) === 0 ? alea(8) : 0, vente: alea(6) === 0 ? alea(6) : 0, don: alea(9) === 0 ? alea(3) : 0,
-                    effectif_m: alea(10), effectif_f: alea(30), effectif_sevres: alea(40), effectif_smeres: alea(40), effectif_final: 20 + alea(300),
+                    effectif_m: alea(10), effectif_f: alea(30), effectif_sevres: alea(40), effectif_smeres: alea(40), effectif_final: 20 + alea(300), ponte_total: alea(3) === 0 ? null : alea(60),
                     weight_sample_avg_g: alea(3) === 0 ? null : 500 + alea(4000), symptomes: alea(6) === 0 ? 'Diarrhée' : null,
                     treatment_product_id: alea(5) === 0 ? produits[alea(2)].id : null,
                     transfert_entree: alea(8) === 0 ? 1 + alea(5) : 0, transfert_sortie: alea(8) === 0 ? 1 + alea(5) : 0,
@@ -60,7 +62,7 @@ for (let i = 0; i < 240; i++) {
     const mois = alea(3);
     const choisi = new Date(Date.UTC(annee, Number(aujourdhui.slice(5, 7)) - 1 - mois - (i % 2 === 0 ? 0 : 6), 1 + alea(28)));
     scenarios.push({
-        famille, aujourdhui, produits, exercices, lots, fiches, soins, bandeId: alea(4) === 0 ? null : lotChoisi.id,
+        famille, module, aujourdhui, produits, exercices, lots, fiches, soins, bandeId: alea(4) === 0 ? null : lotChoisi.id,
         date: alea(12) === 0 ? 'pas-une-date' : `${choisi.getUTCFullYear()}-${deux(choisi.getUTCMonth() + 1)}-${deux(choisi.getUTCDate())}`,
     });
 }
@@ -82,7 +84,7 @@ test('écran = vrai FicheLapins : KPI, mois, jours, taux, poids, traitements, ba
     if (!retour) return t.skip(raison);
     let jours = 0; let bandeaux = 0; let avecTraitement = 0;
     scenarios.forEach((s, i) => {
-        const donnees = { lots: s.lots, fiches: s.fiches, soins: s.soins, produits: s.produits.map((p) => ({ id: p.id, name: p.name })), exercices: s.exercices };
+        const donnees = { modules: s.module === null ? [] : [{ species_code: 'helico', is_enabled: s.module }], lots: s.lots, fiches: s.fiches, soins: s.soins, produits: s.produits.map((p) => ({ id: p.id, name: p.name })), exercices: s.exercices };
         const m = modeleFiche(donnees, { bandeId: s.bandeId, date: s.date, aujourdhui: s.aujourdhui, famille: FAMILLES[s.famille] });
         const p = retour[i];
         const ctx = `scénario ${i}`;

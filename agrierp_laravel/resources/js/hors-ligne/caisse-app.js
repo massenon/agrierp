@@ -37,7 +37,7 @@ const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
     elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
-    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], famille: 'lapins', feedTypes: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
+    fiche: { vue: false, servie: false, donnees: null, bandeId: null, date: null, saisies: [], exercices: [], rations: [], famille: 'lapins', feedTypes: [], modules: [], releves: [], delais: null, standards: [], evenements: [], soinsEnAttente: [], saisie: null, saisieCle: null, retour: null },
     role: null,
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
@@ -156,6 +156,7 @@ async function chargerReferentiels() {
     // PWA-3 (É3) : saisies de fiche en attente d'envoi, exercices et barème, rejoués AVANT les ventes en attente.
     app.fiche.saisies = await saisiesEnAttente(app.ctx);
     app.fiche.exercices = await lire('fiscal_years');
+    app.fiche.modules = await lire('modules_config');
     app.fiche.feedTypes = await lire('feed_types');
     app.fiche.standards = await lire('prophylaxis_schedule_standards');
     app.fiche.evenements = await lire('livestock_reproduction_events');
@@ -169,10 +170,11 @@ async function chargerReferentiels() {
     // PWA-3 (É2) : la fiche lapins n'est offerte que si le serveur a servi les fiches (droit view-elevage).
     app.fiche.servie = Boolean(await app.base.lire('referentiels', 'livestock_daily_entries'));
     app.fiche.donnees = app.fiche.servie ? {
-        lots: app.elevage.lots, fiches: app.elevage.fiches, soins: soinsAvecLocaux(await lire('veterinary_records'), app.fiche.soinsEnAttente), produits: app.produits, exercices: await lire('fiscal_years'),
+        modules: app.fiche.modules, lots: app.elevage.lots, fiches: app.elevage.fiches, soins: soinsAvecLocaux(await lire('veterinary_records'), app.fiche.soinsEnAttente), produits: app.produits, exercices: await lire('fiscal_years'),
     } : null;
     $('btn-vue-fiche').hidden = !app.fiche.servie;
     $('btn-vue-porcs').hidden = !app.fiche.servie;
+    $('btn-vue-escargots').hidden = !app.fiche.servie;
     if (!app.fiche.servie && app.fiche.vue) basculerVue(null);
     if (app.fiche.vue) dessinerFiche();
     app.serverTime = (await app.base.meta('curseur')) ?? null;
@@ -225,7 +227,18 @@ function formulaireDuJour(m) {
     return rendreFormulaire(h, {
         s, famille: F,
         retourInitial: app.fiche.retour,
-        lire: () => ({ lot: lot(), fiches: donnees().fiches, jour, rations: app.fiche.rations.filter((r) => r.species_code === F.espece), autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === F.espece).map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves, app.fiche.delais), conflitsSoins: app.fiche.soinsEnAttente.filter((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict'), protocole: protocoleDuJour({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, espece: F.espece }), lectureSeule: lectureSeule(), enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'), conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null }),
+        lire: () => ({
+            lot: lot(), fiches: donnees().fiches, jour, lectureSeule: lectureSeule(),
+            enAttente: app.fiche.saisies.some((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'pending'),
+            conflit: app.fiche.saisies.find((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict')?.motif ?? null,
+            // Lapins et porcs : barème, autonomie alimentaire et prophylaxie du jour (les escargots n'en ont pas au web).
+            ...(F.escargots ? {} : {
+                rations: app.fiche.rations.filter((r) => r.species_code === F.espece),
+                autonomie: (kg) => evaluerAutonomie(produitProvende(app.produits, [...new Set(donnees().lots.filter((l) => l.species_code === F.espece).map((l) => l.species_id))]), kg, app.fiche.feedTypes, app.fiche.releves, app.fiche.delais),
+                conflitsSoins: app.fiche.soinsEnAttente.filter((x) => x.lot_id === bande.id && x.jour === jour && x.sync_status === 'conflict'),
+                protocole: protocoleDuJour({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, espece: F.espece }),
+            }),
+        }),
         actions: {
             validerTraitements: async (idsCoches, observations) => {
                 const r = validerTraitements({ lot: lot(), evenements: app.fiche.evenements, standards: app.fiche.standards, soins: donnees().soins, jour, aujourdhui: jourDuComptoir(), espece: F.espece, idsCoches, observations, role: app.role });
@@ -282,7 +295,7 @@ function basculerVue(famille) {
     if (famille !== null) app.fiche.famille = famille;
     if (change) { app.fiche.bandeId = null; app.fiche.date = null; app.fiche.saisie = null; app.fiche.saisieCle = null; app.fiche.retour = null; }
     $('contenu').hidden = app.fiche.vue; $('contenu-fiche').hidden = !app.fiche.vue;
-    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
+    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
     if (app.fiche.vue) dessinerFiche();
 }
 
@@ -602,6 +615,7 @@ function poserEcouteursGeneraux() {
     }, 5000);
     $('btn-vue-fiche').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'lapins' ? null : 'lapins'));
     $('btn-vue-porcs').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'porcs' ? null : 'porcs'));
+    $('btn-vue-escargots').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'escargots' ? null : 'escargots'));
     $('btn-verrouiller').addEventListener('click', () => verrouillerEcran('Application verrouillée. Saisissez votre PIN.'));
 }
 

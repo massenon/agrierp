@@ -26,6 +26,8 @@ Illuminate\Support\Facades\Gate::before(fn ($utilisateur = null) => true);
 
 use App\Livewire\Elevage\FicheLapins;
 use App\Livewire\Elevage\FichePorcs;
+use App\Livewire\Elevage\FicheEscargots;
+use App\Models\ModuleConfig;
 use App\Models\FeedRationStandard;
 use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
@@ -40,7 +42,7 @@ use Livewire\Livewire;
 
 $COLONNES = ['achat', 'ne', 'mort', 'vente', 'don', 'effectif_final', 'effectif_m', 'effectif_f', 'effectif_sevres', 'effectif_smeres', 'feed_qty_kg',
     'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'weight_sample_avg_g',
-    'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune'];
+    'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune', 'ponte_total'];
 $etatDesFiches = function (string $lotId) use ($COLONNES) {
     return LivestockDailyEntry::where('lot_id', $lotId)->orderBy('entry_date')->get()->map(function ($f) use ($COLONNES) {
         $o = ['entry_date' => $f->entry_date->format('Y-m-d')];
@@ -61,7 +63,11 @@ foreach ($entree['scenarios'] as $i => $s) {
         Carbon::setTestNow(Carbon::parse($s['aujourdhui'].' 12:00:00', 'Africa/Porto-Novo'));
         session()->flush();
         $porcs = ($s['famille'] ?? 'lapins') === 'porcs';
-        $code = $porcs ? 'porciculture' : 'cuniculture';
+        $egot = ($s['famille'] ?? 'lapins') === 'escargots';
+        $code = $egot ? 'helico' : ($porcs ? 'porciculture' : 'cuniculture');
+        if ($egot) {
+            ModuleConfig::create(['species_code' => 'helico', 'is_enabled' => true]);   // sinon la fiche n'offre aucune bande
+        }
         $espece = LivestockSpecies::firstOrCreate(['code' => $code], ['label' => ucfirst($code), 'is_enabled' => true]);
         foreach ($s['exercices'] as $e) {
             FiscalYear::create(['year' => $e['year'], 'start_date' => $e['start_date'], 'end_date' => $e['end_date'], 'status' => $e['status']]);
@@ -97,16 +103,23 @@ foreach ($entree['scenarios'] as $i => $s) {
 
         // Noms internes de la saisie (ceux des emplacements de synchronisation) → propriétés du composant des porcs.
         $noms = $porcs ? ['mortChair' => 'mortMarchand', 'mortLapereau' => 'mortPorcelet', 'donChair' => 'donMarchand', 'donLapereau' => 'donPorcelet', 'effectifM' => 'effectifVerrats', 'effectifF' => 'effectifTruies', 'effectifSevres' => 'effectifPorcelets', 'effectifSmeres' => 'effectifEngraissement', 'peseeTotal' => 'peseeTotalKg'] : [];
-        $t = Livewire::test($porcs ? FichePorcs::class : FicheLapins::class)->set('bandeId', $lot->id)->set('selectedDate', $s['jour']);
+        $t = Livewire::test($egot ? FicheEscargots::class : ($porcs ? FichePorcs::class : FicheLapins::class))->set('bandeId', $lot->id)->set('selectedDate', $s['jour']);
         $c = $t->instance();
         $charge = [];
-        foreach (['achat', 'ne', 'mortRepro', 'mortChair', 'mortLapereau', 'donRepro', 'donChair', 'donLapereau', 'passage', 'effectifM', 'effectifF', 'effectifSevres', 'effectifSmeres', 'departRepro', 'departSevre', 'departJeune', 'peseeTotal', 'mortAncienTotal', 'donAncienTotal'] as $p) {
+        $proprietes = $egot
+            ? ['achat', 'oeufsTerre', 'naissainsNes', 'mortBorde', 'mortEngraissement', 'mortNaissain', 'donBorde', 'donEngraissement', 'donNaissain', 'mortEnregistre', 'donEnregistre', 'effectifNaissains', 'effectifEngraissement', 'effectifBordes', 'peseeTotal']
+            : ['achat', 'ne', 'mortRepro', 'mortChair', 'mortLapereau', 'donRepro', 'donChair', 'donLapereau', 'passage', 'effectifM', 'effectifF', 'effectifSevres', 'effectifSmeres', 'departRepro', 'departSevre', 'departJeune', 'peseeTotal', 'mortAncienTotal', 'donAncienTotal'];
+        foreach ($proprietes as $p) {
             $charge[$p] = $c->{$noms[$p] ?? $p};
         }
         foreach ($s['saisie'] as $p => $v) {
             $t->set($noms[$p] ?? $p, $v);
         }
         $a = $t->instance();
+        if ($egot) {
+            $apercu = ['veille' => $a->getPreviousEffectifProperty(), 'vente' => $a->getVenteDuJourProperty(), 'effectifFinal' => $a->getEffectifFinalCalcProperty(), 'taux' => $a->getMortalityRateCalcProperty(),
+                'poidsEstime' => $a->getPoidsMoyenEstimeProperty(), 'eclosion' => $a->getEclosionRateCalcProperty()];
+        } else {
         $cat = $a->getCategoriesJourProperty();
         $apercu = [
             'veille' => $a->getPreviousEffectifProperty(), 'effectifFinal' => $a->getEffectifFinalCalcProperty(), 'taux' => $a->getMortalityRateCalcProperty(),
@@ -115,6 +128,7 @@ foreach ($entree['scenarios'] as $i => $s) {
             'autonomie' => (function () use ($a) { $x = $a->getFeedAutonomyProperty(); return ['available' => $x['available'], 'product' => isset($x['product']) ? $x['product']->id : null, 'stock_kg' => $x['stock_kg'] ?? null, 'autonomie_jours' => $x['autonomie_jours'] ?? null, 'critique' => $x['critique'] ?? null, 'rupture' => $x['rupture'] ?? null, 'inconnu' => $x['inconnu'] ?? false]; })(),
             'cat' => array_intersect_key($cat, array_flip(['mode', 'repro', 'sevre', 'jeune', 'motif', 'refus_passage', 'avertissements', 'depart_requis', 'depart_date'])),
         ];
+        }
         $t->call('saveDay');
         $toast = null;
         foreach ($t->effects['dispatches'] ?? [] as $d) {
