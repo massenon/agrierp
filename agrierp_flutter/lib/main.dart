@@ -1855,7 +1855,7 @@ class _BarreLaterale extends StatelessWidget {
                   children: [
                     const Icon(SymbolesAgri.agriculture, color: AgriColors.accentYellow, size: 26),
                     const SizedBox(width: AgriSpacing.sm),
-                    // « Agri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
+                    // « LogiAgri » blanc puis « ERP » jaune, `font-extrabold text-lg`.
                     RichText(
                       key: const Key('barre-laterale-marque'),
                       text: const TextSpan(

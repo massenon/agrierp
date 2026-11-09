@@ -23,7 +23,7 @@ body{font-family:'Inter',sans-serif;}
     <div class="fade-up d1 w-24 h-24 md:w-28 md:h-28 rounded-full bg-white/5 border border-white/20 flex items-center justify-center mb-6">
         <span class="material-symbols-outlined text-[#a6f2d1]" style="font-size:56px;">agriculture</span>
     </div>
-    <h1 class="fade-up d2 font-extrabold text-3xl md:text-5xl leading-tight max-w-3xl">Bienvenue sur <span class="text-[#FFD55F]">Agri</span>ERP</h1>
+    <h1 class="fade-up d2 font-extrabold text-3xl md:text-5xl leading-tight max-w-3xl">Bienvenue sur LogiAgri<span class="text-[#FFD55F]">ERP</span></h1>
     <p class="fade-up d3 text-white/70 text-sm md:text-base max-w-xl mt-4 leading-relaxed">
         La solution intégrée pour gérer votre exploitation agricole : ventes, stocks, comptabilité SYSCOHADA et élevage — au comptoir comme au champ.
     </p>
