@@ -8,7 +8,7 @@
  * Kg pour les porcs). Les libellés sont lus dans `fiche-lapins.blade.php` / `fiche-porcs.blade.php` par les gardes de sources.
  */
 
-import { LAPINS, PORCS } from './effectif-categories.js';
+import { LAPINS, PORCS, VOLAILLES_REPRO } from './effectif-categories.js';
 import { provendeDuJour, provendeDuJourPorcs } from './fiche-lapins-calculs.js';
 
 /** Libellés communs aux deux écrans (identiques dans les deux Blade). */
@@ -137,7 +137,43 @@ export const ESCARGOTS_F = {
     prophylaxie: null,
 };
 
-export const FAMILLES = { lapins: LAPINS_F, porcs: PORCS_F, escargots: ESCARGOTS_F };
+const STADES_AVICULTURE = { reproduction: 'Reproducteur', croissance: 'Poussin', engraissement: 'Jeune', ponte: 'Ponte' };
+
+/**
+ * Volailles REPRODUCTEURS (VOL-1) : Reproducteur / Jeune / Poussin (emplacements `repro` / `jeune` / `sevre`), départ OBLIGATOIRE avant toute journée,
+ * ventes par catégorie en lecture seule (la caisse les range), passage Poussin → Jeune, couvoir (œufs couvés = `ponte_total`, poussins nés = `ne`).
+ * Les bandes : aviculture HORS stade `ponte` (les pondeuses sont l'autre famille). Pas de colonne de traitements au tableau du mois.
+ */
+export const REPRODUCTEURS_F = {
+    id: 'reproducteurs', espece: 'aviculture', calcul: VOLAILLES_REPRO, filiere: 'aviculture', bouton: 'Fiches Reproducteurs', icone: 'grid_view', kg: false, volaille: true,
+    accepte: (lot) => lot.species_code === 'aviculture' && lot.stage !== 'ponte',
+    libelleStade: (stade) => STADES_AVICULTURE[stade] ?? (stade ? `${String(stade)[0].toUpperCase()}${String(stade).slice(1)}` : ''),
+    ecran: {
+        titre: 'Fiches Volailles - Reproducteurs, Poussins & Goliath',
+        sousTitre: 'Suivi de la reproduction avicole, couvoir, incubation, éclosion, poussins et poulets de chair.',
+        kpis: ['Effectif Total Vivant', "Taux d'Éclosion Couvoir", 'Poussins Nés (Éclosion)', 'Taux de Mortalité'],
+        kpiLegendes: ['Reproducteurs, Poussins & Goliath', 'Ratio : Poussins Nés ÷ Œufs Couvés', 'Cumul naissances au couvoir', 'Seuil critique < 5%'],
+        kpiIcones: ['grid_view', 'egg', 'child_care', 'trending_down'],
+        aucuneBande: 'Aucune bande active (Reproducteurs/Goliath/Poussins) pour le moment.',
+        saisieTitre: 'Saisie Journalière Couvoir & Suivi Chair',
+        bandeLabel: 'Bande / Lot Concerné', bandeToujours: true,
+        groupes: [['Date', 'rowspan'], ['Couvoir', 2], ['Morts (total)', 1], ['Effectif Final', 'rowspan'], ['Taux Mort %', 'rowspan'], ['Poids Général (g)', 'rowspan']],
+        sousColonnes: ['Couvés', 'Nés', 'Reproducteur+Jeune+Poussin'],
+        cartes: ['Couvés', 'Nés', 'Morts (total)', 'Effectif Final', 'Taux Mort %', 'Poids Général (g)'],
+        // Cellules du tableau mensuel (dans l'ordre du Blade) : champ, alerte rouge si > 0, gras.
+        cellules: [['ponte_total'], ['ne'], ['mort', 'alerte'], ['effectif_final', 'gras'], ['taux', 'tauxAlerte'], ['poids_general_g', 'num']],
+        note: 'La ventilation Reproducteur / Jeune / Poussin des morts, des dons et des ventes est conservée par catégorie (ticket VOL-1) — le tableau mensuel en affiche le cumul.',
+    },
+    kpiValeurs: (k) => [nombre(k.effectif_total), k.taux_eclosion === null ? '—' : `${virgule(k.taux_eclosion)} %`, String(k.poussins_nes), `${virgule(k.taux_mortalite_mois)} %`],
+    motifs: {
+        aucuneBande: "Sélectionnez d'abord une bande.",
+        ancienneFiche: "Cette fiche porte des morts ou des dons non ventilés par catégorie : ventilez-les (Reproducteur / Jeune / Poussin) avant d'enregistrer.",
+    },
+    libelles: {},
+    prophylaxie: { titre: 'Traitements & Prophylaxie', observations: 'Observations', observationsExemple: 'ex : RAS' },
+};
+
+export const FAMILLES = { lapins: LAPINS_F, porcs: PORCS_F, escargots: ESCARGOTS_F, reproducteurs: REPRODUCTEURS_F };
 export const FAMILLE_PAR_DEFAUT = LAPINS_F;
 /** La famille d'une bande (par le code de son espèce), `null` si ni lapins ni porcs. */
-export const familleDuLot = (lot) => Object.values(FAMILLES).find((f) => f.espece === lot?.species_code) ?? null;
+export const familleDuLot = (lot) => Object.values(FAMILLES).find((f) => (f.accepte ? f.accepte(lot ?? {}) : f.espece === lot?.species_code)) ?? null;

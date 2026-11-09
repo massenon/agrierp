@@ -26,6 +26,7 @@ app()->setLocale('fr');
 use App\Livewire\Elevage\FicheLapins;
 use App\Livewire\Elevage\FichePorcs;
 use App\Livewire\Elevage\FicheEscargots;
+use App\Livewire\Elevage\FicheReproducteurs;
 use App\Models\ModuleConfig;
 use App\Models\FiscalYear;
 use App\Models\LivestockDailyEntry;
@@ -58,7 +59,7 @@ foreach ($entree['scenarios'] as $i => $s) {
         $especes = [];
         foreach ($s['lots'] as $l) {
             $especes[$l['species_code']] ??= LivestockSpecies::firstOrCreate(['code' => $l['species_code']], ['label' => ucfirst($l['species_code']), 'is_enabled' => true]);
-            $lot = new LivestockLot(['code' => $l['code'], 'species_id' => $especes[$l['species_code']]->id, 'stage' => 'reproduction', 'initial_quantity' => $l['initial_quantity'], 'current_quantity' => $l['current_quantity'], 'created_date' => '2026-01-01', 'status' => $l['status'], 'is_active' => $l['is_active']]);
+            $lot = new LivestockLot(['code' => $l['code'], 'species_id' => $especes[$l['species_code']]->id, 'stage' => $l['stage'] ?? 'reproduction', 'initial_quantity' => $l['initial_quantity'], 'current_quantity' => $l['current_quantity'], 'created_date' => '2026-01-01', 'status' => $l['status'], 'is_active' => $l['is_active']]);
             $lot->id = $l['id'];
             $lot->save();
         }
@@ -76,7 +77,11 @@ foreach ($entree['scenarios'] as $i => $s) {
         if ($s['famille'] === 'escargots' && $s['module'] !== null) {
             ModuleConfig::create(['species_code' => 'helico', 'is_enabled' => $s['module']]);
         }
-        $c = match ($s['famille']) { 'porcs' => new FichePorcs, 'escargots' => new FicheEscargots, default => new FicheLapins };
+        $c = match ($s['famille']) { 'porcs' => new FichePorcs, 'escargots' => new FicheEscargots, 'reproducteurs' => new FicheReproducteurs, default => new FicheLapins };
+        if ($c instanceof FicheReproducteurs) {
+            // `mount()` : la bande choisie, sinon la première (`selectedLotId`) ; ici on ne monte pas le composant.
+            $c->selectedLotId = $s['bandeId'] ?? ($c->getLotsProperty()->first()?->id ?? '');
+        }
         if ($c instanceof FicheEscargots) {
             $c->moduleEnabled = ModuleConfig::isEnabled('helico');   // `mount()` le lit ; ici on ne monte pas le composant
         }
@@ -100,7 +105,7 @@ foreach ($entree['scenarios'] as $i => $s) {
                     'effectif_m' => $entry->effectif_m,
                     'mort' => $entry->mort,
                 ],
-                'traitements' => $c->traitementsDuJour($jour, $entry),
+                'traitements' => method_exists($c, 'traitementsDuJour') ? $c->traitementsDuJour($jour, $entry) : null,   // pas de colonne de traitements chez les reproducteurs
             ];
         }
         $sortie[$i] = [
@@ -110,7 +115,7 @@ foreach ($entree['scenarios'] as $i => $s) {
             'estMoisCourant' => $c->getEstMoisCourantProperty(),
             'bandeau' => $c->getBandeauLectureSeuleProperty(),
             'transferts' => $c->getTransfertsDuJourProperty(),
-            'bande' => $c->getBandeProperty()?->id,
+            'bande' => $c instanceof FicheReproducteurs ? $c->getSelectedLotProperty()?->id : $c->getBandeProperty()?->id,
         ];
     } finally {
         DB::rollBack();

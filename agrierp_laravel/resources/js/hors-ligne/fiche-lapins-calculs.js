@@ -184,3 +184,35 @@ export function provendeDuJourPorcs(cat, rations) {
     const total = inconnu ? null : porcelet.total_g + jeune.total_g + repro.total_g;
     return { porcelet, jeune, repro, total_g: total, total_kg: total === null ? null : arrondiPhp(total / 1000, 2) };
 }
+
+// -------------------------------------------------------------------------- volailles reproductrices (PWA-3, fiche reproducteurs)
+
+/** `CategorieVolaille::RATIONS_PROVISOIRES` — UNIQUEMENT si le barème ne porte pas la ligne. */
+export const RATIONS_VOLAILLES_PROVISOIRES = { reproducteur: 130, jeune: 80, poussin: 30 };
+export const LIBELLES_VOLAILLES = { reproducteur: 'Reproducteur', jeune: 'Jeune', poussin: 'Poussin' };
+/** `CategorieVolaille::EMPLACEMENTS` : reproducteur → `repro`, jeune → `jeune`, poussin → `sevre`. */
+export const EMPLACEMENTS_VOLAILLES = { reproducteur: 'repro', jeune: 'jeune', poussin: 'sevre' };
+
+/** `CategorieVolaille::cleDuLibelle` : ÉGALITÉ STRICTE du libellé normalisé (jamais une sous-chaîne), `null` sinon. */
+export function cleVolaille(libelle) {
+    const l = ascii(libelle);
+    return Object.entries(LIBELLES_VOLAILLES).find(([, affiche]) => ascii(affiche) === l)?.[0] ?? null;
+}
+
+/** `CategorieVolaille::ration`. */
+export function rationVolaille(rations, cle) {
+    const ligne = rations.find((r) => cleVolaille(r.stage_label) === cle);
+    return Math.trunc(Number(ligne?.ration_g_per_day ?? RATIONS_VOLAILLES_PROVISOIRES[cle])) || 0;
+}
+
+/** `CategorieVolaille::tableauReproducteurs` : une ligne par catégorie (effectif calculé × ration), total g et kg (2 décimales), `null` si une catégorie est inconnue. */
+export function tableauReproducteurs(rations, effectifs) {
+    const lignes = Object.keys(LIBELLES_VOLAILLES).map((cle) => {
+        const effectif = effectifs[EMPLACEMENTS_VOLAILLES[cle]] ?? null;
+        const ration = rationVolaille(rations, cle);
+        return { cle, libelle: LIBELLES_VOLAILLES[cle], ration, effectif: effectif === null ? null : Math.trunc(effectif), total_g: effectif === null ? null : Math.trunc(effectif) * ration };
+    });
+    const inconnu = lignes.some((l) => l.total_g === null);
+    const total = inconnu ? null : lignes.reduce((s, l) => s + l.total_g, 0);
+    return { lignes, total_g: total, total_kg: total === null ? null : arrondiPhp(total / 1000, 2) };
+}

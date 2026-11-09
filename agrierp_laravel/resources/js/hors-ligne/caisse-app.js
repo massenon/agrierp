@@ -175,6 +175,7 @@ async function chargerReferentiels() {
     $('btn-vue-fiche').hidden = !app.fiche.servie;
     $('btn-vue-porcs').hidden = !app.fiche.servie;
     $('btn-vue-escargots').hidden = !app.fiche.servie;
+    $('btn-vue-reproducteurs').hidden = !app.fiche.servie;
     if (!app.fiche.servie && app.fiche.vue) basculerVue(null);
     if (app.fiche.vue) dessinerFiche();
     app.serverTime = (await app.base.meta('curseur')) ?? null;
@@ -295,7 +296,7 @@ function basculerVue(famille) {
     if (famille !== null) app.fiche.famille = famille;
     if (change) { app.fiche.bandeId = null; app.fiche.date = null; app.fiche.saisie = null; app.fiche.saisieCle = null; app.fiche.retour = null; }
     $('contenu').hidden = app.fiche.vue; $('contenu-fiche').hidden = !app.fiche.vue;
-    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
+    for (const [id, f] of [['btn-vue-fiche', 'lapins'], ['btn-vue-porcs', 'porcs'], ['btn-vue-escargots', 'escargots'], ['btn-vue-reproducteurs', 'reproducteurs']]) $(id).lastChild.textContent = app.fiche.vue && app.fiche.famille === f ? 'Caisse' : FAMILLES[f].bouton;
     if (app.fiche.vue) dessinerFiche();
 }
 
@@ -615,6 +616,7 @@ function poserEcouteursGeneraux() {
     }, 5000);
     $('btn-vue-fiche').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'lapins' ? null : 'lapins'));
     $('btn-vue-porcs').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'porcs' ? null : 'porcs'));
+    $('btn-vue-reproducteurs').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'reproducteurs' ? null : 'reproducteurs'));
     $('btn-vue-escargots').addEventListener('click', () => basculerVue(app.fiche.vue && app.fiche.famille === 'escargots' ? null : 'escargots'));
     $('btn-verrouiller').addEventListener('click', () => verrouillerEcran('Application verrouillée. Saisissez votre PIN.'));
 }

@@ -22,9 +22,9 @@ let compteur = 0;
 const scenarios = [];
 const NB = Number(process.env.SCENARIOS_LIMITE ?? 600); // une valeur réduite sert aux contrôles par mutation seulement
 for (let i = 0; i < NB; i++) {
-    const famille = i % 2 === 0 ? 'lapins' : 'porcs';
-    const espece = famille === 'porcs' ? 'porciculture' : 'cuniculture';
-    const autre = famille === 'porcs' ? 'cuniculture' : 'porciculture';
+    const famille = ['lapins', 'porcs', 'reproducteurs'][i % 3];
+    const espece = { lapins: 'cuniculture', porcs: 'porciculture', reproducteurs: 'aviculture' }[famille];
+    const autre = famille === 'porcs' ? 'cuniculture' : (famille === 'reproducteurs' ? 'porciculture' : 'porciculture');
     const stage = ['reproduction', 'croissance', 'engraissement'][alea(3)];
     const lot = { id: uuid(++compteur), stage, created_date: jour(10 + alea(20)) };
     const evenements = stage === 'reproduction' ? Array.from({ length: alea(4) }, () => ({ id: uuid(++compteur), saillie_date: jour(alea(40)) })) : [];

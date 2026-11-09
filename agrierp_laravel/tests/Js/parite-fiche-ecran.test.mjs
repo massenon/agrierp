@@ -20,10 +20,12 @@ const deux = (n) => String(n).padStart(2, '0');
 const AUJOURDHUI = ['2026-11-09', '2026-01-31', '2026-03-01', '2027-02-15'];
 let compteur = 0;
 const scenarios = [];
-for (let i = 0; i < 360; i++) {
-    const famille = ['lapins', 'porcs', 'escargots'][i % 3]; // un tiers des scénarios par fiche
-    const espece = { lapins: 'cuniculture', porcs: 'porciculture', escargots: 'helico' }[famille];
-    const autre = famille === 'porcs' ? 'cuniculture' : 'porciculture';
+for (let i = 0; i < 480; i++) {
+    const famille = ['lapins', 'porcs', 'escargots', 'reproducteurs'][i % 4]; // un quart des scénarios par fiche
+    const espece = { lapins: 'cuniculture', porcs: 'porciculture', escargots: 'helico', reproducteurs: 'aviculture' }[famille];
+    const autre = famille === 'porcs' ? 'cuniculture' : (famille === 'reproducteurs' ? 'aviculture' : 'porciculture');
+    const stageAutre = famille === 'reproducteurs' ? 'ponte' : 'reproduction'; // les pondeuses ne sont PAS dans la fiche des reproducteurs
+    const stageDe = () => (famille === 'reproducteurs' ? ['reproduction', 'croissance', 'engraissement'][alea(3)] : 'reproduction');
     // Escargots : le module `helico` activé, désactivé ou jamais configuré.
     const module = famille === 'escargots' ? [true, true, true, false, null][alea(5)] : null;
     const aujourdhui = AUJOURDHUI[i % AUJOURDHUI.length];
@@ -33,9 +35,9 @@ for (let i = 0; i < 360; i++) {
         { id: 2, year: annee, start_date: `${annee}-01-01`, end_date: `${annee}-12-31`, status: i % 7 === 0 ? 'cloture' : 'ouvert' }];
     if (i % 11 === 0) exercices.length = 1;
     const lots = [];
-    for (let k = 0; k < 1 + alea(3); k++) lots.push({ id: uuid(++compteur), code: `LAP-${i}-${k}`, species_code: espece, status: 'actif', is_active: true, initial_quantity: 50 + alea(150), current_quantity: alea(200) });
-    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `ARCH-${i}`, species_code: espece, status: 'archive', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
-    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `POR-${i}`, species_code: autre, status: 'actif', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
+    for (let k = 0; k < 1 + alea(3); k++) lots.push({ id: uuid(++compteur), code: `LAP-${i}-${k}`, species_code: espece, stage: stageDe(), status: 'actif', is_active: true, initial_quantity: 50 + alea(150), current_quantity: alea(200) });
+    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `ARCH-${i}`, species_code: espece, stage: stageDe(), status: 'archive', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
+    if (alea(3) === 0) lots.push({ id: uuid(++compteur), code: `POR-${i}`, species_code: autre, stage: stageAutre, status: 'actif', is_active: true, initial_quantity: 100, current_quantity: alea(50) });
     const fiches = [];
     const soins = [];
     for (const lot of lots) {
@@ -58,9 +60,11 @@ for (let i = 0; i < 360; i++) {
             }
         }
     }
-    const lotChoisi = lots[alea(lots.length)];
+    // Reproducteurs : le sélecteur ne propose que les bandes de la fiche (une bande hors liste ne peut pas être choisie).
+    const choisissables = famille === 'reproducteurs' ? lots.filter((l) => l.status === 'actif' && l.stage !== 'ponte') : lots;
+    const lotChoisi = choisissables[alea(choisissables.length)] ?? lots[0];
     const mois = alea(3);
-    const choisi = new Date(Date.UTC(annee, Number(aujourdhui.slice(5, 7)) - 1 - mois - (i % 2 === 0 ? 0 : 6), 1 + alea(28)));
+    const choisi = new Date(Date.UTC(annee, Number(aujourdhui.slice(5, 7)) - 1 - mois - (Math.floor(i / 4) % 2 === 0 ? 0 : 6), 1 + alea(28)));
     scenarios.push({
         famille, module, aujourdhui, produits, exercices, lots, fiches, soins, bandeId: alea(4) === 0 ? null : lotChoisi.id,
         date: alea(12) === 0 ? 'pas-une-date' : `${choisi.getUTCFullYear()}-${deux(choisi.getUTCMonth() + 1)}-${deux(choisi.getUTCDate())}`,
@@ -106,7 +110,7 @@ test('écran = vrai FicheLapins : KPI, mois, jours, taux, poids, traitements, ba
                 assert.equal(j.fiche.effectif_final, q.fiche.effectif_final, `${ctx} ${j.date} effectif affiché`);
                 assert.equal(j.fiche.effectif_m, q.fiche.effectif_m, `${ctx} ${j.date} effectif M`);
             }
-            assert.equal(j.traitements, q.traitements, `${ctx} ${j.date} traitements`);
+            if (s.famille !== 'reproducteurs') assert.equal(j.traitements, q.traitements, `${ctx} ${j.date} traitements`);
             jours++; if (j.traitements !== '—') avecTraitement++;
         });
         if (m.bandeau) bandeaux++;

@@ -39,11 +39,12 @@ const sql = (requete) => execFileSync('php', ['-r', "$p = new PDO('sqlite:'.$arg
 // FICHE_FAMILLE=porcs : MÊME scénario sur la fiche porcs (espèce porciculture, bouton « Fiches Porcs », provende de 600 g/j par porc marchand).
 // FICHE_FAMILLE=escargots : fiche Escargots (module helico activé ; pas de départ, de prophylaxie ni d'autonomie au web).
 const PORCS = process.env.FICHE_FAMILLE === 'porcs';
+const REPRO = process.env.FICHE_FAMILLE === 'reproducteurs'; // volailles reproductrices : départ obligatoire proposé par un bouton, ventes par catégorie, tableau du mois propre
 const ESC = process.env.FICHE_FAMILLE === 'escargots';
-const ESPECE = ESC ? 'helico' : (PORCS ? 'porciculture' : 'cuniculture');
-const BOUTON = ESC ? '#btn-vue-escargots' : (PORCS ? '#btn-vue-porcs' : '#btn-vue-fiche');
-const CHAMP_MORT = ESC ? '#saisie-mortNaissain' : '#saisie-mortChair';
-const COL_FINAL = ESC ? 10 : 11; // l'effectif final : après 3 colonnes d'effectif (escargots) ou 4
+const ESPECE = ESC ? 'helico' : (REPRO ? 'aviculture' : (PORCS ? 'porciculture' : 'cuniculture'));
+const BOUTON = ESC ? '#btn-vue-escargots' : (REPRO ? '#btn-vue-reproducteurs' : (PORCS ? '#btn-vue-porcs' : '#btn-vue-fiche'));
+const CHAMP_MORT = ESC ? '#saisie-mortNaissain' : (REPRO ? '#saisie-mortPoulet' : '#saisie-mortChair');
+const COL_FINAL = ESC ? 10 : (REPRO ? 5 : 11); // l'effectif final : après 3 colonnes d'effectif (escargots) ou 4
 const resultats = [];
 const ok = (nom) => { resultats.push(nom); console.log(`  ✔ ${nom}`); };
 
@@ -53,8 +54,9 @@ php(['artisan', 'tinker', '--execute', `
     $lap = \\App\\Models\\LivestockSpecies::firstOrCreate(['code' => '${ESPECE}'], ['label' => 'Espece', 'is_enabled' => true]);
     $lot = \\App\\Models\\LivestockLot::forceCreate(['code' => 'BANDE-SAISIE', 'species_id' => $lap->id, 'stage' => '${ESC ? 'croissance' : 'engraissement'}', 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
     if (${ESC}) { \\App\\Models\\ModuleConfig::updateOrCreate(['species_code' => 'helico'], ['is_enabled' => true]); }
+    if (${REPRO}) { \\App\\Models\\Product::where('species_id', $lap->id)->update(['name' => 'Divers volaille']); }   // le semis a déjà des aliments d'aviculture : on ne garde que le nôtre
     $cat = \\App\\Models\\ProductCategory::first() ?? \\App\\Models\\ProductCategory::create(['label' => 'Aliments', 'is_active' => true]);
-    \\App\\Models\\Product::forceCreate(['sku' => 'PROV-LAP', 'name' => '${PORCS ? 'Provende porc' : 'Provende lapin'}', 'category_id' => $cat->id, 'species_id' => $lap->id, 'unit' => 'kg', 'pricing_mode' => 'fourchette', 'price_min' => 400, 'price_max' => 500, 'stock_qty' => 10, 'tva_rate' => 0, 'is_active' => true]);
+    \\App\\Models\\Product::forceCreate(['sku' => 'PROV-LAP', 'name' => '${PORCS ? 'Provende porc' : (REPRO ? 'Provende volaille' : 'Provende lapin')}', 'category_id' => $cat->id, 'species_id' => $lap->id, 'unit' => 'kg', 'pricing_mode' => 'fourchette', 'price_min' => 400, 'price_max' => 500, 'stock_qty' => 10, 'tva_rate' => 0, 'is_active' => true]);
     \\DB::table('prophylaxis_schedule_standards')->update(['is_active' => false]);
     \\DB::table('prophylaxis_schedule_standards')->insert(['id' => '00000000-0000-4000-8000-0000000000aa', 'species_code' => '${ESPECE}', 'period_label' => 'E2E', 'treatment' => 'Vermifuge E2E', 'product_recommended' => 'Ivermectine', 'dosage' => '1 ml', 'withdrawal_days' => 5, 'is_active' => true, 'cycle_day_start' => 1, 'cycle_day_end' => 9999, 'created_at' => now(), 'updated_at' => now()]);
     foreach ([2, 1, 0] as $k) {
@@ -119,6 +121,7 @@ try {
     await page.dispatchEvent('#fiche-date', 'change');
     await page.waitForSelector(`#fiche-mensuel tbody tr.choisi[data-jour="${hier}"]`);
     assert.equal(await page.isDisabled('#saisie-enregistrer'), false, 'le compte admin peut écrire');
+    if (REPRO) { await page.click('#depart-proposition'); assert.match(await page.textContent('#depart-requis'), /obligatoire/); }
     if (!ESC) assert.equal(await page.inputValue('#saisie-departJeune'), '40', 'départ proposé d\'après le stade (engraissement = Jeune)');
     if (ESC) {
         assert.equal(await page.$('#saisie-autonomie'), null, 'aucune autonomie alimentaire pour les escargots (rien au web)');
@@ -126,6 +129,12 @@ try {
         assert.match(await page.textContent('.fiche-kpi'), /^Effectif Total Vivant/);
         const entetes = await page.$$eval('#fiche-mensuel thead th', (t) => t.map((x) => x.textContent));
         assert.ok(entetes.includes('Naissain Né') && entetes.includes('Bordés') && entetes.includes('Poids Général (g)'), 'colonnes de la fiche escargots');
+    } else if (REPRO) {
+        assert.equal((await page.textContent('#saisie-autonomie')).trim(), 'Autonomie alimentaire : 3.1 jours (Provende volaille, 10 Kg en stock).', 'autonomie : 10 kg ÷ (40 jeunes × 80 g)');
+        assert.equal(await page.textContent('#day-total-provende-g'), '3200 g (3.2 Kg)');
+        assert.match(await page.textContent('.fiche-kpi'), /^Effectif Total Vivant/);
+        const entetes = await page.$$eval('#fiche-mensuel thead th', (t) => t.map((x) => x.textContent));
+        assert.deepEqual(entetes, ['Date', 'Couvoir', 'Morts (total)', 'Effectif Final', 'Taux Mort %', 'Poids Général (g)', 'Couvés', 'Nés', 'Reproducteur+Jeune+Poussin']);
     } else if (PORCS) {
         assert.match((await page.textContent('#saisie-autonomie')).trim(), /Alerte critique - Autonomie alimentaire.*Provende porc ne couvre plus que 0\.4 jours/, 'autonomie : 10 kg ÷ (40 porcs × 600 g) = 0,4 jour : critique');
         assert.equal(await page.textContent('#day-total-provende-g'), '24000 g (24 Kg)');
@@ -147,7 +156,7 @@ try {
         await page.waitForFunction(() => /\S/.test(document.querySelector('#saisie-alertes').textContent));
         const motif = await page.textContent('#saisie-alertes');
         assert.match(motif, /somme/i, 'le motif du départ est dit');
-        await page.fill('#saisie-mortChair', '3');
+        await page.fill(CHAMP_MORT, '3');
         await page.click('#saisie-enregistrer');
         await page.waitForFunction(() => /\S/.test(document.querySelector('#saisie-retour').textContent));
         assert.equal((await page.textContent('#saisie-retour')).trim(), motif.trim(), 'le refus reprend la phrase du web');
@@ -161,7 +170,7 @@ try {
     await page.waitForFunction(() => /Jour enregistré avec succès\./.test(document.querySelector('#saisie-retour')?.textContent ?? ''));
     assert.match(await page.textContent('#saisie-etat'), /en attente d'envoi/);
     assert.deepEqual(await colonne(), ['40', '37', '37'], 'l\'effectif des jours suivants change (cascade)');
-    assert.match(await page.textContent('.fiche-kpi'), /37$/, 'effectif total de la bande');
+    assert.match(await page.textContent('.fiche-kpi'), /37(Reproducteurs, Poussins & Goliath)?$/, 'effectif total de la bande');
     assert.equal(effectifsServeur(), avant, 'le serveur n\'a rien reçu');
     ok('saisie enregistrée sur l\'appareil : 37 le jour saisi et le lendemain, « en attente d\'envoi », serveur intact');
 
@@ -228,7 +237,7 @@ try {
 
     // --- Refus d'exercice clos : motif du serveur montré, jamais renvoyé en boucle ---
     await contexte.setOffline(true);
-    const avantier = sql("select entry_date from livestock_daily_entries order by entry_date limit 1");
+    const avantier = REPRO ? aujourdhui : sql("select entry_date from livestock_daily_entries order by entry_date limit 1");
     await page.fill('#fiche-date', avantier);
     await page.dispatchEvent('#fiche-date', 'change');
     await page.waitForSelector(`#fiche-mensuel tbody tr.choisi[data-jour="${avantier}"]`);
@@ -243,7 +252,7 @@ try {
     assert.match(await page.textContent('#avis'), /1 fiche\(s\) d'élevage refusée\(s\)/);
     await page.waitForSelector('#saisie-conflit');
     assert.match(await page.textContent('#saisie-conflit'), /clôturé : aucune saisie ne peut être datée du/);
-    assert.equal(sql(`select coalesce(${ESC ? 'mort' : 'mort_jeune'}, 0) from livestock_daily_entries where entry_date='${avantier}'`), '0', 'le serveur n\'a rien écrit');
+    assert.equal(sql(`select coalesce(${ESC || REPRO ? 'mort' : 'mort_jeune'}, 0) from livestock_daily_entries where entry_date='${avantier}'`), '0', 'le serveur n\'a rien écrit');
     await page.click('#btn-synchroniser');
     await page.waitForTimeout(1500);
     await page.click('#saisie-abandonner');

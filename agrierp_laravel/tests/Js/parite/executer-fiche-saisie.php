@@ -27,6 +27,7 @@ Illuminate\Support\Facades\Gate::before(fn ($utilisateur = null) => true);
 use App\Livewire\Elevage\FicheLapins;
 use App\Livewire\Elevage\FichePorcs;
 use App\Livewire\Elevage\FicheEscargots;
+use App\Livewire\Elevage\FicheReproducteurs;
 use App\Models\ModuleConfig;
 use App\Models\FeedRationStandard;
 use App\Models\FiscalYear;
@@ -42,7 +43,7 @@ use Livewire\Livewire;
 
 $COLONNES = ['achat', 'ne', 'mort', 'vente', 'don', 'effectif_final', 'effectif_m', 'effectif_f', 'effectif_sevres', 'effectif_smeres', 'feed_qty_kg',
     'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'weight_sample_avg_g',
-    'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune', 'ponte_total'];
+    'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune', 'ponte_total', 'vente_repro', 'vente_sevre', 'vente_jeune'];
 $etatDesFiches = function (string $lotId) use ($COLONNES) {
     return LivestockDailyEntry::where('lot_id', $lotId)->orderBy('entry_date')->get()->map(function ($f) use ($COLONNES) {
         $o = ['entry_date' => $f->entry_date->format('Y-m-d')];
@@ -64,13 +65,18 @@ foreach ($entree['scenarios'] as $i => $s) {
         session()->flush();
         $porcs = ($s['famille'] ?? 'lapins') === 'porcs';
         $egot = ($s['famille'] ?? 'lapins') === 'escargots';
-        $code = $egot ? 'helico' : ($porcs ? 'porciculture' : 'cuniculture');
+        $repro = ($s['famille'] ?? 'lapins') === 'reproducteurs';
+        $code = $egot ? 'helico' : ($repro ? 'aviculture' : ($porcs ? 'porciculture' : 'cuniculture'));
         if ($egot) {
             ModuleConfig::create(['species_code' => 'helico', 'is_enabled' => true]);   // sinon la fiche n'offre aucune bande
         }
         $espece = LivestockSpecies::firstOrCreate(['code' => $code], ['label' => ucfirst($code), 'is_enabled' => true]);
         foreach ($s['exercices'] as $e) {
             FiscalYear::create(['year' => $e['year'], 'start_date' => $e['start_date'], 'end_date' => $e['end_date'], 'status' => $e['status']]);
+        }
+        if ($repro) {
+            // La migration VOL-1 sème Reproducteur 130 / Jeune 80 / Poussin 30 : le scénario porte SON barème, sans ces lignes.
+            FeedRationStandard::where('species_code', $code)->delete();
         }
         foreach ($s['rations'] as $r) {
             FeedRationStandard::create(['species_code' => $code, 'stage_label' => $r['stage_label'], 'ration_g_per_day' => $r['ration_g_per_day'], 'is_active' => true]);
@@ -103,12 +109,14 @@ foreach ($entree['scenarios'] as $i => $s) {
 
         // Noms internes de la saisie (ceux des emplacements de synchronisation) → propriétés du composant des porcs.
         $noms = $porcs ? ['mortChair' => 'mortMarchand', 'mortLapereau' => 'mortPorcelet', 'donChair' => 'donMarchand', 'donLapereau' => 'donPorcelet', 'effectifM' => 'effectifVerrats', 'effectifF' => 'effectifTruies', 'effectifSevres' => 'effectifPorcelets', 'effectifSmeres' => 'effectifEngraissement', 'peseeTotal' => 'peseeTotalKg'] : [];
-        $t = Livewire::test($egot ? FicheEscargots::class : ($porcs ? FichePorcs::class : FicheLapins::class))->set('bandeId', $lot->id)->set('selectedDate', $s['jour']);
+        $t = Livewire::test($egot ? FicheEscargots::class : ($repro ? FicheReproducteurs::class : ($porcs ? FichePorcs::class : FicheLapins::class)))->set($repro ? 'selectedLotId' : 'bandeId', $lot->id)->set('selectedDate', $s['jour']);
         $c = $t->instance();
         $charge = [];
-        $proprietes = $egot
+        $proprietes = $repro
+            ? ['achat', 'oeufsCouves', 'poussinsNes', 'mortRepro', 'mortPoulet', 'mortPoussin', 'donRepro', 'donPoulet', 'donPoussin', 'passage', 'departRepro', 'departSevre', 'departJeune', 'mortEnregistre', 'donEnregistre', 'peseeTotal']
+            : ($egot
             ? ['achat', 'oeufsTerre', 'naissainsNes', 'mortBorde', 'mortEngraissement', 'mortNaissain', 'donBorde', 'donEngraissement', 'donNaissain', 'mortEnregistre', 'donEnregistre', 'effectifNaissains', 'effectifEngraissement', 'effectifBordes', 'peseeTotal']
-            : ['achat', 'ne', 'mortRepro', 'mortChair', 'mortLapereau', 'donRepro', 'donChair', 'donLapereau', 'passage', 'effectifM', 'effectifF', 'effectifSevres', 'effectifSmeres', 'departRepro', 'departSevre', 'departJeune', 'peseeTotal', 'mortAncienTotal', 'donAncienTotal'];
+            : ['achat', 'ne', 'mortRepro', 'mortChair', 'mortLapereau', 'donRepro', 'donChair', 'donLapereau', 'passage', 'effectifM', 'effectifF', 'effectifSevres', 'effectifSmeres', 'departRepro', 'departSevre', 'departJeune', 'peseeTotal', 'mortAncienTotal', 'donAncienTotal']);
         foreach ($proprietes as $p) {
             $charge[$p] = $c->{$noms[$p] ?? $p};
         }
@@ -116,7 +124,15 @@ foreach ($entree['scenarios'] as $i => $s) {
             $t->set($noms[$p] ?? $p, $v);
         }
         $a = $t->instance();
-        if ($egot) {
+        if ($repro) {
+            $x = $a->getFeedAutonomyProperty();
+            $cat = $a->getCategoriesJourProperty();
+            $apercu = ['veille' => $a->getPreviousEffectifProperty(), 'vente' => $a->getVenteDuJourProperty(), 'ventes' => $a->getVentesDuJourProperty(), 'effectifFinal' => $a->getEffectifFinalCalcProperty(), 'taux' => $a->getMortalityRateCalcProperty(),
+                'eclosion' => $a->getEclosionRateCalcProperty(), 'avertissementMorts' => $a->getAvertissementMortsProperty(), 'poidsEstime' => $a->getPoidsMoyenEstimeProperty(),
+                'ration' => $a->getRationnementProperty(),
+                'autonomie' => ['available' => $x['available'], 'product' => isset($x['product']) ? $x['product']->id : null, 'stock_kg' => $x['stock_kg'] ?? null, 'autonomie_jours' => $x['autonomie_jours'] ?? null, 'critique' => $x['critique'] ?? null, 'rupture' => $x['rupture'] ?? null, 'inconnu' => $x['inconnu'] ?? false],
+                'cat' => array_intersect_key($cat, array_flip(['mode', 'repro', 'sevre', 'jeune', 'motif', 'refus_passage', 'avertissements', 'depart_requis', 'depart_date', 'proposition']))];
+        } elseif ($egot) {
             $apercu = ['veille' => $a->getPreviousEffectifProperty(), 'vente' => $a->getVenteDuJourProperty(), 'effectifFinal' => $a->getEffectifFinalCalcProperty(), 'taux' => $a->getMortalityRateCalcProperty(),
                 'poidsEstime' => $a->getPoidsMoyenEstimeProperty(), 'eclosion' => $a->getEclosionRateCalcProperty()];
         } else {

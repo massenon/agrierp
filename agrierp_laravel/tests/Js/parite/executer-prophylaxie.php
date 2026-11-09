@@ -26,6 +26,7 @@ Illuminate\Support\Facades\Gate::before(fn ($utilisateur = null) => true);
 
 use App\Livewire\Elevage\FicheLapins;
 use App\Livewire\Elevage\FichePorcs;
+use App\Livewire\Elevage\FicheReproducteurs;
 use App\Models\LivestockLot;
 use App\Models\LivestockSpecies;
 use Carbon\Carbon;
@@ -40,7 +41,8 @@ foreach ($entree['scenarios'] as $i => $s) {
         Carbon::setTestNow(Carbon::parse($s['aujourdhui'].' 12:00:00', 'Africa/Porto-Novo'));
         session()->flush();
         $porcs = ($s['famille'] ?? 'lapins') === 'porcs';
-        $code = $porcs ? 'porciculture' : 'cuniculture';
+        $repro = ($s['famille'] ?? 'lapins') === 'reproducteurs';
+        $code = $repro ? 'aviculture' : ($porcs ? 'porciculture' : 'cuniculture');
         $espece = LivestockSpecies::firstOrCreate(['code' => $code], ['label' => ucfirst($code), 'is_enabled' => true]);
         $lot = new LivestockLot(['code' => 'L'.$i, 'species_id' => $espece->id, 'stage' => $s['lot']['stage'], 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => $s['lot']['created_date'], 'status' => 'actif', 'is_active' => true]);
         $lot->id = $s['lot']['id'];
@@ -54,7 +56,7 @@ foreach ($entree['scenarios'] as $i => $s) {
         foreach ($s['soins'] as $so) {
             DB::table('veterinary_records')->insert(['id' => $so['id'], 'lot_id' => $lot->id, 'action_type' => $so['action_type'], 'record_date' => $so['record_date'], 'is_active' => $so['is_active'], 'created_at' => now(), 'updated_at' => now()]);
         }
-        $t = Livewire::test($porcs ? FichePorcs::class : FicheLapins::class)->set('bandeId', $lot->id)->set('selectedDate', $s['jour']);
+        $t = Livewire::test($repro ? FicheReproducteurs::class : ($porcs ? FichePorcs::class : FicheLapins::class))->set($repro ? 'selectedLotId' : 'bandeId', $lot->id)->set('selectedDate', $s['jour']);
         $p = $t->instance()->getProtocoleDuJourProperty();
         $avant = [
             'jourDeCycle' => $p->jourDeCycle, 'motif' => $p->motifIndetermine, 'calendaires' => $p->calendairesNonEvalues, 'etat' => $p->etat(), 'enAttente' => $p->enAttente(),

@@ -109,7 +109,7 @@ export function tauxMortaliteFiche(fiche, veille) {
 export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille = FAMILLE_PAR_DEFAUT }) {
     // Escargots : sans le module `helico` activé (`modules_config`), aucune bande (`FicheEscargots::getLotsProperty`).
     const moduleDesactive = Boolean(famille.module) && !(donnees.modules ?? []).some((x) => x.species_code === famille.module && x.is_enabled);
-    const lots = moduleDesactive ? [] : donnees.lots.filter((l) => l.species_code === famille.espece && l.status === 'actif' && l.is_active !== false);
+    const lots = moduleDesactive ? [] : donnees.lots.filter((l) => (famille.accepte ? famille.accepte(l) : l.species_code === famille.espece) && l.status === 'actif' && l.is_active !== false);
     const bande = (bandeId !== null ? lots.find((l) => l.id === bandeId) : null) ?? lots[0] ?? null;
     const dateChoisie = dateValide(date) ? date : null; // sans date lisible : aucun jour surligné, aucun transfert (comme le composant)
     const dateAffichee = dateChoisie ?? aujourdhui;
@@ -128,7 +128,10 @@ export function modeleFiche(donnees, { bandeId = null, date, aujourdhui, famille
     const taux = totalDepart > 0 ? arrondiPhp((totalMorts / totalDepart) * 100, 1) : 0;
     const totalOeufs = sommeNum(moisDesLots, (e) => e.ponte_total);
     const naissains = sommeNum(moisDesLots, (e) => e.ne);
-    const kpis = famille.id === 'escargots'
+    const totalCouves = totalOeufs;
+    const kpis = famille.id === 'reproducteurs'
+        ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), taux_eclosion: totalCouves > 0 ? arrondiPhp((naissains / totalCouves) * 100, 1) : null, poussins_nes: naissains, taux_mortalite_mois: taux }
+        : famille.id === 'escargots'
         ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), naissains_mois: naissains, taux_eclosion: totalOeufs > 0 ? arrondiPhp((naissains / totalOeufs) * 100, 1) : null, taux_mortalite_mois: taux }
         : famille.id === 'porcs'
         ? { effectif_total: sommeNum(lots, (l) => l.current_quantity), truies: sommeNum(derniereParLot, (e) => e.effectif_f), verrats: sommeNum(derniereParLot, (e) => e.effectif_m), porcelets_sous_mere: sommeNum(derniereParLot, (e) => e.effectif_sevres), taux_mortalite_mois: taux }
@@ -198,7 +201,7 @@ export function texteTransferts(t) {
 export function rendreFiche(m, h, actions) {
     const F = m.famille;
     const E = { ...ECRAN_COMMUN, ...F.ecran };
-    const kpi = (libelle, valeur, icone, couleur) => h('div', { class: `kpi fiche-kpi ${couleur}` }, h('div', { class: 'groupe', style: 'justify-content:space-between' }, h('span', { class: 'kpi-libelle' }, libelle), h('span', { class: 'material-symbols-outlined' }, icone)), h('span', { class: 'kpi-valeur' }, valeur));
+    const kpi = (libelle, valeur, icone, couleur, legende = null) => h('div', { class: `kpi fiche-kpi ${couleur}` }, h('div', { class: 'groupe', style: 'justify-content:space-between' }, h('span', { class: 'kpi-libelle' }, libelle), h('span', { class: 'material-symbols-outlined' }, icone)), h('span', { class: 'kpi-valeur' }, valeur), legende ? h('small', { class: 'muted' }, legende) : null);
 
     if (m.moduleDesactive) {
         return [h('div', { class: 'carte', id: 'fiche-module-desactive', style: 'text-align:center' }, h('span', { class: 'material-symbols-outlined', style: 'font-size:56px;color:#9ca3af' }, 'lock'), h('h2', {}, MODULE_DESACTIVE.titre), h('p', { class: 'muted' }, MODULE_DESACTIVE.texte))];
@@ -208,7 +211,7 @@ export function rendreFiche(m, h, actions) {
             h('div', {}, h('h2', {}, h('span', { class: 'material-symbols-outlined' }, F.icone), E.titre), h('p', { class: 'muted' }, E.sousTitre)),
             h('button', { type: 'button', class: 'btn', disabled: true, title: E.exportPdfHorsLigne, 'data-export-pdf': true }, h('span', { class: 'material-symbols-outlined' }, 'picture_as_pdf'), E.exportPdf)),
         h('div', { class: 'fiche-kpis' },
-            ...F.kpiValeurs(m.kpis).map((v, i) => kpi(E.kpis[i], v, E.kpiIcones[i], ['emerald', 'blue', 'maize', 'red'][i])),
+            ...F.kpiValeurs(m.kpis).map((v, i) => kpi(E.kpis[i], v, E.kpiIcones[i], ['emerald', 'blue', 'maize', 'red'][i], E.kpiLegendes?.[i] ?? null)),
             ),
     ];
 
@@ -218,11 +221,11 @@ export function rendreFiche(m, h, actions) {
     }
 
     const selecteurs = [];
-    if (m.lots.length > 1) {
-        const select = h('select', { id: 'fiche-bande', class: 'fiche-select' }, ...m.lots.map((l) => h('option', { value: l.id }, l.code)));
+    if (m.lots.length > 1 || E.bandeToujours) {
+        const select = h('select', { id: 'fiche-bande', class: 'fiche-select' }, ...m.lots.map((l) => h('option', { value: l.id }, E.bandeToujours ? `${l.code} (${F.libelleStade(l.stage)} — ${l.current_quantity} têtes)` : l.code)));
         select.value = m.bande.id;
         select.addEventListener('change', () => actions.choisirBande(select.value));
-        selecteurs.push(h('span', { class: 'muted' }, E.bande), select);
+        selecteurs.push(h('span', { class: 'muted' }, E.bandeLabel ?? E.bande), select);
     }
     const champDate = h('input', { type: 'date', id: 'fiche-date', class: 'fiche-select', value: m.dateAffichee });
     champDate.addEventListener('change', () => actions.choisirDate(champDate.value));
@@ -243,6 +246,13 @@ export function rendreFiche(m, h, actions) {
     const sous = E.sousColonnes.map((libelle) => h('th', {}, libelle));
     const ligne = (j) => {
         const f = j.fiche;
+        if (E.cellules) {
+            // Famille à tableau propre (reproducteurs) : les cellules suivent l'ordre du Blade.
+            const valeur = (champ) => (champ === 'taux' ? (f ? f.taux : E.vide) : cellule(f?.[champ]));
+            const classe = (style) => (style === 'alerte' ? ((f?.mort ?? 0) > 0 ? 'alerte' : '') : style === 'tauxAlerte' ? (f?.tauxPositif ? 'alerte' : '') : style ?? '');
+            return h('tr', { 'data-jour': j.date, class: j.choisi ? 'choisi' : '', onclick: () => actions.choisirDate(j.date) },
+                h('td', { class: 'sticky' }, j.jourMois), ...E.cellules.map(([champ, style]) => h('td', { class: classe(style) }, valeur(champ))));
+        }
         return h('tr', { 'data-jour': j.date, class: j.choisi ? 'choisi' : '', onclick: () => actions.choisirDate(j.date) },
             h('td', { class: 'sticky' }, j.jourMois),
             h('td', {}, cellule(f?.achat)), h('td', {}, cellule(f?.ne)),
@@ -255,12 +265,18 @@ export function rendreFiche(m, h, actions) {
             h('td', {}, j.traitements));
     };
     noeuds.push(h('div', { class: 'carte fiche-tableau' },
-        h('div', { style: 'overflow-x:auto' }, h('table', { id: 'fiche-mensuel' }, h('thead', {}, h('tr', {}, ...groupes), h('tr', {}, ...sous)), h('tbody', {}, ...m.jours.map(ligne))))));
+        h('div', { style: 'overflow-x:auto' }, h('table', { id: 'fiche-mensuel' }, h('thead', {}, h('tr', {}, ...groupes), h('tr', {}, ...sous)), h('tbody', {}, ...m.jours.map(ligne)))),
+        E.note ? h('p', { class: 'muted', id: 'fiche-note' }, E.note) : null));
 
     // Cartes (petits écrans) : un jour = une carte, mêmes libellés de colonnes.
-    const noms = [...E.sousColonnes];
+    const noms = E.cartes ? [...E.cartes] : [...E.sousColonnes];
     noeuds.push(h('div', { class: 'fiche-cartes', id: 'fiche-cartes' }, ...m.jours.map((j) => {
         const f = j.fiche;
+        if (E.cellules) {
+            return h('div', { class: `fiche-carte${j.choisi ? ' choisi' : ''}`, 'data-jour': j.date, onclick: () => actions.choisirDate(j.date) },
+                h('b', {}, j.jourMois),
+                h('div', { class: 'fiche-carte-grille' }, ...E.cellules.map(([champ], i) => h('span', {}, h('small', {}, noms[i]), ' ', champ === 'taux' ? (f ? f.taux : E.vide) : cellule(f?.[champ])))));
+        }
         const valeurs = f ? [f.achat, f.ne, f.mort, f.vente, f.don, ...E.colonnesEffectif.map((c) => f[c]), f.effectif_final] : [];
         return h('div', { class: `fiche-carte${j.choisi ? ' choisi' : ''}`, 'data-jour': j.date, onclick: () => actions.choisirDate(j.date) },
             h('b', {}, j.jourMois),

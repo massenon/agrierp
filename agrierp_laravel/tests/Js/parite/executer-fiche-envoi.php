@@ -45,7 +45,7 @@ $utilisateur->assignRole('animalier');
 
 $COLONNES = ['achat', 'ne', 'mort', 'vente', 'don', 'effectif_final', 'effectif_m', 'effectif_f', 'effectif_sevres', 'effectif_smeres', 'feed_qty_kg',
     'mort_repro', 'mort_sevre', 'mort_jeune', 'don_repro', 'don_sevre', 'don_jeune', 'passage_sevre_jeune', 'weight_sample_avg_g',
-    'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune', 'ponte_total'];
+    'cat_depart_repro', 'cat_depart_sevre', 'cat_depart_jeune', 'cat_eff_repro', 'cat_eff_sevre', 'cat_eff_jeune', 'ponte_total', 'vente_repro', 'vente_sevre', 'vente_jeune'];
 $etat = function (string $lotId) use ($COLONNES) {
     return LivestockDailyEntry::where('lot_id', $lotId)->orderBy('entry_date')->get()->map(function ($f) use ($COLONNES) {
         $o = ['entry_date' => $f->entry_date->format('Y-m-d')];
