@@ -1,5 +1,7 @@
 import 'structure_maquette.g.dart';
 
+/// ⚠️ INSTANTANÉ FIGÉ, NON RÉGÉNÉRABLE : la maquette HTML est retirée du projet (décision du client, 09/11/2026).
+/// `structure_maquette.g.dart` reste commité comme référence ; les outils qui le produisaient sont obsolètes.
 /// Nombre de cartes d'indicateur attendu d'un écran porté — ticket F0.54.
 ///
 /// ⚠️⚠️ **POURQUOI CE FICHIER EXISTE PLUTÔT QU'UN `cartesMaquette[page]!` DANS

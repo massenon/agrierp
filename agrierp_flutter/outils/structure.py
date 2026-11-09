@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Releve la STRUCTURE d'une page du prototype, pas seulement son vocabulaire.
+"""OBSOLÈTE depuis le 09/11/2026 : la maquette HTML n'existe plus ; outil conservé pour mémoire.
+
+Releve la STRUCTURE d'une page du prototype, pas seulement son vocabulaire.
 
     python outils/structure.py liste-achats.html [autres.html...]
 

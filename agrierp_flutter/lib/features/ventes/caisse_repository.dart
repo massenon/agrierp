@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../core/mecef/marque_boitier.dart';
 import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
 import '../clients/clients_creances_repository.dart';
@@ -74,6 +77,7 @@ class CaisseRepository {
     Uuid? uuid,
     DateTime Function()? maintenant,
     GestesImportants? gestes,
+    this.apresVente,
   }) : _db = database,
        // ignore: prefer_initializing_formals
        _deviceId = deviceId,
@@ -89,6 +93,10 @@ class CaisseRepository {
   /// Ticket S-T3 — une vente enregistrée est un geste important : la synchronisation automatique la pousse
   /// après un court délai d'agrégation. `null` : aucun signal.
   final GestesImportants? _gestes;
+
+  /// MECEF-2 — appelé (sans attendre) avec l'identifiant de chaque vente enregistrée : le poste en mode boîtier transmet alors la
+  /// facture normalisée. Ses échecs ne font jamais échouer la vente (déjà encaissée).
+  final Future<void> Function(String venteId)? apresVente;
 
   /// Horloge du poste — injectable pour les tests (F0.89). C'est elle qui dit « aujourd'hui » à
   /// l'écran, aux bornes du calendrier et à l'horodatage de la saisie : une seule source.
@@ -165,6 +173,80 @@ class CaisseRepository {
         .creerClient(FormulaireClient(nom: nom, telephone: telephone));
     _gestes?.signaler();
     return client;
+  }
+
+  // ── MECEF-2 — la transmission de la facture normalisée PAR LE POSTE (mode boîtier) ───────────────────────────────────────
+  //
+  // ⚠️ Ce dépôt est le SEUL écrivain de `sales` (écrivain_unique_test) : le service `TransmissionBoitier` lit, décide et appelle le
+  // boîtier, mais ses écritures passent toutes ici. Le poste n'écrit les `mecef_*` QUE dans ce cas (la normalisation reste
+  // sinon au serveur) et JAMAIS un jeton : le boîtier n'en a pas, e-MECeF n'a jamais cours ici.
+
+  /// Les ventes que le poste doit transmettre au boîtier : normalisées, validées, pas encore normalisées. `marquees` : celles dont
+  /// l'issue est incertaine (jamais reprises seules). `refusees` : refusées par le boîtier (reprise manuelle seulement).
+  Future<List<Sale>> ventesATransmettreAuBoitier({bool marquees = false, bool refusees = false}) async {
+    final lignes = await (_db.select(_db.sales)
+          ..where((t) => t.factureType.equals(ChoixFacture.normalisee) & t.status.equals('validee'))
+          ..orderBy([(t) => OrderingTerm(expression: t.soldAt)]))
+        .get();
+    return [
+      for (final v in lignes)
+        if (v.mecefStatus != StatutMecef.transmise.code && (refusees || v.mecefStatus != StatutMecef.erreur.code) && (marquees || v.mecefMessage != marqueTransmissionBoitier)) v,
+    ];
+  }
+
+  /// Réserve la transmission d'UNE vente : relue dans la transaction, elle doit être normalisée, validée, pas déjà normalisée, et
+  /// — sauf [apresVerification] — pas marquée « incertaine ». La marque est posée AVANT l'appel au boîtier. Rend la vente
+  /// réservée, ou `null` (déjà normalisée, simple, annulée, marquée…) : alors rien n'est appelé.
+  Future<Sale?> reserverTransmissionBoitier(String venteId, {bool apresVerification = false}) {
+    return _db.transaction(() async {
+      final v = await (_db.select(_db.sales)..where((t) => t.id.equals(venteId))).getSingleOrNull();
+      if (v == null || v.factureType != ChoixFacture.normalisee || v.status != 'validee') return null;
+      if (v.mecefStatus == StatutMecef.transmise.code) return null;
+      if (v.mecefMessage == marqueTransmissionBoitier && !apresVerification) return null;
+      await (_db.update(_db.sales)..where((t) => t.id.equals(venteId))).write(
+        SalesCompanion(mecefStatus: Value(StatutMecef.enAttente.code), mecefMessage: const Value(marqueTransmissionBoitier)),
+      );
+      return v;
+    });
+  }
+
+  /// Le boîtier n'a pas été joint : rien n'est parti, la marque est levée, la facture attend son retour (pas une erreur).
+  Future<void> relacherTransmissionBoitier(String venteId) async {
+    await (_db.update(_db.sales)..where((t) => t.id.equals(venteId) & t.mecefMessage.equals(marqueTransmissionBoitier))).write(
+      SalesCompanion(mecefStatus: Value(StatutMecef.enAttente.code), mecefMessage: const Value(messageBoitierInjoignable)),
+    );
+  }
+
+  /// Le boîtier a CERTIFIÉ la facture (`qr_code` non vide) : on garde ce qu'il a rendu et la vente repart au serveur, qui le valide
+  /// (mode boîtier seulement, jamais par-dessus une facture déjà normalisée). `pending` + horodatage : l'absorbeur du tirage
+  /// n'écrase pas la ligne, et l'envoi la reprend.
+  Future<void> noterFactureCertifiee(String venteId, {required String qr, String? code, String? nim, DateTime? instant}) async {
+    await (_db.update(_db.sales)..where((t) => t.id.equals(venteId) & (t.mecefStatus.isNull() | t.mecefStatus.isNotValue(StatutMecef.transmise.code!)))).write(
+      SalesCompanion(
+        mecefStatus: Value(StatutMecef.transmise.code),
+        mecefQrRef: Value(qr),
+        mecefCode: Value(code),
+        mecefNim: Value(nim),
+        mecefNormaliseLe: Value(instant ?? maintenant()),
+        mecefMessage: const Value(null),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(maintenant()),
+      ),
+    );
+    _gestes?.signaler();
+  }
+
+  /// Le boîtier a REFUSÉ la facture : état « Refusée » avec son motif français ; reprise à la main seulement.
+  Future<void> noterRefusBoitier(String venteId, String motif) async {
+    await (_db.update(_db.sales)..where((t) => t.id.equals(venteId) & (t.mecefStatus.isNull() | t.mecefStatus.isNotValue(StatutMecef.transmise.code!)))).write(
+      SalesCompanion(
+        mecefStatus: Value(StatutMecef.erreur.code),
+        mecefMessage: Value(motif),
+        syncStatus: const Value(SyncStatus.pending),
+        updatedAt: Value(maintenant()),
+      ),
+    );
+    _gestes?.signaler();
   }
 
   /// MECEF-3 — le choix « Facture simple / normalisée » n'est proposé que si le module MeCeF est actif (mode e-MECeF, boîtier ou
@@ -409,6 +491,12 @@ class CaisseRepository {
 
     // Ticket S-T3 — APRÈS la transaction : la vente est écrite, elle peut partir.
     _gestes?.signaler();
+
+    // MECEF-2 — APRÈS la transaction (jamais dedans : un appel au boîtier ne se rejoue pas) et SANS attendre : l'encaissement ne dépend
+    // pas du boîtier. Son échec est une facture « en attente », jamais une vente défaite.
+    if (apresVente != null && choix.type == ChoixFacture.normalisee) {
+      unawaited(apresVente!(venteId).catchError((Object _) {}));
+    }
 
     return (await (_db.select(
       _db.sales,

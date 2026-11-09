@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'structure_maquette.g.dart';
 
+/// ⚠️ INSTANTANÉ FIGÉ, NON RÉGÉNÉRABLE : la maquette HTML est retirée du projet (décision du client, 09/11/2026).
+/// `structure_maquette.g.dart` reste commité comme référence ; les outils qui le produisaient sont obsolètes.
 /// Ticket F0.49 — LA STRUCTURE DES ÉCRANS, VÉRIFIÉE COLONNE PAR COLONNE.
 ///
 /// ⚠️⚠️ **CE QUE LE CONTRÔLE DE VOCABULAIRE NE VOIT PAS.** `fidelite_libelles`

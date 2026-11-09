@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -78,7 +80,9 @@ import 'features/elevage/fiche_reproducteurs_screen.dart';
 import 'features/elevage/production_oeufs_service.dart';
 import 'features/elevage/soins_repository.dart';
 import 'features/elevage/fiche_lapins_screen.dart';
+import 'core/mecef/passerelle_boitier_plateforme.dart';
 import 'features/ventes/caisse_repository.dart';
+import 'features/ventes/transmission_boitier.dart';
 import 'features/administration/administration_repository.dart';
 import 'features/comptabilite/comptabilite_repository.dart';
 import 'features/comptabilite/cloture_exercice_repository.dart';
@@ -255,7 +259,14 @@ class _AgriErpAppState extends State<AgriErpApp> {
     database: _db,
     deviceId: widget.identifiantPoste,
     gestes: _gestes,
+    // MECEF-2 — en mode boîtier, la facture normalisée d'une vente est transmise au boîtier de CE poste (sans attendre le serveur).
+    // Le navigateur n'a pas de boîtier : aucun appel. L'échec d'une transmission ne fait jamais échouer la vente (déjà encaissée).
+    apresVente: kIsWeb ? null : (id) => _boitier.transmettre(id).then((_) {}),
   );
+
+  /// MECEF-2 — la transmission au boîtier fiscal (poste Windows seulement ; le navigateur n'a pas de boîtier).
+  /// ⚠️ NON VÉRIFIÉ AVEC UN VRAI BOÎTIER.
+  late final TransmissionBoitier _boitier = TransmissionBoitier(caisse: _caisse, database: _db, passerelle: creerPasserelleBoitier());
 
   late final SoinsRepository _soins = SoinsRepository(
     database: _db,
@@ -561,6 +572,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           adminLocale: _adminLocale,
           fiches: _fiches,
           caisse: _caisse,
+          boitier: kIsWeb ? null : _boitier,
           soins: _soins,
           production: _production,
           depenses: _depenses,
@@ -629,6 +641,7 @@ class SocleAccueil extends StatefulWidget {
     required this.auth,
     required this.fiches,
     required this.caisse,
+    this.boitier,
     required this.soins,
     required this.production,
     required this.depenses,
@@ -725,6 +738,9 @@ class SocleAccueil extends StatefulWidget {
   final AuthService auth;
   final FicheJournaliereRepository fiches;
   final CaisseRepository caisse;
+
+  /// MECEF-2 — la transmission au boîtier fiscal ; `null` dans le navigateur et dans les tests qui ne s'en servent pas.
+  final TransmissionBoitier? boitier;
   final SoinsRepository soins;
   final ProductionOeufsService production;
   final DepensesRepository depenses;
@@ -883,6 +899,7 @@ class _SocleAccueilState extends State<SocleAccueil> {
     if (!mounted) return;
     _lireMecef();
     _lireAssistant();
+    _reprendreBoitier();
     setState(() => _versionTirage++);
     _finDeTirage.value++;
     _exercice.charger();
@@ -929,11 +946,28 @@ class _SocleAccueilState extends State<SocleAccueil> {
     );
   }
 
+  Timer? _repriseBoitier;
+
+  /// MECEF-2 — reprend les factures « en attente » du boîtier (mode boîtier seulement : sinon la reprise ne fait rien). Jamais d'erreur à l'écran.
+  void _reprendreBoitier() {
+    final b = widget.boitier;
+    if (b == null || !mounted) return;
+    unawaited(b.reprendre().then((_) {}).catchError((Object _) {}));
+  }
+
   @override
   void initState() {
     super.initState();
     _lireMecef();
     _lireAssistant();
+
+    // MECEF-2 — l'indicateur du boîtier lit ce service ; la reprise au retour du boîtier : à l'ouverture, après chaque tirage et
+    // toutes les 90 secondes (la reprise ne touche au réseau que s'il y a des factures en attente).
+    if (widget.boitier != null) {
+      TransmissionBoitier.courant = widget.boitier;
+      _reprendreBoitier();
+      _repriseBoitier = Timer.periodic(const Duration(seconds: 90), (_) => _reprendreBoitier());
+    }
 
     // ⚠️ ON N'OUVRE PAS SUR UN ÉCRAN INTERDIT. Démarrer sur la fiche d'élevage
     // quel que soit le rôle accueillerait le caissier par un « accès refusé »
@@ -1008,6 +1042,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
 
   @override
   void dispose() {
+    _repriseBoitier?.cancel();
+    if (identical(TransmissionBoitier.courant, widget.boitier)) TransmissionBoitier.courant = null;
     _automatique?.arreter();
     _finDeTirage.dispose();
     widget.demandeEcran?.removeListener(_ecranDemande);

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Phase 1D de AUDIT_FIDELISATION.md — captures comparees, prototype | poste.
+"""OBSOLÈTE depuis le 09/11/2026 : la maquette HTML n'existe plus ; outil conservé pour mémoire.
+
+Phase 1D de AUDIT_FIDELISATION.md — captures comparees, prototype | poste.
 
     AUDIT_RENDU=1 flutter test test/capture_ecrans_test.dart --update-goldens
     py outils/captures.py            # prototype (Chrome headless) + montages

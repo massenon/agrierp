@@ -34,7 +34,9 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - **Tests.** `tests/Feature/EffectifTotalVivantCascadeTest.php` (4 tests) et un test dans `test/fiche_journaliere_test.dart`. Tous sont **rouges sans le correctif, verts avec** (épreuve de mutation faite).
 - **Reste à vérifier.** La fiche Escargots n'a pas de test dédié (module `helico` à activer dans le test) ; ticket A1-bis.
 
-### A2 ❓ Bandes « issues d'une bande » comptées deux fois
+### A2 ✅ Bandes « issues d'une bande » comptées deux fois (construit par E1 ; reste à confirmer sur les données réelles)
+
+> **État 09/11/2026 :** le transfert entre bandes (écran dédié, sortie de la source et entrée dans la cible le même jour, `lot_source_id`) et la correction des bandes déjà saisies ont été livrés (ticket E1, web puis poste). Reste, côté exploitant : comparer « Effectif Total Vivant » à un comptage physique (voir « Décisions proposées au client du 09/11/2026 »).
 
 - **Constat probable** (à confirmer avec l'exploitant) :
   1. Les naissances sont saisies dans la fiche de la bande mère (`ne`), qui augmente son effectif.
@@ -56,7 +58,7 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - `TransformationForm` passe par `RecordSaleOnFicheElevageAction` : les sujets transformés sont une « Vente » de la fiche du jour, avec cascade.
 - La sauvegarde de fiche suivante ne l'efface plus.
 
-### A5 🔧 Autorisation des fiches journalières
+### A5 ✅ Autorisation des fiches journalières (vérifié le 09/11/2026 : les cinq méthodes `saveDay()` appellent `authorize('manage-elevage')`)
 
 - Les cinq méthodes `saveDay()` des fiches web n'appellent pas `$this->authorize('manage-elevage')`, contrairement à la règle du projet (« première ligne de toute méthode mutante »).
 - Ajouter l'appel et un test par fiche, après vérification que chaque rôle qui saisit des fiches a bien `manage-elevage`.
@@ -76,11 +78,26 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - Dans le monorepo, ces chemins n'existent plus. Hors du poste du développeur, `export_comptabilite_test.dart` échoue (3 tests) et d'autres tests se mettent en saut (32 sautés).
 - **Proposition :** un seul résolveur de chemins (`test/chemins_depot.dart`) qui pointe sur `../agrierp_laravel/`.
 
-### A8 ❓ Le prototype HTML n'est pas dans le monorepo
+### A8 ✅ Clos le 09/11/2026 : la maquette HTML est retirée du projet (décision du client) ; les tests qui la lisaient sont supprimés ou ne comparent plus qu'au web
 
 - Les `CLAUDE.md`, les outils de fixtures et plusieurs tests s'appuient sur `prototype_html/`, qui n'a pas été importé dans `massenon/agrierp`.
 - Sans lui, la fidélité « prototype » n'est plus vérifiable que sur le poste du développeur.
-- **Décision :** l'ajouter au dépôt (`prototype_html/` à la racine), ou acter que la vue Blade est désormais la seule référence (Doctrine, article 0) et retirer les dépendances au prototype.
+- **Décision du client (09/11/2026) :** « OUI, FAIT, ENLEVER, ON N'A PLUS LA MAQUETTE HTML » : la vue Blade est la seule référence (Doctrine, article 0). Les tests qui ne comparaient qu'à la maquette sont supprimés, ceux qui comparaient aussi au web ne gardent que le web ; `dossierPrototype` et `AGRIERP_PROTOTYPE` sont retirés des tests ; les outils Python qui la lisent sont marqués obsolètes ; les fixtures `*_maquette.g.dart` restent un instantané figé, non régénérable.
+
+
+### Décisions proposées au client (09/11/2026) — recommandations, à valider
+
+Le client a demandé les propositions ; chacune est une RECOMMANDATION (rien n'est tranché à sa place) et se valide par « OUI ».
+
+| Réf. | Question | Proposition recommandée | Pourquoi |
+|---|---|---|---|
+| A2 | Les bandes « issues d'une bande » sont-elles encore comptées deux fois ? | **Contrôle sur les vraies données** : comparer « Effectif Total Vivant » à un comptage physique sur trois bandes ayant des portées, puis clore. Le code est livré (E1). | Le défaut ne se voit que sur les données de la ferme. |
+| DEV-Q2 | Lignes de devis structurées (produits du catalogue, remise par ligne) | **Non pour l'instant** : description libre comme le web. À rouvrir si les prestations deviennent fréquentes. | Un devis de prestation n'est pas un panier de caisse ; le structurer double la logique de la caisse. |
+| DEV-Q3 | Impression d'un devis « document client » | **Oui, web d'abord** : A4 avec en-tête de la ferme, mentions légales, durée de validité, bon pour accord ; puis poste par le même générateur de PDF (`ExportOfficiel`) ; numéro attribué par le serveur. | Un devis se remet au client ; l'état « Exporter » n'est pas présentable. |
+| CAISSE-1 | Appareil personnel ou d'entreprise : le code PIN suffit-il ? | **Appareil d'entreprise recommandé, PIN suffisant** (4 à 6 chiffres, chiffrement AES-GCM dérivé du PIN, limiteur d'essais). **Appareil personnel toléré** avec un PIN de 6 chiffres et l'effacement des données hors ligne à la déconnexion. | Le PIN protège déjà la clé de chiffrement ; l'appareil personnel est le risque de perte ou de prêt. |
+| CAISSE-2 | Reçu provisoire à imprimer ? | **Oui** : « Reçu provisoire » sans numéro de facture légal, avec l'identifiant court du poste (8 premiers caractères de l'UUID de la vente) et la mention « facture n° attribué à la synchronisation ». | Le client repart avec une preuve ; le numéro légal reste attribué par le serveur. |
+| CAISSE-3 | Essai sur les vrais appareils | **Un essai d'une journée sur trois appareils** (Android Chrome, iPhone Safari, un PC) : coupure du réseau, cinq ventes, retour du réseau, comparaison avec le serveur (ventes, stock, caisse). Résultats consignés dans `docs/logialvia/46_…`. | Safari et les appareils réels sont les deux zones jamais vérifiées. |
+| COMPTA-1 | Droit d'export des ventes (`export-ventes`) pour le comptable | **Oui** : l'accorder au comptable (il lit déjà ventes, clients, créances et avances ; l'export est une lecture). Seeder, migration de données, matrice du poste et test de matrice. | Cohérent avec CONF-4 / CONF-5 ; le poste imprime déjà ces états en local. |
 
 ### A9 ✅ Empreinte du plan comptable SYSCOHADA
 
@@ -546,9 +563,9 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 | Ticket | Contenu | État |
 |---|---|---|
 | DEV2 | Tableau de bord : l'onglet « Devis » des « Transactions récentes » est encore vide au poste (« Aucun devis récent. ») alors que `quotes` descend désormais ; le lire comme `Dashboard\Index` | 🔧 proposé |
-| DEV-Q1 | ❓ Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ❓ client |
-| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client |
-| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client |
+| DEV-Q1 | ✅ (09/11/2026) Construit : la conversion « devis accepté → facture / vente » existe au web puis au poste (`ConversionDevisFactureTest`, `ConversionDevisWebTest`). *Question d'origine :* Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ✅ livré |
+| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client — proposition ci-dessous |
+| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client — proposition ci-dessous |
 ## Sprint VL — Verrou local du poste (décision du client du 21/10/2026)
 
 ### VL-1 ✅ (21/10/2026) Code PIN, écran de verrouillage à chaque lancement, sans réseau
@@ -931,14 +948,14 @@ Décisions du client (07/11/2026) : la ferme a un compte e-MECeF (API en ligne d
 | Facture PDF | QR de la DGI + code MeCeF/DGI, NIM, compteurs, date et heure, web et poste ; rien d'inventé sans normalisation. |
 | Poste | Drift v84 (colonnes `mecef_*` de `sales` et `credit_notes`, tirées, jamais écrites) ; Facturation : statuts Normalisée / En attente / Refusée / Expirée + motif ; lecture seule de la facture normalisée. |
 
-**MECEF-2 (boîtier par le poste) : à faire à l'achat du boîtier**, contrat déjà défini : le poste appelle `http://localhost:38917/check` puis `/bill` avec le MÊME `MecefFactureBuilder`, vérifie que `qr_code` est rempli (le pilote répond 200 même en échec), puis synchronise le résultat ; pilote sans authentification : n'écouter que localhost. (Le builder est aujourd'hui en PHP : MECEF-2 le fera soit porter en Dart avec parité exécutée, soit servir la charge par le serveur ; à trancher.)
+**MECEF-2 (boîtier par le poste) : ✅ CONSTRUIT SANS L'APPAREIL (09/11/2026) / ⚠️ ESSAI RÉEL À FAIRE.** Décision du client : « faut lancer le chantier, faut pas attendre le boîtier ». Option A retenue (charge portée en Dart, parité PHP exécutée : `charge_boitier_parite_php_test.dart`) ; client HTTP localhost (succès SEULEMENT si `qr_code` non vide, 400 → motif français, 503 → « Boîtier injoignable » sans erreur rouge) ; transmission par le poste en mode `boitier` (états En attente / Normalisée / Refusée, marque d'incertitude, jamais deux transmissions d'une vente, reprise au retour du boîtier) ; résultat envoyé au serveur (bloc `mecef`, validé, jamais par-dessus une facture normalisée) ; indicateur d'état (Paramètres › Facturation normalisée, caisse). **NON VÉRIFIÉ AVEC UN VRAI BOÎTIER** (faux pilote seulement) ni sous Windows ; **avoir par le poste NON branché** ; libellé « Boîtier MeCeF (à venir) » gardé jusqu'à l'essai. Checklist du premier essai : `docs/logialvia/41_MECEF_EMECEF.md` § 3.3.
 
 **Non vérifié** : AUCUN appel réel à la DGI (ni jeton ni IFU) — chemins, noms de champs, détection de l'expiration et reprise par confirmation seule d'après un paquet non officiel, non confirmés par la documentation DGI (injoignable) ; arrondis des prix unitaires non entiers ; confirmation d'une facture déjà confirmée ; MySQL/MariaDB réel (migration `mecef_status` enum → texte essayée sous SQLite seulement) ; rendu Windows réel du QR du PDF du poste ; suites complètes.
 **Restes / décisions à prendre** : numérotation propre de la facture normalisée ; ~~IFU et AIB du client (absents de la base)~~ ✅ MECEF-3 ; ~~frais de livraison hors facture DGI~~ ✅ MECEF-3 ; avoirs du poste : pas d'écran de statut d'avoir ; clés `transmise` / `erreur` conservées (renommer en `normalisee` / `refusee` demande une migration des données, des tests et du poste).
 
 ## MECEF-3 ✅ (07/11/2026) prix entiers, choix « facture simple / normalisée », livraison incluse, formulaire e-MECeF (Drift v85)
 
-Demande du client du 07/11/2026. (Le ticket « MECEF-2 » reste le mode boîtier par le poste, non construit.)
+Demande du client du 07/11/2026. (Le ticket « MECEF-2 » est le mode boîtier par le poste : construit sans l'appareil, essai réel à faire.)
 
 | Point | Livraison |
 |---|---|

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Ajoute des pages du prototype aux deux jeux d'epreuves des tests.
+"""OBSOLÈTE depuis le 09/11/2026 : la maquette HTML n'existe plus ; outil conservé pour mémoire.
+
+Ajoute des pages du prototype aux deux jeux d'epreuves des tests.
 
     python outils/fixtures.py rapports-exports.html rapport-tresorerie.html ...
 

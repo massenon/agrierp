@@ -13,6 +13,7 @@ import '../../core/widgets/modale_agri.dart';
 import '../../core/widgets/zone_depot.dart';
 import '../comptabilite/documents_comptabilite.dart';
 import '../rh/calcul_paie.dart';
+import '../ventes/bandeau_boitier.dart';
 import 'reglages_ferme_repository.dart';
 
 /// Tickets PA-2, PA-3, PA-4, PA-7, PA-8 — modales et sous-pages des réglages de la ferme. Les libellés sont ceux des Blade
@@ -844,7 +845,7 @@ class _PageFacturationEmecefState extends State<PageFacturationEmecef> {
         _erreur(_erreurs['mecefMode'], const Key('entreprise-erreur-mecefMode')),
         if (_mode == 'boitier')
           const Text(
-            "Mode boîtier : la transmission se fera par le poste Windows où le boîtier est branché. Le réglage est enregistré, mais rien n'est encore transmis : les factures restent en attente.",
+            "Mode boîtier : la transmission se fait par le poste Windows où le boîtier Eltrade CC300 est branché (fonction construite, pas encore essayée avec un vrai boîtier). Tant que le boîtier est absent, les factures restent en attente et partent dès son retour.",
             style: TextStyle(fontSize: 10, color: AgriColors.outline),
           )
         else if (_mode == 'desactive')
@@ -854,6 +855,8 @@ class _PageFacturationEmecefState extends State<PageFacturationEmecef> {
             "Les ventes choisies en « Facture normalisée » à l'encaissement sont transmises à la DGI par le serveur.",
             style: TextStyle(fontSize: 10, color: AgriColors.outline),
           ),
+        // MECEF-2 — l'état du boîtier branché sur CE poste (vérifier, factures en attente). Rien tant que le réglage ENREGISTRÉ n'est pas « boîtier ».
+        if (_mode == 'boitier') const BandeauBoitier(key: Key('entreprise-boitier')),
         const SizedBox(height: AgriSpacing.md),
         champReglage(p, 'ifu', "IFU de l'entreprise", _ifu, _erreurs, indice: '13 chiffres'),
         const Text(

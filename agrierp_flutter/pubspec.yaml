@@ -100,6 +100,8 @@ flutter:
   assets:
     - assets/images/logo.png
     - assets/images/image_login.png
+    # Aperçu de partage du produit (1280×640), le même que celui du web (public/assets/images/social-preview.png).
+    - assets/images/social-preview.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
     # ATT-3 — l'attestation est fabriquée AU POSTE (hors ligne) : logo, filigrane, décor et polices libres du modèle officiel.

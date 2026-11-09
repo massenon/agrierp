@@ -17,7 +17,6 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'chemins_depot.dart';
 import 'fiches_especes_commun.dart' show bladeDe;
 import 'php_laravel.dart';
 
@@ -752,16 +751,6 @@ echo json_encode([
       expect(b, isNot(contains('à maturité')));
       expect(b, contains('>Jeune<'));
       expect(b, contains('Passage du jour (Poussin → Jeune)'));
-    });
-
-    test('la maquette dit encore « Poulet » : l écran suit la décision client, pas la maquette', () {
-      final maquette = File('$dossierPrototype/fiche-volailles-reproducteurs.html');
-      if (!maquette.existsSync()) {
-        markTestSkipped('maquette absente de ce poste de développement');
-        return;
-      }
-      // Si la maquette est alignée un jour, cet écart n'en est plus un : retirer ce test.
-      expect(maquette.readAsStringSync(), contains('Poulet'));
     });
 
     test('⚠️ les clés de synchronisation ne sont PAS renommées : `*_jeune` porte les Jeunes, `*_sevre` les Poussins', () {

@@ -7,6 +7,7 @@ import '../clients/clients_creances_repository.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/champs_date_agri.dart';
 import '../../core/widgets/modale_agri.dart';
+import 'bandeau_boitier.dart';
 import 'caisse_repository.dart';
 import 'choix_facture.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -420,6 +421,8 @@ class _CaisseScreenState extends State<CaisseScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // MECEF-2 — l'état du boîtier, en mode boîtier seulement (invisible sinon).
+        const BandeauBoitier(compact: true),
         Padding(
           padding: const EdgeInsets.all(AgriSpacing.md),
           child: TextField(

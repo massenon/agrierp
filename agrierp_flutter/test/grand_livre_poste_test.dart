@@ -794,7 +794,7 @@ void main() {
         expect(
           l0('—'),
           findsOneWidget,
-          reason: 'crédit nul = tiret, comme la maquette',
+          reason: 'crédit nul = tiret, comme la vue web',
         );
         expect(l0('105 000'), findsOneWidget);
 
@@ -920,7 +920,7 @@ void main() {
       expect(dans('kpi-livre-final', '88 000'), findsOneWidget);
     });
 
-    testWidgets('⚠️ aucune ligne : le message de la maquette', (tester) async {
+    testWidgets('⚠️ aucune ligne : le message de la vue web', (tester) async {
       await jeu();
       await afficher(tester);
 
@@ -1016,7 +1016,7 @@ void main() {
       },
     );
 
-    testWidgets('les colonnes de la maquette, dans l ordre', (tester) async {
+    testWidgets('les colonnes de la vue, dans l ordre', (tester) async {
       await jeu();
       await afficher(tester);
 
@@ -1034,62 +1034,50 @@ void main() {
       }
     });
 
-    // ── Fidélité à la maquette ET à la page web (lues dans le dépôt Laravel, jamais copiées) ──────
+    // ── Fidélité à la page web (lue dans le dépôt Laravel, jamais copiée) ──────
 
-    final maquette = File(
-      '$dossierPrototype/grand-livre.html',
-    );
     final vueWeb = File(
       '$dossierLaravel/resources/views/livewire/comptabilite/grand-livre.blade.php',
     );
-    final sautMaquette = maquette.existsSync() && vueWeb.existsSync()
-        ? null
-        : 'SAUT : maquette ou vue web absente';
+    final sautWeb = vueWeb.existsSync() ? null : 'SAUT : vue web absente';
 
     List<String> trouver(String source, RegExp motif) => [
       for (final m in motif.allMatches(source)) m.group(1)!.trim(),
     ];
 
     testWidgets(
-      '⚠️⚠️ les quatre cartes : les libellés de la maquette ET de la page web, dans l ordre',
+      '⚠️⚠️ les quatre cartes : les libellés de la page web, dans l ordre',
       (tester) async {
-        final cartesMaquette = trouver(
-          maquette.readAsStringSync(),
-          RegExp(
-            r'<span class="text-\[10px\] text-outline font-bold uppercase block">([^<]+)</span>',
-          ),
-        );
         final cartesWeb = trouver(
           vueWeb.readAsStringSync(),
           RegExp(r'<x-kpi-card label="([^"]+)"'),
         );
-        expect(cartesMaquette, [
+        expect(cartesWeb, [
           "Solde d'Ouverture",
           'Total Débit Période',
           'Total Crédit Période',
           'Solde Final',
         ]);
-        expect(cartesWeb, cartesMaquette);
 
         await jeu();
         await afficher(tester);
 
         final x = [
-          for (final c in cartesMaquette)
+          for (final c in cartesWeb)
             tester.getTopLeft(find.text(c.toUpperCase())).dx,
         ];
         for (var i = 1; i < x.length; i++) {
-          expect(x[i], greaterThan(x[i - 1]), reason: cartesMaquette[i]);
+          expect(x[i], greaterThan(x[i - 1]), reason: cartesWeb[i]);
         }
       },
-      skip: sautMaquette != null,
+      skip: sautWeb != null,
     );
 
     testWidgets(
-      '⚠️⚠️ les colonnes <th> de la maquette, dans l ordre, et la page web identique',
+      '⚠️⚠️ les colonnes <th> de la page web, dans l ordre',
       (tester) async {
         final entetes = trouver(
-          maquette.readAsStringSync(),
+          vueWeb.readAsStringSync(),
           RegExp(r'<th class="[^"]*">([^<]+)</th>'),
         );
         expect(entetes, [
@@ -1100,13 +1088,6 @@ void main() {
           'Crédit',
           'Solde Progressif',
         ]);
-        expect(
-          trouver(
-            vueWeb.readAsStringSync(),
-            RegExp(r'<th class="[^"]*">([^<]+)</th>'),
-          ),
-          entetes,
-        );
 
         await jeu();
         await afficher(tester);
@@ -1119,13 +1100,12 @@ void main() {
           expect(x[i], greaterThan(x[i - 1]), reason: entetes[i]);
         }
       },
-      skip: sautMaquette != null,
+      skip: sautWeb != null,
     );
 
     testWidgets(
-      '⚠️ sous-titre, recherche, état vide et plan vide : les textes de la maquette et de la page web',
+      '⚠️ sous-titre, recherche, état vide et plan vide : les textes de la page web',
       (tester) async {
-        final html = maquette.readAsStringSync();
         final blade = vueWeb.readAsStringSync();
 
         const sousTitre =
@@ -1135,7 +1115,6 @@ void main() {
         const planVide = 'Aucun compte au plan comptable';
 
         for (final texte in [sousTitre, recherche, vide]) {
-          expect(html, contains(texte), reason: 'maquette : $texte');
           expect(blade, contains(texte), reason: 'page web : $texte');
         }
         expect(blade, contains(planVide));
@@ -1154,11 +1133,11 @@ void main() {
           expect(dans(cle, '—'), findsOneWidget, reason: cle);
         }
       },
-      skip: sautMaquette != null,
+      skip: sautWeb != null,
     );
 
     test(
-      '⚠️ le bouton « Exporter PDF » de la maquette est porté (ticket F0.87, ancien écart T4)',
+      '⚠️ le bouton « Exporter PDF » du web est porté (ticket F0.87, ancien écart T4)',
       () {
         // Jusqu'au ticket F0.87 ce test verrouillait l'ABSENCE du bouton (écart connu, T4). Le bouton
         // est arrivé : l'exemption de `fidelite_libelles_test.dart` a disparu avec lui, et le
@@ -1169,7 +1148,7 @@ void main() {
         expect(source.contains("'Exporter PDF'"), isTrue);
         expect(source.contains("'exporter-pdf-grand-livre'"), isTrue);
         expect(
-          maquette.existsSync() ? maquette.readAsStringSync() : 'Exporter PDF',
+          vueWeb.existsSync() ? vueWeb.readAsStringSync() : 'Exporter PDF',
           contains('Exporter PDF'),
         );
       },

@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'inventaire_maquette.g.dart';
 
+/// ⚠️ INSTANTANÉ FIGÉ, NON RÉGÉNÉRABLE : la maquette HTML est retirée du projet (décision du client, 09/11/2026).
+/// `inventaire_maquette.g.dart` reste commité comme référence ; les outils qui le produisaient sont obsolètes.
 /// Texte de tous les LITTÉRAUX DE CHAÎNE d'une source Dart.
 ///
 /// ⚠️⚠️ **TICKET F0.53 — CE CONTRÔLE SE CONTENTAIT D'UN COMMENTAIRE.** Il

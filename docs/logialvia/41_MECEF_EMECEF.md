@@ -23,7 +23,7 @@ Deux façons d'obtenir cette certification (les deux existent, d'après les déc
 | Principe | API en ligne de la DGI : le logiciel envoie la facture, la DGI la certifie | Un appareil branché à un PC, piloté en HTTP local |
 | Qui transmet | le **serveur** (jeton secret, jamais sur les postes) | le **poste** où le boîtier est branché (le serveur hébergé ne peut pas joindre `localhost`) |
 | Prérequis | compte e-MECeF de l'IFU, **jeton** (JWT) délivré par le portail de la DGI | boîtier acheté et déclaré, pilote installé |
-| État dans LogiAgriERP | **livré** (MECEF-1, MECEF-3) | **squelette** : réglage enregistré, rien n'est transmis (MECEF-2 à faire) |
+| État dans LogiAgriERP | **livré** (MECEF-1, MECEF-3) | **construit sans l'appareil** (MECEF-2), NON vérifié avec un vrai boîtier |
 
 ### 1.2 Vocabulaire
 - **IFU** : Identifiant Fiscal Unique, **13 chiffres** (celui de l'entreprise vendeuse ; celui du client, **facultatif**).
@@ -93,39 +93,67 @@ Pilote relu : `/home/user/issotina/eltrade-cc300-driver/` (`Readme.md`, `bill.sp
 | Authentification | **Aucune** (« Host Headers [NOT YET IMPLEMENTED] ») : n'écouter que `localhost`, ne jamais exposer le port |
 | Schéma `/bill` | `seller_id`, `seller_name` (≤ 30), `payments` [{`mode` V/C/M/D/E/A, `amount`}], `products` [{`label` ≤ 60, `tax` A à F, `price` TTC, `items` (quantité), `original_price`, `price_change_explanation` ≤ 24, `specific_tax`…}], `buyer_ifu`, `buyer_name`, `aib` (`1%`/`5%`/`N/A`) ; **vente** : `vt` (FV/CV/EV/EC) ; **avoir** : `rt` (FA/CA/EA/ER) + `rn` (« NIM-TC ») |
 
-### 3.1 MECEF-2 (non construit, faute de boîtier)
+### 3.1 MECEF-2 (construit sans l'appareil : voir § 3.3)
 Contrat défini dans `docs/PLAN_FINALISATION.md` : le poste appelle `http://localhost:38917/check` puis `/bill`, **vérifie que `qr_code` est rempli**, puis synchronise le résultat. Question ouverte d'LogiAgriERP : le constructeur étant en PHP, MECEF-2 le fera soit porter en Dart avec parité exécutée, soit servir la charge par le serveur.
 
 ### 3.2 ⚠️ Précision à apporter au guide et au plan (écart relevé)
 Le guide (bloc 19) et le plan disent que le boîtier utilisera « le MÊME `MecefFactureBuilder` ». **Ce n'est vrai que pour la logique** (prix entiers, répartition de remise, arrondi, groupes de taxe, libellés ≤ 60). Le **JSON** produit par `MecefFactureBuilder::enveloppe` suit l'API en ligne (`items`/`taxGroup`/`payment`/`type`/`reference`/`aib` = `A|B`) ; le pilote attend un **autre schéma** (`products`/`tax`/`payments`/`vt`|`rt`/`rn`/`aib` = `"1%"|"5%"|"N/A"`, `seller_id`, `seller_name`). MECEF-2 nécessite donc une **couche de traduction** (et, pour l'avoir, la référence « NIM-TC » au lieu de l'`uid`). Ne pas promettre « même charge utile ».
 
-### 3.3 MECEF-2 — état au 09/11/2026 : SQUELETTE seulement (relu dans le code), rien n'est construit côté poste
+### 3.3 MECEF-2 — état au 09/11/2026 : CONSTRUIT SANS L'APPAREIL, NON VÉRIFIÉ AVEC UN VRAI BOÎTIER
 
-> Plan d'exécution en prompts réutilisables : `47_PLAN_BOITIER_MECEF_2.md`.
+> Plan d'exécution en prompts : `47_PLAN_BOITIER_MECEF_2.md`. Décision du client (09/11/2026) : « faut lancer le chantier, faut pas attendre le boîtier ». **Rien ci-dessous n'a été essayé avec un vrai boîtier** : tout est éprouvé contre un FAUX PILOTE (`agrierp_flutter/test/boitier_faux_pilote.dart`) qui rejoue ce que dit le `Readme.md` du pilote (succès, 200 + `qr_code` vide, 400, 503, réponse lente).
 
-**Contexte (décisions du client du 07/11/2026).** La ferme a un COMPTE e-MECeF (API en ligne de la DGI, sans boîtier) et utilise ce mode ; d'autres structures ont un BOÎTIER **Eltrade CC300** branché sur le poste et la ferme en achètera un : les deux modes doivent pouvoir coexister (`MecefMode` : `desactive` · `emecef` · `boitier`, libellé du réglage « Boîtier MeCeF (à venir) »).
+**Contexte (décisions du client du 07/11/2026).** La ferme a un COMPTE e-MECeF et utilise ce mode ; d'autres structures ont un BOÎTIER **Eltrade CC300** branché sur le poste. Les deux modes coexistent (`MecefMode` : `desactive` · `emecef` · `boitier`). Le libellé « Boîtier MeCeF (à venir) » est GARDÉ jusqu'au premier essai réel.
 
-| Pièce | État | Fichier |
+#### Décision B0 (une page) — OPTION A : porter le constructeur en Dart, parité exécutée contre le vrai PHP
+
+| | A. Porter `MecefFactureBuilder` + `ChargeBoitierEltrade` en Dart | B. Faire servir la charge par le serveur |
 |---|---|---|
-| Mode `boitier` réglable (écran Paramètres › Facturation normalisée, copié au poste dans `app_settings` `mecef.mode`) | FAIT | `agrierp_laravel/app/Support/MecefMode.php` |
-| Fabrique qui résout la passerelle À CHAQUE transmission | FAIT | `app/Services/Mecef/MecefGatewayFactory.php` (`MecefMode::BOITIER => BoitierMecefGateway`) |
-| `BoitierMecefGateway` | **SQUELETTE** : implémente `MecefGatewayInterface` et `MecefAvoirGatewayInterface`, ne transmet RIEN ; répond `success=false`, message « Mode boîtier : transmission par le poste non encore disponible. », état `en_attente` | `app/Services/Mecef/BoitierMecefGateway.php` |
-| Couche de traduction vers le schéma du pilote (`bill.spec.json`) | FAITE, **jamais confrontée à un vrai boîtier** | `app/Services/Mecef/ChargeBoitierEltrade.php` (`MODES` E/M/V/C/D/A, `VENDEUR_MAX` 30, `rt` = FA + `rn` pour l'avoir, `aib` = `"1%"` / `"5%"` / `"N/A"`) |
-| Spécimen de la charge du pilote | FAIT (lu, jamais envoyé) | `presentation/ticket_essai_mecef.json` (vente d'essai de 21 300 FCFA TTC), produit par `MecefFactureBuilder` puis `ChargeBoitierEltrade` |
-| **Appel du boîtier PAR LE POSTE** (`GET /check`, `POST /bill` sur `http://localhost:38917`) | **NON CONSTRUIT** (« à faire à l'achat du boîtier », `docs/PLAN_FINALISATION.md`) | — |
+| Hors ligne | **La facture sort du boîtier sans serveur** : le poste est offline-first, le boîtier est local | Impossible tant que la charge n'est pas servie : le caissier attendrait le réseau pour un boîtier posé à côté de lui |
+| Parité | Prouvée par un test qui EXÉCUTE le vrai PHP (`charge_boitier_parite_php_test.dart`, ~40 cas : remise, livraison, écart d'arrondi, refus, TVA inactive, modes de paiement, libellés longs, avoirs) | Aucune à prouver (une seule implémentation) |
+| Surface de code | +1 fichier Dart (`facture_mecef.dart`) à garder aligné | +1 route serveur, +1 état « charge demandée » |
+| Risque d'arrondi | Une seule fonction d'arrondi (`FactureMecef.arrondi`, moitié vers le haut), prix entiers, mêmes libellés, mêmes groupes de taxe, même AIB ; mutations prouvées (arrondi → plancher, AIB `B` → `1%` : le test devient rouge) | Nul |
 
-**Pourquoi par le poste.** Le boîtier est un serveur HTTP LOCAL (`http://localhost:38917`) sans authentification : le serveur hébergé ne peut pas l'atteindre ; seule la machine à laquelle il est branché le peut. Le **jeton e-MECeF reste web-only** et inchangé : il n'existe NI colonne, NI champ de saisie, NI clé de demande au poste (l'écran du poste montre seulement « •••• » configuré ou « Aucun jeton enregistré ») ; le pilote n'a aucune authentification (§ 3) et le schéma `bill.spec.json` ne porte aucun jeton : le mode boîtier n'en transmet pas.
+**Choix : A** (imposé par le client : le poste est offline-first, une facture doit sortir du boîtier sans serveur ; l'option B est écartée). Le risque d'écart est couvert par la parité exécutée : toute évolution du constructeur PHP casse le test Dart tant que la transposition n'est pas refaite.
 
-**Ce qui reste à faire** (contrat défini au plan, sans rien promettre de plus) :
-1. Le poste (Windows, puis le poste web : voir le point 6) appelle `GET /check` (état `{"status":"Ready"}` ou 503 `DeviceNotConnected`), puis `POST /bill` avec la charge traduite, et **vérifie que `qr_code` est rempli** — jamais le code HTTP (le pilote répond 200 même en échec, § 3).
-2. Le constructeur de charge est en PHP : décision à prendre — le PORTER en Dart avec parité exécutée contre le vrai PHP (modèle : `choix_facture_parite_php_test.dart`), OU faire servir la charge par le serveur (`ChargeBoitierEltrade`) au poste. Ne pas promettre « même charge utile » (§ 3.2).
-3. Reporter le résultat (QR, code MeCeF/DGI, NIM, compteurs, `normalise_le`) dans la vente puis le synchroniser ; le poste ne doit JAMAIS écrire ces colonnes aujourd'hui TIRÉES seulement (`mecef_code`, `mecef_nim`, `mecef_compteurs`, `mecef_normalise_le`, `mecef_message` : garde `mecef_emecef_poste_test`) — c'est un changement de contrat à décider.
-4. Hors ligne : la vente part « demandée — en attente » comme en e-MECeF (`MecefEtat::EN_ATTENTE`) ; le boîtier est local, donc il peut normaliser HORS RÉSEAU : question à poser (le ticket normalisé s'imprime-t-il avant la synchronisation ?).
-5. Avoir sur une facture normalisée par le boîtier : `rt`/`rn` (« NIM-TC » : la référence est celle du boîtier, pas l'`uid` de l'API en ligne).
-6. Poste web (navigateur) : un navigateur ne peut appeler `http://localhost:38917` depuis une page HTTPS qu'avec les restrictions de contenu mixte / accès au réseau privé du navigateur : **NON étudié**, à valider avant de promettre le mode boîtier dans la PWA.
+**Changements de CONTRAT qu'implique l'écriture au poste des colonnes `mecef_*`** (jusqu'ici TIRÉES seulement) : voir « Ce qui est construit » ci-dessous. Le garde `mecef_emecef_poste_test` est RESSERRÉ, pas supprimé : la vente n'emporte la normalisation que par UN bloc `mecef`, en mode boîtier, vente en attente d'envoi, jamais un jeton, jamais `mecef_uid`, jamais l'AIB calculé ; l'avoir reste entièrement au serveur.
 
-**À valider avec un VRAI appareil (rien de ceci n'a été essayé)** : le schéma `bill.spec.json` tel que traduit (prix entiers TTC, groupes de taxe A à F, `price_change_explanation` ≤ 24, `items` décimaux) ; la durée de `GET /info` (« cette requête prend 4 s » selon le pilote) ; le comportement quand le boîtier est éteint ou débranché (503) ; ce que le pilote renvoie d'autre que `qr_code` (NIM, compteurs : à lire dans la réponse réelle) ; l'AIB ; les arrondis ; le débit d'un boîtier sous plusieurs ventes de suite ; l'impression du ticket.
+#### Ce qui est construit (poste Windows)
 
+| Pièce | Fichier |
+|---|---|
+| Charge en Dart (vente `FV`) + traduction du boîtier + parité PHP exécutée | `agrierp_flutter/lib/core/mecef/facture_mecef.dart`, `test/charge_boitier_parite_php_test.dart` |
+| Contrat `PasserelleBoitier` (résultats typés : certifiée · refusée · injoignable · incertaine), lecture du `qr_code` | `lib/core/mecef/passerelle_boitier.dart` |
+| Client HTTP `http://localhost:38917` : **localhost seulement** (garde + mutation), client Dio À PART (jamais l'en-tête `Authorization`), délais explicites (connexion 2 s, `/check` 3 s, `/info` 8 s pour 4 s annoncées, `/bill` 30 s), succès **seulement si `qr_code` non vide**, 400 → motif français, 503 / connexion refusée → « Boîtier injoignable » (état, pas erreur rouge) | `lib/core/mecef/passerelle_boitier_native.dart` ; navigateur : `passerelle_boitier_web.dart` (aucun boîtier) ; choix par import conditionnel `passerelle_boitier_plateforme.dart` |
+| Transmission par le poste (mode `boitier`) : réservation en base AVANT l'appel, états, reprise | `lib/features/ventes/transmission_boitier.dart` ; écritures de `sales` par l'unique écrivain `caisse_repository.dart` |
+| Envoi du résultat : bloc `mecef` de la vente ; acquittement qui ne perd pas un résultat arrivé PENDANT l'envoi | `lib/core/sync/sync_engine.dart` (`_blocMecefDuPoste`) |
+| Serveur : applique le bloc (mode boîtier seulement, facture à déclarer seulement, jamais par-dessus une facture normalisée, `qr_ref` non vide exigé) | `agrierp_laravel/app/Services/Mecef/ResultatBoitierDuPoste.php`, `SyncController::pushSales`, test `MecefBoitierPosteEnvoiTest` |
+| Indicateur d'état du boîtier (Paramètres › Facturation normalisée : vérifier, informations de l'appareil, factures en attente / refusées / à vérifier ; caisse : version compacte) | `lib/features/ventes/bandeau_boitier.dart` |
+
+**États (`sales.mecef_status`, clés inchangées).** `transmise` = « Normalisée » (le boîtier a rendu un `qr_code` non vide) · `erreur` = « Refusée » (400, 200 sans QR, ou charge refusée par le constructeur ; motif français ; reprise À LA MAIN seulement) · `en_attente` = boîtier injoignable (reprise AUTOMATIQUE à l'ouverture, après chaque tirage, toutes les 90 s, bouton de l'écran) · `expiree` n'existe pas en mode boîtier.
+
+**Idempotence : jamais deux transmissions d'une même vente.** (1) La vente est réservée dans une transaction ; la MARQUE « Transmission au boîtier commencée, réponse non reçue : vérifiez sur l'appareil… » est posée dans `mecef_message` AVANT l'appel ; (2) une vente marquée est « incertaine » : jamais reprise seule (arrêt de l'application pendant l'appel, ou réponse perdue après envoi) — l'écran demande de vérifier sur l'appareil puis de relancer à la main ; (3) le tirage n'écrase jamais la marque ; (4) une vente normalisée n'est plus retransmise et est verrouillée (correction = avoir, inchangé) ; (5) verrou mémoire en plus. **Jamais de jeton** au poste (le pilote n'en a pas).
+
+**Hors ligne.** Le boîtier est local : la facture se normalise sans réseau ; le résultat part à la synchronisation suivante. Si le boîtier n'est pas joint : « En attente », reprise à son retour.
+
+**Limites connues / NON construit :**
+1. **Avoir sur une facture normalisée par le boîtier** (`rt`/`rn`) : la charge Dart de l'avoir existe (parité exécutée) mais **la transmission de l'avoir par le poste n'est PAS branchée** ; la référence « NIM-TC » est non vérifiée. Le serveur en mode boîtier laisse l'avoir « en attente ».
+2. **Un seul poste doit porter le boîtier.** Une vente faite au web en mode boîtier est transmise par le poste qui la tire ; deux postes avec un boîtier chacun peuvent certifier deux fois la même vente (le serveur garde la première normalisation, mais le boîtier a déjà certifié). À régler par l'organisation avant l'essai.
+3. Annuler une vente « incertaine » n'est pas encore refusé par le poste.
+4. Formats du `qr_code` (`F;NIM;code;IFU;AAAAMMJJHHMMSS`) tirés du seul exemple du `Readme.md` ; compteurs de l'appareil (`/info`) lus pour l'affichage, **non** stockés sur la facture.
+5. Poste web (navigateur) : aucun boîtier (non étudié : contenu mixte / accès au réseau privé).
+6. **Aucun essai réel, aucun essai sous Windows.**
+
+#### Checklist du PREMIER ESSAI RÉEL du boîtier (à faire avec l'appareil, sur une vente de test)
+
+0. Sauvegarde ; pilote `eltrade-cc300-driver` lancé sur le poste (port 38917) ; boîtier branché ; IFU du boîtier = IFU de la ferme.
+1. Web : Paramètres › Facturation normalisée : mode « Boîtier MeCeF », IFU, **identifiant et nom de l'opérateur** (`seller_id` / `seller_name` ≤ 30) ; poste : synchroniser (le mode descend).
+2. Poste : Paramètres › Facturation normalisée : **« Vérifier le boîtier »** → « Boîtier prêt » + NIM, IFU, compteurs. Noter la durée réelle de `/info` (annoncée 4 s). Débrancher : « Boîtier injoignable » (jamais d'erreur rouge).
+3. Caisse : un produit, « Facture normalisée », nom (et IFU) ; valider. Contrôler : statut « Normalisée », QR rempli, code, NIM ; **noter le `qr_code` brut** (le format réel remplace l'exemple du Readme) et la réponse brute de `/info`.
+4. Cas, un par un : (a) AIB 1 % puis 5 % (le boîtier accepte-t-il le champ `aib` ?) ; (b) remise ; (c) quantité décimale (2,5 kg) ; (d) libellé > 60 caractères ; (e) paiement mobile money, crédit, avance (modes `M`, `A`) ; (f) **boîtier éteint à la validation** : « En attente », puis rallumer : reprise automatique en ≤ 90 s, UNE seule facture sur l'appareil ; (g) **débrancher pendant la transmission** : la vente doit rester marquée « à vérifier » ; vérifier sur l'appareil, puis « Relancer après vérification » ; (h) refus (charge hors schéma) : motif lisible ; (i) vente hors ligne puis synchronisation : le web affiche « Normalisée » ; (j) deux ventes de suite rapides (débit) ; (k) impression du ticket.
+5. Web : l'écran Facturation montre la facture « Normalisée » avec le QR du boîtier ; vérifier qu'aucun second envoi ne la modifie.
+6. **Avoir** : non branché : à construire après l'essai (NIM-TC).
+7. Consigner les réponses brutes, corriger les points « NON vérifié » ci-dessus, puis seulement retirer « (à venir) » du libellé du mode.
 
 ---
 
@@ -137,7 +165,7 @@ Le guide (bloc 19) et le plan disent que le boîtier utilisera « le MÊME `Mece
 4. **AIB** : champ `aib` `B` (5 %) / `A` (1 %) / omis (N/A), **montant jamais calculé par nous** (la DGI le renvoie, gardé dans `mecef_aib_montant`), règlement envoyé **sans** AIB (le paquet compare les paiements à la somme des lignes). **La DGI peut refuser un total avec AIB** : son motif s'affichera tel quel.
 5. Détection de l'expiration et reprise par confirmation seule ; comportement d'une **confirmation d'une facture déjà confirmée** ; arrondis des prix non entiers : non vérifiés.
 6. MySQL/MariaDB réel (migration `mecef_status` enum → texte essayée sous SQLite seulement) ; **rendu Windows réel du QR du PDF du poste** ; suites complètes.
-7. Mode boîtier : rien n'est transmis (squelette).
+7. Mode boîtier : construit contre un faux pilote, JAMAIS essayé avec un vrai boîtier (§ 3.3) ; avoir non branché.
 8. Texte d'erreur d'LogiAgriERP à corriger dans LogiALVIA (incohérence relevée) : `EmecefGateway` renvoie « renseignez-le dans Paramètres, Données de l'Entreprise », alors que le formulaire du jeton est l'onglet **« Facturation normalisée (e-MECeF) »**. Dans LogiALVIA, citer le bon onglet.
 
 ---

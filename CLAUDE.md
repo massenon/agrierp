@@ -34,5 +34,5 @@ cd agrierp_flutter && build_windows.bat
 ```
 
 - La suite Laravel a besoin de `npm run build` (manifeste Vite) et de `php artisan storage:link`, sinon 10 tests échouent pour des raisons d'environnement.
-- Les tests et outils du poste trouvent `agrierp_laravel/` et `prototype_html/` par `test/chemins_depot.dart` / `outils/chemins.py` (variables `AGRIERP_LARAVEL`, `AGRIERP_PROTOTYPE`, sinon le monorepo, sinon l'ancien chemin Windows). Sans la maquette (A8), 16 tests se sautent avec leur raison.
+- Les tests et outils du poste trouvent `agrierp_laravel/` par `test/chemins_depot.dart` / `outils/chemins.py` (variable `AGRIERP_LARAVEL`, sinon le monorepo, sinon l'ancien chemin Windows). La maquette HTML `prototype_html/` est retirée du projet depuis le 09/11/2026 (décision du client, A8) : aucun test ne la lit, la vue Blade du web fait seule foi ; les outils `outils/{fixtures,inventaire,structure,captures}.py` qui la lisaient sont obsolètes, conservés pour mémoire.
 - `build_windows.bat` échoue si Inno Setup ou le runtime VC++ manque ; `--sans-installateur` produit le seul dossier Release.

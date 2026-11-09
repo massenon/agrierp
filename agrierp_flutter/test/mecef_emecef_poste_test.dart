@@ -153,11 +153,25 @@ void main() {
       expect(StatutMecef.depuis(v.mecefStatus).libelle, 'Expirée');
     });
 
-    test('⚠️ le poste n écrit JAMAIS les colonnes MeCeF : ni la vente, ni l avoir envoyés ne les portent', () {
+    // DÉCISION MECEF-2 (mode boîtier, 09/11/2026 — voir docs/logialvia/41_MECEF_EMECEF.md § 3.3) : ce garde disait « le poste n'écrit
+    // JAMAIS la normalisation » (MECEF-1 : elle appartenait au serveur). En mode boîtier, le boîtier est branché sur le POSTE : le
+    // serveur ne peut pas le joindre, donc le poste écrit et envoie le résultat. Le garde est resserré, pas supprimé : la vente
+    // n'emporte la normalisation que par UN bloc `mecef`, en mode boîtier, vente en attente d'envoi, jamais un jeton, jamais l'identifiant
+    // e-MECeF (`mecef_uid`), jamais l'AIB calculé ; l'avoir, lui, reste entièrement au serveur.
+    test('⚠️ le poste n envoie la normalisation que par le bloc `mecef` du mode boîtier : jamais un jeton, un uid ni l AIB calculé', () {
       final source = File('lib/core/sync/sync_engine.dart').readAsStringSync();
-      final vente = source.split('Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {')[1].split('\n  };')[0];
+      final vente = source.split('Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes, {bool modeBoitier = false}) => {')[1].split('\n  };')[0];
       expect(vente, contains("'total': v.total"), reason: 'le garde lit bien la fonction d\'envoi des ventes');
-      expect(vente, isNot(contains('mecef')), reason: 'la normalisation appartient au serveur');
+      expect(vente, contains("'mecef': ?_blocMecefDuPoste(v, modeBoitier: modeBoitier)"), reason: 'un seul bloc, jamais des colonnes éparses');
+      expect(vente.replaceAll("'mecef': ?_blocMecefDuPoste(v, modeBoitier: modeBoitier)", ''), isNot(contains('mecef')), reason: 'aucune autre colonne MeCeF dans la vente');
+
+      final bloc = source.split('static Map<String, dynamic>? _blocMecefDuPoste(')[1].split('\n  }\n')[0];
+      expect(bloc, contains('if (!modeBoitier || v.syncStatus != SyncStatus.pending) return null;'), reason: 'mode boîtier ET vente en attente d\'envoi');
+      expect(bloc, contains('marqueTransmissionBoitier'), reason: 'une transmission incertaine ne part pas');
+      expect(bloc, contains("(v.mecefQrRef ?? '').trim().isNotEmpty"), reason: 'seule une facture avec QR est envoyée comme normalisée');
+      for (final interdit in ['mecefUid', 'mecef_uid', 'mecefAibMontant', 'aib_montant', 'jeton', 'token', 'Authorization']) {
+        expect(bloc, isNot(contains(interdit)), reason: '$interdit ne part jamais du poste');
+      }
 
       final avoir = source.split('Map<String, dynamic> _avoirEnJson(AvoirClient a) => {')[1].split('};')[0];
       expect(avoir, contains("'amount'"));

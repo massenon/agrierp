@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, visible
 import '../config/fichiers_entreprise.dart';
 import '../database/app_database.dart';
 import '../database/sync_columns.dart';
+import '../mecef/marque_boitier.dart';
 import '../systeme/justificatifs_navigateur.dart';
 import '../systeme/plateforme_poste.dart';
 import '../systeme/verrou_onglets.dart';
@@ -4246,6 +4247,11 @@ class SyncEngine {
 
       if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
 
+      // MECEF-2 — une transmission au boîtier commencée dont l'issue est inconnue (marque locale) n'est JAMAIS effacée par le tirage :
+      // sans elle, le poste retransmettrait une facture peut-être déjà certifiée (deux factures pour une vente). Seule une
+      // normalisation reçue du serveur (`transmise`) la remplace.
+      if (locale != null && locale.mecefMessage == marqueTransmissionBoitier && l['mecef_status'] != 'transmise') continue;
+
       // TICKET F0.93 (réserve 2 de l'audit indépendant) : le repli lit l'horloge INJECTÉE,
       // comme `horodatage` ci-dessous — jamais `DateTime.now()`, invisible à un test figé.
       final vendueLe = _date(l['sold_at']) ?? HeureBenin.depuisInstant(_maintenant());
@@ -5950,6 +5956,15 @@ class SyncEngine {
       )..where((t) => t.saleId.equals(v.id))).get();
     }
 
+    // MECEF-2 — le résultat d'une transmission faite PAR LE POSTE ne part qu'en mode boîtier (le serveur le revalide et l'ignore sinon).
+    final modeBoitier =
+        (await (_db.select(_db.appSettings)..where((s) => s.key.equals('mecef.mode'))).getSingleOrNull())?.value == 'boitier';
+
+    // MECEF-2 — quelles ventes partent AVEC leur résultat du boîtier : l'acquittement ne marque `synced` que celles-là (voir plus bas).
+    _ventesPartiesAvecBloc
+      ..clear()
+      ..addAll([for (final v in ventes) if (_blocMecefDuPoste(v, modeBoitier: modeBoitier) != null) v.id]);
+
     // Ticket DEP4 — les lignes de chaque dépense en attente, dans l'ordre : elles partent DANS le document de l'en-tête.
     final lignesDeDepense = <String, List<ExpenseLine>>{};
     for (final d in depenses) {
@@ -6043,7 +6058,7 @@ class SyncEngine {
         if (modules.isNotEmpty)
           'modules_config': modules.map(_moduleEnJson).toList(),
         'sales': ventes
-            .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const []))
+            .map((v) => _venteEnJson(v, lignesDeVente[v.id] ?? const [], modeBoitier: modeBoitier))
             .toList(),
         // Ticket AV1 — le serveur traite les retours APRÈS les ventes du même envoi. ⚠️ JAMAIS de `stock_adjustments` ni
         // d'écriture pour un avoir : le serveur réintègre le stock et passe l'écriture inverse (`AvoirClientService`).
@@ -6447,7 +6462,21 @@ class SyncEngine {
       'sales',
       corps['sales'],
       (ids, statut) async {
-        await (_db.update(_db.sales)..where((t) => t.id.isIn(ids)))
+        // MECEF-2 — ⚠️ UNE VENTE NORMALISÉE PAR LE BOÎTIER PENDANT L'ENVOI RESTE `pending`. Le boîtier peut répondre entre la lecture des
+        // ventes à envoyer et l'accusé du serveur : la vente partie SANS résultat serait alors acquittée, le tirage suivant effacerait
+        // la normalisation locale, et le poste retransmettrait une facture déjà certifiée. Elle repart au prochain envoi, avec son résultat.
+        var aAcquitter = ids;
+        if (statut == SyncStatus.synced && ids.isNotEmpty) {
+          final modeBoitierAccuse =
+              (await (_db.select(_db.appSettings)..where((r) => r.key.equals('mecef.mode'))).getSingleOrNull())?.value == 'boitier';
+          final actuelles = await (_db.select(_db.sales)..where((t) => t.id.isIn(ids))).get();
+          final nouvelles = {
+            for (final v in actuelles)
+              if (_blocMecefDuPoste(v, modeBoitier: modeBoitierAccuse) != null && !_ventesPartiesAvecBloc.contains(v.id)) v.id,
+          };
+          aAcquitter = [for (final id in ids) if (!nouvelles.contains(id)) id];
+        }
+        await (_db.update(_db.sales)..where((t) => t.id.isIn(aAcquitter)))
             .write(SalesCompanion(syncStatus: Value(statut)));
         if (statut == SyncStatus.synced) {
           _ventesDeBetailAcquittees += ids
@@ -8718,7 +8747,29 @@ class SyncEngine {
     'is_enabled': m.isEnabled,
   };
 
-  Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes) => {
+  /// MECEF-2 — les ventes du dernier envoi qui portaient le résultat du boîtier (voir l'acquittement des ventes).
+  final Set<String> _ventesPartiesAvecBloc = {};
+
+  /// MECEF-2 — le SEUL cas où le poste écrit la normalisation : la facture a été certifiée (ou refusée) par le boîtier de CE poste,
+  /// en mode boîtier, et la vente attend son envoi. Bloc `mecef` que le serveur REVALIDE (mode boîtier, vente à déclarer, jamais
+  /// par-dessus une facture déjà normalisée). ⚠️ Jamais `mecef_uid`, jamais un jeton, jamais l'AIB calculé : cela vient de la DGI.
+  /// Une marque « incertaine » ou une attente ne partent pas : elles restent locales.
+  static Map<String, dynamic>? _blocMecefDuPoste(Sale v, {required bool modeBoitier}) {
+    if (!modeBoitier || v.syncStatus != SyncStatus.pending) return null;
+    if (v.mecefMessage == marqueTransmissionBoitier) return null;
+    final certifiee = v.mecefStatus == 'transmise' && (v.mecefQrRef ?? '').trim().isNotEmpty;
+    if (!certifiee && v.mecefStatus != 'erreur') return null;
+    return {
+      'status': v.mecefStatus,
+      'qr_ref': certifiee ? v.mecefQrRef : null,
+      'code': certifiee ? v.mecefCode : null,
+      'nim': certifiee ? v.mecefNim : null,
+      'normalise_le': certifiee && v.mecefNormaliseLe != null ? _instant(v.mecefNormaliseLe!) : null,
+      'message': certifiee ? null : v.mecefMessage,
+    };
+  }
+
+  Map<String, dynamic> _venteEnJson(Sale v, List<SaleLine> lignes, {bool modeBoitier = false}) => {
     'id': v.id,
     'customer_id': v.customerId,
     'payment_mode': v.paymentMode,
@@ -8751,6 +8802,8 @@ class SyncEngine {
     'client_ifu': v.clientIfu,
     'client_nom_facture': v.clientNomFacture,
     'aib_taux': v.aibTaux,
+    // MECEF-2 — le résultat du boîtier de ce poste, seulement en mode boîtier (voir [_blocMecefDuPoste]).
+    'mecef': ?_blocMecefDuPoste(v, modeBoitier: modeBoitier),
     'device_id': v.deviceId,
     'updated_at': v.updatedAt.toUtc().toIso8601String(),
     'lines': lignes
