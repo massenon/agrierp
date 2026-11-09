@@ -5,8 +5,9 @@ namespace App\Services\Import;
 /**
  * Ticket IMPORT-1 — une colonne d'un modèle d'importation.
  *
- * `type` : `texte`, `telephone` (texte : le zéro initial ne se perd pas), `entier` (FCFA entiers), `decimal`
- * (virgule ou point), `liste` (valeur de la liste déroulante `liste`).
+ * `type` : `texte`, `telephone` (texte : le zéro initial ne se perd pas), `code` (texte : numéro de compte, zéros conservés),
+ * `date` (texte AAAA-MM-JJ : jamais convertie en date Excel), `entier` (FCFA entiers), `decimal` (virgule ou point), `liste`
+ * (valeur de la liste déroulante `liste`).
  */
 final class ColonneImport
 {
@@ -30,6 +31,8 @@ final class ColonneImport
     {
         return match ($this->type) {
             'telephone' => 'Texte (le zéro initial est conservé)',
+            'code' => 'Texte (les zéros initiaux sont conservés)',
+            'date' => 'Date au format AAAA-MM-JJ (exemple : 2026-11-08)',
             'entier' => 'Nombre entier de FCFA, sans décimale ni séparateur',
             'decimal' => 'Nombre (virgule ou point)',
             'liste' => 'Valeur de la liste déroulante',

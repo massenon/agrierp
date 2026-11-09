@@ -202,7 +202,7 @@ class _ImportationScreenState extends State<ImportationScreen> {
               ],
             ),
             const Text(
-              "Créez vos produits avec leur stock initial, vos clients ou vos fournisseurs à partir d'un tableur Excel (.xlsx) : "
+              "Créez vos produits avec leur stock initial, vos clients, vos fournisseurs, vos employés, vos comptes comptables ou votre barème de rationnement à partir d'un tableur Excel (.xlsx) : "
               "téléchargez le modèle, remplissez-le, déposez-le, vérifiez l'aperçu, puis confirmez.",
               style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
             ),
@@ -313,6 +313,9 @@ class _ImportationScreenState extends State<ImportationScreen> {
   static IconData _icone(String cle) => switch (cle) {
     'stocks' => SymbolesAgri.inventory_2,
     'clients' => SymbolesAgri.groups,
+    'employes' => SymbolesAgri.badge,
+    'plan_comptable' => SymbolesAgri.menu_book,
+    'rations' => SymbolesAgri.agriculture,
     _ => SymbolesAgri.local_shipping,
   };
 

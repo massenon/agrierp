@@ -18,7 +18,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">upload_file</span>Importation en masse
         </h2>
-        <p class="text-xs text-outline mt-xs">Créez vos produits avec leur stock initial, vos clients ou vos fournisseurs à partir d'un tableur Excel (.xlsx) : téléchargez le modèle, remplissez-le, déposez-le, vérifiez l'aperçu, puis confirmez.</p>
+        <p class="text-xs text-outline mt-xs">Créez vos produits avec leur stock initial, vos clients, vos fournisseurs, vos employés, vos comptes comptables ou votre barème de rationnement à partir d'un tableur Excel (.xlsx) : téléchargez le modèle, remplissez-le, déposez-le, vérifiez l'aperçu, puis confirmez.</p>
     </div>
 
     {{-- Étapes --}}

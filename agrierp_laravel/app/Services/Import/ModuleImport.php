@@ -109,6 +109,17 @@ abstract class ModuleImport
         return null;
     }
 
+    /**
+     * Colonnes SENSIBLES (le salaire d'un employé…) : leurs valeurs ne figurent JAMAIS au rapport téléchargeable et ne sont pas
+     * gardées après l'import, même pour une ligne refusée (le rapport à corriger les laisse vides).
+     *
+     * @return array<int, string> clés de colonne
+     */
+    public function colonnesSensibles(): array
+    {
+        return [];
+    }
+
     /** Empreinte des en-têtes réels : change dès qu'une colonne bouge. */
     public function empreinte(): string
     {

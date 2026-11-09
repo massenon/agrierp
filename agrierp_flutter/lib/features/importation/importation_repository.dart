@@ -9,8 +9,11 @@ import '../../core/erreurs/message_erreur.dart';
 import '../../core/temps/heure_benin.dart';
 import '../achats/fournisseurs_repository.dart';
 import '../clients/clients_creances_repository.dart';
+import '../comptabilite/comptabilite_repository.dart';
 import '../elevage/categorie_volaille.dart';
+import '../elevage/parametres_elevage_repository.dart';
 import '../elevage/stade_pondeuse.dart';
+import '../rh/personnel_repository.dart';
 import '../stocks/produits_repository.dart';
 
 /// Ticket IMPORT-1 — un fichier (ou un import entier) refusé AVANT toute écriture : le message est celui de l'écran.
@@ -48,6 +51,7 @@ class ModuleImportation {
     required this.permission,
     required this.version,
     required this.colonnes,
+    this.colonnesSensibles = const [],
   });
 
   final String cle;
@@ -58,6 +62,9 @@ class ModuleImportation {
   final String permission;
   final int version;
   final List<ColonneImportation> colonnes;
+
+  /// Colonnes SENSIBLES (le salaire) : jamais au rapport, jamais gardées après l'import (`ModuleImport::colonnesSensibles`).
+  final List<String> colonnesSensibles;
 
   ColonneImportation colonne(String cle) => colonnes.firstWhere((c) => c.cle == cle);
 
@@ -226,8 +233,70 @@ class ImportationRepository {
     ],
   );
 
-  /// Dans l'ordre de l'écran web.
-  static const modules = [stocks, clients, fournisseurs];
+  /// IMPORT-2 — employés : point de passage `PersonnelRepository.enregistrerEmploye` (`SaisieEmployeAction` au web), droit `manage-rh`.
+  static const employes = ModuleImportation(
+    cle: 'employes',
+    libelle: 'Employés',
+    description: "Registre des employés : nom, prénom, poste, date d'embauche, salaire de base et statut.",
+    permission: 'manage-rh',
+    version: 1,
+    colonnes: [
+      ColonneImportation('nom', 'Nom', obligatoire: true, type: 'texte'),
+      ColonneImportation('prenom', 'Prénom', obligatoire: true, type: 'texte'),
+      ColonneImportation('poste', 'Poste', obligatoire: true, type: 'texte'),
+      ColonneImportation('date_embauche', "Date d'embauche", obligatoire: true, type: 'date'),
+      ColonneImportation('salaire', 'Salaire de base (FCFA)', obligatoire: false, type: 'entier'),
+      ColonneImportation('statut', 'Statut', obligatoire: false, type: 'liste', liste: 'statuts'),
+    ],
+    colonnesSensibles: ['salaire'],
+  );
+
+  /// IMPORT-3 — comptes complémentaires : `ComptabiliteRepository.creerCompte` (`PlanComptableService::creer`), droit `manage-comptabilite`.
+  static const planComptable = ModuleImportation(
+    cle: 'plan_comptable',
+    libelle: 'Plan comptable',
+    description: 'Comptes complémentaires du plan comptable : numéro, intitulé et classe.',
+    permission: 'manage-comptabilite',
+    version: 1,
+    colonnes: [
+      ColonneImportation('numero', 'Numéro de compte', obligatoire: true, type: 'code'),
+      ColonneImportation('libelle', 'Intitulé', obligatoire: true, type: 'texte'),
+      ColonneImportation('classe', 'Classe', obligatoire: true, type: 'liste', liste: 'classes'),
+    ],
+  );
+
+  /// IMPORT-4 — barème de rationnement : `ParametresElevageRepository.enregistrerRation` (`RationStandardService::creer`), droit `manage-elevage`.
+  static const rations = ModuleImportation(
+    cle: 'rations',
+    libelle: 'Rations',
+    description: 'Barème de rationnement : espèce, stade physiologique et ration normative en grammes par tête et par jour.',
+    permission: 'manage-elevage',
+    version: 1,
+    colonnes: [
+      ColonneImportation('espece', 'Espèce', obligatoire: true, type: 'liste', liste: 'especes'),
+      ColonneImportation('stade', "Stade physiologique / tranche d'âge", obligatoire: true, type: 'texte'),
+      ColonneImportation('grammes', 'Ration normative (g/tête/jour)', obligatoire: true, type: 'entier'),
+    ],
+  );
+
+  /// Libellés de la liste « Statut » (`ImportEmployesService::STATUTS`) : clé du statut → libellé.
+  static const statutsEmploye = {'actif': 'Actif', 'conge': 'Congé', 'suspendu': 'Suspendu'};
+
+  /// Libellés de la liste « Classe » (`PlanComptableService::LIBELLES_CLASSE`).
+  static const classesComptables = {
+    1: '1 - Ressources', 2: '2 - Immobilisations', 3: '3 - Stocks', 4: '4 - Tiers', 5: '5 - Trésorerie',
+    6: '6 - Charges', 7: '7 - Produits', 8: '8 - Autres', 9: '9 - Hors bilan et analytique',
+  };
+
+  /// Libellés de la liste « Espèce » (`RationStandardService::ESPECES`) : code → libellé.
+  static const especesRation = {
+    'aviculture': 'Aviculture (Volailles)',
+    'cuniculture': 'Cuniculture (Lapins)',
+    'porciculture': 'Porciculture (Porcs)',
+  };
+
+  /// Dans l'ordre de l'écran web (copie de `ImportMasseService::REGISTRE`).
+  static const modules = [stocks, clients, fournisseurs, employes, planComptable, rations];
 
   static ModuleImportation? module(String cle) => modules.where((m) => m.cle == cle).firstOrNull;
 
@@ -337,6 +406,9 @@ class ImportationRepository {
         'stocks' => _validerStocks(brut, contexte),
         'clients' => _validerClients(brut),
         'fournisseurs' => _validerFournisseurs(brut),
+        'employes' => _validerEmployes(brut),
+        'plan_comptable' => _validerPlanComptable(brut),
+        'rations' => _validerRations(brut),
         _ => throw ArgumentError('Module inconnu : ${m.cle}'),
       };
 
@@ -524,14 +596,145 @@ class ImportationRepository {
     );
   }
 
+  /// Entier au sens de la règle `integer` de Laravel (`FILTER_VALIDATE_INT`) : signe facultatif, pas de zéro initial.
+  static int? _entierLaravel(String t) => RegExp(r'^[+-]?(0|[1-9]\d{0,17})$').hasMatch(t) ? int.parse(t) : null;
+
+  /// IMPORT-2 — règles de `SaisieEmployeAction::regles()`, noms de colonne du web (« prénom », « nom », « poste », « date d'embauche »).
+  ({Map<String, Object?> valeurs, Map<String, String> erreurs}) _validerEmployes(Map<String, String> brut) {
+    final e = <String, String>{};
+
+    final texteDate = texte(brut['date_embauche']);
+    var date = '';
+    if (texteDate.isNotEmpty) {
+      final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(texteDate);
+      var valide = false;
+      if (m != null) {
+        final a = int.parse(m.group(1)!);
+        final mo = int.parse(m.group(2)!);
+        final j = int.parse(m.group(3)!);
+        final d = DateTime(a, mo, j);
+        valide = a >= 1 && d.year == a && d.month == mo && d.day == j;
+      }
+      if (valide) {
+        date = texteDate;
+      } else {
+        e['date_embauche'] = 'Date invalide : « $texteDate ». Écrivez la date au format AAAA-MM-JJ (exemple : 2026-11-08).';
+      }
+    }
+
+    final texteStatut = texte(brut['statut']);
+    var statut = 'actif';
+    if (texteStatut.isNotEmpty) {
+      statut = '';
+      for (final entree in statutsEmploye.entries) {
+        if (cle(texteStatut) == cle(entree.value) || cle(texteStatut) == entree.key) statut = entree.key;
+      }
+      if (statut.isEmpty) e['statut'] = 'Statut inconnu : « $texteStatut ». Choisissez une valeur de la liste déroulante.';
+    }
+
+    final texteSalaire = texte(brut['salaire']);
+    int? salaire;
+    if (texteSalaire.isNotEmpty) {
+      salaire = entier(texteSalaire);
+      if (salaire == null) e['salaire'] = 'Montant invalide : un nombre entier de FCFA est attendu.';
+    }
+
+    final nom = texte(brut['nom']);
+    final prenom = texte(brut['prenom']);
+    final poste = texte(brut['poste']);
+
+    void regle(String colonne, String? motif) {
+      if (motif != null) e.putIfAbsent(colonne, () => motif);
+    }
+
+    regle('nom', nom.isEmpty ? _obligatoire('nom') : (_longueur(nom) > 100 ? _tropLong('nom', 100) : null));
+    regle('prenom', prenom.isEmpty ? _obligatoire('prénom') : (_longueur(prenom) > 100 ? _tropLong('prénom', 100) : null));
+    regle('poste', poste.isEmpty ? _obligatoire('poste') : (_longueur(poste) > 100 ? _tropLong('poste', 100) : null));
+    regle('date_embauche', date.isEmpty ? _obligatoire("date d'embauche") : null);
+
+    return (
+      valeurs: {'last_name': nom, 'first_name': prenom, 'position': poste, 'hire_date': date, 'base_salary': salaire, 'status': statut},
+      erreurs: e,
+    );
+  }
+
+  /// IMPORT-3 — règles de `PlanComptableService::regles()` SANS `unique` (un numéro déjà là est « ignoré », création seule).
+  ({Map<String, Object?> valeurs, Map<String, String> erreurs}) _validerPlanComptable(Map<String, String> brut) {
+    final e = <String, String>{};
+
+    final texteClasse = texte(brut['classe']);
+    var classe = texteClasse;
+    for (final entree in classesComptables.entries) {
+      if (texteClasse.isNotEmpty && cle(entree.value) == cle(texteClasse)) classe = '${entree.key}';
+    }
+
+    final code = texte(brut['numero']);
+    final libelle = texte(brut['libelle']);
+
+    void regle(String colonne, String? motif) {
+      if (motif != null) e.putIfAbsent(colonne, () => motif);
+    }
+
+    regle('numero', code.isEmpty ? _obligatoire('code') : (_longueur(code) > 20 ? _tropLong('code', 20) : null));
+    regle('libelle', libelle.isEmpty ? _obligatoire('libellé') : (_longueur(libelle) > 255 ? _tropLong('libellé', 255) : null));
+    final n = _entierLaravel(classe);
+    regle(
+      'classe',
+      classe.isEmpty
+          ? _obligatoire('classe')
+          : (n == null ? 'Le champ classe doit être un nombre entier.' : ((n < 1 || n > 9) ? 'Le champ classe doit être compris entre 1 et 9.' : null)),
+    );
+
+    return (valeurs: {'code': code, 'label': libelle, 'class': classe}, erreurs: e);
+  }
+
+  /// IMPORT-4 — règles de `RationStandardService::regles()`, noms de colonne du web (« espèce », « stade », « ration (grammes) »).
+  ({Map<String, Object?> valeurs, Map<String, String> erreurs}) _validerRations(Map<String, String> brut) {
+    final e = <String, String>{};
+
+    final texteEspece = texte(brut['espece']);
+    var espece = '';
+    for (final entree in especesRation.entries) {
+      if (texteEspece.isNotEmpty && (cle(texteEspece) == cle(entree.value) || cle(texteEspece) == entree.key)) espece = entree.key;
+    }
+    if (texteEspece.isNotEmpty && espece.isEmpty) {
+      e['espece'] = "Espèce inconnue : « $texteEspece ». Choisissez une valeur de la liste déroulante.";
+    }
+
+    final stade = texte(brut['stade']);
+    final grammes = sansEspaces(texte(brut['grammes']));
+
+    void regle(String colonne, String? motif) {
+      if (motif != null) e.putIfAbsent(colonne, () => motif);
+    }
+
+    regle('espece', espece.isEmpty ? _obligatoire('espèce') : null);
+    regle('stade', stade.isEmpty ? _obligatoire('stade') : (_longueur(stade) > 100 ? _tropLong('stade', 100) : null));
+    final g = _entierLaravel(grammes);
+    regle(
+      'grammes',
+      grammes.isEmpty
+          ? _obligatoire('ration (grammes)')
+          : (g == null ? 'Le champ ration (grammes) doit être un nombre entier.' : (g < 1 ? _auMoins('ration (grammes)', 1) : null)),
+    );
+
+    return (valeurs: {'species_code': espece, 'stage_label': stade, 'ration_g_per_day': g ?? 0}, erreurs: e);
+  }
+
   /// Clé naturelle NORMALISÉE d'une ligne valide (doublon dans le fichier, UUID v5) — `ModuleImport::cleLigne`.
   String cleLigne(ModuleImportation m, Map<String, Object?> v) => switch (m.cle) {
     'stocks' =>
       '${cle('${v['name']}')}|${cle('${v['categorie_libelle']}')}|${cle('${v['unit']}')}|${cle('${v['filiere_libelle']}').isEmpty ? '-' : cle('${v['filiere_libelle']}')}',
     'clients' => '${cle('${v['name']}')}|${normaliserTelephone(v['phone'] as String?) ?? '-'}',
     'fournisseurs' => '${cle('${v['name']}')}|${normaliserTelephone(v['phone'] as String?) ?? _chiffresOuTiret(v['phone'] as String?)}',
+    'employes' => '${'${v['last_name']}'.toLowerCase()}|${'${v['first_name']}'.toLowerCase()}|${v['hire_date']}',
+    'plan_comptable' => cleDeCompte('${v['code']}'),
+    'rations' => '${v['species_code']}|${cle('${v['stage_label']}')}',
     _ => throw ArgumentError('Module inconnu : ${m.cle}'),
   };
+
+  /// Clé d'un numéro de compte : sans espace, en minuscules (`ImportPlanComptableService::cleDeCode`).
+  static String cleDeCompte(String code) => sansEspaces(code).toLowerCase();
 
   static String _chiffresOuTiret(String? t) {
     final d = (t ?? '').replaceAll(RegExp(r'\D+'), '');
@@ -559,7 +762,7 @@ class ImportationRepository {
     for (final entree in lues.entries) {
       final numero = entree.key;
       final brut = entree.value;
-      final ligne = LigneImportation(ligne: numero, designation: brut['nom'] ?? '', brut: brut);
+      final ligne = LigneImportation(ligne: numero, designation: designation(m, brut), brut: brut);
 
       final r = validerLigne(m, brut, contexte);
       if (r.erreurs.isNotEmpty) {
@@ -586,8 +789,16 @@ class ImportationRepository {
     return ApercuImportation(module: m, nomFichier: nomFichier, lignes: lignes, bloquant: await _controlePrealable(m));
   }
 
+  /// Texte qui désigne la ligne dans l'aperçu et le rapport (`ModuleImport::designation`).
+  static String designation(ModuleImportation m, Map<String, String> brut) => switch (m.cle) {
+    'employes' => '${texte(brut['prenom'])} ${texte(brut['nom'])}'.trim(),
+    'plan_comptable' => '${texte(brut['numero'])} — ${texte(brut['libelle'])}'.replaceAll(RegExp(r'^[ —]+|[ —]+$'), ''),
+    'rations' => texte(brut['stade']),
+    _ => brut['nom'] ?? '',
+  };
+
   /// Motif qui interdit TOUT l'import : un exercice CLOS qui couvre le jour de l'import refuse le stock initial
-  /// (`AdjustStockAction`, R4) — `ImportStocksService::controlePrealable`. Clients et fournisseurs : aucun.
+  /// (`AdjustStockAction`, R4) — `ImportStocksService::controlePrealable`. Les cinq autres modules : aucun (aucun n'écrit dans un exercice).
   Future<String?> _controlePrealable(ModuleImportation m) async {
     if (m.cle != 'stocks') return null;
 
@@ -708,6 +919,27 @@ class ImportationRepository {
         if (_cleNaturellePersonne('${v['name']}', v['phone'] as String?, c.fournisseurs)) {
           return 'Ce fournisseur existe déjà (même nom, même téléphone) : ignoré, la fiche existante est gardée.';
         }
+      case 'employes':
+        if (await (database.select(database.employees)..where((x) => x.id.equals(id))).getSingleOrNull() != null) {
+          return 'Cet employé a déjà été importé : ignoré.';
+        }
+        if (c.employes.contains(cleLigne(m, v))) {
+          return "Cet employé existe déjà (même nom, même prénom, même date d'embauche) : ignoré, la fiche existante est gardée.";
+        }
+      case 'plan_comptable':
+        if (await (database.select(database.chartOfAccounts)..where((x) => x.id.equals(id))).getSingleOrNull() != null) {
+          return 'Ce compte a déjà été importé : ignoré.';
+        }
+        if (c.comptes.contains(cleLigne(m, v))) {
+          return 'Ce numéro de compte existe déjà au plan comptable : ignoré, le compte existant est gardé.';
+        }
+      case 'rations':
+        if (await (database.select(database.feedRationStandards)..where((x) => x.id.equals(id))).getSingleOrNull() != null) {
+          return 'Cette ration a déjà été importée : ignorée.';
+        }
+        if (c.rations.contains(cleLigne(m, v))) {
+          return 'Cette ration existe déjà au barème (même espèce, même stade) : ignorée, la ration existante est gardée.';
+        }
     }
     return null;
   }
@@ -772,7 +1004,14 @@ class ImportationRepository {
 
     // Les valeurs lues ne restent que pour les lignes REFUSÉES (le rapport à corriger).
     for (final l in apercu.lignes) {
-      if (l.statut != refusee) l.brut = null;
+      if (l.statut != refusee) {
+        l.brut = null;
+      } else {
+        // IMPORT-2 — une colonne SENSIBLE (le salaire) n'est gardée pour aucune ligne, refusée comprise.
+        for (final cleSensible in m.colonnesSensibles) {
+          l.brut?[cleSensible] = '';
+        }
+      }
     }
     apercu.termine = true;
     return apercu;
@@ -820,6 +1059,30 @@ class ImportationRepository {
           ),
           id: id,
         );
+      case 'employes':
+        await PersonnelRepository(database: database, identifiantPoste: deviceId).enregistrerEmploye(
+          id: id,
+          prenom: v['first_name'] as String,
+          nom: v['last_name'] as String,
+          fonction: v['position'] as String,
+          embauche: DateTime.parse(v['hire_date'] as String),
+          salaire: (v['base_salary'] as int?)?.toDouble(),
+          statut: v['status'] as String,
+        );
+      case 'plan_comptable':
+        await ComptabiliteRepository(database: database, deviceId: deviceId).creerCompte(
+          code: v['code'] as String,
+          libelle: v['label'] as String,
+          classe: v['class'] as String,
+          id: id,
+        );
+      case 'rations':
+        await ParametresElevageRepository(database: database, maintenant: _maintenant).enregistrerRation(
+          id: id,
+          espece: v['species_code'] as String,
+          stade: v['stage_label'] as String,
+          grammes: v['ration_g_per_day'] as int,
+        );
     }
   }
 
@@ -831,6 +1094,12 @@ class ImportationRepository {
       case 'clients' || 'fournisseurs':
         final t = normaliserTelephone(v['phone'] as String?);
         if (t != null) (m.cle == 'clients' ? c.clients : c.fournisseurs).add('${cle('${v['name']}')}|$t');
+      case 'employes':
+        c.employes.add(cleLigne(m, v));
+      case 'plan_comptable':
+        c.comptes.add(cleLigne(m, v));
+      case 'rations':
+        c.rations.add(cleLigne(m, v));
     }
   }
 
@@ -859,6 +1128,12 @@ class ImportationRepository {
         };
       case 'fournisseurs':
         return {'categories': categoriesFournisseur};
+      case 'employes':
+        return {'statuts': statutsEmploye.values.toList()};
+      case 'plan_comptable':
+        return {'classes': classesComptables.values.toList()};
+      case 'rations':
+        return {'especes': especesRation.values.toList()};
       default:
         return {};
     }
@@ -916,7 +1191,12 @@ class ImportationRepository {
     ecrire('Formats');
     ecrire('Montants', 'Francs CFA ENTIERS, sans décimale ni séparateur de milliers (exemple : 4500).');
     ecrire('Nombres', 'Quantités et pourcentages : virgule ou point (exemple : 8,5).');
-    ecrire('Dates', "Format AAAA-MM-JJ (exemple : 2026-11-08). Aucune date n'est demandée par ce modèle.");
+    ecrire(
+      'Dates',
+      m.colonnes.any((c) => c.type == 'date')
+          ? 'Format AAAA-MM-JJ (exemple : 2026-11-08). Écrivez la date telle quelle, comme du texte.'
+          : "Format AAAA-MM-JJ (exemple : 2026-11-08). Aucune date n'est demandée par ce modèle.",
+    );
     ecrire('Téléphones', 'Écrivez les téléphones et l\'IFU comme du texte (le zéro initial doit rester).');
     ecrire('Limites', '5 000 lignes et 5 Mo au plus par fichier. Fichier .xlsx uniquement.');
     ligne++;
@@ -975,7 +1255,12 @@ class ImportationRepository {
     ligneTexte(refusees, 0, ['Ligne', 'Motif', for (final c in apercu.module.colonnes) c.entete], gras: true);
     var n = 1;
     for (final l in apercu.lignes.where((l) => l.statut == refusee)) {
-      ligneTexte(refusees, n++, ['${l.ligne}', l.motif ?? '', for (final c in apercu.module.colonnes) l.brut?[c.cle] ?? '']);
+      // Une colonne sensible reste VIDE : le rapport ne reproduit jamais un salaire.
+      ligneTexte(refusees, n++, [
+        '${l.ligne}',
+        l.motif ?? '',
+        for (final c in apercu.module.colonnes) apercu.module.colonnesSensibles.contains(c.cle) ? '' : (l.brut?[c.cle] ?? ''),
+      ]);
     }
 
     final sortie = classeur.encode();
@@ -999,6 +1284,9 @@ class ContexteImportation {
     required this.produits,
     required this.clients,
     required this.fournisseurs,
+    required this.employes,
+    required this.comptes,
+    required this.rations,
   });
 
   /// clé de comparaison du libellé → identifiant.
@@ -1014,6 +1302,11 @@ class ContexteImportation {
   /// clés naturelles « nom|téléphone » des fiches ACTIVES (téléphone exploitable seulement).
   final Set<String> clients;
   final Set<String> fournisseurs;
+
+  /// clés de ligne des employés ACTIFS (`nom|prénom|date d'embauche`), des comptes du plan (tous, archivés compris) et des rations ACTIVES.
+  final Set<String> employes;
+  final Set<String> comptes;
+  final Set<String> rations;
 
   /// Ne lit que ce que [module] consulte : un caissier qui importe des clients ne lit ni le catalogue ni les fournisseurs.
   static Future<ContexteImportation> charger(AppDatabase db, String module) async {
@@ -1055,6 +1348,21 @@ class ContexteImportation {
       if (t != null && n.isNotEmpty) fournisseurs.add('$n|$t');
     }
 
+    final employes = <String>{};
+    for (final x in module != 'employes' ? const <Employee>[] : await (db.select(db.employees)..where((t) => t.isActive.equals(true))).get()) {
+      final h = x.hireDate;
+      final date = h == null ? '' : '${h.year.toString().padLeft(4, '0')}-${h.month.toString().padLeft(2, '0')}-${h.day.toString().padLeft(2, '0')}';
+      employes.add('${ImportationRepository.cle(x.lastName)}|${ImportationRepository.cle(x.firstName)}|$date');
+    }
+    final comptes = <String>{};
+    for (final x in module != 'plan_comptable' ? const <ChartOfAccount>[] : await db.select(db.chartOfAccounts).get()) {
+      comptes.add(ImportationRepository.cleDeCompte(x.code));
+    }
+    final rations = <String>{};
+    for (final x in module != 'rations' ? const <FeedRationStandard>[] : await (db.select(db.feedRationStandards)..where((t) => t.isActive.equals(true))).get()) {
+      rations.add('${x.speciesCode}|${ImportationRepository.cle(x.stageLabel)}');
+    }
+
     return ContexteImportation(
       categories: categories,
       filieres: filieres,
@@ -1062,6 +1370,9 @@ class ContexteImportation {
       produits: produits,
       clients: clients,
       fournisseurs: fournisseurs,
+      employes: employes,
+      comptes: comptes,
+      rations: rations,
     );
   }
 }

@@ -127,7 +127,7 @@
             @endhasanyrole
 
             {{-- Ticket IMPORT-1 : « Importation en masse » (tableur xlsx) dans le groupe ADMINISTRATION, visible à qui peut importer
-                 au moins un module (manage-stocks / manage-ventes / manage-achats) ; la route reste protégée par `can:importation-masse`. --}}
+                 au moins un module (manage-stocks / manage-ventes / manage-achats / manage-rh / manage-comptabilite / manage-elevage) ; la route reste protégée par `can:importation-masse`. --}}
             @if(auth()->user()->hasRole('admin') || auth()->user()->can('importation-masse'))
             <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider px-xs pt-sm">ADMINISTRATION</p>
             <div class="space-y-xs mb-sm">

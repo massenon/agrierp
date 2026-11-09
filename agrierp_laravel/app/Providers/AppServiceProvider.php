@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Ticket IMPORT-1 — l'écran « Importation en masse » s'ouvre à qui peut importer AU MOINS un module : le droit du module
         // (`manage-stocks`, `manage-ventes`, `manage-achats`) reste vérifié à chaque lecture et écriture (`ImportMasseService`).
-        \Illuminate\Support\Facades\Gate::define('importation-masse', fn ($user) => $user->canAny(['manage-stocks', 'manage-ventes', 'manage-achats']));
+        \Illuminate\Support\Facades\Gate::define('importation-masse', fn ($user) => $user->canAny(['manage-stocks', 'manage-ventes', 'manage-achats', 'manage-rh', 'manage-comptabilite', 'manage-elevage']));
 
         // Ticket CONF-4 (DV-20) — LA CORRECTION COMPTABLE N'OUVRE PAS LA CAISSE. Un AVOIR (créer, marquer traité, retransmettre sa
         // facture `FA`) s'ouvre à `manage-ventes` (caissier : inchangé) OU `correct-invoices` (comptable). Retransmettre une FACTURE
