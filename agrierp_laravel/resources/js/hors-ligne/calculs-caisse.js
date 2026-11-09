@@ -67,7 +67,10 @@ export const MOTIFS = {
     remise: 'Le champ remise est inférieur au minimum autorisé (0).',
     remiseEntiere: 'La remise doit être un nombre entier de FCFA.',
     remiseTropGrande: 'La remise ne peut pas dépasser le sous-total de la vente.',
-    produitSansBande: "Ce produit est rattaché à une espèce d'élevage : sa vente exige la bande source et le contrôle vétérinaire. Vendez-le en ligne.",
+    // PWA-1b — produits rattachés à une espèce : les phrases de `PosInterface::confirmWeightAdd` et `validateSale`.
+    bandeObligatoire: 'La bande source est obligatoire pour un sujet vivant.',
+    remanenceAjout: (code) => `Vente interdite - Bande ${code} sous remanence veterinaire active. Blocage automatique du systeme.`,
+    remanenceValidation: (code) => `Vente interdite - Bande ${code} sous remanence veterinaire active. Retirez ce sujet du panier avant de valider.`,
     produitSurDevis: 'Ce produit se chiffre sur devis : il ne se vend pas à la caisse.',
     produitInconnu: 'Produit inconnu de la copie locale : synchronisez d’abord.',
     especesInsuffisantes: 'Le montant reçu est inférieur au total à payer.',
@@ -211,15 +214,15 @@ export function tvaIncluse(lignes, remise, tvaActive) {
  *
  * @returns {{ok:true, qty:number, montant:number}|{ok:false, motif:string}}
  */
-export function validerLigne({ produit, qty, montant }) {
+export function validerLigne({ produit, qty, montant, lotId = null }) {
     if (!produit) {
         return { ok: false, motif: MOTIFS.produitInconnu };
     }
     if (produit.pricing_mode === 'quote') {
         return { ok: false, motif: MOTIFS.produitSurDevis };
     }
-    if (produit.species_id) {
-        return { ok: false, motif: MOTIFS.produitSansBande };
+    if (produit.species_id && !lotId) {
+        return { ok: false, motif: MOTIFS.bandeObligatoire, champ: 'lot_id' };
     }
     const quantite = lireEntier(qty);
     if (quantite === null) {
@@ -347,7 +350,7 @@ export function construireVente(entree) {
 
     const lignes = panier.map((l) => ({
         product_id: l.product_id,
-        lot_id: null,
+        lot_id: l.lot_id ?? null,
         qty: l.qty,
         unit_price: prixUnitaire(l.montant, l.qty),
         manual_total_amount: l.montant,

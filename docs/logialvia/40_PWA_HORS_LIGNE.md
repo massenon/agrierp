@@ -290,9 +290,8 @@ Chemins cités vérifiés par `ls` à la rédaction (07/11/2026) : `agrierp_lara
 
 ---
 
-## Suite de PWA-1 (09/11/2026) : PWA-1b et première pierre de PWA-3
+## Suite de PWA-1 (09 et 10/11/2026) : PWA-1b et socle de PWA-3
 
-- **PWA-1b** (caisse complète de la PWA JS ; ⚠️ « PWA-2 » désigne désormais le poste Flutter web) : livraison facturée, vente sur avance, client créé hors ligne sont construits, avec parité exécutée contre le PHP ; les produits rattachés à une espèce restent à construire. Détail et preuves : `docs/PLAN_FINALISATION.md` (section PWA-1b) et `agrierp_laravel/CLAUDE.md`.
-- **PWA-3** : seule la première pierre est livrée — le calcul d'effectif par catégorie/stade (`effectif-categories.js`), prouvé contre `EffectifParCategorieService`. La fiche journalière hors ligne (écran, file, tirage des bandes) n'est PAS construite.
+- **PWA-1b** (caisse complète de la PWA JS ; ⚠️ « PWA-2 » désigne désormais le poste Flutter web) : livraison facturée, vente sur avance, client créé hors ligne ET produits rattachés à une espèce (bande source, rémanence tirée, refus du web, effet sur la fiche du jour) sont construits, avec parité exécutée contre le PHP. Détail et preuves : `docs/PLAN_FINALISATION.md` (section PWA-1b) et `agrierp_laravel/CLAUDE.md`.
+- **PWA-3** : aucune fiche n'est livrée. Livré et prouvé contre le PHP : le calcul d'une journée (`effectif-categories.js`), la chaîne d'une bande (`chaine-effectif.js`) et le tirage des bandes, fiches et rémanences. La fiche LAPINS (écran, saisie, barèmes, file d'envoi) reste à faire, puis escargots, porcs, volailles.
 - Décisions CAISSE-1/2/3 (appareil/PIN renforcé, reçu provisoire, refus au-delà d'un seuil de prix) : toujours des propositions, non validées par le client, non bâties.
-

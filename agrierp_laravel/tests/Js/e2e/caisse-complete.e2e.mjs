@@ -47,6 +47,17 @@ php(['artisan', 'tinker', '--execute', `
     \\App\\Models\\Customer::create(['name' => 'Awa KPOGNON', 'phone' => '97000000', 'ifu' => '1234567890123', 'is_active' => true]);
     \\App\\Models\\TreasuryAccount::firstOrCreate(['type' => 'caisse'], ['label' => 'Caisse Principale', 'account_code' => '531', 'balance' => 0, 'is_active' => true]);
 `]);
+php(['artisan', 'tinker', '--execute', `
+    // PWA-1b — produits rattachés à une espèce : bandes de lapins (une libre, une sous rémanence) et de volailles SANS départ saisi.
+    $lap = \\App\\Models\\LivestockSpecies::firstOrCreate(['code' => 'cuniculture'], ['label' => 'Cuniculture', 'is_enabled' => true]);
+    $avi = \\App\\Models\\LivestockSpecies::firstOrCreate(['code' => 'aviculture'], ['label' => 'Aviculture', 'is_enabled' => true]);
+    $cat = \\App\\Models\\ProductCategory::first();
+    $bande = fn ($code, $espece) => \\App\\Models\\LivestockLot::forceCreate(['code' => $code, 'species_id' => $espece->id, 'stage' => 'croissance', 'initial_quantity' => 40, 'current_quantity' => 40, 'created_date' => '2026-01-01', 'status' => 'actif', 'is_active' => true]);
+    $libre = $bande('LAP-E2E', $lap); $bloquee = $bande('LAP-BLOQ', $lap); $bande('VOL-E2E', $avi);
+    \\App\\Models\\VeterinaryWithdrawalPeriod::forceCreate(['lot_id' => $bloquee->id, 'product_used' => 'Antibiotique E2E', 'start_date' => now()->toDateString(), 'withdrawal_days' => 30, 'end_date' => now()->addDays(30)->toDateString()]);
+    $produit = fn ($sku, $nom, $espece, $categorie) => \\App\\Models\\Product::forceCreate(['sku' => $sku, 'name' => $nom, 'category_id' => $cat->id, 'species_id' => $espece->id, 'categorie_effectif' => $categorie, 'unit' => 'u', 'pricing_mode' => 'fourchette', 'price_min' => 1000, 'price_max' => 9000, 'stock_qty' => 50, 'tva_rate' => 0, 'is_active' => true]);
+    $produit('LAP-VIF', 'Lapin vif E2E', $lap, null); $produit('VOL-JEU', 'Poulet jeune E2E', $avi, 'jeune');
+`]);
 const produits = sql("select id||'|'||name||'|'||stock_qty from products where species_id is null and pricing_mode != 'quote' order by name limit 3").split('\n').map((l) => l.split('|'));
 assert.ok(produits.length >= 2, 'au moins deux produits vendables hors sujets vivants');
 
@@ -204,6 +215,71 @@ try {
     assert.equal(sql("select count(*) from sales where payment_mode='credit' and customer_id=(select id from customers where phone='97000000')"), '1', 'la vente est rattachée à la fiche du serveur');
     assert.equal(sql("select count(*) from sales"), '2');
     ok('client déjà connu du serveur : fusionné (une seule fiche), la vente à crédit en file est rattachée à la fiche du serveur');
+
+    // --- 6. Produits rattachés à une espèce : bande source, rémanence, refus du web, effectif du navigateur = effectif du serveur ---
+    const idLapin = sql("select id from products where sku='LAP-VIF'");
+    const idPoulet = sql("select id from products where sku='VOL-JEU'");
+    await contexte.setOffline(true);
+    const ouvrir = async (id) => { await page.click(`#produits .produit[data-id="${id}"]`); await page.waitForSelector('#dlg-piece[open]'); };
+    // Sans bande : refus, avec la phrase de la caisse web.
+    await ouvrir(idLapin);
+    assert.equal(await page.isVisible('#piece-bande'), true);
+    await page.fill('#piece-qte', '2');
+    await page.fill('#piece-montant', '15000');
+    await page.click('#piece-ajouter');
+    assert.equal(await page.textContent('#piece-erreur'), 'La bande source est obligatoire pour un sujet vivant.');
+    // Les bandes proposées : celles de l'espèce, avec leur effectif.
+    const options = await page.$$eval('#piece-bande option', (o) => o.map((x) => x.textContent));
+    assert.deepEqual(options, ['-- Sélectionner --', 'LAP-BLOQ (40 têtes)', 'LAP-E2E (40 têtes)']);
+    // Bande sous rémanence : refus avec la phrase du web.
+    await page.selectOption('#piece-bande', { label: 'LAP-BLOQ (40 têtes)' });
+    await page.click('#piece-ajouter');
+    assert.equal(await page.textContent('#piece-erreur'), 'Vente interdite - Bande LAP-BLOQ sous remanence veterinaire active. Blocage automatique du systeme.');
+    ok('sujet vivant : bande source obligatoire, bande sous rémanence refusée (phrases de la caisse web)');
+
+    // Volailles sans départ saisi : refusées AVANT l'enregistrement, panier gardé.
+    await page.click('[data-fermer="dlg-piece"]');
+    await ouvrir(idPoulet);
+    await page.fill('#piece-qte', '3');
+    await page.fill('#piece-montant', '9000');
+    await page.selectOption('#piece-bande', { label: 'VOL-E2E (40 têtes)' });
+    await page.click('#piece-ajouter');
+    await page.click('#btn-valider');
+    await page.waitForFunction(() => document.querySelector('#erreur-vente').textContent !== '');
+    assert.match(await page.textContent('#erreur-vente'), /^Vente refusée : l'effectif de départ par catégorie de la bande VOL-E2E n'est pas saisi\. Ouvrez la fiche Volailles Reproducteurs/);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#corps-panier tr').length), 1, 'le panier est gardé');
+    await page.click('#corps-panier button');   // retire le poulet
+    ok('volailles sans départ saisi : vente refusée avant l\'enregistrement avec le motif du serveur, panier gardé');
+
+    // Vente de 2 lapins de la bande libre, hors ligne : la bande passe à 38 sur l'appareil, le serveur n'a rien reçu.
+    const ventesAvant = sql('select count(*) from sales');
+    await ouvrir(idLapin);
+    await page.fill('#piece-qte', '2');
+    await page.fill('#piece-montant', '15000');
+    await page.selectOption('#piece-bande', { label: 'LAP-E2E (40 têtes)' });
+    await page.click('#piece-ajouter');
+    assert.match(await page.textContent('#corps-panier'), /Lapin vif E2E — LAP-E2E/);
+    await page.selectOption('#mode', 'especes');
+    await page.click('#btn-valider');
+    await page.waitForFunction(() => /Vente enregistrée sur cet appareil/.test(document.querySelector('#avis').textContent));
+    await ouvrir(idLapin);
+    assert.ok((await page.$$eval('#piece-bande option', (o) => o.map((x) => x.textContent))).includes('LAP-E2E (38 têtes)'), 'la bande est à 38 têtes sur l\'appareil, avant tout envoi');
+    await page.click('[data-fermer="dlg-piece"]');
+    assert.equal(sql('select count(*) from sales'), ventesAvant);
+    assert.equal(sql("select current_quantity from livestock_lots where code='LAP-E2E'"), '40', 'le serveur n\'a rien reçu');
+
+    // Retour du réseau : le serveur rejoue la vente ; son effectif est celui du navigateur.
+    await contexte.setOffline(false);
+    await page.waitForFunction(() => /Synchronisé/.test(document.querySelector('#etat-synchro').textContent), null, { timeout: 40000 });
+    assert.equal(sql("select current_quantity from livestock_lots where code='LAP-E2E'"), '38', 'effectif de la bande au serveur = celui du navigateur');
+    const fiche = sql("select vente||'|'||effectif_final from livestock_daily_entries where lot_id=(select id from livestock_lots where code='LAP-E2E')");
+    assert.equal(fiche, '2|38', 'la fiche du jour porte la vente');
+    assert.equal(sql("select count(*) from sale_lines where lot_id=(select id from livestock_lots where code='LAP-E2E')"), '1');
+    await page.waitForFunction(() => [...document.querySelectorAll('#corps-ventes tr')].every((t) => t.dataset.statut === 'synced'));
+    await ouvrir(idLapin);
+    assert.ok((await page.$$eval('#piece-bande option', (o) => o.map((x) => x.textContent))).includes('LAP-E2E (38 têtes)'), 'après le tirage, l\'effectif reste 38 (aucun « retour » à 40)');
+    await page.click('[data-fermer="dlg-piece"]');
+    ok('vente de sujets vivants hors ligne : bande à 38 sur l\'appareil, fiche du jour et bande à 38 au serveur après la synchronisation, rien ne « remonte » après le tirage');
 
 } catch (e) {
     echec = e;

@@ -120,7 +120,8 @@ test('catalogue : filtre sans accents, catégorie, tuiles non vendables, âge du
     assert.deepEqual(filtrerProduits(produits, 'legumes').map((p) => p.id), ['4']);
     assert.deepEqual(filtrerProduits(produits, 'œufs').map((p) => p.id), ['1']);
     assert.deepEqual(filtrerProduits(produits, '', 'c1').map((p) => p.id), ['4', '1']);
-    assert.equal(etatTuile(produits[1]).vendable, false);
+    // PWA-1b : un produit rattaché à une espèce se vend hors ligne, avec sa bande source obligatoire.
+    assert.deepEqual(etatTuile(produits[1]), { vendable: true, note: 'Sujet vivant : bande source obligatoire' });
     assert.equal(etatTuile(produits[2]).note, 'Sur devis technique');
     assert.equal(etatTuile(produits[0]).vendable, true);
     assert.equal(fourchetteDePrix(produits[0]), '2 000 – 2 500 FCFA');

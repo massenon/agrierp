@@ -67,14 +67,13 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-xs text-outline space-y-sm">
             <p class="text-sm font-bold text-brand-forest uppercase">Ce que couvre ce mode</p>
             <ul class="list-disc pl-md space-y-xs">
-                <li>Ventes de caisse : produits du catalogue, panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
+                <li>Ventes de caisse : produits du catalogue (sujets vivants avec leur bande source et le contrôle de rémanence vétérinaire), panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
                 <li>Création d'un client avec le bouton « + » (nom, téléphone, IFU facultatif) ; il est envoyé au serveur à la synchronisation, qui peut le rapprocher d'une fiche déjà connue.</li>
                 <li>Consultation du catalogue et des clients copiés sur l'appareil.</li>
             </ul>
             <p class="text-sm font-bold text-brand-forest uppercase pt-sm">Ce qu'il ne couvre pas</p>
             <ul class="list-disc pl-md space-y-xs">
                 <li>Comptabilité, élevage, achats, paie : ces écrans exigent le réseau.</li>
-                <li>Les produits rattachés à une espèce d'élevage (bande source, contrôle vétérinaire) se vendent en ligne.</li>
             </ul>
             <p class="text-sm font-bold text-brand-forest uppercase pt-sm">À savoir</p>
             <ul class="list-disc pl-md space-y-xs">

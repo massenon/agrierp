@@ -11,10 +11,11 @@ import { etatAppareil, deverrouiller, desactiver, purgerLocal, lireMarqueur, not
 import { ErreurPin, dechiffrer } from './coffre.js';
 import { ajouterVente, lister, remettreEnFile, abandonner } from './file-envoi.js';
 import { validerClient, ajouterClient, clientsEnAttente, clientsVisibles } from './clients-hors-ligne.js';
+import { jourBenin, lotsVendables, bandeSousRemanence, refusDuPanier, elevageApresVentes } from './elevage-hors-ligne.js';
 import { creerSynchro } from './synchro.js';
 import { etatAffiche, heureDuServeur, ageDuTirageEnJours } from './etat.js';
 import { filtrerProduits, etatTuile, fourchetteDePrix, messageAgeTirage, messageBandeauPrix, messageConfirmationVente, niveauPrixPerimes, NIVEAUX_PRIX, LIBELLES_STATUT } from './catalogue.js';
-import { construireVente, validerLigne, validerChoixFacture, validerLivraison, livraisonRetenue, lireNombre, sousTotal, totalVente, monnaieARendre, tvaIncluse, formaterFcfa, lireEntier, MODES_LIVRAISON } from './calculs-caisse.js';
+import { MOTIFS, construireVente, validerLigne, validerChoixFacture, validerLivraison, livraisonRetenue, lireNombre, sousTotal, totalVente, monnaieARendre, tvaIncluse, formaterFcfa, lireEntier, MODES_LIVRAISON } from './calculs-caisse.js';
 import { decider, DUREE_PAR_DEFAUT } from '../verrou-logique.js';
 
 const $ = (id) => document.getElementById(id);
@@ -30,6 +31,7 @@ const h = (tag, attrs = {}, ...enfants) => {
 const app = {
     base: null, ctx: null, jeton: null, appareil: null, synchro: null,
     produits: [], categories: [], clients: [], entreprise: null,
+    elevageTire: { lots: [], fiches: [] }, elevage: { lots: [], fiches: [] }, remanences: [],
     livraison: { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' },
     panier: [], produitEnCours: null, facture: { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' },
     enLigne: navigator.onLine, enCours: false, suspendu: false,
@@ -138,9 +140,22 @@ async function chargerReferentiels() {
     // PWA-1b : les clients du tirage, puis ceux créés sur cet appareil et pas encore acquittés.
     app.clients = clientsVisibles(await lire('customers'), await clientsEnAttente(app.ctx));
     app.entreprise = (await lire('company_settings'))[0] ?? null;
+    // PWA-1b — bandes, fiches du jour et rémanences tirées ; les ventes en attente sont rejouées au-dessus (jamais écrites dans la copie tirée).
+    app.elevageTire = { lots: await lire('livestock_lots'), fiches: await lire('livestock_daily_entries') };
+    app.remanences = await lire('veterinary_withdrawal_periods');
+    await recalculerElevage();
     app.serverTime = (await app.base.meta('curseur')) ?? null;
     app.decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
     app.derniereSynchro = heureDuServeur(await app.base.meta('derniere_synchro'));
+}
+
+/** Le jour du Bénin (UTC+1) à l'heure de l'appareil corrigée du décalage serveur. */
+const jourDuComptoir = () => jourBenin(Date.now() + (app.decalage ?? 0));
+
+/** Les bandes et fiches APRÈS les ventes en attente (rejouées dans l'ordre de saisie). */
+async function recalculerElevage() {
+    const ventes = (await lister(app.ctx, 'pending')).map((l) => l.vente);
+    app.elevage = elevageApresVentes(app.elevageTire, ventes, app.produits);
 }
 
 // ----------------------------------------------------------------------------------------------- affichage
@@ -217,7 +232,7 @@ function dessinerPanier() {
     $('panier-vide').hidden = app.panier.length > 0;
     $('table-panier').hidden = app.panier.length === 0;
     $('corps-panier').replaceChildren(...app.panier.map((l, i) => h('tr', {},
-        h('td', { 'data-label': 'Produit' }, l.name), h('td', { class: 'num', 'data-label': 'Qté' }, String(l.qty)), h('td', { class: 'num', 'data-label': 'Montant' }, formaterFcfa(l.montant)),
+        h('td', { 'data-label': 'Produit' }, l.lot_code ? `${l.name} — ${l.lot_code}` : l.name), h('td', { class: 'num', 'data-label': 'Qté' }, String(l.qty)), h('td', { class: 'num', 'data-label': 'Montant' }, formaterFcfa(l.montant)),
         h('td', { 'data-label': '' }, h('button', { type: 'button', class: 'btn danger', 'aria-label': 'Retirer du panier', onclick: () => { app.panier.splice(i, 1); dessinerPanier(); } }, h('span', { class: 'material-symbols-outlined' }, 'close'))))));
     const remise = lireEntier($('remise').value || '0') ?? 0;
     const lignes = lignesCalcul();
@@ -267,13 +282,19 @@ function ouvrirPiece(p) {
     $('piece-qte').value = '1';
     $('piece-montant').value = '';
     $('piece-erreur').textContent = '';
+    // PWA-1b — un sujet vivant : la bande source est obligatoire (liste des bandes de l'espèce, comme la caisse web).
+    $('piece-bande-bloc').hidden = !p.species_id;
+    $('piece-bande').replaceChildren(h('option', { value: '' }, '-- Sélectionner --'), ...lotsVendables(p, app.elevage.lots).map((l) => h('option', { value: l.id }, `${l.code} (${l.current_quantity} têtes)`)));
     $('dlg-piece').showModal();
 }
 
 $('piece-ajouter').addEventListener('click', () => {
-    const r = validerLigne({ produit: app.produitEnCours, qty: $('piece-qte').value, montant: $('piece-montant').value });
+    const lotId = $('piece-bande').value || null;
+    const r = validerLigne({ produit: app.produitEnCours, qty: $('piece-qte').value, montant: $('piece-montant').value, lotId });
     if (!r.ok) { $('piece-erreur').textContent = r.motif; return; }
-    app.panier.push({ product_id: app.produitEnCours.id, name: app.produitEnCours.name, qty: r.qty, montant: r.montant });
+    const lot = lotId ? app.elevage.lots.find((l) => l.id === lotId) : null;
+    if (lotId && bandeSousRemanence(lotId, app.remanences, jourDuComptoir())) { $('piece-erreur').textContent = MOTIFS.remanenceAjout(lot?.code); return; }
+    app.panier.push({ product_id: app.produitEnCours.id, name: app.produitEnCours.name, qty: r.qty, montant: r.montant, lot_id: lotId, lot_code: lot?.code ?? null });
     $('dlg-piece').close();
     dessinerPanier();
 });
@@ -306,6 +327,10 @@ $('btn-valider').addEventListener('click', async () => {
     $('erreur-vente').textContent = ''; $('erreur-client').textContent = '';
     if (app.lectureSeule) return;
     const decalage = (await app.base.meta('decalage_horloge_ms')) ?? 0;
+    app.decalage = decalage;
+    // PWA-1b — rémanence, départ, date et catégorie d'effectif : refusés AVANT l'enregistrement, le panier est gardé.
+    const refusElevage = refusDuPanier(app.panier, app.produits, app.elevage, app.remanences, jourDuComptoir());
+    if (refusElevage !== null) { $('erreur-vente').textContent = refusElevage.motif; return; }
     const type = $('bloc-facture').hidden ? 'simple' : $('facture-type').value;
     const r = construireVente({
         panier: app.panier, remise: lireEntier($('remise').value || '0') ?? -1, modePaiement: $('mode').value, clientId: $('client').value || null, livraison: app.livraison,
@@ -329,6 +354,7 @@ $('btn-valider').addEventListener('click', async () => {
         $('erreur-vente').textContent = e?.message ?? "Le stockage de l'appareil a refusé la vente : elle n'est PAS enregistrée.";
         return; // refus de valider : le panier est gardé
     }
+    await recalculerElevage(); // la vente en attente est déjà rejouée sur la bande et la fiche du jour
     app.panier = []; $('remise').value = '0'; $('recu').value = ''; $('client').value = ''; $('facture-type').value = 'simple';
     app.livraison = { concernee: false, mode: 'gratuite', frais: null, adresse: '', contact: '' };
     app.facture = { facture_type: 'simple', client_ifu: '', client_nom_facture: '', aib_taux: '5%' };

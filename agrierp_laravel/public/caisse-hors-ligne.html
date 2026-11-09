@@ -142,6 +142,11 @@
 <dialog id="dlg-piece">
     <h3>Vente à la Pièce</h3>
     <p id="piece-produit" class="muted"></p>
+    <div id="piece-bande-bloc" hidden>
+        <label class="champ" for="piece-bande">Bande Source *</label>
+        <select id="piece-bande"><option value="">-- Sélectionner --</option></select>
+        <p class="muted" style="font-size:11px;margin:4px 0 0">Nécessaire pour vérifier qu'aucun délai de rémanence vétérinaire n'est actif sur cette bande.</p>
+    </div>
     <label class="champ" for="piece-qte">Nombre de sujets / Quantité</label>
     <input id="piece-qte" type="number" step="1" min="1" placeholder="ex : 2" inputmode="numeric">
     <label class="champ" for="piece-montant">Montant Global de la Vente (FCFA)</label>

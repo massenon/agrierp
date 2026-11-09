@@ -20,7 +20,15 @@ import { chiffrer, dechiffrer } from './coffre.js';
 import { classerReponse, delaiDeReessai, heureDuServeur } from './etat.js';
 
 /** Tables gardées par la caisse hors ligne (le reste du tirage est ignoré, jamais stocké). */
-export const TABLES_GARDEES = ['products', 'product_categories', 'customers', 'company_settings'];
+export const TABLES_GARDEES = [
+    'products', 'product_categories', 'customers', 'company_settings',
+    // PWA-1b — produits rattachés à une espèce : bandes, fiches journalières (chaîne d'effectif) et rémanences, sous le droit de lecture du compte.
+    'livestock_lots', 'livestock_daily_entries', 'veterinary_withdrawal_periods',
+];
+/** Familles PAGINÉES par le serveur : leurs lignes arrivent sur TOUTES les pages (les autres tables, sur la première seulement). */
+export const TABLES_PAGINEES = ['livestock_daily_entries'];
+/** Tables servies EN ENTIER à chaque tirage (jamais incrémentales) : leur copie est remplacée, une rémanence levée disparaît. */
+export const TABLES_COMPLETES = ['veterinary_withdrawal_periods'];
 const COLONNES_ENTREPRISE = ['company_name', 'tva_enabled', 'tva_default_rate', 'mecef_actif'];
 export const TAILLE_LOT = 20;
 const TIMEOUT_MS = 30_000;
@@ -38,6 +46,9 @@ export function ligneValide(table, ligne) {
     if (table === 'products') return typeof ligne.name === 'string' && typeof ligne.pricing_mode === 'string';
     if (table === 'product_categories') return typeof ligne.label === 'string';
     if (table === 'customers') return typeof ligne.name === 'string';
+    if (table === 'livestock_lots') return typeof ligne.code === 'string' && typeof ligne.stage === 'string';
+    if (table === 'livestock_daily_entries') return typeof ligne.lot_id === 'string' && /^\d{4}-\d{2}-\d{2}/.test(String(ligne.entry_date ?? ''));
+    if (table === 'veterinary_withdrawal_periods') return typeof ligne.lot_id === 'string' && /^\d{4}-\d{2}-\d{2}/.test(String(ligne.end_date ?? ''));
     return true;
 }
 
@@ -110,6 +121,11 @@ export function creerSynchro({
                     for (const t of TABLES_GARDEES) {
                         if (t in j) cumul[t] = j[t];
                     }
+                } else {
+                    // Les familles paginées (fiches journalières) continuent sur les pages suivantes.
+                    for (const t of TABLES_PAGINEES) {
+                        if (Array.isArray(j[t])) cumul[t] = [...(cumul[t] ?? []), ...j[t]];
+                    }
                 }
                 dateReponse = r.date ?? dateReponse;
                 fin = j;
@@ -152,7 +168,7 @@ export function creerSynchro({
                 else refusees.push({ table, id: l?.id ?? null });
             }
             recus += bonnes.length;
-            ecritures.push({ table, lignes: bonnes, remplacer: t.completLors });
+            ecritures.push({ table, lignes: bonnes, remplacer: t.completLors || TABLES_COMPLETES.includes(table) });
         }
 
         const existants = {};
@@ -319,6 +335,16 @@ export function creerSynchro({
             return { ...e, recus, prochainEssaiMs: delaiDeReessai(etat.essai - 1) };
         }
         etat.essai = 0;
+        // PWA-1b — des ventes viennent d'être acceptées : leur effet sur les bandes et les fiches n'est dans la copie tirée qu'au tirage
+        // SUIVANT. On le tire tout de suite (au mieux) : sans lui, l'effectif d'une bande « remonterait » entre l'accusé et le prochain tirage.
+        if (e.envoyes > 0) {
+            try {
+                const t2 = await tirer();
+                if (t2.statut === 'ok') recus += (await absorber(t2)).recus;
+            } catch (erreur) {
+                if (erreur?.name === 'ErreurBase') throw erreur;
+            }
+        }
         await base.poserMeta('dernier_envoi', maintenant().toISOString());
         await nettoyerSynced(ctx, undefined, maintenant);
         const serveur = await base.meta('curseur');
