@@ -34,7 +34,9 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - **Tests.** `tests/Feature/EffectifTotalVivantCascadeTest.php` (4 tests) et un test dans `test/fiche_journaliere_test.dart`. Tous sont **rouges sans le correctif, verts avec** (épreuve de mutation faite).
 - **Reste à vérifier.** La fiche Escargots n'a pas de test dédié (module `helico` à activer dans le test) ; ticket A1-bis.
 
-### A2 ❓ Bandes « issues d'une bande » comptées deux fois
+### A2 ✅ Bandes « issues d'une bande » comptées deux fois (construit par E1 ; reste à confirmer sur les données réelles)
+
+> **État 09/11/2026 :** le transfert entre bandes (écran dédié, sortie de la source et entrée dans la cible le même jour, `lot_source_id`) et la correction des bandes déjà saisies ont été livrés (ticket E1, web puis poste). Reste, côté exploitant : comparer « Effectif Total Vivant » à un comptage physique (voir « Décisions proposées au client du 09/11/2026 »).
 
 - **Constat probable** (à confirmer avec l'exploitant) :
   1. Les naissances sont saisies dans la fiche de la bande mère (`ne`), qui augmente son effectif.
@@ -56,7 +58,7 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - `TransformationForm` passe par `RecordSaleOnFicheElevageAction` : les sujets transformés sont une « Vente » de la fiche du jour, avec cascade.
 - La sauvegarde de fiche suivante ne l'efface plus.
 
-### A5 🔧 Autorisation des fiches journalières
+### A5 ✅ Autorisation des fiches journalières (vérifié le 09/11/2026 : les cinq méthodes `saveDay()` appellent `authorize('manage-elevage')`)
 
 - Les cinq méthodes `saveDay()` des fiches web n'appellent pas `$this->authorize('manage-elevage')`, contrairement à la règle du projet (« première ligne de toute méthode mutante »).
 - Ajouter l'appel et un test par fiche, après vérification que chaque rôle qui saisit des fiches a bien `manage-elevage`.
@@ -81,6 +83,21 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - Les `CLAUDE.md`, les outils de fixtures et plusieurs tests s'appuient sur `prototype_html/`, qui n'a pas été importé dans `massenon/agrierp`.
 - Sans lui, la fidélité « prototype » n'est plus vérifiable que sur le poste du développeur.
 - **Décision :** l'ajouter au dépôt (`prototype_html/` à la racine), ou acter que la vue Blade est désormais la seule référence (Doctrine, article 0) et retirer les dépendances au prototype.
+
+
+### Décisions proposées au client (09/11/2026) — recommandations, à valider
+
+Le client a demandé les propositions ; chacune est une RECOMMANDATION (rien n'est tranché à sa place) et se valide par « OUI ».
+
+| Réf. | Question | Proposition recommandée | Pourquoi |
+|---|---|---|---|
+| A2 | Les bandes « issues d'une bande » sont-elles encore comptées deux fois ? | **Contrôle sur les vraies données** : comparer « Effectif Total Vivant » à un comptage physique sur trois bandes ayant des portées, puis clore. Le code est livré (E1). | Le défaut ne se voit que sur les données de la ferme. |
+| DEV-Q2 | Lignes de devis structurées (produits du catalogue, remise par ligne) | **Non pour l'instant** : description libre comme le web. À rouvrir si les prestations deviennent fréquentes. | Un devis de prestation n'est pas un panier de caisse ; le structurer double la logique de la caisse. |
+| DEV-Q3 | Impression d'un devis « document client » | **Oui, web d'abord** : A4 avec en-tête de la ferme, mentions légales, durée de validité, bon pour accord ; puis poste par le même générateur de PDF (`ExportOfficiel`) ; numéro attribué par le serveur. | Un devis se remet au client ; l'état « Exporter » n'est pas présentable. |
+| CAISSE-1 | Appareil personnel ou d'entreprise : le code PIN suffit-il ? | **Appareil d'entreprise recommandé, PIN suffisant** (4 à 6 chiffres, chiffrement AES-GCM dérivé du PIN, limiteur d'essais). **Appareil personnel toléré** avec un PIN de 6 chiffres et l'effacement des données hors ligne à la déconnexion. | Le PIN protège déjà la clé de chiffrement ; l'appareil personnel est le risque de perte ou de prêt. |
+| CAISSE-2 | Reçu provisoire à imprimer ? | **Oui** : « Reçu provisoire » sans numéro de facture légal, avec l'identifiant court du poste (8 premiers caractères de l'UUID de la vente) et la mention « facture n° attribué à la synchronisation ». | Le client repart avec une preuve ; le numéro légal reste attribué par le serveur. |
+| CAISSE-3 | Essai sur les vrais appareils | **Un essai d'une journée sur trois appareils** (Android Chrome, iPhone Safari, un PC) : coupure du réseau, cinq ventes, retour du réseau, comparaison avec le serveur (ventes, stock, caisse). Résultats consignés dans `docs/logialvia/46_…`. | Safari et les appareils réels sont les deux zones jamais vérifiées. |
+| COMPTA-1 | Droit d'export des ventes (`export-ventes`) pour le comptable | **Oui** : l'accorder au comptable (il lit déjà ventes, clients, créances et avances ; l'export est une lecture). Seeder, migration de données, matrice du poste et test de matrice. | Cohérent avec CONF-4 / CONF-5 ; le poste imprime déjà ces états en local. |
 
 ### A9 ✅ Empreinte du plan comptable SYSCOHADA
 
@@ -546,9 +563,9 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 | Ticket | Contenu | État |
 |---|---|---|
 | DEV2 | Tableau de bord : l'onglet « Devis » des « Transactions récentes » est encore vide au poste (« Aucun devis récent. ») alors que `quotes` descend désormais ; le lire comme `Dashboard\Index` | 🔧 proposé |
-| DEV-Q1 | ❓ Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ❓ client |
-| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client |
-| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client |
+| DEV-Q1 | ✅ (09/11/2026) Construit : la conversion « devis accepté → facture / vente » existe au web puis au poste (`ConversionDevisFactureTest`, `ConversionDevisWebTest`). *Question d'origine :* Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ✅ livré |
+| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client — proposition ci-dessous |
+| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client — proposition ci-dessous |
 ## Sprint VL — Verrou local du poste (décision du client du 21/10/2026)
 
 ### VL-1 ✅ (21/10/2026) Code PIN, écran de verrouillage à chaque lancement, sans réseau
