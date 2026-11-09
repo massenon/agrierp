@@ -24,7 +24,7 @@
                 </select>
                 @error('mecefMode') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 @if($mecefMode === 'boitier')
-                    <p class="text-[10px] text-outline mt-xs">Mode boîtier : la transmission se fera par le poste Windows où le boîtier est branché. Le réglage est enregistré, mais rien n'est encore transmis : les factures restent en attente.</p>
+                    <p class="text-[10px] text-outline mt-xs">Mode boîtier : la transmission se fait par le poste Windows où le boîtier Eltrade CC300 est branché (fonction construite, pas encore essayée avec un vrai boîtier). Tant que le boîtier est absent, les factures restent en attente et partent dès son retour.</p>
                 @elseif($mecefMode === 'desactive')
                     <p class="text-[10px] text-outline mt-xs">Aucune facture n'est transmise : la facturation reste un registre avec facture PDF.</p>
                 @else

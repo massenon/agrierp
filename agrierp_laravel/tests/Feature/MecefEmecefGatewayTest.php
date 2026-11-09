@@ -251,9 +251,9 @@ class MecefEmecefGatewayTest extends TestCase
         $r = app(FacturationMecefService::class)->facturer($vente);
 
         $this->assertFalse($r['transmise']);
-        $this->assertSame('Mode boîtier : transmission par le poste non encore disponible.', $r['message']);
+        $this->assertSame(\App\Services\Mecef\BoitierMecefGateway::MESSAGE, $r['message']);
         $this->assertSame('en_attente', $vente->fresh()->mecef_status);
-        $this->assertSame('Mode boîtier : transmission par le poste non encore disponible.', $vente->fresh()->mecef_message);
+        $this->assertSame(\App\Services\Mecef\BoitierMecefGateway::MESSAGE, $vente->fresh()->mecef_message);
         Http::assertNothingSent();
     }
 

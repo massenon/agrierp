@@ -6734,7 +6734,11 @@ class SyncController extends Controller
                     app(VerifySaleDateAction::class)->execute($validated['sold_at']);
                 }
 
-                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler, $choix) {
+                // MECEF-2 — le résultat du boîtier de CE poste (mode boîtier seulement ; sinon null).
+                $resultatBoitier = $aAnnuler ? null : app(\App\Services\Mecef\ResultatBoitierDuPoste::class)->valider($saleData);
+                $normaliseeParLePoste = false;
+
+                DB::transaction(function () use ($validated, $saleData, $fichesRecues, $aAnnuler, $choix, $resultatBoitier, &$normaliseeParLePoste) {
                     // ⚠️ Même contrainte que LivestockDailyEntry ci-dessus :
                     // 'id' n'est pas fillable sur Sale — assignation
                     // explicite pour préserver réellement l'UUID généré
@@ -6847,6 +6851,12 @@ class SyncController extends Controller
                         app(\App\Actions\AnnulerVenteAction::class)->execute($sale->fresh('lines'));
                     }
 
+                    // MECEF-2 — EN DERNIER : une vente normalisée est verrouillée (ses lignes ne se créent plus). Le résultat du boîtier
+                    // du poste (mode boîtier seulement) s'applique donc une fois la vente et ses effets écrits.
+                    if ($resultatBoitier !== null) {
+                        $normaliseeParLePoste = app(\App\Services\Mecef\ResultatBoitierDuPoste::class)->appliquer($sale->fresh(), $resultatBoitier);
+                    }
+
                     // 🔴→✅ TICKET 14.80 — LA NORMALISATION FISCALE MANQUAIT : une vente encaissée hors ligne arrivait
                     // en base avec `mecef_status` NUL, jamais déclarée à la DGI. ⚠️ TICKET S-T13 : elle est facturée
                     // APRÈS la transaction de l'envoi (`push`, `ventesAFacturer`), jamais dans un essai qui peut être
@@ -6855,7 +6865,9 @@ class SyncController extends Controller
 
                 $accepted[] = $validated['id'];
                 // Une vente reçue annulée n'a pas à être normalisée auprès de la DGI.
-                if (! $aAnnuler) {
+                // MECEF-2 — une vente que le boîtier du poste a déjà traitée (certifiée ou refusée) n'est pas refacturée par le serveur :
+                // la passerelle boîtier du serveur ne ferait que repasser sa facture « en attente ».
+                if (! $aAnnuler && ! $normaliseeParLePoste) {
                     $this->ventesAFacturer[] = $validated['id'];
                 }
             } catch (ValidationException $e) {
@@ -6877,6 +6889,14 @@ class SyncController extends Controller
                             $rejected[] = ['id' => $saleData['id'], 'reason' => $e->getMessage()];
 
                             continue;
+                        }
+                    }
+                    // MECEF-2 — vente CONNUE renvoyée par le poste avec le résultat de son boîtier (la facture avait été poussée avant sa
+                    // transmission) : appliqué en mode boîtier seulement, jamais par-dessus une facture déjà normalisée.
+                    if (! $aAnnuler && is_array($saleData) && ($bloc = app(\App\Services\Mecef\ResultatBoitierDuPoste::class)->valider($saleData)) !== null) {
+                        $connue = Sale::query()->find($saleData['id']);
+                        if ($connue !== null) {
+                            app(\App\Services\Mecef\ResultatBoitierDuPoste::class)->appliquer($connue, $bloc);
                         }
                     }
                     $accepted[] = $saleData['id'];
