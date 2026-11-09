@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show Listenable;
+import 'package:flutter/foundation.dart' show Listenable, debugPrint;
 
 import '../systeme/evenements_navigateur.dart';
 import 'sync_engine.dart';
@@ -50,6 +50,7 @@ class SynchronisationAutomatique {
     this.evenementsNavigateur,
     this.delaiAntiRebond = delaiAntiRebondParDefaut,
     DateTime Function()? maintenant,
+    Future<bool> Function()? sondeur,
   }) : _maintenant = maintenant ?? DateTime.now,
         // Paramètres NOMMÉS : Dart interdit `this._synchroniser` (voir `SyncEngine`).
        // ignore: prefer_initializing_formals
@@ -57,7 +58,9 @@ class SynchronisationAutomatique {
        // ignore: prefer_initializing_formals
        _changementsReseau = changementsReseau,
        // ignore: prefer_initializing_formals
-       _demandeDuServeur = demandeDuServeur;
+       _demandeDuServeur = demandeDuServeur,
+       // ignore: prefer_initializing_formals
+       _sondeur = sondeur;
 
   /// Ticket S-T6 — le serveur peut DEMANDER une synchronisation (bouton « Demander la synchronisation des postes »
   /// du web) : la session ouverte l'interroge à cet intervalle (`GET /api/sync/demande`, [SyncEngine.demandeDuServeur])
@@ -73,6 +76,11 @@ class SynchronisationAutomatique {
 
   /// PWA-2b — le retour de focus ne relance pas une synchronisation tentée il y a moins de ce délai (changer d'onglet
   /// dix fois en une minute n'en fait pas dix). Le retour en ligne, lui, n'est jamais retenu.
+  /// PWA-2c — sondage léger du serveur (`SyncEngine.serveurJoignable`), joué AVANT de synchroniser sur `online` / retour de
+  /// focus. `null` : pas de sondage. Un échec laisse le poste hors ligne SANS erreur (rien n'est tiré ni envoyé).
+  final Future<bool> Function()? _sondeur;
+  bool _sondageEnCours = false;
+
   final Duration delaiAntiRebond;
   static const delaiAntiRebondParDefaut = Duration(seconds: 30);
   final DateTime Function() _maintenant;
@@ -159,10 +167,10 @@ class SynchronisationAutomatique {
       switch (e) {
         case EvenementNavigateur.retourEnLigne:
           _enLigne = true;
-          declencher();
+          _declencherApresSondage();
         case EvenementNavigateur.ongletVisible:
           final derniere = _derniereTentative;
-          if (derniere == null || _maintenant().difference(derniere) >= delaiAntiRebond) declencher();
+          if (derniere == null || _maintenant().difference(derniere) >= delaiAntiRebond) _declencherApresSondage();
       }
     });
     gestes?.addListener(_surGeste);
@@ -173,6 +181,25 @@ class SynchronisationAutomatique {
   }
 
   /// Ticket S-T6 — une interrogation du serveur ; déclenche une synchronisation s'il en demande une. Ne lève jamais.
+  /// PWA-2c — le serveur répond-il ? Oui : on synchronise. Non (ou délai dépassé) : on reste hors ligne, sans erreur et sans
+  /// réessai bruyant ; la minuterie ordinaire ou le prochain événement retentera. Jamais deux sondages à la fois.
+  Future<void> _declencherApresSondage() async {
+    final sonde = _sondeur;
+    if (sonde == null) return declencher();
+    if (_sondageEnCours || _enCours || _suspendue) return;
+    _sondageEnCours = true;
+    bool joignable;
+    try {
+      joignable = await sonde();
+    } catch (_) {
+      joignable = false;
+    } finally {
+      _sondageEnCours = false;
+    }
+    _enLigne = joignable;
+    if (joignable) await declencher();
+  }
+
   Future<void> interrogerLeServeur() async {
     final demande = _demandeDuServeur;
     // Hors ligne (dernier état connu), ou interrogation / synchronisation déjà en cours : rien à demander.
@@ -232,7 +259,9 @@ class SynchronisationAutomatique {
       final resultat = await _synchroniser();
       if (!resultat.horsLigne) _echecs = 0;
       onTermine?.call();
-    } catch (e) {
+    } catch (e, pile) {
+      // PWA-2c — la cause d'un échec silencieux reste lisible dans la console du navigateur (jamais à l'écran : hors ligne n'est pas une erreur).
+      debugPrint('Synchronisation automatique : $e\n$pile');
       if (e is EchecSynchronisation && e.estSessionRefusee) {
         _suspendre();
       } else if (estReessayable(e)) {

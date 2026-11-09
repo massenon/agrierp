@@ -63,8 +63,17 @@ class PostePwa2Test extends TestCase
         $this->assertStringContainsString('Recharger', $boot);
         // SKIP_WAITING n'est envoyé QUE par le clic du bouton ; le rechargement n'a lieu qu'après ce clic.
         $this->assertSame(1, preg_match_all("/postMessage\('SKIP_WAITING'\)/", $boot), 'SKIP_WAITING seulement au clic.');
-        $this->assertSame(1, preg_match_all('/location\.reload\(\)/', $boot), 'Un seul rechargement, conditionné au clic.');
-        $this->assertMatchesRegularExpression('/if \(window\.__rechargerApresMiseAJour\) window\.location\.reload\(\)/', $boot);
+        // PWA-2c : deux rechargements, TOUS deux conditionnés à un clic de l'utilisateur : (1) après son clic « Recharger » (drapeau),
+        // (2) le clic « Recharger » du bandeau d'un AUTRE onglet (la version a déjà changé ailleurs), jamais automatiquement.
+        $this->assertSame(2, preg_match_all('/location\.reload\(\)/', $boot), 'Rechargements : drapeau du clic, bouton « autre onglet » ; jamais seul.');
+        $this->assertMatchesRegularExpression('/if \(window\.__rechargerApresMiseAJour\) \{ window\.location\.reload\(\); return; \}/', $boot);
+        $this->assertMatchesRegularExpression('/if \(autreOnglet\) \{ window\.location\.reload\(\); return; \}/', $boot);
+        // Un autre onglet est PRÉVENU (bandeau), jamais rechargé de force ; la première installation n'en déclenche pas.
+        $this->assertStringContainsString('proposerMiseAJour(null, true)', $boot);
+        $this->assertStringContainsString('avaitUnControleur', $boot);
+        // Le bandeau périmé d'un onglet est REMPLACÉ quand un autre onglet a déjà activé la version.
+        $this->assertStringContainsString('if (existant) existant.remove();', $boot);
+        $this->assertStringContainsString('La version a chang', $boot);
         // Une première installation n'est pas une mise à jour.
         $this->assertStringContainsString('navigator.serviceWorker.controller', $boot);
         // Jamais de désinscription ni de service worker de Flutter.

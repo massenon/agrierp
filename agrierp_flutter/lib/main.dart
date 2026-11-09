@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 
 import 'core/auth/auth_service.dart';
+import 'core/systeme/plateforme_poste.dart';
 import 'core/comptabilite/exercice_choisi.dart';
 import 'core/auth/garde_ecran.dart';
 import 'core/auth/permissions_poste.dart';
@@ -979,6 +980,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
       gestes: widget.gestes,
       // PWA-2b — navigateur seulement : retour en ligne (`online`) et retour de focus de l'onglet. Natif : flux vide.
       evenementsNavigateur: evenementsDuNavigateur(),
+      // PWA-2c — sondage léger (`/up`, 3 s, jamais en cache) avant de synchroniser au retour en ligne / de focus.
+      sondeur: widget.engine.serveurJoignable,
     )..demarrer(aussitot: widget.synchroniserALOuverture);
     _cycleDeVie = AppLifecycleListener(
       onExitRequested: () async {
@@ -1086,6 +1089,9 @@ class _SocleAccueilState extends State<SocleAccueil> {
                     enAttente: (instantane.data?.$1.aEnvoyer ?? 0) + (instantane.data?.$1.refuses ?? 0),
                     refuses: instantane.data?.$1.refuses ?? 0,
                     onSynchroniser: _ouvrirSynchronisation,
+                    // PWA-2c — « Hors ligne / En attente (N) / Synchronisé » : au navigateur seulement (le poste
+                    // Windows garde sa barre telle quelle).
+                    liaison: PlateformePoste.navigateur ? widget.engine.liaisonServeur : null,
                     avantFermeture: widget.changementsReseau == null ? null : _avantFermeture,
                     nonLues: instantane.data?.$2.nonLues,
                     recentes: [

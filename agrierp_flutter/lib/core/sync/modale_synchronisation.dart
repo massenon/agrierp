@@ -58,7 +58,8 @@ class _ModaleSynchronisationState extends State<ModaleSynchronisation> {
   }
 
   Future<void> _relire() async {
-    final enLigne = await widget.engine.estEnLigne();
+    // PWA-2c — le dernier sondage ou la dernière synchronisation fait foi sur « le réseau » du navigateur.
+    final enLigne = widget.engine.liaisonServeur.value ?? await widget.engine.estEnLigne();
     final compteurs = await widget.database.compteursSynchronisation();
     final etat = await widget.database.etatDeSynchronisation();
     if (!mounted) return;

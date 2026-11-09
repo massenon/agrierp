@@ -17,7 +17,10 @@ void main() {
   Completer<void>? bloquer;
   late SynchronisationAutomatique auto;
 
-  SynchronisationAutomatique creer({Stream<EvenementNavigateur>? flux}) =>
+  SynchronisationAutomatique creer({
+    Stream<EvenementNavigateur>? flux,
+    Future<bool> Function()? sondeur,
+  }) =>
       SynchronisationAutomatique(
         synchroniser: () async {
           appels++;
@@ -28,6 +31,7 @@ void main() {
         intervalle: const Duration(hours: 1),
         evenementsNavigateur: flux,
         maintenant: () => horloge,
+        sondeur: sondeur,
       );
 
   setUp(() {
@@ -108,5 +112,89 @@ void main() {
     evenements.add(EvenementNavigateur.retourEnLigne);
     await laisserPasser();
     expect(appels, 0);
+  });
+
+  // PWA-2c — sondage léger avant de synchroniser (faux sondeur).
+  group('sondage léger au retour en ligne', () {
+    test('serveur injoignable : on reste hors ligne, rien n\'est tiré, aucune erreur', () async {
+      var sondages = 0;
+      auto = creer(
+        flux: evenements.stream,
+        sondeur: () async {
+          sondages++;
+          return false;
+        },
+      )..demarrer();
+      evenements.add(EvenementNavigateur.retourEnLigne);
+      await laisserPasser();
+      await laisserPasser();
+      expect(sondages, 1);
+      expect(appels, 0, reason: 'sondage en échec : aucune synchronisation, donc aucune erreur rouge');
+      expect(auto.echecsConsecutifs, 0);
+      expect(auto.reessaiProgramme, isNull, reason: 'hors ligne n\'est pas une erreur : pas de réessai bruyant');
+    });
+
+    test('serveur joignable : le sondage précède la synchronisation', () async {
+      final ordre = <String>[];
+      auto = SynchronisationAutomatique(
+        synchroniser: () async {
+          ordre.add('synchro');
+          return const SyncOutcome(tire: 0, accepte: 0, rejete: 0);
+        },
+        changementsReseau: reseau.stream,
+        intervalle: const Duration(hours: 1),
+        evenementsNavigateur: evenements.stream,
+        maintenant: () => horloge,
+        sondeur: () async {
+          ordre.add('sonde');
+          return true;
+        },
+      )..demarrer();
+      evenements.add(EvenementNavigateur.retourEnLigne);
+      await laisserPasser();
+      await laisserPasser();
+      expect(ordre, ['sonde', 'synchro']);
+    });
+
+    test('un sondeur qui lève vaut « hors ligne » ; le focus après 30 s sonde de nouveau', () async {
+      var joignable = false;
+      var sondages = 0;
+      auto = creer(
+        flux: evenements.stream,
+        sondeur: () async {
+          sondages++;
+          if (!joignable) throw TimeoutException('3 s');
+          return true;
+        },
+      )..demarrer();
+      evenements.add(EvenementNavigateur.ongletVisible);
+      await laisserPasser();
+      await laisserPasser();
+      expect((sondages, appels), (1, 0));
+      joignable = true;
+      evenements.add(EvenementNavigateur.ongletVisible);
+      await laisserPasser();
+      await laisserPasser();
+      expect((sondages, appels), (2, 1), reason: 'aucune tentative n\'a eu lieu : pas d\'anti-rebond');
+    });
+
+    test('jamais deux sondages à la fois', () async {
+      final fin = Completer<bool>();
+      var sondages = 0;
+      auto = creer(
+        flux: evenements.stream,
+        sondeur: () {
+          sondages++;
+          return fin.future;
+        },
+      )..demarrer();
+      evenements
+        ..add(EvenementNavigateur.retourEnLigne)
+        ..add(EvenementNavigateur.retourEnLigne);
+      await laisserPasser();
+      expect(sondages, 1);
+      fin.complete(false);
+      await laisserPasser();
+    });
   });
 }

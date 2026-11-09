@@ -23,6 +23,9 @@ class PlateformePoste {
   /// Livraison d'un fichier au navigateur (téléchargement) ; remplaçable en test.
   static Future<String> Function(String nom, List<int> octets) livreurNavigateur = livrerFichier;
 
+  /// PWA-2c — recharge la page (navigateur) après une restauration ; remplaçable en test. Natif : sans effet.
+  static Future<void> Function() rechargeur = rechargerPage;
+
   /// Motif affiché quand un geste exige le disque de la machine.
   static const motifSansDisque =
       "Ce geste utilise le disque de l'ordinateur : il n'est pas disponible dans le navigateur. Utilisez le poste Windows "

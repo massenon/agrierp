@@ -25,3 +25,6 @@ Future<Uint8List?> octetsDuFichierChoisi(PlatformFile fichier) async {
 
 /// Sélecteur : sur Windows les octets se lisent par le chemin (pas besoin de les charger d'avance).
 const bool selecteurAvecOctets = false;
+
+/// PWA-2c — natif : la restauration complète garde SON mécanisme (installée au prochain lancement) ; rien à recharger.
+Future<void> rechargerPage() async {}

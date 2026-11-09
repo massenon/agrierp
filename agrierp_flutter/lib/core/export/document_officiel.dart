@@ -327,7 +327,7 @@ class ExportOfficiel {
                     pw.Text(
                       nomFerme,
                       style: pw.TextStyle(
-                        fontSize: 15,
+                        fontSize: 22,
                         fontWeight: pw.FontWeight.bold,
                         color: _encreForet,
                       ),

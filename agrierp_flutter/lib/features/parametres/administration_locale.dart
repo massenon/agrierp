@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
@@ -9,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/auth/permissions_poste.dart';
 import '../../core/database/app_database.dart';
 import '../../core/demarrage/dossier_donnees.dart';
+import '../../core/systeme/fichiers_poste.dart';
 import '../../core/systeme/plateforme_poste.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -127,9 +129,38 @@ class AdministrationLocale {
 
   /// PWA-2 — motif des gestes qui exigent le disque de Windows (sauvegarde complète, copie, restauration, ré-import).
   static const motifNavigateur =
-      "La copie, la restauration et le ré-import de sauvegardes ne sont pas disponibles dans le navigateur : la base reste conservée "
-      'par le navigateur (« Sauvegarde complète » la télécharge). Pour restaurer, utilisez la sauvegarde du serveur (web de gestion) '
-      'ou le poste Windows.';
+      "La copie, la restauration depuis la liste et le ré-import de sauvegardes ne sont pas disponibles dans le navigateur : la base reste conservée "
+      'par le navigateur (« Sauvegarde complète » la télécharge). Pour restaurer, choisissez le fichier JSON de sauvegarde complète '
+      '(« Restaurer depuis un fichier »), ou utilisez la sauvegarde du serveur (web de gestion) ou le poste Windows.';
+
+  /// PWA-2c — contrôle SANS écrire : le fichier est-il une sauvegarde acceptable, et la base locale est-elle dans un état sûr
+  /// (aucune saisie `pending` / `conflict`) ? Lève [RefusAdministration] avec le motif français.
+  Future<void> controlerRestaurationNavigateur(List<int> octets) async {
+    if (!PlateformePoste.navigateur) throw const RefusAdministration(PlateformePoste.motifSansDisque);
+    try {
+      await RestaurationSauvegarde.restaurer(database, octets, ecrire: false);
+    } on RestaurationRefusee catch (e) {
+      throw RefusAdministration(e.message);
+    }
+  }
+
+  /// PWA-2c — RESTAURATION au navigateur depuis le fichier JSON de sauvegarde complète (voir [RestaurationSauvegarde] : état
+  /// sûr, contrôle strict, une transaction). Puis redémarrage LOGIQUE : la page est rechargée. Le natif garde son mécanisme
+  /// ([programmerRestauration]). La CONFIRMATION (mot « RESTAURER ») est demandée par l'écran, avant cet appel.
+  Future<String> restaurerDepuisFichierNavigateur(List<int> octets) async {
+    if (!PlateformePoste.navigateur) throw const RefusAdministration(PlateformePoste.motifSansDisque);
+    final int repris;
+    try {
+      repris = await RestaurationSauvegarde.restaurer(database, octets);
+    } on RestaurationRefusee catch (e) {
+      throw RefusAdministration(e.message);
+    }
+    await PlateformePoste.rechargeur();
+    return 'Sauvegarde restaurée ($repris ligne(s)) : le poste redémarre.';
+  }
+
+  /// Mot à recopier pour confirmer une restauration.
+  static const motDeRestauration = 'RESTAURER';
 
   Future<List<FichierSauvegarde>> sauvegardes() async {
     if (PlateformePoste.navigateur) return const [];
@@ -405,6 +436,31 @@ class _OngletSauvegardesState extends State<OngletSauvegardes> {
     }
   }
 
+  /// PWA-2c — navigateur : fichier JSON → contrôle (rien n'est écrit) → confirmation par le mot « RESTAURER » → restauration.
+  Future<void> _restaurerDepuisFichier() async {
+    final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['json'], dialogTitle: 'Choisir la sauvegarde complète (.json)', withData: selecteurAvecOctets);
+    if (r == null || r.files.isEmpty) return;
+    final octets = await octetsDuFichierChoisi(r.files.first);
+    if (octets == null) {
+      if (mounted) setState(() => _refus = 'Fichier illisible.');
+      return;
+    }
+    try {
+      await widget.admin.controlerRestaurationNavigateur(octets);
+    } on RefusAdministration catch (e) {
+      if (mounted) setState(() => _refus = e.message);
+      return;
+    }
+    if (!mounted) return;
+    final mot = await afficherModale<String>(
+      context: context,
+      confirmation: true,
+      constructeur: (_) => const ModaleRestauration(),
+    );
+    if (mot != AdministrationLocale.motDeRestauration) return;
+    await _faire(() => widget.admin.restaurerDepuisFichierNavigateur(octets));
+  }
+
   Widget _liste(String cle, String valeur, Map<String, String> options, String vide, ValueChanged<String> surChoix) => DropdownButtonFormField<String>(
     key: Key(cle),
     initialValue: valeur,
@@ -451,6 +507,20 @@ class _OngletSauvegardesState extends State<OngletSauvegardes> {
         if (_refus != null) Text(_refus!, key: const Key('sauvegarde-refus'), style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.errorDeep)),
         const SizedBox(height: AgriSpacing.sm),
         Align(alignment: Alignment.centerLeft, child: _bouton('sauvegarde-generer', 'Générer une sauvegarde', SymbolesAgri.backup, () => _faire(widget.admin.generer), plein: true)),
+        if (PlateformePoste.navigateur) ...[
+          const SizedBox(height: AgriSpacing.lg),
+          const Text('Restaurer une sauvegarde complète', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
+          const SizedBox(height: AgriSpacing.xs),
+          const Text(
+            'Choisissez le fichier JSON téléchargé par « Générer une sauvegarde ». Possible seulement si toutes vos saisies sont déjà envoyées au serveur : la base de ce navigateur est alors REMPLACÉE par le fichier.',
+            style: TextStyle(fontSize: 11, color: AgriColors.outline),
+          ),
+          const SizedBox(height: AgriSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _bouton('sauvegarde-restaurer-fichier', 'Restaurer depuis un fichier', SymbolesAgri.restart_alt, _restaurerDepuisFichier),
+          ),
+        ],
         const SizedBox(height: AgriSpacing.lg),
         const Text('Exporter un module seul', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: AgriTypography.gras, color: AgriColors.brandForest)),
         const SizedBox(height: AgriSpacing.xs),
@@ -606,4 +676,64 @@ class _SectionCePosteState extends State<SectionCePoste> {
       ],
     );
   }
+}
+
+/// PWA-2c — confirmation de la restauration : le mot « RESTAURER » doit être recopié (même geste que la réinitialisation).
+class ModaleRestauration extends StatefulWidget {
+  const ModaleRestauration({super.key});
+
+  @override
+  State<ModaleRestauration> createState() => _ModaleRestaurationState();
+}
+
+class _ModaleRestaurationState extends State<ModaleRestauration> {
+  final _mot = TextEditingController();
+  String? _erreur;
+
+  @override
+  void dispose() {
+    _mot.dispose();
+    super.dispose();
+  }
+
+  void _confirmer() {
+    final saisi = _mot.text.trim();
+    if (saisi != AdministrationLocale.motDeRestauration) {
+      setState(() => _erreur = 'Saisissez ${AdministrationLocale.motDeRestauration} pour confirmer.');
+      return;
+    }
+    Navigator.of(context).pop(saisi);
+  }
+
+  @override
+  Widget build(BuildContext context) => ModaleConfirmation(
+    icone: SymbolesAgri.warning,
+    couleurIcone: AgriColors.errorDeep,
+    titre: 'Restaurer la sauvegarde ?',
+    message:
+        'La base de ce navigateur sera REMPLACÉE par le contenu du fichier : tout ce qui a été saisi depuis cette sauvegarde '
+        'disparaît de ce poste (le serveur le garde). Le poste redémarre ensuite. Cette action est irréversible.',
+    detail: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: AgriSpacing.md),
+        TextField(
+          key: const Key('restauration-confirmation'),
+          controller: _mot,
+          autofocus: true,
+          decoration: InputDecoration(hintText: AdministrationLocale.motDeRestauration, errorText: _erreur),
+          onSubmitted: (_) => _confirmer(),
+        ),
+      ],
+    ),
+    actions: [
+      BoutonModaleSecondaire(libelle: 'Annuler', onPressed: () => Navigator.of(context).pop()),
+      BoutonModalePrimaire(
+        key: const Key('restauration-confirmer'),
+        libelle: 'Confirmer la restauration',
+        couleur: AgriColors.errorRed,
+        onPressed: _confirmer,
+      ),
+    ],
+  );
 }

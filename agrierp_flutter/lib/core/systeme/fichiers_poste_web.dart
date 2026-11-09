@@ -29,3 +29,7 @@ Future<String> livrerFichier(String nom, List<int> octets) async {
 Future<Uint8List?> octetsDuFichierChoisi(PlatformFile fichier) async => fichier.bytes;
 
 const bool selecteurAvecOctets = true;
+
+/// PWA-2c — redémarrage LOGIQUE du poste après une restauration : on recharge la page (la base est rouverte, tout l'état
+/// en mémoire est reconstruit).
+Future<void> rechargerPage() async => web.window.location.reload();

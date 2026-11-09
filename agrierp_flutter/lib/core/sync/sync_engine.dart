@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io' show File;
+import 'dart:io' show File, SocketException;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -271,8 +272,54 @@ class SyncEngine {
   @visibleForTesting
   static Future<SyncOutcome> Function(Future<SyncOutcome> Function() action) verrouEntreOnglets = sousVerrouEntreOnglets<SyncOutcome>;
 
-  Future<SyncOutcome> synchroniser() => _tentativeEnCours ??=
-      verrouEntreOnglets(_synchroniserUneFois).whenComplete(() => _tentativeEnCours = null);
+  Future<SyncOutcome> synchroniser() => _tentativeEnCours ??= verrouEntreOnglets(_synchroniserUneFois)
+      .then(
+        (r) {
+          liaisonServeur.value = !r.horsLigne;
+          return r;
+        },
+        onError: (Object e, StackTrace pile) {
+          // Une panne de RÉSEAU dit « hors ligne » ; un refus du serveur (401, 422…) prouve qu'il répond.
+          if (e is SocketException || e is TimeoutException || (e is DioException && e.response == null)) {
+            liaisonServeur.value = false;
+          }
+          Error.throwWithStackTrace(e, pile);
+        },
+      )
+      .whenComplete(() => _tentativeEnCours = null);
+
+  /// PWA-2c — le serveur répond-il VRAIMENT ? (`true` joignable, `false` hors ligne ; `null` : jamais vérifié.) Lu par
+  /// l'indicateur de la barre supérieure et par la modale « Synchronisation » (« En ligne » / « Hors ligne »).
+  final ValueNotifier<bool?> liaisonServeur = ValueNotifier<bool?>(null);
+
+  /// PWA-2c — SONDAGE LÉGER avant de synchroniser au retour en ligne / au retour de focus du navigateur : `navigator.onLine`
+  /// ment (il dit « en ligne » derrière un portail captif ou sans route vers le serveur). Réutilise la route de santé
+  /// EXISTANTE de Laravel (`/up`, sans authentification, sans donnée) ; jamais mise en cache (`Cache-Control: no-store`,
+  /// paramètre variable, hors du périmètre `/poste/` du service worker) ; délai court. NE LÈVE JAMAIS : hors ligne n'est pas une
+  /// erreur. Un HTTP < 500 prouve que le serveur répond (même un 401).
+  Future<bool> serveurJoignable({Duration delai = const Duration(seconds: 3)}) async {
+    bool joignable;
+    try {
+      final r = await _client
+          .get<Object?>(
+            '/up',
+            queryParameters: {'_': DateTime.now().microsecondsSinceEpoch},
+            options: Options(
+              headers: const {'Cache-Control': 'no-store', 'Pragma': 'no-cache'},
+              sendTimeout: delai,
+              receiveTimeout: delai,
+              validateStatus: (_) => true,
+              responseType: ResponseType.plain,
+            ),
+          )
+          .timeout(delai);
+      joignable = (r.statusCode ?? 599) < 500;
+    } catch (_) {
+      joignable = false;
+    }
+    liaisonServeur.value = joignable;
+    return joignable;
+  }
 
   Future<SyncOutcome> _synchroniserUneFois() async {
     if (!await estEnLigne()) {
@@ -587,25 +634,34 @@ class SyncEngine {
     // ⚠️ Lecture TOLÉRANTE : voir `etatDeSynchronisation` (table dupliquée).
     final etat = await _db.etatDeSynchronisation();
 
-    final resyncFaite = await _lireReglage(cleJournalResync) != null;
+    // PWA-2c — les douze marques de resynchronisation en UNE lecture (`IN (...)`) au lieu de douze `select`.
+    final marques = {
+      for (final r in await (_db.select(_db.appSettings)..where(
+            (t) => t.key.isIn(const [cleJournalResync, cleJournalResyncCreation, cleJournalIncomplet, cleFichesResync, cleFichesResyncCategories, cleLignesResync, cleRetoursResync, cleMouvementsResync, cleFichesResyncU10, cleDepensesResync, cleDepensesResyncU14, cleDepensesResyncDep1]),
+          ))
+          .get())
+        r.key,
+    };
+    bool marque(String cle) => marques.contains(cle);
+    final resyncFaite = marque(cleJournalResync);
     final resyncCreationFaite =
-        await _lireReglage(cleJournalResyncCreation) != null;
-    final etaitIncomplet = await _lireReglage(cleJournalIncomplet) != null;
-    final resyncFichesFaite = await _lireReglage(cleFichesResync) != null;
+        marque(cleJournalResyncCreation);
+    final etaitIncomplet = marque(cleJournalIncomplet);
+    final resyncFichesFaite = marque(cleFichesResync);
     final resyncCategoriesFaite =
-        await _lireReglage(cleFichesResyncCategories) != null;
-    final resyncLignesFaite = await _lireReglage(cleLignesResync) != null;
-    final resyncRetoursFaite = await _lireReglage(cleRetoursResync) != null;
+        marque(cleFichesResyncCategories);
+    final resyncLignesFaite = marque(cleLignesResync);
+    final resyncRetoursFaite = marque(cleRetoursResync);
     final resyncMouvementsFaite =
-        await _lireReglage(cleMouvementsResync) != null;
+        marque(cleMouvementsResync);
     final resyncFichesU10Faite =
-        await _lireReglage(cleFichesResyncU10) != null;
+        marque(cleFichesResyncU10);
     final resyncDepensesFaite =
-        await _lireReglage(cleDepensesResync) != null;
+        marque(cleDepensesResync);
     final resyncDepensesU14Faite =
-        await _lireReglage(cleDepensesResyncU14) != null;
+        marque(cleDepensesResyncU14);
     final resyncDepensesDep1Faite =
-        await _lireReglage(cleDepensesResyncDep1) != null;
+        marque(cleDepensesResyncDep1);
     final toutRedemander =
         complet ||
         !resyncFaite ||
@@ -702,8 +758,16 @@ class SyncEngine {
       cles.addAll(corps.keys);
 
       final aAbsorber = corps;
+      // PWA-2c — UNE SEULE transaction pour tous les absorbeurs de la page : à l'intérieur, `_transactionDePage` ne
+      // rouvre pas de point de sauvegarde (deux messages de plus au navigateur par absorbeur, ≈ 80 par tirage), car une
+      // erreur d'un absorbeur annule déjà toute la page (aucun ne l'attrape).
       await _db.transaction(() async {
-        recus += await _absorberPage(aAbsorber);
+        _pageEnTransaction = true;
+        try {
+          recus += await _absorberPage(aAbsorber);
+        } finally {
+          _pageEnTransaction = false;
+        }
       });
 
       final suivante = corps['page_suivante'];
@@ -832,6 +896,15 @@ class SyncEngine {
   /// Ticket S-T4 — une page du tirage, absorbée table par table dans l'ordre des dépendances (l'appelant
   /// l'enveloppe dans UNE transaction). Une clé ABSENTE (table non servie à ce compte, ou pas sur cette page) ne
   /// touche à rien : chaque absorbeur l'ignore.
+  /// Vrai pendant que [_absorberPage] tourne DANS la transaction unique de la page (une synchronisation à la fois : le moteur
+  /// n'absorbe jamais deux pages en même temps).
+  bool _pageEnTransaction = false;
+
+  /// Une transaction d'absorbeur : déjà dans celle de la page, on exécute directement (pas de point de
+  /// sauvegarde) ; ailleurs, une vraie transaction. ⚠️ Suppose qu'aucun absorbeur n'attrape l'erreur d'un autre.
+  Future<T> _transactionDePage<T>(Future<T> Function() corps) =>
+      _pageEnTransaction ? corps() : _db.transaction(corps);
+
   Future<int> _absorberPage(Map<String, dynamic> corps) async {
     var recus = 0;
 
@@ -989,6 +1062,8 @@ class SyncEngine {
 
   Future<int> _absorberProduits(Object? brut) async {
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
     // ⚠️⚠️ UN PRODUIT `pending` OU `conflict` N'EST PAS ÉCRASÉ PAR LE TIRAGE : il
     // n'existe (ou n'a changé) que sur ce poste, et l'effacer perdrait la saisie.
@@ -1098,7 +1173,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final b in await (_db.select(_db.livestockLots)..where((t) => t.id.isIn(vus))).get()) b.id: b.syncStatus,
       };
@@ -1166,7 +1241,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final connues = {
         for (final b in await _db.select(_db.livestockLots).get()) b.id,
       };
@@ -1229,7 +1304,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       for (final t in recues) {
         final locale = await (_db.select(_db.transformations)..where((x) => x.id.equals(t.id.value))).getSingleOrNull();
         if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
@@ -1293,7 +1368,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final connues = {
         for (final b in await _db.select(_db.livestockLots).get()) b.id,
       };
@@ -1358,7 +1433,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final connues = {
         for (final b in await _db.select(_db.livestockLots).get()) b.id,
       };
@@ -1667,7 +1742,7 @@ class SyncEngine {
 
     // ── Application, en une transaction ─────────────────────────────────────
     final avertissements = <String>[];
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final codes = <String, String>{};
       final bandes = {for (final f in fiches) f.lotId.value}.toList();
       for (final morceau in _morceaux(bandes)) {
@@ -1685,45 +1760,75 @@ class SyncEngine {
         }
       }
 
+      // PWA-2c — LECTURES GROUPÉES (`IN (...)` par tranches) des fiches déjà connues et des fiches occupant (bande, jour), puis
+      // UNE rafale `batch` : au navigateur, chaque instruction attendue est un aller-retour vers le worker SQLite (912 fiches
+      // = 2 736 instructions avant). Sémantique STRICTE inchangée : une fiche `pending` / `conflict` n'est jamais écrasée ;
+      // une autre fiche déjà là pour (bande, jour) est conservée avec son avertissement.
+      final locales = <String, LivestockDailyEntry>{};
+      for (final morceau in _morceaux([for (final f in fiches) f.id.value])) {
+        for (final e in await (_db.select(_db.livestockDailyEntries)..where((t) => t.id.isIn(morceau))).get()) {
+          locales[e.id] = e;
+        }
+      }
+      int jour(DateTime d) => d.millisecondsSinceEpoch ~/ 1000; // la base garde des SECONDES
+      final occupantes = <String, LivestockDailyEntry>{};
+      for (final morceau in _morceaux(bandes)) {
+        for (final e in await (_db.select(_db.livestockDailyEntries)..where((t) => t.lotId.isIn(morceau))).get()) {
+          occupantes['${e.lotId}|${jour(e.entryDate)}'] = e;
+        }
+      }
+
+      final aEcrire = <LivestockDailyEntriesCompanion>[];
+      final prevues = <String>{}; // identifiants prévus dans la rafale
+      final casesPrevues = <String>{}; // (bande, jour) prévus dans la rafale
+      Future<void> ecrire() async {
+        if (aEcrire.isEmpty) return;
+        final lot = List<LivestockDailyEntriesCompanion>.of(aEcrire);
+        await _db.batch((b) {
+          for (final ligne in lot) {
+            b.insert(_db.livestockDailyEntries, ligne, onConflict: DoUpdate((_) => ligne));
+          }
+        });
+        aEcrire.clear();
+        prevues.clear();
+        casesPrevues.clear();
+      }
+
       for (final f in fiches) {
-        final locale = await (_db.select(
-          _db.livestockDailyEntries,
-        )..where((t) => t.id.equals(f.id.value))).getSingleOrNull();
+        final cle = '${f.lotId.value}|${jour(f.entryDate.value)}';
+        var locale = locales[f.id.value];
+        var occupante = occupantes[cle];
+        // Cas rare : la même fiche, ou le même (bande, jour), est DÉJÀ prévu dans cette rafale par une fiche précédente du lot
+        // servi. On écrit d'abord ce qui est prévu, puis on relit comme le faisait la version ligne à ligne.
+        if (prevues.contains(f.id.value) || casesPrevues.contains(cle)) {
+          await ecrire();
+          locale = await (_db.select(_db.livestockDailyEntries)..where((t) => t.id.equals(f.id.value))).getSingleOrNull();
+          occupante =
+              await (_db.select(_db.livestockDailyEntries)..where(
+                    (t) => Expression.and([t.lotId.equals(f.lotId.value), t.entryDate.equals(f.entryDate.value)]),
+                  ))
+                  .getSingleOrNull();
+        }
 
         // ⚠️⚠️ `pending` / `conflict` : intouchable (n'existe, ou n'a changé, que sur ce poste).
         if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
 
-        final occupante =
-            await (_db.select(_db.livestockDailyEntries)..where(
-                  (t) => Expression.and([
-                    t.lotId.equals(f.lotId.value),
-                    t.entryDate.equals(f.entryDate.value),
-                  ]),
-                ))
-                .getSingleOrNull();
         if (occupante != null && occupante.id != f.id.value) {
-          avertissements.add(
-            _avertissementFicheEnDouble(
-              occupante,
-              codes[f.lotId.value] ?? f.lotId.value,
-            ),
-          );
+          avertissements.add(_avertissementFicheEnDouble(occupante, codes[f.lotId.value] ?? f.lotId.value));
           continue;
         }
 
-        final ligne = f.copyWith(
-          deviceId: Value(locale?.deviceId ?? 'serveur'),
-          syncStatus: const Value(SyncStatus.synced),
-          updatedAt: Value(
-            f.updatedAt.present
-                ? f.updatedAt.value
-                : locale?.updatedAt ?? _maintenant(),
+        aEcrire.add(
+          f.copyWith(
+            deviceId: Value(locale?.deviceId ?? 'serveur'),
+            syncStatus: const Value(SyncStatus.synced),
+            updatedAt: Value(f.updatedAt.present ? f.updatedAt.value : locale?.updatedAt ?? _maintenant()),
           ),
         );
-        await _db
-            .into(_db.livestockDailyEntries)
-            .insert(ligne, onConflict: DoUpdate((_) => ligne));
+        prevues.add(f.id.value);
+        casesPrevues.add(cle);
       }
+      await ecrire();
     });
 
     _avertissements.addAll(avertissements);
@@ -1838,7 +1943,7 @@ class SyncEngine {
     required Expression<bool> Function(T) synceeHorsServis,
     required Insertable<D> archivage,
   }) async {
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final l in await _db.select(table).get())
           if (statutDe(l) != SyncStatus.synced) idDe(l),
@@ -1946,7 +2051,7 @@ class SyncEngine {
       updatedAt: const Value(null),
     );
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locale = await (_db.select(
         _db.elevageNumberingSettings,
       )..where((t) => t.id.equals('unique'))).getSingleOrNull();
@@ -2127,7 +2232,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.growthStandards).go();
       for (final r in recus) {
         await _db.into(_db.growthStandards).insert(r);
@@ -2240,7 +2345,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.veterinaryWithdrawalPeriods).go();
 
       for (final l in lignes) {
@@ -2272,6 +2377,8 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
     // ⚠️⚠️ LES DECLARATIONS EN ATTENTE SONT PRESERVEES. Une saillie declaree
     // au poste et pas encore acquittee n'existe pas encore cote serveur : la
@@ -2330,8 +2437,10 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final c
             in await (_db.select(_db.customers)..where(
@@ -2382,7 +2491,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       for (final l in lignes) {
         await _db
             .into(_db.receivables)
@@ -2422,7 +2531,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final a
             in await (_db.select(_db.customerAdvances)..where(
@@ -2477,7 +2586,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️⚠️ UNE FICHE `pending` OU `conflict` N'EST NI EFFACÉE NI ÉCRASÉE : elle n'existe
       // (ou n'a changé) que sur ce poste. Seules les fiches synchronisées sont remplacées
       // par le tirage — l'ensemble, comme avant.
@@ -2531,7 +2640,7 @@ class SyncEngine {
       _identifiantStrict(l, vus, 'Compte');
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locaux = {
         for (final c in await _db.select(_db.chartOfAccounts).get()) c.id: c.syncStatus,
       };
@@ -2578,7 +2687,7 @@ class SyncEngine {
       _identifiantStrict(l, vus, 'Immobilisation');
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locaux = {for (final b in await _db.select(_db.fixedAssets).get()) b.id: b.syncStatus};
       final disparus = [
         for (final e in locaux.entries)
@@ -2623,7 +2732,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.fiscalYears).go();
 
       for (final l in lignes) {
@@ -2657,7 +2766,7 @@ class SyncEngine {
       _identifiantStrict(l, vus, 'Clôture de mois');
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.periodicClosures).go();
       await _db.batch((b) {
         for (final l in lignes) {
@@ -2868,12 +2977,14 @@ class SyncEngine {
 
     // ── Application, en une transaction ─────────────────────────────────────
     String? avertissementVidage;
-    await _db.transaction(() async {
-      for (final e in entetes) {
-        await _db
-            .into(_db.accountingEntries)
-            .insert(e, onConflict: DoUpdate((_) => e));
-      }
+    await _transactionDePage(() async {
+      // PWA-2c — une rafale `batch` pour les en-têtes et une pour les lignes (491 écritures + 1 287 lignes = 1 778 instructions
+      // avant : au navigateur chacune coûtait un aller-retour). Même ordre, mêmes règles (une ligne qui heurte une clé refuse la page).
+      await _db.batch((b) {
+        for (final e in entetes) {
+          b.insert(_db.accountingEntries, e, onConflict: DoUpdate((_) => e));
+        }
+      });
 
       // Les lignes d'une écriture servie sont REMPLACÉES : `updateManual` les recrée avec de
       // nouveaux identifiants, les anciennes ne sont plus servies — et ne doivent plus compter.
@@ -2882,9 +2993,7 @@ class SyncEngine {
           _db.accountingEntryLines,
         )..where((l) => l.entryId.isIn(morceau))).go();
       }
-      for (final c in corps) {
-        await _db.into(_db.accountingEntryLines).insert(c);
-      }
+      await _db.batch((b) => b.insertAll(_db.accountingEntryLines, corps));
 
       if (annoncees != null) {
         final locales = [
@@ -3017,7 +3126,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locale = await (_db.select(
         _db.companySettings,
       )..where((t) => t.id.equals('unique'))).getSingleOrNull();
@@ -3070,7 +3179,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️⚠️ TICKET MOD1 — UNE BASCULE FAITE SUR CE POSTE ET PAS ENCORE ACQUITTÉE N'EST JAMAIS ÉCRASÉE. Le référentiel
       // était remplacé en bloc à chaque tirage : le serveur, qui n'avait pas encore reçu la bascule, renvoyait
       // l'ancienne valeur et le module « revenait » tout seul à son état d'avant. Les lignes `pending` / `conflict`
@@ -3118,7 +3227,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.rolesApplicatifs).go();
 
       for (final l in lignes) {
@@ -3152,7 +3261,7 @@ class SyncEngine {
       _identifiantStrict(l, vus, 'Ligne de relevé');
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.bankStatementLines).go();
       await _db.batch((b) {
         for (final l in lignes) {
@@ -3181,7 +3290,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.permissionsApplicatives).go();
       await _db.batch((b) {
         for (final l in lignes) {
@@ -3236,7 +3345,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.auditLogs).go();
 
       for (final l in lignes) {
@@ -3273,7 +3382,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.notifications).go();
 
       for (final l in lignes) {
@@ -3314,7 +3423,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.lotRevenues).go();
 
       for (final l in lignes) {
@@ -3355,7 +3464,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.livestockSpecies).go();
 
       for (final l in lignes) {
@@ -3423,7 +3532,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // Les acquittés sont remplacés par l'ensemble servi ; les `pending` / `conflict` restent tels quels.
       await (_db.delete(_db.animals)..where((t) => t.syncStatus.equalsValue(SyncStatus.synced))).go();
       final gardes = {
@@ -3451,7 +3560,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.attestationTemplates).go();
 
       for (final l in lignes) {
@@ -3540,7 +3649,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final m
             in await (_db.select(_db.mails)..where(
@@ -3637,7 +3746,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final d
             in await (_db.select(_db.administrativeDocuments)..where(
@@ -3750,7 +3859,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final protegees = {
         for (final a
             in await (_db.select(_db.archivedDocuments)..where(
@@ -3978,7 +4087,7 @@ class SyncEngine {
       recus.add(IncomeTaxBracketsCompanion.insert(id: id, fromAmount: plancher, toAmount: Value(plafond), rate: taux));
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.incomeTaxBrackets).go();
       await _db.batch((b) => b.insertAll(_db.incomeTaxBrackets, recus));
     });
@@ -3993,7 +4102,7 @@ class SyncEngine {
     List<UpdateCompanion<D>> recus,
     Set<String> vus,
   ) async {
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = <String, String>{};
       for (final l in await _db
           .customSelect(
@@ -4032,12 +4141,19 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
+    // PWA-2c — lecture GROUPÉE (`IN (...)` par tranches) des pointages connus, puis UNE rafale `batch` (au navigateur, une
+    // instruction par ligne coûtait un aller-retour chacune). Un pointage `pending` / `conflict` n'est toujours jamais écrasé.
+    final locales = <String, AttendanceRecord>{};
+    for (final morceau in _morceaux([for (final l in lignes) l['id'] as String])) {
+      for (final e in await (_db.select(_db.attendanceRecords)..where((t) => t.id.isIn(morceau))).get()) {
+        locales[e.id] = e;
+      }
+    }
+    final aEcrire = <AttendanceRecordsCompanion>[];
     for (final l in lignes) {
       final id = l['id'] as String;
 
-      final local = await (_db.select(
-        _db.attendanceRecords,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = locales[id];
 
       if (local != null && local.syncStatus != SyncStatus.synced) continue;
 
@@ -4057,10 +4173,14 @@ class SyncEngine {
         isActive: Value(_actifStrict(l, 'Pointage $id')),
       );
 
-      await _db
-          .into(_db.attendanceRecords)
-          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+      aEcrire.add(ligne);
     }
+
+    await _db.batch((b) {
+      for (final ligne in aEcrire) {
+        b.insert(_db.attendanceRecords, ligne, onConflict: DoUpdate((_) => ligne));
+      }
+    });
 
     return lignes.length;
   }
@@ -4081,12 +4201,19 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
+    // PWA-2c — lecture GROUPÉE des ventes connues (`IN (...)` par tranches), puis UNE rafale `batch` : une vente `pending` /
+    // `conflict` reste intouchable, `updatedAt` d'une vente connue reste gardé.
+    final locales = <String, Sale>{};
+    for (final morceau in _morceaux([for (final l in lignes) l['id'] as String])) {
+      for (final e in await (_db.select(_db.sales)..where((t) => t.id.isIn(morceau))).get()) {
+        locales[e.id] = e;
+      }
+    }
+    final aEcrire = <SalesCompanion>[];
     for (final l in lignes) {
       final id = l['id'] as String;
 
-      final locale = await (_db.select(
-        _db.sales,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      final locale = locales[id];
 
       if (locale != null && locale.syncStatus != SyncStatus.synced) continue;
 
@@ -4140,10 +4267,14 @@ class SyncEngine {
         soldAt: vendueLe,
       );
 
-      await _db
-          .into(_db.sales)
-          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+      aEcrire.add(ligne);
     }
+
+    await _db.batch((b) {
+      for (final ligne in aEcrire) {
+        b.insert(_db.sales, ligne, onConflict: DoUpdate((_) => ligne));
+      }
+    });
 
     return lignes.length;
   }
@@ -4415,7 +4546,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️ Un achat que le poste tient `pending` ou en `conflict` n'est pas celui du serveur : rien n'y est touché.
       final achatsLocaux = {
         for (final a in await (_db.select(
@@ -4512,7 +4643,7 @@ class SyncEngine {
       parPiece[piece]!.add(ligne);
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       // ⚠️⚠️ Une pièce `pending` ou en `conflict` sur CE poste garde ses lignes : jamais écrasées.
       final aProteger = await protegees();
       final remplacees = [
@@ -4539,7 +4670,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.payables).go();
 
       for (final l in lignes) {
@@ -4605,7 +4736,7 @@ class SyncEngine {
       ];
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locaux = {
         for (final b in await _db.select(_db.purchaseOrders).get()) b.id: b.syncStatus,
       };
@@ -4642,15 +4773,28 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
 
+    // PWA-2c — UNE lecture groupée (`IN (...)` par tranches) des achats déjà connus et non acquittés au lieu d'un
+    // `select` par ligne, puis UNE rafale `batch`. Sémantique inchangée : un achat `pending` / `conflict` n'est jamais écrasé.
+    final protegees = <String>{};
+    final ids = [for (final l in lignes) l['id'] as String];
+    for (var d = 0; d < ids.length; d += 500) {
+      final tranche = ids.sublist(d, d + 500 > ids.length ? ids.length : d + 500);
+      protegees.addAll(
+        (await (_db.select(_db.purchases)..where(
+                  (t) => t.id.isIn(tranche) & t.syncStatus.equalsValue(SyncStatus.synced).not(),
+                ))
+                .get())
+            .map((a) => a.id),
+      );
+    }
+
+    final aEcrire = <PurchasesCompanion>[];
     for (final l in lignes) {
       final id = l['id'] as String;
-
-      final local = await (_db.select(
-        _db.purchases,
-      )..where((t) => t.id.equals(id))).getSingleOrNull();
-
-      if (local != null && local.syncStatus != SyncStatus.synced) continue;
+      if (protegees.contains(id)) continue;
 
       final ligne = PurchasesCompanion.insert(
         id: id,
@@ -4676,10 +4820,14 @@ class SyncEngine {
             : const Value.absent(),
       );
 
-      await _db
-          .into(_db.purchases)
-          .insert(ligne, onConflict: DoUpdate((_) => ligne));
+      aEcrire.add(ligne);
     }
+
+    await _db.batch((b) {
+      for (final ligne in aEcrire) {
+        b.insert(_db.purchases, ligne, onConflict: DoUpdate((_) => ligne));
+      }
+    });
 
     return lignes.length;
   }
@@ -4697,7 +4845,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.supplierCredits).go();
 
       for (final l in lignes) {
@@ -4765,7 +4913,7 @@ class SyncEngine {
 
     final lignes = _lignes(brut);
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.treasuryAccounts).go();
       await _db.batch((b) {
         for (final l in lignes) {
@@ -4803,7 +4951,7 @@ class SyncEngine {
 
     final libelles = brut.whereType<String>().toList();
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.expenseCategories).go();
       await _db.batch((b) {
         for (final libelle in libelles) {
@@ -4969,7 +5117,7 @@ class SyncEngine {
       }
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final d in await (_db.select(
           _db.expenses,
@@ -5029,7 +5177,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.costCenters).go();
       await _db.batch((b) => b.insertAll(_db.costCenters, recus));
     });
@@ -5123,7 +5271,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final a in await (_db.select(
           _db.creditNotes,
@@ -5219,7 +5367,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       await _db.delete(_db.corbeilleElements).go();
       for (final e in recus) {
         await _db.into(_db.corbeilleElements).insert(e);
@@ -5315,7 +5463,7 @@ class SyncEngine {
       );
     }
 
-    await _db.transaction(() async {
+    await _transactionDePage(() async {
       final locales = {
         for (final d in await (_db.select(
           _db.quotes,
@@ -5422,6 +5570,8 @@ class SyncEngine {
     if (brut == null) return 0;
 
     final lignes = _lignes(brut);
+    // PWA-2c — charge vide : fusion pure, rien à lire ni à écrire (une instruction de moins par table au navigateur).
+    if (lignes.isEmpty) return 0;
     final actifs = [
       for (final l in lignes) _actifStrict(l, 'Soin ${l['id']}'),
     ];

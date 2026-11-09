@@ -56,8 +56,14 @@ const ok = (nom) => console.log(`  ✔ ${nom}`);
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
 console.log(`Base temporaire : ${db}\nServeur : ${base}`);
-php(['artisan', 'migrate:fresh', '--seed', '--force']);
-php(['artisan', 'db:seed', '--class=DemoDataSeeder', '--force']);
+if (process.env.E2E_BASE_PRETE) {
+  // Gain de temps (la graine de démonstration prend plusieurs minutes) : une COPIE d'une base déjà semée, jamais l'original.
+  assert.ok(path.resolve(process.env.E2E_BASE_PRETE).startsWith(os.tmpdir()), 'la base prête doit être dans le dossier temporaire');
+  fs.copyFileSync(process.env.E2E_BASE_PRETE, db);
+} else {
+  php(['artisan', 'migrate:fresh', '--seed', '--force']);
+  php(['artisan', 'db:seed', '--class=DemoDataSeeder', '--force']);
+}
 
 const serveur = spawn('php', ['-S', `127.0.0.1:${port}`, path.join(laravel, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')], { cwd: path.join(laravel, 'public'), env, stdio: 'ignore' });
 const arreter = () => { try { serveur.kill('SIGTERM'); } catch { /* déjà arrêté */ } };
@@ -78,6 +84,7 @@ const ouvrir = async (horsLigne = false) => {
   if (horsLigne) await contexte.setOffline(true);
   const page = contexte.pages()[0] ?? await contexte.newPage();
   page.on('pageerror', (e) => console.log('  [erreur page]', e.message.slice(0, 200)));
+  if (process.env.E2E_DEBUG) page.on('console', (m) => console.log('  [console]', m.type(), m.text().slice(0, 300)));
   page.on('requestfailed', (r) => { if (!contexteHorsLigne) console.log('  [requête échouée]', r.url().slice(0, 120), r.failure()?.errorText); });
   return page;
 };

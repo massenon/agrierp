@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../fenetre/fenetre_poste.dart';
@@ -54,6 +55,7 @@ class BarreSuperieure extends StatelessWidget {
     required this.onBasculerMenu,
     this.refuses = 0,
     this.onSynchroniser,
+    this.liaison,
     this.menuOuvert = true,
     this.nomUtilisateur,
     this.onMonProfil,
@@ -134,6 +136,10 @@ class BarreSuperieure extends StatelessWidget {
 
   /// Dont refusés par le serveur : le badge passe au rouge (ticket H2, EF3).
   final int refuses;
+
+  /// PWA-2c — état du serveur sondé (`true` joignable, `false` hors ligne, `null` inconnu) : affiche l'indicateur « Hors
+  /// ligne » / « En attente (N) » / « Synchronisé » à côté du bouton. `null` : aucun indicateur (poste Windows).
+  final ValueListenable<bool?>? liaison;
 
   /// Ouvre la modale « Synchronisation » (ticket H2). `null` : bouton inerte (aucun moteur branché).
   final VoidCallback? onSynchroniser;
@@ -227,6 +233,7 @@ class BarreSuperieure extends StatelessWidget {
           //
           // ⚠️ SON BADGE COMPTE CE QUI N'EST PAS ENCORE AU SERVEUR, pas un état décoratif : c'est le seul
           // chiffre qui dise à l'animalier si sa journée est partie.
+          if (liaison != null) ...[_etatLiaison(), const SizedBox(width: AgriSpacing.xs)],
           _boutonSynchroniser(),
           const SizedBox(width: AgriSpacing.sm),
 
@@ -424,6 +431,32 @@ class BarreSuperieure extends StatelessWidget {
 
   /// Badge sur le modèle de celui de la cloche (`notification-bell.blade.php`) : 16 px, 9 px gras, plafonné à
   /// « 9+ ». Rouge s'il y a au moins un refus à corriger, émeraude sinon ; absent à 0 (PRD, EF3).
+  /// PWA-2c — mêmes mots que la modale « Synchronisation » (« Hors ligne ») et son compteur « En attente d'envoi ».
+  /// Priorité : hors ligne (le serveur ne répond pas) > en attente (N) > synchronisé. Inconnu (`null`) compte comme en ligne :
+  /// « Synchronisé » n'est affiché que si rien n'attend.
+  static String libelleLiaison({required bool? liaison, required int enAttente}) {
+    if (liaison == false) return 'Hors ligne';
+    if (enAttente > 0) return 'En attente ($enAttente)';
+    return 'Synchronisé';
+  }
+
+  Widget _etatLiaison() {
+    return ValueListenableBuilder<bool?>(
+      valueListenable: liaison!,
+      builder: (context, valeur, _) {
+        final texte = libelleLiaison(liaison: valeur, enAttente: enAttente);
+        final couleur = valeur == false
+            ? AgriColors.outline
+            : (enAttente > 0 ? AgriColors.errorDeep : AgriColors.brandEmerald);
+        return Text(
+          texte,
+          key: const Key('etat-synchronisation'),
+          style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.bold, color: couleur),
+        );
+      },
+    );
+  }
+
   Widget _boutonSynchroniser() {
     final badge = enAttente > 9 ? '9+' : '$enAttente';
 
