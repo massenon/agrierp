@@ -47,7 +47,7 @@ class ImportEmployesService extends ModuleImport
 
     public function description(): string
     {
-        return "Registre des employés : nom, prénom, poste, date d'embauche, salaire de base et statut.";
+        return 'Registre des employés : nom, prénom, poste, date d\'embauche, salaire de base et statut.';
     }
 
     public function icone(): string

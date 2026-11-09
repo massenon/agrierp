@@ -185,13 +185,13 @@ class ImportMasseModelesTest extends ImportMasseBase
         $this->assertStringContainsString('« Nom * », « Catégorie * »', $renommee);
     }
 
-    public function test_une_extension_autre_que_xlsx_est_refusee(): void
+    public function test_une_extension_autre_que_xlsx_ou_csv_est_refusee(): void
     {
         $user = $this->utilisateur(['manage-ventes']);
         $chemin = $this->fichier(ImportMasseService::module('clients'), [['nom' => 'A']]);
 
-        $message = $this->refus(fn () => $this->service()->analyser('clients', $chemin, 'clients.csv', $user));
-        $this->assertStringStartsWith('Seuls les fichiers Excel .xlsx sont acceptés', $message);
+        $message = $this->refus(fn () => $this->service()->analyser('clients', $chemin, 'clients.txt', $user));
+        $this->assertStringStartsWith('Seuls les fichiers Excel .xlsx (ou CSV .csv en repli) sont acceptés', $message);
     }
 
     public function test_un_fichier_illisible_ou_vide_est_refuse(): void

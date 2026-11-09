@@ -115,7 +115,7 @@ Ordre issu du guide §1 (révisé le 07/11/2026) et du jalonnement W0–W9 (guid
 | 7 | W6c | Clients, fournisseurs, ventes/caisse, créances | `24_` |
 | 8 | W6d | Élevage : bandes → fiches → rationnement → soins/prophylaxie → couvoir → rappels | `23_` |
 | 9 | W6e | Pilotage : tableaux de bord, notifications | `22_` |
-| 10 | W7a | Importation en masse (stocks d'abord) | `28_` |
+| 10 | W7a | Importation en masse (CONSTRUITE : stocks, clients, fournisseurs, employés, plan comptable, rations ; CSV de repli) | `28_`, `48_` |
 | 11 | W7b | MeCeF / e-MECeF côté serveur | `24_`, `41_` |
 | 12 | W8 | Comptabilité et exercices ; au poste : demandes rejouées par le serveur | `26_` |
 | 13 | W6f | Rapports et exports (après la comptabilité : le résultat net doit venir d'une seule source) | `28_` |

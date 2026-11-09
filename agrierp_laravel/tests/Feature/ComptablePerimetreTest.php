@@ -211,9 +211,14 @@ class ComptablePerimetreTest extends TestCase
         $this->actingAs($this->comptable);
 
         foreach (['/gestion-elevage', '/gestion-bandes', '/parametres-elevage', '/parametres-hub', '/mode-hors-ligne',
-            '/importation-masse', '/produits/ajouter', '/personnel-stages', '/administration', '/bareme-its'] as $url) {
+            '/produits/ajouter', '/personnel-stages', '/administration', '/bareme-its'] as $url) {
             $this->get($url)->assertForbidden();
         }
+
+        // IMPORT-3 : le comptable ouvre l'importation en masse POUR LE PLAN COMPTABLE seulement (`manage-comptabilite`) ; ses autres modules
+        // (stocks, clients, fournisseurs, employés, rations) lui sont refusés au serveur (`ImportMasseModelesTest`, `ImportMasse*Test`).
+        $this->get('/importation-masse')->assertOk();
+        $this->assertSame(['plan_comptable'], array_keys(app(\App\Services\Import\ImportMasseService::class)->modulesAutorises($this->comptable)));
 
         Livewire::test(GestionUtilisateurs::class)->assertForbidden();
         Livewire::test(RolesPermissions::class)->assertForbidden();

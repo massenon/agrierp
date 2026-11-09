@@ -85,6 +85,35 @@ foreach ($in['modules'] as $cle => $lignes) {
         'designations' => array_map(fn ($l) => $l['designation'], $lot->lignes),
     ];
 }
+// IMPORT-5 — le CSV de repli : le PHP écrit les fichiers (trois styles) et les ANALYSE avec le vrai `LecteurCsv`.
+function ecrireCsv($module, array $lignes, string $sep, string $encodage, bool $bom): string {
+    $champ = function ($v) use ($sep) {
+        $v = (string) $v;
+        return ($v !== '' && (str_contains($v, $sep) || str_contains($v, '"') || str_contains($v, "\n") || $v !== trim($v))) ? '"'.str_replace('"', '""', $v).'"' : $v;
+    };
+    $sortie = implode($sep, array_map($champ, array_map(fn ($c) => $c->entete(), $module->colonnes())))."\r\n";
+    foreach ($lignes as $ligne) {
+        $sortie .= implode($sep, array_map(fn ($c) => $champ($ligne[$c->cle] ?? ''), $module->colonnes()))."\r\n";
+    }
+    if ($encodage !== 'UTF-8') { $sortie = mb_convert_encoding($sortie, $encodage, 'UTF-8'); }
+    return ($bom ? "\xEF\xBB\xBF" : '').$sortie;
+}
+$sortie['csv'] = [];
+foreach (['clients', 'employes'] as $cle) {
+    $module = ImportMasseService::module($cle);
+    $base = $in['modules'][$cle];
+    $csvLignes = array_merge(array_slice($base, 0, 3), [[]], array_slice($base, 3), [
+        $cle === 'clients'
+            ? ['nom' => "Multi\nligne « Évolution » dit \"Le Grand\"", 'telephone' => '0196999999', 'ville' => "Pobè\nCentre", 'email' => 'multi@x.test']
+            : ['nom' => 'Œuvre', 'prenom' => 'Zoë', 'poste' => 'Poste; avec point-virgule, et virgule', 'date_embauche' => '2024-05-05'],
+    ]);
+    foreach ([['pv_bom', ';', 'UTF-8', true], ['virgule_1252', ',', 'Windows-1252', false], ['tab', "\t", 'UTF-8', false]] as [$nom, $sep, $enc, $bom]) {
+        $chemin = sys_get_temp_dir().'/parite_csv_'.$cle.'_'.$nom.'_'.getmypid().'.csv';
+        file_put_contents($chemin, ecrireCsv($module, $csvLignes, $sep, $enc, $bom));
+        $lot = app(ImportMasseService::class)->analyser($cle, $chemin, 'import.csv', $user);
+        $sortie['csv'][] = ['module' => $cle, 'style' => $nom, 'fichier' => $chemin, 'lignes' => array_map(fn ($l) => ['ligne' => $l['ligne'], 'statut' => $l['statut'], 'motif' => $l['motif'], 'doublon' => $l['doublon'], 'designation' => $l['designation']], $lot->lignes)];
+    }
+}
 $f = app(App\Services\FusionReferentielsService::class);
 $sortie['normalisations'] = [];
 foreach ($in['textes'] as $t) {
@@ -229,6 +258,10 @@ echo json_encode($sortie);
   });
 
   tearDownAll(() {
+    for (final c in (php?['csv'] as List? ?? const [])) {
+      final f = File((c as Map)['fichier'] as String);
+      if (f.existsSync()) f.deleteSync();
+    }
     for (final m in (php?['modules'] as Map<String, dynamic>? ?? {}).values) {
       final f = File(m['fichier'] as String);
       if (f.existsSync()) f.deleteSync();
@@ -314,6 +347,31 @@ echo json_encode($sortie);
       expect(apercu.bloquant, p['bloquant']);
     }, skip: saut);
   }
+
+  test('IMPORT-5 : le CSV de repli (UTF-8 et BOM, Windows-1252, séparateurs ; , tabulation, guillemets, sauts de ligne) donne le même aperçu qu\'au serveur', () async {
+    final csv = (php!['csv'] as List).cast<Map<String, dynamic>>();
+    expect(csv, hasLength(6));
+    for (final c in csv) {
+      final m = ImportationRepository.module(c['module'] as String)!;
+      final db = await baseSemee();
+      addTearDown(db.close);
+      final apercu = await ImportationRepository(database: db).analyser(m, Uint8List.fromList(File(c['fichier'] as String).readAsBytesSync()), 'import.csv');
+
+      final attendu = (c['lignes'] as List).cast<Map<String, dynamic>>();
+      expect(apercu.lignes.length, attendu.length, reason: '${c['module']} ${c['style']}');
+      final ecarts = <String>[];
+      for (var i = 0; i < attendu.length; i++) {
+        final a = attendu[i];
+        final b = apercu.lignes[i];
+        if (b.ligne != a['ligne']) ecarts.add('ligne ${a['ligne']} : numéro ${b.ligne}');
+        if (b.statut != a['statut']) ecarts.add('ligne ${a['ligne']} : état ${b.statut} / serveur ${a['statut']}');
+        if ((b.motif ?? '') != (a['motif'] ?? '')) ecarts.add('ligne ${a['ligne']} : motif\n  poste   « ${b.motif} »\n  serveur « ${a['motif']} »');
+        if (b.doublon != a['doublon']) ecarts.add('ligne ${a['ligne']} : doublon');
+        if (b.designation != a['designation']) ecarts.add('ligne ${a['ligne']} : désignation « ${b.designation} » / « ${a['designation']} »');
+      }
+      expect(ecarts, isEmpty, reason: '${c['module']} ${c['style']}\n${ecarts.join('\n')}');
+    }
+  }, skip: saut);
 
   test('les normalisations de cellule et de clé sont celles du serveur', () {
     final n = (php!['normalisations'] as List).cast<Map<String, dynamic>>();

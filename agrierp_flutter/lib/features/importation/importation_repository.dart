@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:excel/excel.dart';
 import 'package:uuid/uuid.dart';
@@ -727,7 +729,7 @@ class ImportationRepository {
       '${cle('${v['name']}')}|${cle('${v['categorie_libelle']}')}|${cle('${v['unit']}')}|${cle('${v['filiere_libelle']}').isEmpty ? '-' : cle('${v['filiere_libelle']}')}',
     'clients' => '${cle('${v['name']}')}|${normaliserTelephone(v['phone'] as String?) ?? '-'}',
     'fournisseurs' => '${cle('${v['name']}')}|${normaliserTelephone(v['phone'] as String?) ?? _chiffresOuTiret(v['phone'] as String?)}',
-    'employes' => '${'${v['last_name']}'.toLowerCase()}|${'${v['first_name']}'.toLowerCase()}|${v['hire_date']}',
+    'employes' => '${cle('${v['last_name']}')}|${cle('${v['first_name']}')}|${v['hire_date']}',
     'plan_comptable' => cleDeCompte('${v['code']}'),
     'rations' => '${v['species_code']}|${cle('${v['stage_label']}')}',
     _ => throw ArgumentError('Module inconnu : ${m.cle}'),
@@ -750,11 +752,13 @@ class ImportationRepository {
   ///
   /// Lève [ImportationRefusee] quand le fichier ENTIER est refusé (mêmes messages que `LecteurXlsx`).
   Future<ApercuImportation> analyser(ModuleImportation m, Uint8List octets, String nomFichier) async {
-    if (!nomFichier.toLowerCase().endsWith('.xlsx')) {
-      throw ImportationRefusee("Seuls les fichiers Excel .xlsx sont acceptés : utilisez le modèle « ${m.libelle} » téléchargé à l'étape 2.");
+    final minuscules = nomFichier.toLowerCase();
+    if (!minuscules.endsWith('.xlsx') && !minuscules.endsWith('.csv')) {
+      throw ImportationRefusee("Seuls les fichiers Excel .xlsx (ou CSV .csv en repli) sont acceptés : utilisez le modèle « ${m.libelle} » téléchargé à l'étape 2.");
     }
 
-    final lues = _lire(m, octets);
+    // IMPORT-5 — le CSV de repli est lu à part et ramené au même tableau que le classeur (`LecteurCsv` du serveur).
+    final lues = minuscules.endsWith('.csv') ? _lireCsv(m, octets) : _lire(m, octets);
     final contexte = await ContexteImportation.charger(database, m.cle);
 
     final lignes = <LigneImportation>[];
@@ -803,6 +807,132 @@ class ImportationRepository {
     if (m.cle != 'stocks') return null;
 
     return ExerciceDeSaisie(database, maintenant: _maintenant).refus(_maintenant(), regle: RegleExercice.closSeulement);
+  }
+
+
+  /// IMPORT-5 — lecture d'un fichier CSV de repli : transposition de `App\Services\Import\LecteurCsv` (parité exécutée). UTF-8 avec ou
+  /// sans BOM, à défaut Windows-1252 ; séparateur `;`, `,` ou tabulation lu sur la ligne d'en-têtes (à égalité : `;`) ; guillemets
+  /// doublés ; saut de ligne permis dans un champ guillemeté ; numéro de ligne = numéro d'ENREGISTREMENT (l'en-tête est la ligne 1).
+  /// Pas de feuille « Modele » : ni module ni version ne se contrôlent, les en-têtes exacts du modèle font foi.
+  Map<int, Map<String, String>> _lireCsv(ModuleImportation m, Uint8List octets) {
+    if (octets.length > tailleMaxOctets) {
+      final mo = (octets.length / 1024 / 1024).toStringAsFixed(1).replaceAll('.', ',');
+      throw ImportationRefusee('Le fichier dépasse ${tailleMaxOctets ~/ 1024 ~/ 1024} Mo ($mo Mo) : réduisez le nombre de lignes.');
+    }
+    final illisible = ImportationRefusee("Ce fichier n'est pas un fichier CSV lisible. Utilisez le modèle « ${m.libelle} » téléchargé à l'étape 2.");
+
+    var brut = octets;
+    if (brut.length >= 3 && brut[0] == 0xEF && brut[1] == 0xBB && brut[2] == 0xBF) brut = Uint8List.sublistView(brut, 3);
+    if (brut.contains(0) || brut.every((o) => o == 0x20 || o == 0x09 || o == 0x0A || o == 0x0D)) throw illisible;
+    String texteCsv;
+    try {
+      texteCsv = utf8.decode(brut);
+    } on FormatException {
+      texteCsv = _windows1252(brut);
+    }
+
+    final enregistrements = _enregistrementsCsv(texteCsv);
+    final entetes = [for (final c in enregistrements.isEmpty ? <String>[] : enregistrements.first) texte(c)];
+
+    final positions = <String, int>{};
+    final manquantes = <String>[];
+    for (final col in m.colonnes) {
+      final p = entetes.indexOf(col.entete);
+      if (p < 0) {
+        manquantes.add('« ${col.entete} »');
+      } else {
+        positions[col.cle] = p;
+      }
+    }
+    if (manquantes.isNotEmpty) {
+      throw ImportationRefusee(
+        '${manquantes.length > 1 ? 'Colonnes manquantes ou renommées' : 'Colonne manquante ou renommée'} dans la première ligne du fichier CSV : '
+        '${manquantes.join(', ')}. Ne renommez pas les en-têtes : téléchargez le modèle « ${m.libelle} » à jour.',
+      );
+    }
+    if (enregistrements.length > lignesParcouruesMax) {
+      throw ImportationRefusee('Le fichier compte plus de 20 000 lignes : supprimez les lignes vides ou découpez le fichier.');
+    }
+
+    final lignes = <int, Map<String, String>>{};
+    for (var i = 1; i < enregistrements.length; i++) {
+      final cellules = enregistrements[i];
+      final ligne = <String, String>{};
+      var vide = true;
+      for (final MapEntry(key: cle, value: p) in positions.entries) {
+        final t = p < cellules.length ? texte(cellules[p]) : '';
+        if (t.isNotEmpty) vide = false;
+        ligne[cle] = t;
+      }
+      if (vide) continue;
+      lignes[i + 1] = ligne;
+      if (lignes.length > lignesMax) throw ImportationRefusee('Le fichier dépasse 5 000 lignes : découpez-le en plusieurs fichiers.');
+    }
+    if (lignes.isEmpty) {
+      throw ImportationRefusee('Le fichier ne contient aucune ligne à importer : remplissez le fichier sous les en-têtes.');
+    }
+    return lignes;
+  }
+
+  /// Les 32 caractères de Windows-1252 qui diffèrent d'ISO-8859-1 (0x80 à 0x9F ; les cinq cases vides restent telles quelles).
+  static const _tableWindows1252 = [
+    0x20AC, 0x81, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x8D, 0x017D, 0x8F,
+    0x90, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x9D, 0x017E, 0x0178,
+  ];
+
+  static String _windows1252(Uint8List octets) =>
+      String.fromCharCodes([for (final o in octets) (o >= 0x80 && o <= 0x9F) ? _tableWindows1252[o - 0x80] : o]);
+
+  static List<List<String>> _enregistrementsCsv(String contenu) {
+    final texteCsv = contenu.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final fin = texteCsv.indexOf('\n');
+    final premiere = fin < 0 ? texteCsv : texteCsv.substring(0, fin);
+    var separateur = ';';
+    var meilleur = -1;
+    for (final candidat in [';', ',', '\t']) {
+      final n = candidat.allMatches(premiere).length;
+      if (n > meilleur) {
+        meilleur = n;
+        separateur = candidat;
+      }
+    }
+
+    final enregistrements = <List<String>>[];
+    var champ = StringBuffer();
+    var ligne = <String>[];
+    var guillemets = false;
+    for (var i = 0; i < texteCsv.length; i++) {
+      final c = texteCsv[i];
+      if (guillemets) {
+        if (c == '"') {
+          if (i + 1 < texteCsv.length && texteCsv[i + 1] == '"') {
+            champ.write('"');
+            i++;
+          } else {
+            guillemets = false;
+          }
+        } else {
+          champ.write(c);
+        }
+      } else if (c == '"' && champ.isEmpty) {
+        guillemets = true;
+      } else if (c == separateur) {
+        ligne.add(champ.toString());
+        champ = StringBuffer();
+      } else if (c == '\n') {
+        ligne.add(champ.toString());
+        enregistrements.add(ligne);
+        ligne = <String>[];
+        champ = StringBuffer();
+      } else {
+        champ.write(c);
+      }
+    }
+    if (champ.isNotEmpty || ligne.isNotEmpty) {
+      ligne.add(champ.toString());
+      enregistrements.add(ligne);
+    }
+    return enregistrements;
   }
 
   /// Lit le classeur : contrôle du FICHIER (taille, signature, lisibilité, modèle, version, en-têtes, nombre de lignes).

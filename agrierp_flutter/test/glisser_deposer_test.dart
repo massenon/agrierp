@@ -240,7 +240,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('importation-vers-depot')));
       await tester.pumpAndSettle();
-      expect(find.text('Glissez votre fichier .xlsx ici, ou cliquez pour le choisir'), findsOneWidget);
+      expect(find.text('Glissez votre fichier .xlsx (ou .csv) ici, ou cliquez pour le choisir'), findsOneWidget);
 
       source.fichiers['/tmp/liste.xlsx'] = Uint8List.fromList('pas un classeur'.codeUnits);
       await source.zones.last.chemins(['/tmp/liste.xlsx']);

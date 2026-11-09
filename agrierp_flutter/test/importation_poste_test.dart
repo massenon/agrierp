@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
@@ -105,10 +107,14 @@ void main() {
     });
 
     test('les droits : un caissier n\'importe pas les stocks, un rôle sans droit n\'a aucun module', () async {
-      expect(ImportationRepository.modulesAutorises('admin').map((m) => m.cle), ['stocks', 'clients', 'fournisseurs']);
+      expect(ImportationRepository.modulesAutorises('admin').map((m) => m.cle), ['stocks', 'clients', 'fournisseurs', 'employes', 'plan_comptable', 'rations']);
       expect(ImportationRepository.modulesAutorises('caissier').map((m) => m.cle), ['clients']);
-      expect(ImportationRepository.modulesAutorises('animalier'), isEmpty);
-      expect(ImportationRepository.peutImporter('comptable'), isFalse);
+      // IMPORT-2 à 4 : l'animalier importe le barème, le comptable le plan comptable, aucun ne voit les autres modules.
+      expect(ImportationRepository.modulesAutorises('animalier').map((m) => m.cle), ['rations']);
+      expect(ImportationRepository.modulesAutorises('comptable').map((m) => m.cle), ['plan_comptable']);
+      expect(ImportationRepository.modulesAutorises('inconnu'), isEmpty);
+      expect(ImportationRepository.peutImporter('comptable'), isTrue);
+      expect(ImportationRepository.peutImporter('inconnu'), isFalse);
 
       final m = ImportationRepository.stocks;
       final apercu = await depot().analyser(m, await fichier(m, [poulet]), 's.xlsx');
@@ -143,12 +149,136 @@ void main() {
           'Ce fichier est le modèle « Clients » en version 2 ; la version 1 est attendue : téléchargez le modèle à jour.');
       expect(await refus(() async => depot().analyser(m, await fichier(m, [{'nom': 'A'}], sansColonne: true), 'c.xlsx')),
           'Colonne manquante ou renommée dans la feuille « Données » : « Nom * ». Ne renommez pas les en-têtes : téléchargez le modèle « Clients » à jour.');
-      expect(await refus(() async => depot().analyser(m, await fichier(m, [{'nom': 'A'}]), 'c.csv')), startsWith('Seuls les fichiers Excel .xlsx sont acceptés'));
+      expect(await refus(() async => depot().analyser(m, await fichier(m, [{'nom': 'A'}]), 'c.txt')), startsWith('Seuls les fichiers Excel .xlsx (ou CSV .csv en repli) sont acceptés'));
       expect(await refus(() async => depot().analyser(m, Uint8List.fromList('nom;tel'.codeUnits), 'c.xlsx')), contains("n'est pas un classeur Excel (.xlsx) lisible"));
       expect(await refus(() async => depot().analyser(m, await fichier(m, []), 'c.xlsx')), startsWith('Le fichier ne contient aucune ligne à importer'));
       expect(await refus(() async => depot().analyser(m, await fichier(ImportationRepository.fournisseurs, [{'nom': 'A'}]), 'c.xlsx')),
           'Ce fichier n\'est pas le modèle « Clients » (version 1) : c\'est le modèle « Fournisseurs ». Téléchargez le modèle à jour.');
       expect(await refus(() async => depot().analyser(m, Uint8List(ImportationRepository.tailleMaxOctets + 1)..[0] = 0x50, 'c.xlsx')), startsWith('Le fichier dépasse 5 Mo'));
+    });
+
+
+    // ── IMPORT-2 à IMPORT-4 : employés, plan comptable, rations ───────────────────────────────────────────────
+
+    test('employés : écrits par PersonnelRepository (pending, UUID déterministe), salaire jamais gardé, ré-import sans doublon', () async {
+      final m = ImportationRepository.employes;
+      final f = await fichier(m, [
+        {'nom': 'AGBOTON', 'prenom': 'Pascal', 'poste': 'Gardien', 'date_embauche': '2024-03-01', 'salaire': '45000', 'statut': 'Actif'},
+        {'nom': 'DOSSOU', 'prenom': 'Clarisse', 'poste': '', 'date_embauche': '2025-09-15', 'salaire': '123456'},
+      ]);
+      final apercu = await depot().analyser(m, f, 'e.xlsx');
+      expect([apercu.valides, apercu.refusees], [1, 1]);
+      expect(apercu.lignes.first.designation, 'Pascal AGBOTON');
+      expect(await db.select(db.employees).get(), isEmpty, reason: "l'aperçu n'écrit rien");
+
+      await depot().importer(apercu, 'admin');
+      final e = (await db.select(db.employees).get()).single;
+      expect([e.lastName, e.firstName, e.position, e.baseSalary, e.status, e.isActive, e.syncStatus], ['AGBOTON', 'Pascal', 'Gardien', 45000.0, 'actif', true, SyncStatus.pending]);
+      expect(e.hireDate, DateTime(2024, 3, 1));
+      // Le salaire n'est gardé nulle part, ni sur la ligne refusée ni au rapport.
+      expect(apercu.lignes.last.brut!['salaire'], '');
+      final rapport = Excel.decodeBytes(depot().rapport(apercu));
+      final refusees = rapport['Lignes refusées'].rows.map((r) => r.map((c) => c?.value.toString() ?? '').toList()).toList();
+      expect(refusees.last.join('|'), isNot(contains('123456')));
+      expect(refusees.last[6], '', reason: 'colonne « Salaire de base (FCFA) » vide');
+
+      // Le rapport d'un APERÇU (valeurs encore lues, avant toute confirmation) masque aussi la colonne.
+      final enAttente = await depot().analyser(m, await fichier(m, [{'nom': 'X', 'prenom': 'Y', 'poste': '', 'date_embauche': '2025-01-01', 'salaire': '777777'}]), 'e2.xlsx');
+      expect(enAttente.lignes.single.brut!['salaire'], '777777');
+      final apercuRapport = Excel.decodeBytes(depot().rapport(enAttente));
+      final ligne = apercuRapport['Lignes refusées'].rows.last.map((c) => c?.value.toString() ?? '').toList();
+      expect(ligne.join('|'), isNot(contains('777777')));
+
+      final second = await depot().analyser(m, f, 'e.xlsx');
+      expect([second.valides, second.ignorees], [0, 1]);
+      await depot().importer(second, 'admin');
+      expect(await db.select(db.employees).get(), hasLength(1));
+    });
+
+    test('employés : le droit manage-rh est exigé (le caissier, le comptable, l\'animalier sont refusés)', () async {
+      final m = ImportationRepository.employes;
+      final apercu = await depot().analyser(m, await fichier(m, [{'nom': 'A', 'prenom': 'B', 'poste': 'C', 'date_embauche': '2024-01-01'}]), 'e.xlsx');
+      for (final role in ['caissier', 'comptable', 'animalier']) {
+        await expectLater(depot().importer(apercu, role), throwsA(isA<ImportationRefusee>()), reason: role);
+      }
+      expect(await db.select(db.employees).get(), isEmpty);
+    });
+
+    test('plan comptable : écrit par ComptabiliteRepository (pending), un numéro déjà au plan est ignoré, jamais écrasé', () async {
+      await db.into(db.chartOfAccounts).insert(ChartOfAccountsCompanion.insert(id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', code: '6061', label: 'Fournitures', accountClass: const Value(6)));
+      final m = ImportationRepository.planComptable;
+      final f = await fichier(m, [
+        {'numero': '60511', 'libelle': 'Achats de provende', 'classe': '6 - Charges'},
+        {'numero': '6061', 'libelle': 'Écrasement ?', 'classe': '7'},
+        {'numero': '6062', 'libelle': 'Classe folle', 'classe': '12'},
+      ]);
+      final apercu = await depot().analyser(m, f, 'p.xlsx');
+      expect([apercu.valides, apercu.ignorees, apercu.refusees], [1, 1, 1]);
+      expect(apercu.lignes[1].motif, 'Ce numéro de compte existe déjà au plan comptable : ignoré, le compte existant est gardé.');
+      expect(apercu.lignes[0].designation, '60511 — Achats de provende');
+
+      await depot().importer(apercu, 'comptable');
+      final comptes = await (db.select(db.chartOfAccounts)..orderBy([(c) => OrderingTerm(expression: c.code)])).get();
+      expect(comptes.map((c) => c.code), ['60511', '6061']);
+      expect(comptes.first.accountClass, 6);
+      expect(comptes.first.syncStatus, SyncStatus.pending);
+      expect(comptes.last.label, 'Fournitures', reason: 'jamais d\'écrasement');
+    });
+
+    test('rations : écrites par ParametresElevageRepository (pending), même espèce et même stade ignorés, grammes entiers', () async {
+      await db.into(db.feedRationStandards).insert(FeedRationStandardsCompanion.insert(id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', speciesCode: 'aviculture', stageLabel: 'Pondeuse (adulte)', rationGPerDay: 120));
+      final m = ImportationRepository.rations;
+      final f = await fichier(m, [
+        {'espece': 'Aviculture (Volailles)', 'stade': 'Poulette test', 'grammes': '85'},
+        {'espece': 'aviculture', 'stade': 'PONDEUSE (adulte)', 'grammes': '999'},
+        {'espece': 'cuniculture', 'stade': 'Lapine', 'grammes': '30,5'},
+      ]);
+      final apercu = await depot().analyser(m, f, 'r.xlsx');
+      expect([apercu.valides, apercu.ignorees, apercu.refusees], [1, 1, 1]);
+      expect(apercu.lignes[2].motif, 'Feuille « Données », ligne 4, colonne « Ration normative (g/tête/jour) * » : Le champ ration (grammes) doit être un nombre entier.');
+
+      await depot().importer(apercu, 'animalier');
+      final rations = await (db.select(db.feedRationStandards)..orderBy([(r) => OrderingTerm(expression: r.stageLabel)])).get();
+      expect(rations.map((r) => [r.stageLabel, r.rationGPerDay, r.speciesCode]), [
+        ['Pondeuse (adulte)', 120.0, 'aviculture'],
+        ['Poulette test', 85.0, 'aviculture'],
+      ]);
+      expect(rations.last.syncStatus, SyncStatus.pending);
+    });
+
+    test('les trois modèles du poste : feuilles, en-têtes exacts, listes, note des dates', () async {
+      for (final m in [ImportationRepository.employes, ImportationRepository.planComptable, ImportationRepository.rations]) {
+        final classeur = Excel.decodeBytes(await depot().genererModele(m));
+        expect(classeur.tables.keys.toSet(), {'Instructions', 'Données', 'Listes', 'Modele'}, reason: m.cle);
+        expect(classeur['Données'].rows.first.map((c) => c!.value.toString()).toList(), [for (final c in m.colonnes) c.entete], reason: m.cle);
+        expect(classeur['Modele'].cell(CellIndex.indexByString('B1')).value.toString(), m.cle);
+      }
+      final liste = Excel.decodeBytes(await depot().genererModele(ImportationRepository.planComptable))['Listes'];
+      expect(liste.cell(CellIndex.indexByString('A2')).value.toString(), '1 - Ressources');
+      expect(liste.rows.length, 10);
+    });
+
+    test('IMPORT-5 : le CSV de repli est lu comme le classeur ; ses refus de fichier entier ont les mêmes messages que le serveur', () async {
+      final m = ImportationRepository.clients;
+      Future<ApercuImportation> lire(String contenu) => depot().analyser(m, Uint8List.fromList(utf8.encode(contenu)), 'c.csv');
+      Future<String> refus(String contenu) async {
+        try {
+          await lire(contenu);
+        } on ImportationRefusee catch (e) {
+          return e.message;
+        }
+        fail('refus attendu');
+      }
+
+      final ok = await lire('Nom *;Téléphone;E-mail;Ville;IFU\r\nBoulangerie;0197123456;;Pobè;\r\n\r\nMme Adjovi;;;;\r\n');
+      expect([ok.valides, ok.lignes.map((l) => l.ligne)], [2, [2, 4]]);
+      await depot().importer(ok, 'caissier');
+      expect((await db.select(db.customers).get()).map((c) => c.phone).toSet(), {'0197123456', null}, reason: 'le zéro initial est gardé');
+
+      expect(await refus(''), contains("n'est pas un fichier CSV lisible"));
+      expect(await refus('Raison sociale;Téléphone;E-mail;Ville;IFU\nA;;;;\n'),
+          'Colonne manquante ou renommée dans la première ligne du fichier CSV : « Nom * ». Ne renommez pas les en-têtes : téléchargez le modèle « Clients » à jour.');
+      expect(await refus('Nom *;Téléphone;E-mail;Ville;IFU\n;;;;\n'), startsWith('Le fichier ne contient aucune ligne à importer'));
     });
 
     test('5 000 lignes passent, 5 001 sont refusées', () async {

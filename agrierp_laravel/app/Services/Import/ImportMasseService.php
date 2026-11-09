@@ -100,11 +100,13 @@ class ImportMasseService
     {
         $module = $this->moduleAutorise($cle, $user);
 
-        if (strtolower(pathinfo($nomFichier, PATHINFO_EXTENSION)) !== 'xlsx') {
-            throw new ImportRefuse('Seuls les fichiers Excel .xlsx sont acceptés : utilisez le modèle « '.$module->libelle().' » téléchargé à l\'étape 2.');
+        // IMPORT-5 — le CSV de repli est lu à part (`LecteurCsv`) et ramené au même tableau que le classeur.
+        $extension = strtolower(pathinfo($nomFichier, PATHINFO_EXTENSION));
+        if (! in_array($extension, ['xlsx', 'csv'], true)) {
+            throw new ImportRefuse('Seuls les fichiers Excel .xlsx (ou CSV .csv en repli) sont acceptés : utilisez le modèle « '.$module->libelle().' » téléchargé à l\'étape 2.');
         }
 
-        $lecture = app(LecteurXlsx::class)->lire($chemin, $module);
+        $lecture = $extension === 'csv' ? app(LecteurCsv::class)->lire($chemin, $module) : app(LecteurXlsx::class)->lire($chemin, $module);
         $empreinte = hash_file('sha256', $chemin);
 
         $lignes = [];
