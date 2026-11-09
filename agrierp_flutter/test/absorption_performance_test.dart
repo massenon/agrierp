@@ -353,4 +353,77 @@ void main() {
       expect(compteur.instructions, lessThan(165), reason: 'par table : $parTable');
     },
   );
+
+  // PWA-2c (3) — les neuf dernières tables écrites ligne à ligne : fiches journalières, clients, avances, fournisseurs, courriers,
+  // documents administratifs, documents archivés, entreprise (réglages MeCeF), journal (écritures et lignes).
+  test(
+    'tirage de neuf tables à petite charge : instructions bornées, aucune ligne pending écrasée',
+    () async {
+      final page = File('lib/core/sync/sync_engine.dart')
+          .readAsStringSync()
+          .split('Future<int> _absorberPage(Map<String, dynamic> corps) async {')[1]
+          .split('\n  }\n')
+          .first;
+      final cles = {for (final m in RegExp(r"corps\['(\w+)'\]").allMatches(page)) m.group(1)!};
+      String u(String t, int i) => '$t-0000-4000-8000-${i.toString().padLeft(12, '0')}';
+      const n = 8;
+      final lot = u('b0b0b0b0', 1);
+      final corps = <String, Object?>{
+        'livestock_daily_entries': [
+          for (var i = 0; i < n; i++)
+            {'id': u('f1f1f1f1', i), 'lot_id': lot, 'entry_date': '2026-10-0${1 + i}', 'updated_at': '2026-11-09T10:00:00+00:00', 'achat': 0, 'ne': 1, 'mort': 0, 'vente': 0, 'effectif_final': 10 + i},
+        ],
+        'customers': [for (var i = 0; i < n; i++) {'id': u('c2c2c2c2', i), 'name': 'Client $i', 'is_active': true}],
+        'customer_advances': [for (var i = 0; i < n; i++) {'id': u('c3c3c3c3', i), 'customer_id': u('c2c2c2c2', 1), 'amount': 500 + i, 'is_active': true}],
+        'suppliers': [for (var i = 0; i < n; i++) {'id': u('c4c4c4c4', i), 'name': 'Fournisseur $i'}],
+        'mails': [for (var i = 0; i < n; i++) {'id': u('c5c5c5c5', i), 'type': 'entrant', 'subject': 'Objet $i', 'mail_date': '2026-11-01'}],
+        'administrative_documents': [for (var i = 0; i < n; i++) {'id': u('c6c6c6c6', i), 'title': 'Doc $i', 'type': 'attestation', 'beneficiary': 'B$i', 'doc_date': '2026-11-01', 'status': 'signe'}],
+        'archived_documents': [for (var i = 0; i < n; i++) {'id': u('c7c7c7c7', i), 'title': 'Arch $i', 'category': 'RH', 'archived_date': '2026-11-01'}],
+        'company_settings': {'company_name': 'Ferme', 'mecef_actif': true, 'mecef_mode': 'emecef', 'mecef_api_url': 'https://x.test', 'mecef_operateur_id': '1', 'mecef_operateur_nom': 'Op', 'mecef_jeton_configure': true},
+        'accounting_entries': [for (var i = 0; i < n; i++) {'id': u('c8c8c8c8', i), 'entry_date': '2026-11-0${1 + i % 8}', 'reference': 'E$i'}],
+        'accounting_entry_ids': [for (var i = 0; i < n; i++) u('c8c8c8c8', i)],
+        'accounting_entry_lines': [
+          for (var i = 0; i < 2 * n; i++) {'id': u('c9c9c9c9', i), 'entry_id': u('c8c8c8c8', i ~/ 2), 'account_id': u('d2d2d2d2', 1), 'debit': i.isEven ? 100 : 0, 'credit': i.isEven ? 0 : 100},
+        ],
+      };
+      final serveur = _ServeurCharge(cles, corps);
+      final compteur = _Compteur();
+      final db = AppDatabase.forTesting(NativeDatabase.memory().interceptWith(compteur));
+      addTearDown(db.close);
+      final moteur = SyncEngine(database: db, client: Dio()..interceptors.add(serveur), deviceId: 'poste-perf', connectivity: _Connectivite());
+      await db.into(db.livestockLots).insert(LivestockLotsCompanion.insert(id: lot, code: 'B1', speciesId: u('e1e1e1e1', 1)));
+      // Saisies du poste en attente : jamais écrasées par le tirage.
+      await db.into(db.customers).insert(CustomersCompanion.insert(id: u('c2c2c2c2', 3), name: 'LOCAL', syncStatus: const Value(SyncStatus.pending)));
+      await db.into(db.mails).insert(MailsCompanion.insert(id: u('c5c5c5c5', 3), type: 'entrant', subject: 'LOCAL', syncStatus: const Value(SyncStatus.pending)));
+
+      await moteur.synchroniser(); // tirage initial, tout vide
+      serveur.actif = true;
+      await moteur.synchroniser(); // premier tirage de la charge
+      expect((await db.select(db.livestockDailyEntries).get()).length, n);
+      expect((await db.select(db.customers).get()).length, n);
+      expect((await db.select(db.customerAdvances).get()).length, n);
+      expect((await db.select(db.suppliers).get()).length, n);
+      expect((await db.select(db.mails).get()).length, n);
+      expect((await db.select(db.administrativeDocuments).get()).length, n);
+      expect((await db.select(db.archivedDocuments).get()).length, n);
+      expect((await db.select(db.accountingEntries).get()).length, n);
+      expect((await db.select(db.accountingEntryLines).get()).length, 2 * n);
+      expect((await (db.select(db.customers)..where((c) => c.id.equals(u('c2c2c2c2', 3)))).getSingle()).name, 'LOCAL', reason: 'client en attente jamais écrasé');
+      expect((await (db.select(db.mails)..where((c) => c.id.equals(u('c5c5c5c5', 3)))).getSingle()).subject, 'LOCAL', reason: 'courrier en attente jamais écrasé');
+      expect((await (db.select(db.appSettings)..where((r) => r.key.equals('mecef.mode'))).getSingle()).value, 'emecef');
+
+      compteur.journal.clear();
+      compteur.instructions = 0;
+      await moteur.synchroniser(); // même charge, tout déjà connu
+      final parTable = <String, int>{};
+      for (final sql in compteur.journal) {
+        final t = RegExp(r'(?:FROM|INTO|UPDATE)\s+"?(\w+)"?', caseSensitive: false).firstMatch(sql)?.group(1) ?? sql.split(' ').first;
+        parTable[t] = (parTable[t] ?? 0) + 1;
+      }
+      // Mesuré : 209 instructions avant (clients 9, avances 11, fournisseurs 11, courriers 10, documents 11, archives 11,
+      // réglages MeCeF 11), 164 après (3 à 4 par table, 6 pour les réglages ; ≈ 25 contrôles « rien à envoyer » restent). Un
+      // retour à la ligne à ligne dépasse la borne (mutation vérifiée sur le moteur d'avant : 209).
+      expect(compteur.instructions, lessThan(175), reason: 'par table : $parTable');
+    },
+  );
 }
