@@ -514,8 +514,11 @@ Décision du client (08/11/2026) : un onglet CRUD (tableau) lié au Dashboard É
 - **Écran** : champ « Bande Source * » de la modale « Vente à la Pièce », bande affichée au panier, `lot_id` dans la ligne de vente ; `etatTuile` ne dit plus « vente en ligne ». `sw.js` VERSION `agrierp-v9`.
 - **Preuves** : `tests/Js/parite-chaine.test.mjs`, `tests/Js/elevage-hors-ligne.test.mjs`, `tests/Js/e2e/caisse-complete.e2e.mjs` (13 étapes dont bande à 38 avant l'envoi puis fiche et bande à 38 au serveur).
 
-### PWA-3 (en cours) — socle des fiches d'élevage hors ligne ; AUCUNE fiche livrée
-Livré et prouvé contre le PHP : `effectif-categories.js` (calcul d'une journée, départ, stade) et `chaine-effectif.js` (chaîne d'une bande : cascade d'effectif, catégories, `etatPourJour`, `refusDuPassage`, vente sur la fiche du jour). **Reste** : les fiches elles-mêmes (écran, saisie, barèmes, prophylaxie, transferts, file d'envoi `livestock_daily_entries` et règle de `pushDailyEntries`), lapins d'abord ; voir `docs/PLAN_FINALISATION.md` « PWA-3 » pour l'état exact.
+### PWA-3 (en cours) — fiche lapins : É1 ✅ ; É2 à É5 non atteintes ; AUCUNE fiche livrée
+- **Socle prouvé contre le PHP** : `effectif-categories.js`, `chaine-effectif.js` (voir PWA-1b ci-dessus), tirage des bandes, fiches et rémanences.
+- **É1 (11/11)** : tirage complémentaire `view-elevage` dans `synchro.js` — `feed_ration_standards`, `prophylaxis_schedule_standards`, `veterinary_records` (paginé), `livestock_transfers` (paginé), `feed_types`, `fiscal_years` ; `TABLES_COMPLETES` remplace à chaque tirage les barèmes, la prophylaxie, les provendes et les exercices ; chiffré, lignes invalides refusées ; `sw.js` VERSION `agrierp-v10`. Essais : `tests/Js/elevage-hors-ligne.test.mjs` (É1).
+- **Provende du jour** : `fiche-lapins-calculs.js` (`cleRation`, `rationDe`, `provendeDuJour`), parité exécutée contre `CategorieRationLapin` et `FicheLapins::getProvendeCalculationProperty` (`tests/Js/parite-fiche-lapins.test.mjs`, `tests/Js/parite/executer-fiche-lapins.php`, 400 jeux, 5 mutations).
+- **Reste** : É2 (écran, KPI, tableau mensuel, lecture seule d'un exercice clos), É3 (saisie), É4 (file d'envoi et règle de `pushDailyEntries`), É5 (autonomie alimentaire, prophylaxie du jour, parité de la fiche, essai Chromium, aide) ; voir `docs/PLAN_FINALISATION.md` « PWA-3 » pour l'état exact.
 
 ## PWA-2 — le poste Flutter compilé pour le web, servi sous `/poste/` (08/11/2026)
 Le poste (`agrierp_flutter/`, voir sa section « PWA-2 ») est construit par `agrierp_flutter/outils/construire_poste_web.sh` et déposé dans `public/poste/` (**ignoré par git**, comme `public/build`). Même origine que l'API : pas de CORS, jeton Sanctum inchangé.

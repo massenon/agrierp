@@ -24,11 +24,13 @@ export const TABLES_GARDEES = [
     'products', 'product_categories', 'customers', 'company_settings',
     // PWA-1b — produits rattachés à une espèce : bandes, fiches journalières (chaîne d'effectif) et rémanences, sous le droit de lecture du compte.
     'livestock_lots', 'livestock_daily_entries', 'veterinary_withdrawal_periods',
+    // PWA-3 (fiche lapins, É1) — barèmes de rationnement, prophylaxie, soins du mois, transferts, types de provende, exercices (lecture seule).
+    'feed_ration_standards', 'prophylaxis_schedule_standards', 'veterinary_records', 'livestock_transfers', 'feed_types', 'fiscal_years',
 ];
 /** Familles PAGINÉES par le serveur : leurs lignes arrivent sur TOUTES les pages (les autres tables, sur la première seulement). */
-export const TABLES_PAGINEES = ['livestock_daily_entries'];
+export const TABLES_PAGINEES = ['livestock_daily_entries', 'veterinary_records', 'livestock_transfers'];
 /** Tables servies EN ENTIER à chaque tirage (jamais incrémentales) : leur copie est remplacée, une rémanence levée disparaît. */
-export const TABLES_COMPLETES = ['veterinary_withdrawal_periods'];
+export const TABLES_COMPLETES = ['veterinary_withdrawal_periods', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'feed_types', 'fiscal_years'];
 const COLONNES_ENTREPRISE = ['company_name', 'tva_enabled', 'tva_default_rate', 'mecef_actif'];
 export const TAILLE_LOT = 20;
 const TIMEOUT_MS = 30_000;
@@ -48,6 +50,12 @@ export function ligneValide(table, ligne) {
     if (table === 'customers') return typeof ligne.name === 'string';
     if (table === 'livestock_lots') return typeof ligne.code === 'string' && typeof ligne.stage === 'string';
     if (table === 'livestock_daily_entries') return typeof ligne.lot_id === 'string' && /^\d{4}-\d{2}-\d{2}/.test(String(ligne.entry_date ?? ''));
+    if (table === 'feed_ration_standards') return typeof ligne.species_code === 'string' && typeof ligne.stage_label === 'string' && Number.isFinite(Number(ligne.ration_g_per_day));
+    if (table === 'prophylaxis_schedule_standards') return typeof ligne.species_code === 'string' && typeof ligne.period_label === 'string';
+    if (table === 'veterinary_records') return /^\d{4}-\d{2}-\d{2}/.test(String(ligne.record_date ?? ''));
+    if (table === 'livestock_transfers') return typeof ligne.source_lot_id === 'string' && typeof ligne.target_lot_id === 'string' && /^\d{4}-\d{2}-\d{2}/.test(String(ligne.transfer_date ?? ''));
+    if (table === 'feed_types') return typeof ligne.name === 'string';
+    if (table === 'fiscal_years') return Number.isInteger(Number(ligne.year)) && typeof ligne.status === 'string';
     if (table === 'veterinary_withdrawal_periods') return typeof ligne.lot_id === 'string' && /^\d{4}-\d{2}-\d{2}/.test(String(ligne.end_date ?? ''));
     return true;
 }

@@ -138,3 +138,54 @@ test('synchro : des ventes acceptées déclenchent un second tirage (l\'effectif
     await synchroDe(await contexte(), sans).synchroniser();
     assert.equal(sans.pulls, 1, 'rien envoyé : un seul tirage');
 });
+
+// ------------------------------------------------------------------------- PWA-3, fiche lapins — É1 : tirage complémentaire
+
+function serveurFiche({ rations = [{ id: 'r1', species_code: 'cuniculture', stage_label: 'Reproducteur', ration_g_per_day: 120 }, { id: 'r2', species_code: 'cuniculture', stage_label: 'Jeune', ration_g_per_day: 60 }] } = {}) {
+    const tables = ['products', 'product_categories', 'customers', 'company_settings', 'feed_ration_standards', 'prophylaxis_schedule_standards', 'veterinary_records', 'livestock_transfers', 'feed_types', 'fiscal_years'];
+    return {
+        fetch: async (url) => {
+            const u = new URL(url, 'http://x');
+            if (u.pathname !== '/api/sync/pull') return new Response(JSON.stringify({}), { status: 200 });
+            const n = Number(u.searchParams.get('page'));
+            const j = {
+                page: n, page_suivante: n < 2 ? 'p2' : null,
+                veterinary_records: [{ id: `v${n}`, lot_id: 'b-lapins', record_date: `2026-11-0${n}`, action_type: 'vaccin', product_used: 'X', is_active: true }],
+                livestock_transfers: [{ id: `t${n}`, source_lot_id: 'a', target_lot_id: 'b', transfer_date: `2026-11-0${n}`, quantity: 3 }],
+            };
+            if (n === 1) {
+                Object.assign(j, {
+                    tables_servies: tables, data_reset_at: null, products: [], product_categories: [], customers: [], company_settings: {},
+                    feed_ration_standards: [...rations, { id: 'mauvaise' }],
+                    prophylaxis_schedule_standards: [{ id: 'pr1', species_code: 'cuniculture', period_label: 'Lapereaux 0-30 j', cycle_day_start: 1, cycle_day_end: 30, treatment: 'Vitamines' }],
+                    feed_types: [{ id: 'ft1', name: 'Provende lapins' }],
+                    fiscal_years: [{ id: 'e1', year: 2026, start_date: '2026-01-01', end_date: '2026-12-31', status: 'ouvert' }],
+                });
+            }
+            if (!j.page_suivante) j.server_time = '2026-11-10T09:00:00+01:00';
+            return new Response(JSON.stringify(j), { status: 200 });
+        },
+    };
+}
+
+test('É1 — tirage complémentaire : barèmes, prophylaxie, soins, transferts, provendes, exercices : chiffrés, pages cumulées, lignes invalides refusées', async () => {
+    const ctx = await contexte();
+    const r = await synchroDe(ctx, serveurFiche()).synchroniser();
+    assert.equal(r.statut, 'ok');
+    assert.deepEqual((await lire(ctx, 'feed_ration_standards')).map((x) => x.id), ['r1', 'r2'], 'le barème incomplet est refusé');
+    assert.equal((await lire(ctx, 'prophylaxis_schedule_standards')).length, 1);
+    assert.deepEqual((await lire(ctx, 'veterinary_records')).map((x) => x.id), ['v1', 'v2'], 'soins : deux pages');
+    assert.deepEqual((await lire(ctx, 'livestock_transfers')).map((x) => x.id), ['t1', 't2']);
+    assert.equal((await lire(ctx, 'feed_types'))[0].name, 'Provende lapins');
+    assert.equal((await lire(ctx, 'fiscal_years'))[0].status, 'ouvert');
+    const brut = JSON.stringify(await ctx.base.tout('referentiels'));
+    for (const secret of ['Vitamines', 'Provende lapins', 'Lapereaux', 'Antibiotique']) assert.ok(!brut.includes(secret), `« ${secret} » ne doit pas être lisible`);
+});
+
+test('É1 — un barème corrigé au bureau REMPLACE la copie (jamais fusionné avec l\'ancien)', async () => {
+    const ctx = await contexte();
+    await synchroDe(ctx, serveurFiche()).synchroniser();
+    await synchroDe(ctx, serveurFiche({ rations: [{ id: 'r1', species_code: 'cuniculture', stage_label: 'Reproducteur', ration_g_per_day: 150 }] })).synchroniser();
+    const rations = await lire(ctx, 'feed_ration_standards');
+    assert.deepEqual(rations.map((x) => [x.id, Number(x.ration_g_per_day)]), [['r1', 150]], 'la ration supprimée a disparu, la corrigée est à 150 g');
+});
