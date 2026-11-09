@@ -948,14 +948,14 @@ Décisions du client (07/11/2026) : la ferme a un compte e-MECeF (API en ligne d
 | Facture PDF | QR de la DGI + code MeCeF/DGI, NIM, compteurs, date et heure, web et poste ; rien d'inventé sans normalisation. |
 | Poste | Drift v84 (colonnes `mecef_*` de `sales` et `credit_notes`, tirées, jamais écrites) ; Facturation : statuts Normalisée / En attente / Refusée / Expirée + motif ; lecture seule de la facture normalisée. |
 
-**MECEF-2 (boîtier par le poste) : à faire à l'achat du boîtier**, contrat déjà défini : le poste appelle `http://localhost:38917/check` puis `/bill` avec le MÊME `MecefFactureBuilder`, vérifie que `qr_code` est rempli (le pilote répond 200 même en échec), puis synchronise le résultat ; pilote sans authentification : n'écouter que localhost. (Le builder est aujourd'hui en PHP : MECEF-2 le fera soit porter en Dart avec parité exécutée, soit servir la charge par le serveur ; à trancher.)
+**MECEF-2 (boîtier par le poste) : ✅ CONSTRUIT SANS L'APPAREIL (09/11/2026) / ⚠️ ESSAI RÉEL À FAIRE.** Décision du client : « faut lancer le chantier, faut pas attendre le boîtier ». Option A retenue (charge portée en Dart, parité PHP exécutée : `charge_boitier_parite_php_test.dart`) ; client HTTP localhost (succès SEULEMENT si `qr_code` non vide, 400 → motif français, 503 → « Boîtier injoignable » sans erreur rouge) ; transmission par le poste en mode `boitier` (états En attente / Normalisée / Refusée, marque d'incertitude, jamais deux transmissions d'une vente, reprise au retour du boîtier) ; résultat envoyé au serveur (bloc `mecef`, validé, jamais par-dessus une facture normalisée) ; indicateur d'état (Paramètres › Facturation normalisée, caisse). **NON VÉRIFIÉ AVEC UN VRAI BOÎTIER** (faux pilote seulement) ni sous Windows ; **avoir par le poste NON branché** ; libellé « Boîtier MeCeF (à venir) » gardé jusqu'à l'essai. Checklist du premier essai : `docs/logialvia/41_MECEF_EMECEF.md` § 3.3.
 
 **Non vérifié** : AUCUN appel réel à la DGI (ni jeton ni IFU) — chemins, noms de champs, détection de l'expiration et reprise par confirmation seule d'après un paquet non officiel, non confirmés par la documentation DGI (injoignable) ; arrondis des prix unitaires non entiers ; confirmation d'une facture déjà confirmée ; MySQL/MariaDB réel (migration `mecef_status` enum → texte essayée sous SQLite seulement) ; rendu Windows réel du QR du PDF du poste ; suites complètes.
 **Restes / décisions à prendre** : numérotation propre de la facture normalisée ; ~~IFU et AIB du client (absents de la base)~~ ✅ MECEF-3 ; ~~frais de livraison hors facture DGI~~ ✅ MECEF-3 ; avoirs du poste : pas d'écran de statut d'avoir ; clés `transmise` / `erreur` conservées (renommer en `normalisee` / `refusee` demande une migration des données, des tests et du poste).
 
 ## MECEF-3 ✅ (07/11/2026) prix entiers, choix « facture simple / normalisée », livraison incluse, formulaire e-MECeF (Drift v85)
 
-Demande du client du 07/11/2026. (Le ticket « MECEF-2 » reste le mode boîtier par le poste, non construit.)
+Demande du client du 07/11/2026. (Le ticket « MECEF-2 » est le mode boîtier par le poste : construit sans l'appareil, essai réel à faire.)
 
 | Point | Livraison |
 |---|---|

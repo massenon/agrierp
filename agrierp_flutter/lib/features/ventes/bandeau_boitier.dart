@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/mecef/passerelle_boitier.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/theme/symboles_agri.dart';
+import '../../core/widgets/modale_agri.dart';
 import 'transmission_boitier.dart';
 
 /// MECEF-2 — L'INDICATEUR DU BOÎTIER FISCAL : prêt ou injoignable, factures en attente / refusées / à vérifier, et les deux gestes
@@ -104,17 +105,18 @@ class _BandeauBoitierState extends State<BandeauBoitier> {
   Future<void> _relancerAVerifier() async {
     final s = _service;
     if (s == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await afficherModale<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Vérifier sur le boîtier'),
-        content: const Text(
-          "Pour ces factures, la réponse du boîtier n'est pas revenue : il les a peut-être déjà certifiées. Regardez sur l'appareil (dernières factures) : "
-          "si une facture y figure déjà, ne la relancez pas. Relancer une facture déjà certifiée en crée une seconde.",
-        ),
+      confirmation: true,
+      constructeur: (c) => ModaleConfirmation(
+        icone: SymbolesAgri.info,
+        titre: 'Vérifier sur le boîtier',
+        message:
+            "Pour ces factures, la réponse du boîtier n'est pas revenue : il les a peut-être déjà certifiées. Regardez sur l'appareil (dernières factures) : "
+            "si une facture y figure déjà, ne la relancez pas. Relancer une facture déjà certifiée en crée une seconde.",
         actions: [
-          TextButton(key: const Key('boitier-annuler-relance'), onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
-          FilledButton(key: const Key('boitier-confirmer-relance'), onPressed: () => Navigator.pop(c, true), child: const Text("Je l'ai vérifié : relancer")),
+          BoutonModaleSecondaire(key: const Key('boitier-annuler-relance'), libelle: 'Annuler', onPressed: () => Navigator.pop(c, false)),
+          BoutonModalePrimaire(key: const Key('boitier-confirmer-relance'), libelle: "Je l'ai vérifié : relancer", onPressed: () => Navigator.pop(c, true)),
         ],
       ),
     );
@@ -154,7 +156,7 @@ class _BandeauBoitierState extends State<BandeauBoitier> {
           child: Text(
             key: const Key('boitier-etat'),
             texteEtat,
-            style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.w600, color: pret ? AgriColors.brandForest : AgriColors.errorRed),
+            style: TextStyle(fontSize: AgriTypography.xs, fontWeight: FontWeight.w600, color: pret ? AgriColors.brandForest : AgriColors.onSurface),
           ),
         ),
         TextButton(

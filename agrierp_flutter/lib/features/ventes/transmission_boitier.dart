@@ -6,7 +6,6 @@ import '../../core/database/app_database.dart';
 import '../../core/mecef/facture_mecef.dart';
 import '../../core/mecef/marque_boitier.dart';
 import '../../core/mecef/passerelle_boitier.dart';
-import '../parametres/reglages_ferme_repository.dart';
 import 'caisse_repository.dart';
 import 'facturation_repository.dart';
 
@@ -111,7 +110,11 @@ class TransmissionBoitier extends ChangeNotifier {
   }
 
   Future<ResultatTransmission> _transmettre(String venteId, bool apresVerification) async {
-    final reglage = await ReglagesFermeRepository(database: _db, deviceId: 'poste').reglageMecef();
+    // Lu directement (clés posées par le tirage) : ne pas importer le dépôt des réglages, qui élargirait le périmètre de tirage des écrans de vente.
+    final cles = {
+      for (final l in await (_db.select(_db.appSettings)..where((r) => r.key.isIn(['mecef.operateur_id', 'mecef.operateur_nom']))).get()) l.key: l.value,
+    };
+    final reglage = (operateurId: cles['mecef.operateur_id'] ?? '', operateurNom: cles['mecef.operateur_nom'] ?? '');
     if (reglage.operateurId.trim().isEmpty || reglage.operateurNom.trim().isEmpty) {
       return const ResultatTransmission(
         IssueTransmission.nonConcernee,

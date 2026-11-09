@@ -4,7 +4,6 @@ import 'package:agrierp/core/theme/agri_tokens.dart';
 import 'package:agrierp/features/ventes/bandeau_boitier.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
 import 'package:agrierp/features/ventes/transmission_boitier.dart';
-import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

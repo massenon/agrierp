@@ -1,5 +1,7 @@
 # 47 — Plan : le boîtier fiscal Eltrade CC300 branché sur le poste (MECEF-2), en prompts réutilisables
 
+> **STATUT (09/11/2026) : CONSTRUIT, NON VÉRIFIÉ AVEC UN VRAI BOÎTIER.** Sur décision du client (« faut lancer le chantier, faut pas attendre le boîtier »), B0 à B5 ont été réalisés contre un faux pilote : option A (charge portée en Dart, parité PHP exécutée), client HTTP localhost, transmission par le poste, envoi du résultat au serveur, indicateur d'état. **Reste** : l'essai réel (checklist : `41`, § 3.3) et la transmission de l'AVOIR par le poste (non branchée). Le détail de ce qui existe est dans `41_MECEF_EMECEF.md` § 3.3 ; les prompts ci-dessous restent la référence pour l'avoir et la reprise après essai.
+
 > **USAGE**
 >
 > - **Quand l'utiliser.** Le jour où la ferme (ou une autre structure) possède le boîtier et demande que les factures normalisées passent par lui. **Pas avant** : MECEF-2 n'est pas construit (`BoitierMecefGateway` est un squelette) et le schéma du pilote n'a jamais été essayé sur un vrai appareil.
