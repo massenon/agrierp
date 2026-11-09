@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
+    @include('layouts._partage-social')
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiAgriERP | {{ $title ?? 'Connexion' }}</title>
     <meta name="author" content="Dr Rhodes MASSENON, Contact: +2290151335040">
