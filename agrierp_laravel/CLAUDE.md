@@ -11,7 +11,7 @@ It is one of **three** codebases in this project:
 | Codebase | Location | Role |
 |---|---|---|
 | This app | `C:\laragon\www\agrierp` | Laravel 12 web ERP |
-| Prototype + docs | `C:\Projects\agrierp_laravel` | 97-screen HTML prototype (`prototype_html/`) + 60-file knowledge base (`docs/`) |
+| Docs | `C:\Projects\agrierp_laravel` | 60-file knowledge base (`docs/`). The 97-screen HTML prototype (`prototype_html/`) was withdrawn on 09/11/2026 (client decision) |
 | Flutter Desktop | separate | Offline-first POS/élevage client (Drift/SQLite), talks to `/api/sync/*` |
 
 The app was originally delivered as an **overlay** on a hand-assembled Laravel skeleton, not a real `laravel new` install. Several "always present" framework files were in fact missing and had to be created later (`tests/TestCase.php`, `app/Http/Controllers/Controller.php`, `routes/api.php`, `routes/console.php`, `AppServiceProvider`). Assume nothing is present because Laravel normally ships it — check.
@@ -20,11 +20,11 @@ The app was originally delivered as an **overlay** on a hand-assembled Laravel s
 
 ## Source-of-truth hierarchy — never invert it
 
-1. **The HTML prototype** (`C:\Projects\agrierp_laravel\prototype_html\`) wins on anything visual, structural, or behavioural. Read the source file in full before converting a screen — never reconstruct from memory.
-2. **The knowledge-base docs** (`docs/` in the prototype repo, plus the root-level `*.md` here) supply business logic, schema, and calculation rules not visible in the HTML.
+1. **The Blade views / Livewire components of this app** win on anything visual, structural, or behavioural. The HTML prototype (`prototype_html/`) was withdrawn on 09/11/2026 (client decision, A8): it is no longer a source. Read the source file in full before changing a screen — never reconstruct from memory.
+2. **The knowledge-base docs** (`docs/`, plus the root-level `*.md` here) supply business logic, schema, and calculation rules not visible in the views.
 3. **Existing code is not presumed correct** — check it against 1 and 2 before reusing it as reference.
 
-If a rule is in neither the prototype nor a doc, say so explicitly rather than inventing it.
+If a rule is in neither the views nor a doc, say so explicitly rather than inventing it.
 
 ## Commands
 

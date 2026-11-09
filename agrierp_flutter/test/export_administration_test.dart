@@ -11,7 +11,6 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'chemins_depot.dart';
 
 /// Ticket F0.82 — « Exporter PDF » des trois pages du hub Administration
 /// (`gestion-courriers.html`, `archivage-documents.html`, `documents-administratifs.html`).
@@ -384,45 +383,6 @@ void main() {
           donnees(DocumentsAdministration.documents(d.documents)).single[1],
           'Procès-verbal',
         );
-      },
-    );
-
-    test(
-      'les titres, sous-titres et colonnes sont ceux des fonctions de la maquette',
-      () {
-        final dossier = '$dossierPrototype/';
-        if (!File('${dossier}gestion-courriers.html').existsSync()) {
-          markTestSkipped('maquette absente de ce poste de travail');
-          return;
-        }
-        final cas = <String, DocumentOfficiel>{
-          'gestion-courriers.html': DocumentsAdministration.courriers(const []),
-          'archivage-documents.html': DocumentsAdministration.archives(
-            const [],
-            maintenantFixe,
-          ),
-          'documents-administratifs.html': DocumentsAdministration.documents(
-            const [],
-          ),
-        };
-        for (final e in cas.entries) {
-          final html = File('$dossier${e.key}').readAsStringSync();
-          final titre = RegExp(r"title: '([^']+)'").firstMatch(html)!.group(1)!;
-          final sous = RegExp(
-            r"subtitle: '([^']+)'",
-          ).firstMatch(html)!.group(1)!;
-          final tete = RegExp(
-            r"tableHeadHtml: '<tr>(.*?)</tr>'",
-          ).firstMatch(html)!.group(1)!;
-          final colonnes = [
-            for (final m in RegExp(r'<th>([^<]+)</th>').allMatches(tete))
-              m.group(1)!,
-          ];
-
-          expect(e.value.titre, titre, reason: e.key);
-          expect(e.value.sousTitre, sous, reason: e.key);
-          expect(e.value.entetes, colonnes, reason: e.key);
-        }
       },
     );
 

@@ -13,7 +13,6 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'chemins_depot.dart';
 
 /// Serveur de synchronisation feint : sert, tirage après tirage, les blocs [tirages]
 /// (le dernier se répète), répond [reponsePush] à l'envoi et note ce qui est envoyé.
@@ -1419,48 +1418,5 @@ void main() {
       },
     );
 
-    test(
-      '⚠️⚠️ les libellés de cartes de l’écran sont ceux de gestion-courriers.html (lus dans la maquette)',
-      () {
-        final maquette = File(
-          '$dossierPrototype/gestion-courriers.html',
-        );
-        if (!maquette.existsSync()) {
-          markTestSkipped('maquette absente de ce poste de travail');
-          return;
-        }
-
-        // Les libellés de carte sont des <span> `uppercase` SANS `tracking-wider`
-        // (celui des <th>) : l'extracteur de vocabulaire ne les voit pas.
-        final html = maquette.readAsStringSync();
-        final attendus = [
-          for (final m in RegExp(
-            r'<span class="text-\[10px\] text-outline font-bold uppercase">([^<]+)</span>',
-          ).allMatches(html))
-            m.group(1)!.trim(),
-        ];
-
-        expect(attendus, [
-          'Reçus (mois)',
-          'Envoyés (mois)',
-          'En attente',
-        ], reason: 'la maquette a changé : revoir les cartes');
-
-        final ecran = File(
-          'lib/features/administration/administration_screen.dart',
-        ).readAsStringSync();
-        final debut = ecran.indexOf('Widget _ongletCourriers');
-        final fin = ecran.indexOf('Widget _typeCourrier');
-        final onglet = ecran.substring(debut, fin);
-        final presentes = [
-          for (final m in RegExp(
-            r"CarteKpi\(\s*libelle: '([^']+)'",
-          ).allMatches(onglet))
-            m.group(1)!,
-        ];
-
-        expect(presentes, attendus);
-      },
-    );
   });
 }

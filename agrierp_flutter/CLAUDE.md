@@ -18,11 +18,11 @@ Three codebases, one product:
 
 | Codebase | Path | Role |
 |---|---|---|
-| HTML prototype + knowledge base | `C:\Projects\agrierp_laravel\` | **visual and behavioural source of truth** for both clients |
+| Laravel web app (Blade views) | `agrierp_laravel/` | **visual and behavioural source of truth** for the client (the HTML prototype was withdrawn on 09/11/2026) |
 | Laravel 12 + Livewire 3 web app | `C:\laragon\www\agrierp` | server, business rules, sync API |
 | **This Flutter client** | `C:\Projects\agrierp_flutter` | offline-first Windows desktop |
 
-⚠️ **`prototype_html/` and `docs/` here are EMPTY and must stay empty.** The prototype is read from the Laravel repo. Copying it would create a second source of truth that silently drifts — the exact failure mode that once let `README_SPRINT0.md` diverge by ~2400 lines and hide six unbuilt tickets.
+⚠️ **`prototype_html/` and `docs/` here are EMPTY and must stay empty.** The HTML prototype no longer exists (client decision, 09/11/2026, ticket A8): the Blade view of the web app is the only reference. Copying anything here would create a second source of truth that silently drifts — the exact failure mode that once let `README_SPRINT0.md` diverge by ~2400 lines and hide six unbuilt tickets.
 
 ⚠️ Not a git repository. There is no history to consult; the ticket log is the history.
 
@@ -85,23 +85,15 @@ Le script fait tout, sans jamais lire ni modifier un `.env` ni ouvrir une base e
 - Défauts décrits, non corrigés (S-T12) : la caisse du web (`PosInterface::validateSale`) n'est pas rejouée sur un interblocage MariaDB (l'envoi des postes l'est, S-T9) — l'aide de l'essai revalide comme la caissière et le dit au rapport ; la rejouer au serveur exige de sortir MeCeF de la transaction. Une journée couplée (fiches + ventes du jour d'un poste) est indivisible : plus grosse que la limite du mandataire de l'hébergement, ses ventes partent en refus « envoi trop volumineux » — limite à vérifier en production (`post_max_size`, ModSecurity).
 - S-T12 : l'essai couvre TOUT ce qui se synchronise, en **cinq journées au moins** (`ESSAI_JOURS`, défaut 5 ; ~3 min par graine) : achats à crédit, règlements, retours et remboursements fournisseurs, imputations d'avances (dont une sur la vente à crédit du MÊME envoi, écrite directement en table : aucun dépôt ne l'offre, F0.73), produits créés au poste (le même créé au web : fusion S-T5), dépenses, Paramètres Élevage, infirmerie, calendrier, archivage d'un soin, étapes d'un cycle (saillie et palpation dans le même envoi) ; appairage révoqué (caisse 1) et compte désactivé (comptabilité) au web → 401, synchronisation automatique suspendue, reconnexion (le limiteur de connexion, 5 par minute, est respecté) ; la caisse 2 hors ligne trois journées puis de retour (lots de 50, tirage en pages de 40 imposées par `taille`) ; une vente et un achat faits AVANT un inventaire et arrivés APRÈS lui ; la demande du web (S-T6, ~30 s d'attente) ; la réinitialisation au web en fin d'essai (jetons révoqués → reconnexion, envoi sans la marque → 409, purge de chaque poste, rien ne ressuscite). Invariants ajoutés : trésorerie dans les deux livres par code de compte, créances, dettes, avances et créances fournisseurs (tables = grand livre, en écart depuis l'instantané), dépenses comptabilisées une fois, état final de chaque saisie de l'élevage identique au serveur.
 
-### Regenerating the prototype fixtures
+### The prototype fixtures are a frozen snapshot
 
-`test/inventaire_maquette.g.dart` and `test/structure_maquette.g.dart` are **generated from the prototype**, not hand-written. To add the pages a new screen ports:
-
-```powershell
-py outils/fixtures.py rapport-tresorerie.html rapport-creances.html …
-```
-
-It extracts, formats, inserts and runs `dart format`. ⚠️ It **appends only** — see weakness 3 above. `outils/inventaire.py` and `outils/structure.py` remain usable on their own to *inspect* a page (they print JSON to stdout).
-
-All three read from `C:/Projects/agrierp_laravel/prototype_html`, and strip `<script>` blocks and the shared chrome (`aside`/`nav`/`header`) first — rows built in JavaScript are demo data, not labels, and a check that fails on noise ends up ignored.
+`test/inventaire_maquette.g.dart` and `test/structure_maquette.g.dart` were generated from the HTML prototype. **The prototype was withdrawn on 09/11/2026 (client decision, A8): the snapshots are frozen and can no longer be regenerated.** They stay committed as a reference and the tests that read them (`fidelite_libelles_test`, `conformite_structure_test`, `cartes_attendues_test`) still run. `outils/{chemins,fixtures,inventaire,structure,captures}.py` are marked OBSOLETE and kept for memory only. A new screen is checked against the Blade view of the web app (read from `agrierp_laravel/`, never copied).
 
 ⚠️ **Escape `$` when emitting Dart string literals.** The mockup writes « Lapines Reproductrices ($R_1..R_n$) »; Dart reads that as interpolation and refuses to parse. Invisible when reading the HTML, fatal at generation.
 
 ## Source-of-truth hierarchy — never invert it
 
-1. **The HTML prototype** wins on anything visual, structural or behavioural. Read the source file in full before converting a screen — never reconstruct from memory.
+1. **The Blade view / Livewire component of the web app** wins on anything visual, structural or behavioural (the HTML prototype was withdrawn on 09/11/2026). Read the source file in full before converting a screen — never reconstruct from memory.
 2. **The Laravel implementation** wins on business rules and calculations. A rule was fought for there, usually against a real defect; re-deriving it here re-introduces the defect.
 3. **The knowledge-base docs** supply what neither shows.
 
@@ -375,7 +367,7 @@ Numeric data (accounting balances, stock totals, headcounts) is **never** verifi
 Miroir de la section VOL-1 de `agrierp_laravel/CLAUDE.md`. Catégories Reproducteur / **Jeune** (jamais « Poulet », jamais « Jeune à maturité ») / Poussin ; emplacements génériques `repro` / `jeune` / `sevre` (Poussin). **Drift v82** : `livestock_daily_entries.vente_repro/sevre/jeune` (nullables, reçues ET envoyées, jamais saisies à la fiche) et `products.categorie_effectif`.
 - `effectif_par_categorie.dart` : `volailles` (`especeDuCode(code, stade:)` — le stade `ponte` écarte les Pondeuses), `_calculerJourVolailles` (aucun inconnu), `mouvementsConnusAZeroPour`. `categorie_volaille.dart` : clés, libellés, rations PROVISOIRES 130/80/30 (à confirmer), `tableauReproducteurs` (arrondi PHP via `PmpService.arrondi`), `devinerDepuisLeNom`. `CategoriesJour.calculerVolailles` (départ requis au lieu de l'effectif, proposition du stade). `FicheJournaliereRepository` : départ SAISI jamais déduit (`_departVolailles`), `refusDeVenteVolailles` (caisse), `repercuterVente(categorieEffectif:)`, `ecrireEntrees` (don refusé, départ exigé).
 - Écran : `FicheReproducteursScreen` (départ obligatoire, passage Poussin → Jeune, ventes par catégorie en lecture seule, `RationReproducteursFiche`, autonomie alimentaire sur la somme). Produit : champ « Catégorie d'effectif » (aviculture seulement). Journal des sujets : mêmes refus et mêmes clés d'erreur que le web.
-- Écart ASSUMÉ vis-à-vis de la maquette (qui dit « Poulet » / « Repro ») : documenté et gardé par `test/volailles_effectif_test.dart` (le test de la maquette se saute si elle est absente).
+- Écart ASSUMÉ vis-à-vis de la maquette (qui dit « Poulet » / « Repro ») : documenté et gardé par `test/volailles_effectif_test.dart` (le test qui lisait la maquette a été supprimé le 09/11/2026 avec elle).
 - Gardes : `test/volailles_effectif_test.dart` (parité PHP exécutée sur 500 jours, tableau de ration, noms de produits ; dépôt, caisse, produit, écran), `effectif_par_categorie_test.dart` / `cascade_categories_test.dart` (scénarios d'aviculture ventilés, stade `ponte`), `migration_toutes_versions_test.dart` (palier 82). Non fait au poste : le refus « départ requis » de la transformation (le serveur la refuse et le poste la voit en conflit).
 
 ## VOL-2 — Volailles Pondeuses : effectif par STADE CALCULÉ (05/11/2026, Drift v83)

@@ -12,13 +12,13 @@ Objectif : une fidélité de **100 %** entre l'application web (`agrierp_laravel
 
 - **La règle d'or.** Le code Flutter est une **traduction, pas une réinterprétation**. Si un écran existe en version web, le poste reprend exactement sa structure, ses libellés, ses boutons, l'ordre de ses sections et de ses colonnes, et son ergonomie.
 - **Hiérarchie des sources, du plus fort au plus faible :**
-  1. **La vue Blade / le composant Livewire** pour tout ce qui est visible et pour le comportement. La vue Blade est elle-même une conversion du prototype HTML. Ses écarts au prototype y sont documentés et le poste en **hérite**, il ne les « corrige » pas de son côté.
+  1. **La vue Blade / le composant Livewire** pour tout ce qui est visible et pour le comportement. La vue Blade est la seule référence visuelle : le prototype HTML est retiré du projet depuis le 09/11/2026 (décision du client, A8). Les écarts documentés dans la vue sont **hérités** par le poste, il ne les « corrige » pas de son côté.
   2. **Les Actions et Services Laravel** pour les règles métier et les calculs. Chaque règle y a été obtenue contre un défaut réel ; la redériver côté poste réintroduit ce défaut.
-  3. **Le prototype HTML et la base documentaire** pour ce que les deux premiers ne montrent pas.
+  3. **La base documentaire** pour ce que les deux premiers ne montrent pas (le prototype HTML n'existe plus).
 
   Si une règle ne figure dans aucune des trois sources, le dire explicitement au lieu de l'inventer.
 
-  ⚠️ **Changement à acter.** Les `CLAUDE.md` des deux projets placent encore le **prototype HTML** en tête pour le visuel. Cette doctrine place la **vue Blade** en tête. Tant que les deux ne sont pas alignés, une divergence Blade ↔ prototype est **signalée au client**, jamais tranchée en silence.
+  ✅ **Aligné le 09/11/2026.** Les `CLAUDE.md` des deux projets placent désormais la **vue Blade** en tête, comme cette doctrine : le prototype HTML est retiré (plan, A8).
 - **Aucune valeur en dur.** Couleurs, tailles, espacements et largeurs viennent du design system centralisé `lib/core/theme/` (`agri_tokens.dart`, `agri_theme.dart`). Ce design system est transposé un pour un de `tailwind.config.js` et mesuré sur l'application web. *État : appliqué. `test/conformite_portage_test.dart` interdit par exemple `fontSize: 12` au lieu de `AgriTypography.xs`.*
 - **Documentation des écarts.** Tout écart imposé par la plateforme (bureau ou web) est documenté **dans le widget concerné**, avec un commentaire `⚠️ ÉCART` qui donne la raison. L'écart est aussi enregistré dans `test/cartes_attendues.dart` (`ecartsAssumes` ou `ecartsATraiter`, jamais les deux).
 
@@ -55,7 +55,7 @@ Contexte : la connexion Internet est instable en zone rurale (Adja-Ouèrè / Ikp
 
 - **Test de mutation.** Chaque test unitaire ou de widget critique doit être éprouvé : si l'on retire la logique métier du code, le test doit passer **au rouge**. Un test qui reste vert sans la règle ne protège rien. Les valeurs attendues sont des **littéraux calculés à la main**, jamais produits par le code testé.
 - **Parité exécutée.** Pour un calcul porté (effectifs, comptabilité, paie), le test compare le résultat Dart au résultat PHP réel (`test/php_laravel.dart`) quand c'est possible.
-- **Conformité lue dans le code source.** `conformite_portage_test.dart`, `fidelite_libelles_test.dart` et `conformite_structure_test.dart` lisent le code et les fixtures du prototype. Les écarts qu'ils verrouillent sont **invisibles à l'exécution**. Ne jamais les affaiblir pour faire passer un écran.
+- **Conformité lue dans le code source.** `conformite_portage_test.dart`, `fidelite_libelles_test.dart` et `conformite_structure_test.dart` lisent le code, la vue Blade et les fixtures figées (instantané du prototype retiré, non régénérable). Les écarts qu'ils verrouillent sont **invisibles à l'exécution**. Ne jamais les affaiblir pour faire passer un écran.
 - **Zéro chaîne en dur.** Tous les textes affichés passent par un système de localisation, avec parité entre `lang/fr/` (Laravel) et les fichiers l10n du poste.
 
   ⚠️ **CIBLE, non appliquée aujourd'hui des deux côtés.** `agrierp_laravel/lang/` n'existe pas : les libellés sont écrits en français directement dans les vues Blade. Le poste n'a pas de fichiers l10n (`intl` est présent, sans ARB). Les tests de fidélité comparent donc des **littéraux** des deux côtés. Passer à la localisation est un chantier transverse planifié (`PLAN_FINALISATION.md`, sprint F). Il doit migrer le web et le poste **ensemble**, sinon la parité se perd.

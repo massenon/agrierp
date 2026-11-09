@@ -78,11 +78,11 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - Dans le monorepo, ces chemins n'existent plus. Hors du poste du développeur, `export_comptabilite_test.dart` échoue (3 tests) et d'autres tests se mettent en saut (32 sautés).
 - **Proposition :** un seul résolveur de chemins (`test/chemins_depot.dart`) qui pointe sur `../agrierp_laravel/`.
 
-### A8 ❓ Le prototype HTML n'est pas dans le monorepo
+### A8 ✅ Clos le 09/11/2026 : la maquette HTML est retirée du projet (décision du client) ; les tests qui la lisaient sont supprimés ou ne comparent plus qu'au web
 
 - Les `CLAUDE.md`, les outils de fixtures et plusieurs tests s'appuient sur `prototype_html/`, qui n'a pas été importé dans `massenon/agrierp`.
 - Sans lui, la fidélité « prototype » n'est plus vérifiable que sur le poste du développeur.
-- **Décision :** l'ajouter au dépôt (`prototype_html/` à la racine), ou acter que la vue Blade est désormais la seule référence (Doctrine, article 0) et retirer les dépendances au prototype.
+- **Décision du client (09/11/2026) :** « OUI, FAIT, ENLEVER, ON N'A PLUS LA MAQUETTE HTML » : la vue Blade est la seule référence (Doctrine, article 0). Les tests qui ne comparaient qu'à la maquette sont supprimés, ceux qui comparaient aussi au web ne gardent que le web ; `dossierPrototype` et `AGRIERP_PROTOTYPE` sont retirés des tests ; les outils Python qui la lisent sont marqués obsolètes ; les fixtures `*_maquette.g.dart` restent un instantané figé, non régénérable.
 
 
 ### Décisions proposées au client (09/11/2026) — recommandations, à valider

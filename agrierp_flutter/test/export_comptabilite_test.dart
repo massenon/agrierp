@@ -548,26 +548,6 @@ void main() {
       '2 écriture(s) marquée(s) « incomplète » : lignes non encore reçues au poste '
       '(tirage incomplet) ; le montant affiché est le total des débits reçus.';
 
-  /// Lecture d'une fonction d'export de la maquette.
-  ({String titre, String? sousTitre, List<String> colonnes}) maquette(
-    String fichier,
-    String fonction,
-  ) {
-    final html = File(
-      '$dossierPrototype/$fichier',
-    ).readAsStringSync();
-    final debut = html.indexOf('function $fonction(');
-    final corps = html.substring(debut, html.indexOf('\n}', debut));
-    final titre = RegExp(r"title: '([^']*)'").firstMatch(corps)!.group(1)!;
-    final sous = RegExp(r"subtitle: '([^']*)'").firstMatch(corps)?.group(1);
-    final tete = RegExp(r"tableHeadHtml: '([^']*)'").firstMatch(corps)!;
-    final colonnes = [
-      for (final m in RegExp(r'<th>([^<]*)</th>').allMatches(tete.group(1)!))
-        m.group(1)!,
-    ];
-    return (titre: titre, sousTitre: sous, colonnes: colonnes);
-  }
-
   /// Lecture d'un gabarit d'export du WEB (ticket F0.88, arbitrage client du 13/10/2026 : les
   /// libellés des PDF comptables suivent le web, plus la maquette). [colonnes] = les `<th>` du
   /// `<thead>` de `resources/views/exports/<vue>.blade.php` ; [appel] = les arguments passés par le
@@ -751,67 +731,6 @@ void main() {
           'Balance déséquilibrée — écart de § FCFA. Une anomalie de saisie doit être '
           'corrigée avant toute clôture.',
         );
-      },
-    );
-
-    test(
-      '⚠️⚠️ F0.88 : la maquette reste relue — le PDF ne s’en écarte QUE là où le web diffère',
-      () async {
-        // Couverture conservée : les fonctions d'export de la maquette sont toujours lues, et
-        // chaque écart du PDF par rapport à elles est ÉNUMÉRÉ (un écart non listé fait échouer).
-        // A7 : sans la maquette (absente du monorepo, plan A8), saut AVEC sa raison, jamais rouge.
-        if (!File('$dossierPrototype/plan-comptable.html').existsSync()) {
-          markTestSkipped('maquette absente ($dossierPrototype) : comparaison impossible');
-          return;
-        }
-        final docs = await quatreDocuments();
-
-        List<int> ecarts(List<String> a, List<String> b) {
-          expect(a.length, b.length);
-          return [
-            for (var i = 0; i < a.length; i++)
-              if (a[i] != b[i]) i,
-          ];
-        }
-
-        final plan = maquette('plan-comptable.html', 'exportPlanComptablePDF');
-        expect(plan.titre, docs.plan.titre);
-        expect(plan.sousTitre, 'Liste des comptes actifs');
-        expect(docs.plan.sousTitre, isNot(plan.sousTitre));
-        expect(ecarts(plan.colonnes, docs.plan.entetes), isEmpty);
-
-        final journal = maquette('journal-comptable.html', 'exportJournalPDF');
-        expect(journal.titre, docs.journal.titre);
-        expect(journal.sousTitre, 'Écritures comptables SYSCOHADA');
-        expect(docs.journal.sousTitre, isNot(journal.sousTitre));
-        expect(ecarts(journal.colonnes, docs.journal.entetes), isEmpty);
-
-        final livre = maquette('grand-livre.html', 'exportGrandLivrePDF');
-        expect(livre.titre, 'Grand Livre — Compte ');
-        expect(docs.livre.titre, startsWith(livre.titre));
-        expect(livre.colonnes.last, 'Solde');
-        expect(ecarts(livre.colonnes, docs.livre.entetes), [5]);
-
-        final balance = maquette('balance-generale.html', 'exportBalancePDF');
-        expect(balance.titre, docs.balance.titre);
-        expect(balance.colonnes, [
-          'N° Compte',
-          'Libellé',
-          'Ouv. D',
-          'Ouv. C',
-          'Mvt D',
-          'Mvt C',
-          'Final D',
-          'Final C',
-        ]);
-        expect(ecarts(balance.colonnes, docs.balance.entetes), [
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-        ]);
       },
     );
 

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Extrait l'inventaire des libelles structurants d'une page du prototype.
+"""OBSOLÈTE depuis le 09/11/2026 : la maquette HTML n'existe plus ; outil conservé pour mémoire.
+
+Extrait l'inventaire des libelles structurants d'une page du prototype.
 
 Libelles retenus : titres (h2/h3), boutons, en-tetes de colonnes (th),
 etiquettes de champs (label). Ce sont ceux qui portent le vocabulaire de

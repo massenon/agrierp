@@ -8,7 +8,6 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'chemins_depot.dart';
 
 /// Ticket F0.92 — GLOSSAIRE DE LA FICHE LAPINS AU POSTE (suite de 15.36).
 ///
@@ -349,38 +348,8 @@ void main() {
   });
 
   group(
-    'écarts ASSUMÉS vis-à-vis de la maquette (décision client 14/10/2026)',
+    'clés de synchronisation (décision client 14/10/2026)',
     () {
-      final maquette = File(
-        '$dossierPrototype/fiche-lapins.html',
-      );
-      // 🔁 U12a — les libellés sont dans l'écran (configuration du Blade) et la vue commune Lapins / Porcs.
-      final ecran = File('lib/features/elevage/fiche_lapins_screen.dart');
-      final vue = File('lib/features/elevage/fiche_categories_vue.dart');
-
-      test('la maquette dit encore « Espèce » / « Lapereau » / « Sevrés » : '
-          'l\'écran suit la décision client, pas la maquette', () {
-        if (!maquette.existsSync()) {
-          markTestSkipped('maquette absente de ce poste de développement');
-          return;
-        }
-        final html = maquette.readAsStringSync();
-        final code = ecran.readAsStringSync() + vue.readAsStringSync();
-
-        // Si la maquette est alignée un jour, cet écart n'en est plus un :
-        // retirer ce test plutôt que le laisser décrire un passé.
-        expect(html, contains('<th class="px-md py-xs text-left">Espèce</th>'));
-        expect(html, contains('>Lapereau</td>'));
-        expect(html, contains('font-bold">Sevrés</th>'));
-        expect(html, contains('Provende Servie par Espèces'));
-
-        expect(code, contains("'Catégorie'"));
-        expect(code, contains("'Jeunes'"));
-        expect(code, contains('Provende Servie par Catégorie'));
-        expect(code, isNot(contains("'Espèce'")));
-        expect(code, isNot(contains("'Sevrés'")));
-      });
-
       test(
         '⚠️ les clés de synchronisation ne sont PAS renommées (`cat_eff_*`, `effectif_sevres`)',
         () {

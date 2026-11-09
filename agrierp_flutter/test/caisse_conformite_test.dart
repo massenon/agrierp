@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
@@ -7,7 +6,6 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'chemins_depot.dart';
 
 /// Ticket F0.21 — CONFORMITÉ DE LA CAISSE À `pos-interface.html`.
 ///
@@ -166,34 +164,6 @@ void main() {
     expect(find.text('Montant Global de la Vente (FCFA)'), findsOneWidget);
     expect(find.text('Ajouter au panier'), findsOneWidget);
   });
-
-  // ── F0.89 : le champ « Date de la vente », écart ASSUMÉ ─────────────────
-
-  test(
-    "⚠️ F0.89 — la maquette n'a AUCUN champ de date : le champ du poste est un écart assumé",
-    () {
-      final maquette = File(
-        '$dossierPrototype/pos-interface.html',
-      );
-      if (!maquette.existsSync()) {
-        markTestSkipped('SAUT : maquette absente de ce poste.');
-        return;
-      }
-      final html = maquette.readAsStringSync();
-
-      // Si la maquette gagne un jour un champ de date, cet écart n'en est plus un : il faudra
-      // alors porter SON libellé et SA place, et retirer la mention « écart assumé ».
-      expect(html.contains('type="date"'), isFalse);
-      expect(html.toLowerCase().contains('date de la vente'), isFalse);
-
-      // L'écart est DOCUMENTÉ dans l'écran (docblock, écart n° 4), avec sa décision.
-      final source = File(
-        'lib/features/ventes/caisse_screen.dart',
-      ).readAsStringSync();
-      expect(source, contains('Champ « Date de la vente » AJOUTÉ au panier'));
-      expect(source, contains('Décision CLIENT du 14/10/2026'));
-    },
-  );
 
   testWidgets(
     '⚠️ F0.89 — un SEUL champ de date, au panier, jamais dans « Vente à la Pièce »',

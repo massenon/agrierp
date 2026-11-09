@@ -1228,36 +1228,29 @@ void main() {
       );
     });
 
-    // ── Fidélité à la maquette ET à la page web (lues dans les dépôts, jamais copiées) ───────────
+    // ── Fidélité à la page web (lue dans le dépôt Laravel, jamais copiée) ───────────
 
-    final maquette = File(
-      '$dossierPrototype/balance-generale.html',
-    );
     final vueWeb = File(
       '$dossierLaravel/resources/views/livewire/comptabilite/balance-generale.blade.php',
     );
-    final sautMaquette = maquette.existsSync() && vueWeb.existsSync()
-        ? null
-        : 'SAUT : maquette ou vue web absente';
+    final sautWeb = vueWeb.existsSync() ? null : 'SAUT : vue web absente';
 
     List<String> trouver(String source, RegExp motif) => [
       for (final m in motif.allMatches(source)) m.group(1)!.trim(),
     ];
 
     testWidgets(
-      '⚠️⚠️ les trois cartes : libellés de la maquette ET de la page web, dans l ordre',
+      '⚠️⚠️ les trois cartes : libellés de la page web, dans l ordre',
       (tester) async {
         final motif = RegExp(
           r'<span class="text-\[10px\] text-outline font-bold uppercase block">([^<]+)</span>',
         );
-        final cartesMaquette = trouver(maquette.readAsStringSync(), motif);
         final cartesWeb = trouver(vueWeb.readAsStringSync(), motif);
-        expect(cartesMaquette, [
+        expect(cartesWeb, [
           'Total Débits (Soldes Finaux)',
           'Total Crédits (Soldes Finaux)',
           'Écart (doit être 0)',
         ]);
-        expect(cartesWeb, cartesMaquette);
 
         await jeu();
         await afficher(tester);
@@ -1265,33 +1258,30 @@ void main() {
             .widgetList<CarteKpi>(find.byType(CarteKpi))
             .map((c) => c.libelle)
             .toList();
-        expect(rendues, cartesMaquette);
+        expect(rendues, cartesWeb);
       },
-      skip: sautMaquette != null,
+      skip: sautWeb != null,
     );
 
     testWidgets(
-      'sous-titre, « Période : », bandeau et état vide : le texte de la maquette / page web',
+      'sous-titre, « Période : », bandeau et état vide : le texte de la page web',
       (tester) async {
-        final source = maquette.readAsStringSync();
+        final source = vueWeb.readAsStringSync();
         const sousTitre =
             "Synthèse des soldes de tous les comptes utilisés — vérification de l'équilibre avant clôture.";
         expect(source, contains(sousTitre));
         expect(source, contains('Période :'));
-        expect(
-          vueWeb.readAsStringSync(),
-          contains('Aucun compte mouvementé sur cette période.'),
-        );
+        expect(source, contains('Aucun compte mouvementé sur cette période.'));
 
         await jeu();
         await afficher(tester);
         expect(find.text(sousTitre), findsOneWidget);
         expect(find.text('Période :'), findsOneWidget);
       },
-      skip: sautMaquette != null,
+      skip: sautWeb != null,
     );
 
-    testWidgets('la ligne TOTAUX de la maquette', (tester) async {
+    testWidgets('la ligne TOTAUX de la vue', (tester) async {
       await jeu();
       await afficher(tester);
       expect(find.text('TOTAUX'), findsOneWidget);
