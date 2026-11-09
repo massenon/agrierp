@@ -20,7 +20,10 @@ class ImportMasseModelesTest extends ImportMasseBase
     /** @return array<string, array{0: string}> */
     public static function modules(): array
     {
-        return ['stocks' => ['stocks'], 'clients' => ['clients'], 'fournisseurs' => ['fournisseurs']];
+        return [
+            'stocks' => ['stocks'], 'clients' => ['clients'], 'fournisseurs' => ['fournisseurs'],
+            'employes' => ['employes'], 'plan_comptable' => ['plan_comptable'], 'rations' => ['rations'],
+        ];
     }
 
     /** @dataProvider modules */
@@ -182,13 +185,13 @@ class ImportMasseModelesTest extends ImportMasseBase
         $this->assertStringContainsString('« Nom * », « Catégorie * »', $renommee);
     }
 
-    public function test_une_extension_autre_que_xlsx_est_refusee(): void
+    public function test_une_extension_autre_que_xlsx_ou_csv_est_refusee(): void
     {
         $user = $this->utilisateur(['manage-ventes']);
         $chemin = $this->fichier(ImportMasseService::module('clients'), [['nom' => 'A']]);
 
-        $message = $this->refus(fn () => $this->service()->analyser('clients', $chemin, 'clients.csv', $user));
-        $this->assertStringStartsWith('Seuls les fichiers Excel .xlsx sont acceptés', $message);
+        $message = $this->refus(fn () => $this->service()->analyser('clients', $chemin, 'clients.txt', $user));
+        $this->assertStringStartsWith('Seuls les fichiers Excel .xlsx (ou CSV .csv en repli) sont acceptés', $message);
     }
 
     public function test_un_fichier_illisible_ou_vide_est_refuse(): void
@@ -294,6 +297,9 @@ class ImportMasseModelesTest extends ImportMasseBase
         $this->assertStringContainsString('ProductCatalogService::class)->creer(', $stocks);
         $this->assertStringContainsString('CustomerCatalogService::class)->creer(', file_get_contents(app_path('Services/Import/ImportClientsService.php')));
         $this->assertStringContainsString('SupplierCatalogService::class)->creer(', file_get_contents(app_path('Services/Import/ImportFournisseursService.php')));
+        $this->assertStringContainsString('SaisieEmployeAction::class)->creer(', file_get_contents(app_path('Services/Import/ImportEmployesService.php')));
+        $this->assertStringContainsString('PlanComptableService::class)->creer(', file_get_contents(app_path('Services/Import/ImportPlanComptableService.php')));
+        $this->assertStringContainsString('RationStandardService::class)->creer(', file_get_contents(app_path('Services/Import/ImportRationsService.php')));
     }
 
     public function test_le_lien_du_menu_est_dans_le_groupe_administration_pour_qui_peut_importer(): void
@@ -308,12 +314,13 @@ class ImportMasseModelesTest extends ImportMasseBase
             return $this->actingAs($user)->get('/dashboard')->getContent();
         })();
 
-        foreach (['admin', 'caissier'] as $role) {
+        foreach (['admin', 'caissier', 'animalier', 'comptable'] as $role) {
             $html = $lien($role);
             $this->assertMatchesRegularExpression('#ADMINISTRATION</p>\s*<div[^>]*>.*?href="/importation-masse".*?Importation en masse#s', $html, $role);
         }
         $this->assertStringContainsString('Administration &amp; Document', $lien('admin'));
-        $this->assertStringNotContainsString('href="/importation-masse"', $lien('animalier'));
-        $this->assertStringNotContainsString('href="/importation-masse"', $lien('comptable'));
+        // IMPORT-2 à 4 : l'animalier (barème) et le comptable (plan comptable) voient désormais le lien ; un rôle sans aucun des six droits non.
+        \App\Models\Role::findOrCreate('sans-droit-import', 'web')->syncPermissions(['view-stocks']);
+        $this->assertStringNotContainsString('href="/importation-masse"', $lien('sans-droit-import'));
     }
 }

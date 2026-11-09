@@ -153,6 +153,8 @@ void main() {
         EcranPoste.synchronisation,
         // Ticket 15.46 — hors maquette : mêmes rôles que `manage-elevage` (admin, animalier).
         EcranPoste.transfertsBandes,
+        // Ticket IMPORT-4 — hors maquette : l'animalier a `manage-elevage` (module Rations).
+        EcranPoste.importationMasse,
       ]);
 
       // ⚠️⚠️ **LE TICKET F0.52 DONNE ENFIN AU COMPTABLE UN ÉCRAN MÉTIER.**
@@ -187,6 +189,8 @@ void main() {
         EcranPoste.aideEtAPropos,
         EcranPoste.contactEditeur,
         EcranPoste.synchronisation,
+        // Ticket IMPORT-3 — hors maquette : le comptable a `manage-comptabilite` (module Plan comptable).
+        EcranPoste.importationMasse,
       ]);
     });
   });
@@ -206,6 +210,8 @@ void main() {
         expect(PermissionsPoste.autorise('comptable', ecran), isTrue, reason: ecran.name);
       }
       expect(PermissionsPoste.autorise('comptable', EcranPoste.caisse), isFalse);
+      // IMPORT-3 : l'importation en masse s'ouvre au comptable (`manage-comptabilite` : plan comptable) ; ses autres modules lui sont refusés.
+      expect(PermissionsPoste.autorise('comptable', EcranPoste.importationMasse), isTrue);
 
       // Ni élevage, ni utilisateurs / réglages, ni inventaire en masse, ni RH, ni administration.
       for (final ecran in [
@@ -214,7 +220,6 @@ void main() {
         EcranPoste.transfertsBandes,
         EcranPoste.parametresGeneraux,
         EcranPoste.parametres,
-        EcranPoste.importationMasse,
         EcranPoste.personnelEtStages,
         EcranPoste.administrationEtDocument,
       ]) {

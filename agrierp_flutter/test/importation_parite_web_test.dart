@@ -54,14 +54,26 @@ void main() {
       expect(web, contains(t));
       expect(poste.toUpperCase().replaceAll(r"\'", "'"), contains(t.toUpperCase()), reason: t);
     }
-    expect(web, contains('Employés, plan comptable et barème de rationnement viendront dans une prochaine phase.'));
-    expect(poste, contains('Employés, plan comptable et barème de rationnement viendront dans une prochaine phase.'));
+    expect(web, contains("Seuls les modules que votre rôle permet d'importer sont proposés."));
+    expect(poste.replaceAll(r"\'", "'"), contains("Seuls les modules que votre rôle permet d'importer sont proposés."));
+    // IMPORT-2 à 4 sont construits : la phrase « viendront dans une prochaine phase » ne doit plus exister, ni au web ni au poste.
+    expect(web, isNot(contains('viendront dans une prochaine phase')));
+    expect(poste, isNot(contains('viendront dans une prochaine phase')));
+    // Le sous-titre cite les six modules, au web comme au poste.
+    const sousTitre = 'vos employés, vos comptes comptables ou votre barème de rationnement';
+    expect(web, contains(sousTitre));
+    expect(poste, contains(sousTitre));
   }, skip: saut);
 
-  test('les trois modules ont le libellé et la description du web (un seul registre côté serveur)', () {
-    for (final cle in ['Stocks', 'Clients', 'Fournisseurs']) {
-      final php = File('$dossierLaravel/app/Services/Import/Import${cle}Service.php').readAsStringSync();
-      final m = ImportationRepository.module(cle.toLowerCase())!;
+  test('les six modules ont le libellé, la description et le droit du serveur (un seul registre côté serveur)', () {
+    const classes = {
+      'stocks': 'Stocks', 'clients': 'Clients', 'fournisseurs': 'Fournisseurs',
+      'employes': 'Employes', 'plan_comptable': 'PlanComptable', 'rations': 'Rations',
+    };
+    expect(ImportationRepository.modules.map((m) => m.cle), classes.keys);
+    for (final MapEntry(key: cle, value: classe) in classes.entries) {
+      final php = File('$dossierLaravel/app/Services/Import/Import${classe}Service.php').readAsStringSync();
+      final m = ImportationRepository.module(cle)!;
       expect(php, contains("return '${m.libelle}';"));
       expect(php.replaceAll(r"\'", "'"), contains("return '${m.description}';"));
       expect(php, contains("return '${m.permission}';"));
@@ -76,6 +88,9 @@ void main() {
     expect(src, contains('ProduitsRepository(database: database).creer('));
     expect(src, contains('creerClient('));
     expect(src, contains('creerFournisseur('));
+    expect(src, contains('enregistrerEmploye('));
+    expect(src, contains('creerCompte('));
+    expect(src, contains('enregistrerRation('));
     expect(src, isNot(contains('stockQty')), reason: 'aucun stock écrit hors du dépôt des produits');
   });
 }

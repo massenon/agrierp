@@ -928,14 +928,15 @@ class ComptabiliteRepository {
 
   /// « Nouveau Compte » : écrit le compte LOCALEMENT (`pending`) ; le serveur le crée (`PlanComptableService::creer`).
   /// Refuse AVANT d'écrire ([validerCompte]).
-  Future<ChartOfAccount> creerCompte({required String code, required String libelle, required String classe}) async {
+  Future<ChartOfAccount> creerCompte({required String code, required String libelle, required String classe, String? id}) async {
     final refus = await validerCompte(code: code, libelle: libelle, classe: classe);
     if (refus.isNotEmpty) throw SaisieCompteRefusee(refus);
 
-    final id = _uuid.v4();
+    // IMPORT-3 — l'importation en masse impose l'identifiant déterministe (UUID v5) ; la saisie à l'écran en tire un (v4).
+    final identifiant = id ?? _uuid.v4();
     await database.into(database.chartOfAccounts).insert(
       ChartOfAccountsCompanion.insert(
-        id: id,
+        id: identifiant,
         deviceId: Value(deviceId),
         syncStatus: const Value(SyncStatus.pending),
         updatedAt: Value(HeureBenin.maintenant()),
@@ -944,7 +945,7 @@ class ComptabiliteRepository {
         accountClass: Value(int.parse(classe.trim())),
       ),
     );
-    return (await compte(id))!;
+    return (await compte(identifiant))!;
   }
 
   /// « Modifier le Compte » : numéro, intitulé, classe (la fiche repasse `pending`).

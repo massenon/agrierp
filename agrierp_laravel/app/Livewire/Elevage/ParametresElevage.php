@@ -158,11 +158,8 @@ class ParametresElevage extends Component
     {
         $this->authorize('manage-elevage');
 
-        $this->validate([
-            'ration_species_code' => ['required', 'in:aviculture,cuniculture,porciculture'],
-            'ration_stage_label' => ['required', 'string', 'max:100'],
-            'ration_grammes' => ['required', 'integer', 'min:1'],
-        ]);
+        // Ticket IMPORT-4 — règles partagées avec l'importation en masse (`RationStandardService`).
+        $this->validate(\App\Services\RationStandardService::reglesDuFormulaire());
 
         FeedRationStandard::updateOrCreate(
             ['id' => $this->editingRationId],

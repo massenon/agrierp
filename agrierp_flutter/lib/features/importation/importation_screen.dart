@@ -16,9 +16,9 @@ import 'importation_repository.dart';
 /// Fichier choisi par l'utilisateur (injecté en test).
 typedef FichierChoisi = ({String nom, Uint8List octets});
 
-/// Sélecteur par défaut : un classeur .xlsx.
+/// Sélecteur par défaut : un classeur .xlsx (ou, en repli, un fichier .csv).
 Future<FichierChoisi?> choisirClasseurXlsx() async {
-  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx'], dialogTitle: 'Choisir le fichier à importer (.xlsx)', withData: selecteurAvecOctets);
+  final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'csv'], dialogTitle: 'Choisir le fichier à importer (.xlsx ou .csv)', withData: selecteurAvecOctets);
   if (r == null || r.files.isEmpty) return null;
   final octets = await octetsDuFichierChoisi(r.files.first);
   if (octets == null) return null;
@@ -202,7 +202,7 @@ class _ImportationScreenState extends State<ImportationScreen> {
               ],
             ),
             const Text(
-              "Créez vos produits avec leur stock initial, vos clients ou vos fournisseurs à partir d'un tableur Excel (.xlsx) : "
+              "Créez vos produits avec leur stock initial, vos clients, vos fournisseurs, vos employés, vos comptes comptables ou votre barème de rationnement à partir d'un tableur Excel (.xlsx) : "
               "téléchargez le modèle, remplissez-le, déposez-le, vérifiez l'aperçu, puis confirmez.",
               style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
             ),
@@ -304,7 +304,7 @@ class _ImportationScreenState extends State<ImportationScreen> {
       ),
       const SizedBox(height: AgriSpacing.md),
       const Text(
-        "Seuls les modules que votre rôle permet d'importer sont proposés. Employés, plan comptable et barème de rationnement viendront dans une prochaine phase.",
+        "Seuls les modules que votre rôle permet d'importer sont proposés.",
         style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
       ),
     ],
@@ -313,6 +313,9 @@ class _ImportationScreenState extends State<ImportationScreen> {
   static IconData _icone(String cle) => switch (cle) {
     'stocks' => SymbolesAgri.inventory_2,
     'clients' => SymbolesAgri.groups,
+    'employes' => SymbolesAgri.badge,
+    'plan_comptable' => SymbolesAgri.menu_book,
+    'rations' => SymbolesAgri.agriculture,
     _ => SymbolesAgri.local_shipping,
   };
 
@@ -400,7 +403,7 @@ class _ImportationScreenState extends State<ImportationScreen> {
                 children: [
                   const Icon(SymbolesAgri.upload_file, color: AgriColors.brandEmerald, size: 36),
                   const SizedBox(height: AgriSpacing.xs),
-                  const Text('Glissez votre fichier .xlsx ici, ou cliquez pour le choisir', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: FontWeight.bold)),
+                  const Text('Glissez votre fichier .xlsx (ou .csv) ici, ou cliquez pour le choisir', style: TextStyle(fontSize: AgriTypography.sm, fontWeight: FontWeight.bold)),
                   Text(
                     'Modèle « ${m.libelle} », version ${m.version} — 5 Mo et 5 000 lignes au plus',
                     style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),

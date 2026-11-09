@@ -114,7 +114,7 @@ class ModeleXlsxService
             $plage = $lettre.'2:'.$lettre.self::LIGNES_PREPAREES;
 
             // Format texte : un zéro initial de téléphone ou d'IFU ne se perd pas.
-            if ($colonne->type === 'telephone') {
+            if (in_array($colonne->type, ['telephone', 'code', 'date'], true)) {
                 $feuille->getStyle($plage)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
             } elseif ($colonne->type === 'entier') {
                 $feuille->getStyle($plage)->getNumberFormat()->setFormatCode('0');
@@ -181,7 +181,9 @@ class ModeleXlsxService
         $titre('Formats');
         $ecrire('Montants', 'Francs CFA ENTIERS, sans décimale ni séparateur de milliers (exemple : 4500).');
         $ecrire('Nombres', 'Quantités et pourcentages : virgule ou point (exemple : 8,5).');
-        $ecrire('Dates', 'Format AAAA-MM-JJ (exemple : 2026-11-08). Aucune date n\'est demandée par ce modèle.');
+        $ecrire('Dates', collect($module->colonnes())->contains(fn (ColonneImport $c) => $c->type === 'date')
+            ? 'Format AAAA-MM-JJ (exemple : 2026-11-08). Les cellules de date du modèle sont au format texte : écrivez la date telle quelle.'
+            : 'Format AAAA-MM-JJ (exemple : 2026-11-08). Aucune date n\'est demandée par ce modèle.');
         $ecrire('Téléphones', 'Texte : les cellules du modèle sont déjà au format texte, le zéro initial est conservé.');
         $ecrire('Limites', number_format(LecteurXlsx::LIGNES_MAX, 0, ',', ' ').' lignes et '.(LecteurXlsx::TAILLE_MAX_OCTETS / 1024 / 1024).' Mo au plus par fichier. Fichier .xlsx uniquement.');
 

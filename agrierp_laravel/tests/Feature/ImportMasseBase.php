@@ -36,7 +36,7 @@ abstract class ImportMasseBase extends TestCase
     {
         parent::setUp();
 
-        foreach (['manage-stocks', 'manage-ventes', 'manage-achats', 'view-stocks'] as $permission) {
+        foreach (['manage-stocks', 'manage-ventes', 'manage-achats', 'view-stocks', 'manage-rh', 'manage-comptabilite', 'manage-elevage'] as $permission) {
             Permission::findOrCreate($permission, 'web');
         }
 

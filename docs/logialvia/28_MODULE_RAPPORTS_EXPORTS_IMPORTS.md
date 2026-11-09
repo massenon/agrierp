@@ -47,6 +47,8 @@ Ordre : (1) bouton « Exporter PDF » (haut-droite, hors du panneau d'onglet, vi
 - **xlsx** : un seul exporteur (`ExportTableur.construire(DocumentOfficiel)` côté poste, paquet `excel` ; au web LogiAgriERP produit un CSV sous le libellé « Excel » : à LogiALVIA, produire un VRAI xlsx via `phpoffice/phpspreadsheet`/`maatwebsite/excel` — Q-IMP-2) ; cellules = valeurs typées (nombres en nombres, dates en dates) ou texte tel qu'affiché (à décider : le poste d'LogiAgriERP exporte le texte affiché) ; nom d'onglet ≤ 31 caractères ; permission `export-<module>`.
 - **« Exporter une table »** (Paramètres > Sauvegardes) : export brut d'une table, réservé à `admin`, jamais le jeton e-MECeF ni les secrets (SR-040).
 
+> **État au 09/11/2026 :** l'importation en masse est CONSTRUITE pour six modules (stocks, clients, fournisseurs, employés, plan comptable, rations) et accepte un CSV de repli : voir `48_PLAN_IMPORT_MASSE_PHASES.md` et `docs/PLAN_FINALISATION.md` (IMPORT-1 à IMPORT-5). La section ci-dessous est la conception d'origine.
+
 ## 5. Importation en masse par xlsx — À CONCEVOIR (priorité haute du client)
 
 **Rappel** : fonction INEXISTANTE ailleurs (guide bloc 21 : seuls existent l'import CSV d'un relevé bancaire, l'import d'un module depuis une sauvegarde SQL, l'import du plan SYSCOHADA). Tout ce qui suit est une PROPOSITION à valider (Q-IMP-1) ; rien n'est construit.

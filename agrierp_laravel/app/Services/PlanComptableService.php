@@ -18,6 +18,12 @@ use Illuminate\Validation\ValidationException;
  */
 class PlanComptableService
 {
+    /** Libellés des neuf classes (le sélecteur « Classe » de l'écran et la colonne « Classe » de l'importation en masse). */
+    public const LIBELLES_CLASSE = [
+        1 => '1 - Ressources', 2 => '2 - Immobilisations', 3 => '3 - Stocks',
+        4 => '4 - Tiers', 5 => '5 - Trésorerie', 6 => '6 - Charges', 7 => '7 - Produits', 8 => '8 - Autres', 9 => '9 - Hors bilan et analytique',
+    ];
+
     public const MOTIF_COMPTE_UTILISE = "Impossible d'archiver : ce compte est déjà utilisé dans au moins une écriture comptable.";
 
     /**

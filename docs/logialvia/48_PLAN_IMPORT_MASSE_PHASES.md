@@ -1,5 +1,7 @@
 # 48 — Plan : importation en masse par tableur xlsx, phases IMPORT-2 et suivantes
 
+> **STATUT (09/11/2026) : CONSTRUIT.** IMPORT-2 (employés, clé `employes`), IMPORT-3 (plan comptable, clé `plan_comptable`), IMPORT-4 (rations, clé `rations`, avec un nouveau point de passage `RationStandardService`) et IMPORT-5 (CSV de repli, retenu parce qu'il ne change que la lecture du fichier) sont livrés, web puis poste, parité exécutée. Le détail et la justification du choix d'IMPORT-5 : `docs/PLAN_FINALISATION.md` (« IMPORT-2 à IMPORT-5 »). Les prompts ci-dessous restent la référence pour un module de plus. NON vérifié : vrai Excel, Windows, glisser-déposer.
+
 > **USAGE**
 >
 > - **Quand l'utiliser.** Quand le client demande d'importer un module de plus que Stocks, Clients et Fournisseurs (les trois construits par IMPORT-1) : employés, plan comptable, barème de rationnement. Ce fichier est le plan de CHAQUE phase suivante, avec ses clés, ses droits, ses points de passage, ses règles de parité et ses prompts.
@@ -83,4 +85,4 @@ RAPPORT : fait / non vérifié (Excel lui-même : les fichiers ont été essayé
 ## 5. Contrôle de ce fichier
 
 - Chaque classe et chaque méthode citée existe (`grep` dans `agrierp_laravel/app/Services/Import/`, `app/Actions/SaisieEmployeAction.php`, `app/Services/PlanComptableService.php`, `agrierp_flutter/lib/features/{rh,comptabilite,elevage,importation}/`).
-- Aucune phase n'est promise « faite » : IMPORT-2 à IMPORT-5 ne sont PAS construites (`REGISTRE` n'a que trois entrées).
+- État au 09/11/2026 : `REGISTRE` a six entrées (stocks, clients, fournisseurs, employes, plan_comptable, rations) ; IMPORT-5 est le CSV de repli.

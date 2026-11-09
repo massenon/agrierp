@@ -136,10 +136,7 @@ class PlanComptable extends Component
 
     private function classLabels(): array
     {
-        return [
-            1 => '1 - Ressources', 2 => '2 - Immobilisations', 3 => '3 - Stocks',
-            4 => '4 - Tiers', 5 => '5 - Trésorerie', 6 => '6 - Charges', 7 => '7 - Produits', 8 => '8 - Autres', 9 => '9 - Hors bilan et analytique',
-        ];
+        return \App\Services\PlanComptableService::LIBELLES_CLASSE;
     }
 
     public function classLabel(int $class): string

@@ -18,7 +18,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">upload_file</span>Importation en masse
         </h2>
-        <p class="text-xs text-outline mt-xs">Créez vos produits avec leur stock initial, vos clients ou vos fournisseurs à partir d'un tableur Excel (.xlsx) : téléchargez le modèle, remplissez-le, déposez-le, vérifiez l'aperçu, puis confirmez.</p>
+        <p class="text-xs text-outline mt-xs">Créez vos produits avec leur stock initial, vos clients, vos fournisseurs, vos employés, vos comptes comptables ou votre barème de rationnement à partir d'un tableur Excel (.xlsx) : téléchargez le modèle, remplissez-le, déposez-le, vérifiez l'aperçu, puis confirmez.</p>
     </div>
 
     {{-- Étapes --}}
@@ -42,7 +42,7 @@
                 </button>
             @endforeach
         </div>
-        <p class="text-[11px] text-outline mt-md">Seuls les modules que votre rôle permet d'importer sont proposés. Employés, plan comptable et barème de rationnement viendront dans une prochaine phase.</p>
+        <p class="text-[11px] text-outline mt-md">Seuls les modules que votre rôle permet d'importer sont proposés.</p>
     @endif
 
     {{-- ÉTAPE 2 : télécharger le modèle --}}
@@ -79,12 +79,12 @@
                 class="relative">
                 <label for="fichier-import" :class="survol ? 'border-brand-emerald bg-brand-emerald/10' : 'border-outline-variant bg-white'" class="flex flex-col items-center justify-center gap-xs text-center border-2 border-dashed rounded-lg p-lg cursor-pointer hover:border-brand-emerald">
                     <span class="material-symbols-outlined text-brand-emerald text-[36px]">upload_file</span>
-                    <span class="text-sm font-bold text-on-surface">Glissez votre fichier .xlsx ici, ou cliquez pour le choisir</span>
+                    <span class="text-sm font-bold text-on-surface">Glissez votre fichier .xlsx (ou .csv) ici, ou cliquez pour le choisir</span>
                     <span class="text-[11px] text-outline">Modèle « {{ $module->libelle() }} », version {{ $module->version() }} — {{ \App\Services\Import\LecteurXlsx::TAILLE_MAX_OCTETS / 1024 / 1024 }} Mo et {{ number_format(\App\Services\Import\LecteurXlsx::LIGNES_MAX, 0, ',', ' ') }} lignes au plus</span>
                     <span x-show="envoi" x-cloak class="text-xs text-brand-forest font-bold">Envoi en cours…</span>
                     <span wire:loading wire:target="fichier" class="text-xs text-brand-forest font-bold">Lecture et validation du fichier…</span>
                 </label>
-                <input id="fichier-import" x-ref="entree" type="file" wire:model="fichier" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr-only">
+                <input id="fichier-import" x-ref="entree" type="file" wire:model="fichier" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="sr-only">
             </div>
             <div class="flex gap-sm mt-md">
                 <button type="button" wire:click="versEtape(2)" class="text-xs font-bold text-brand-forest border border-outline-variant px-md py-2 rounded-lg hover:bg-surface-zebra">Retour au modèle</button>

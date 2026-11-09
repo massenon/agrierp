@@ -29,8 +29,8 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
  * listées, jamais de demi-ligne » (guide logialvia, bloc 21 §6). Chaque ligne est REVALIDÉE au moment d'être écrite
  * (une fiche créée entre l'aperçu et la confirmation la fait passer en « ignorée »).
  *
- * Registre extensible : ajouter un module = une classe `ModuleImport` + une ligne de [REGISTRE]. Phases suivantes, non
- * construites : employés, plan comptable, barème de rationnement.
+ * Registre extensible : ajouter un module = une classe `ModuleImport` + une ligne de [REGISTRE]. Six modules : stocks, clients,
+ * fournisseurs (IMPORT-1), employés, plan comptable, rations (IMPORT-2 à 4).
  */
 class ImportMasseService
 {
@@ -39,6 +39,10 @@ class ImportMasseService
         'stocks' => ImportStocksService::class,
         'clients' => ImportClientsService::class,
         'fournisseurs' => ImportFournisseursService::class,
+        // IMPORT-2 à IMPORT-4 — employés (`manage-rh`), comptes complémentaires (`manage-comptabilite`), barème de rationnement (`manage-elevage`).
+        'employes' => ImportEmployesService::class,
+        'plan_comptable' => ImportPlanComptableService::class,
+        'rations' => ImportRationsService::class,
     ];
 
     public const STATUT_VALIDE = 'valide';
@@ -96,11 +100,13 @@ class ImportMasseService
     {
         $module = $this->moduleAutorise($cle, $user);
 
-        if (strtolower(pathinfo($nomFichier, PATHINFO_EXTENSION)) !== 'xlsx') {
-            throw new ImportRefuse('Seuls les fichiers Excel .xlsx sont acceptés : utilisez le modèle « '.$module->libelle().' » téléchargé à l\'étape 2.');
+        // IMPORT-5 — le CSV de repli est lu à part (`LecteurCsv`) et ramené au même tableau que le classeur.
+        $extension = strtolower(pathinfo($nomFichier, PATHINFO_EXTENSION));
+        if (! in_array($extension, ['xlsx', 'csv'], true)) {
+            throw new ImportRefuse('Seuls les fichiers Excel .xlsx (ou CSV .csv en repli) sont acceptés : utilisez le modèle « '.$module->libelle().' » téléchargé à l\'étape 2.');
         }
 
-        $lecture = app(LecteurXlsx::class)->lire($chemin, $module);
+        $lecture = $extension === 'csv' ? app(LecteurCsv::class)->lire($chemin, $module) : app(LecteurXlsx::class)->lire($chemin, $module);
         $empreinte = hash_file('sha256', $chemin);
 
         $lignes = [];
@@ -220,6 +226,11 @@ class ImportMasseService
         foreach ($lignes as $i => $l) {
             if ($l['statut'] !== self::STATUT_REFUSEE) {
                 $lignes[$i]['brut'] = null;
+            } else {
+                // IMPORT-2 — une colonne SENSIBLE (le salaire) n'est gardée pour aucune ligne, refusée comprise.
+                foreach ($module->colonnesSensibles() as $cle) {
+                    unset($lignes[$i]['brut'][$cle]);
+                }
             }
         }
 
@@ -280,7 +291,8 @@ class ImportMasseService
             if ($l['statut'] !== self::STATUT_REFUSEE) {
                 continue;
             }
-            $valeurs = array_map(fn (ColonneImport $c) => (string) ($l['brut'][$c->cle] ?? ''), $module->colonnes());
+            // Une colonne sensible reste VIDE : le rapport ne reproduit jamais un salaire.
+            $valeurs = array_map(fn (ColonneImport $c) => in_array($c->cle, $module->colonnesSensibles(), true) ? '' : (string) ($l['brut'][$c->cle] ?? ''), $module->colonnes());
             $this->ligneTexte($refusees, $n++, array_merge([(string) $l['ligne'], (string) $l['motif']], $valeurs));
         }
         $refusees->getColumnDimension('B')->setWidth(90);

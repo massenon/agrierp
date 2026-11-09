@@ -212,9 +212,17 @@ void main() {
     EcranPoste.dashboardElevage: {
       'view-achats': {'purchase_orders'},
     },
+    // Tickets IMPORT-2 à IMPORT-4 — l'écran importe aussi les employés (`manage-rh`), les comptes (`manage-comptabilite`) et les
+    // rations (`manage-elevage`) : il n'ouvre ces modules, et ne lit leurs tables, que sous le même droit que le serveur. Le relevé
+    // statique suit les dépôts propriétaires de bout en bout (personnel, comptabilité, paramètres d'élevage), d'où des tables que
+    // l'import lui-même ne lit pas.
     EcranPoste.importationMasse: {
       'manage-stocks': {'livestock_species'},
       'manage-achats': {'suppliers', 'purchase_orders'},
+      'manage-ventes': {'customer_advances', 'customer_reminders'},
+      'manage-rh': {'employees', 'internships', 'internship_absences', 'attendance_records', 'payslips', 'income_tax_brackets'},
+      'manage-comptabilite': {'chart_of_accounts', 'accounting_entries', 'accounting_entry_lines'},
+      'manage-elevage': {'feed_types', 'elevage_numbering_settings', 'prophylaxis_schedule_standards'},
     },
   };
 
