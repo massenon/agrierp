@@ -91,6 +91,8 @@ Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,LogiAgriERP}"; Fl
 Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\donnees"
 Type: dirifempty; Name: "{userappdata}\OLOUWACHEGOUN"
 Type: filesandordirs; Name: "{userdocs}\LogiAgriERP"
+; Ancien nom du meme dossier (avant le renommage en LogiAgriERP) : repris par le poste au premier export, supprime ici s'il reste.
+Type: filesandordirs; Name: "{userdocs}\AgriERP"
 Type: filesandordirs; Name: "{userdocs}\agrierp_justificatifs"
 
 [Code]
@@ -121,6 +123,7 @@ begin
   Result := ForceDirectories(Dossier)
     and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees'), Dossier + '\donnees-du-poste')
     and CopierDossier(ExpandConstant('{userdocs}\LogiAgriERP'), Dossier + '\archives-et-exports')
+    and CopierDossier(ExpandConstant('{userdocs}\AgriERP'), Dossier + '\archives-et-exports-ancien-dossier')
     and CopierDossier(ExpandConstant('{userdocs}\agrierp_justificatifs'), Dossier + '\justificatifs');
 end;
 

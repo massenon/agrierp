@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import '../systeme/dossier_documents.dart';
 import '../systeme/fichiers_poste.dart';
 import '../systeme/plateforme_poste.dart';
 import 'document_officiel.dart';
@@ -139,9 +139,7 @@ class ExportTableur {
     if (PlateformePoste.navigateur) {
       return PlateformePoste.livreurNavigateur(nomClasseur(classeur, maintenant), construireTableau(classeur));
     }
-    final racine = await getApplicationDocumentsDirectory();
-    final dossier = Directory(p.join(racine.path, 'LogiAgriERP'));
-    if (!dossier.existsSync()) dossier.createSync(recursive: true);
+    final dossier = await dossierDocumentsPoste();
 
     final chemin = cheminLibre(
       dossier.path,
