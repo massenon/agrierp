@@ -131,7 +131,7 @@ try {
   await capture(page, '1_connexion.png');
 
   await page.mouse.click(960, 486); await pause(600); await page.keyboard.type('admin', { delay: 40 });
-  await page.mouse.click(940, 568); await pause(600); await page.keyboard.type('AgriERP@2026', { delay: 40 });
+  await page.mouse.click(940, 568); await pause(600); await page.keyboard.type('LogiAgriERP@2026', { delay: 40 });
   const t1 = Date.now();
   await page.mouse.click(960, 664);
   await attendreTexte(page, /Définir votre code PIN/, 30000);

@@ -14,10 +14,10 @@
 
 > **Rôle.** Tu es analyste métier senior (agriculture tropicale, ERP, droit comptable OHADA/Bénin). Tu rédiges en français.
 > **Contexte.** LogiALVIA (ALLMANY ET COMPAGNIE, Natitingou, Bénin) est aujourd'hui une application Flutter Windows hors ligne (Drift, 31 écrans, 6 filières). Décision du client du 07/11/2026 : « on va CRÉER LE WEB » (Laravel + Livewire, mêmes conventions que LogiAgriERP, monorepo `/home/user/agrierp`). Le poste Windows reste, devient client du serveur (appairage, synchronisation).
-> **Tâches.** (1) Relis les sources listées en USAGE ; (2) pour chaque exigence de la section 3, vérifie qu'elle est vraie dans la source citée ; corrige-la sinon ; (3) ajoute toute exigence manquante, une par ligne, `BR-nnn`, texte à l'indicatif, mesurable, avec source ; (4) classe chaque ligne CONFIRMÉ (source écrite du client ou de logialvia), PROPOSÉ (reprise d'AgriERP, à valider) ou À DÉFINIR ; (5) tiens à jour la section 5 (écarts de périmètre) et la section 6 (questions).
-> **Contraintes.** Tout en français. Aucune règle métier inventée : ce qui n'est dans aucune source est marqué « À DÉFINIR AVEC LE CLIENT » avec une question précise (fermée, à réponse courte). Les exigences d'AgriERP sont des PROPOSITIONS pour LogiALVIA, jamais des faits (AgriERP est l'exploitation Ferme École OLOUWACHEGOUN, un autre client). Citer la source de chaque ligne (fichier + section).
+> **Tâches.** (1) Relis les sources listées en USAGE ; (2) pour chaque exigence de la section 3, vérifie qu'elle est vraie dans la source citée ; corrige-la sinon ; (3) ajoute toute exigence manquante, une par ligne, `BR-nnn`, texte à l'indicatif, mesurable, avec source ; (4) classe chaque ligne CONFIRMÉ (source écrite du client ou de logialvia), PROPOSÉ (reprise d'LogiAgriERP, à valider) ou À DÉFINIR ; (5) tiens à jour la section 5 (écarts de périmètre) et la section 6 (questions).
+> **Contraintes.** Tout en français. Aucune règle métier inventée : ce qui n'est dans aucune source est marqué « À DÉFINIR AVEC LE CLIENT » avec une question précise (fermée, à réponse courte). Les exigences d'LogiAgriERP sont des PROPOSITIONS pour LogiALVIA, jamais des faits (LogiAgriERP est l'exploitation Ferme École OLOUWACHEGOUN, un autre client). Citer la source de chaque ligne (fichier + section).
 > **Critères d'acceptation (vérifiables).** (a) chaque `BR-nnn` a : id unique, énoncé, source, statut, priorité (M/S/C) ; (b) `grep -c '^| BR-' 10_BRS_BUSINESS_REQUIREMENTS.md` ≥ 40 ; (c) aucun `BR-` sans source ; (d) la section 6 liste TOUTES les lignes « À DÉFINIR » ; (e) les contradictions B1/B2/B3 (4 rôles) vs I1 (3 rôles), B1 §6 (« pas de multi-poste ») vs décision du 07/11/2026, sont écrites en section 5 ; (f) aucun chemin cité n'est inexistant (`ls`).
-> **Interdits.** Ne pas modifier le dépôt `logialvia` ; ne pas écrire hors `docs/logialvia/` ; ne pas copier un chiffre d'AgriERP comme s'il était celui d'ALLMANY ; ne pas résoudre une contradiction en silence ; ne pas promettre la PWA hors ligne ni la paie comme acquises.
+> **Interdits.** Ne pas modifier le dépôt `logialvia` ; ne pas écrire hors `docs/logialvia/` ; ne pas copier un chiffre d'LogiAgriERP comme s'il était celui d'ALLMANY ; ne pas résoudre une contradiction en silence ; ne pas promettre la PWA hors ligne ni la paie comme acquises.
 
 ---
 
@@ -37,7 +37,7 @@ ALLMANY ET COMPAGNIE (promoteur : SIDI ALI Raïmatou ; « la Gérante » dans le
 
 ## 3. Exigences métier de départ
 
-Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (reprise AgriERP) ; **D** = À DÉFINIR AVEC LE CLIENT. Priorité : M = must, S = should, C = could.
+Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (reprise LogiAgriERP) ; **D** = À DÉFINIR AVEC LE CLIENT. Priorité : M = must, S = should, C = could.
 
 | ID | Exigence | Source | Statut | Prio |
 |---|---|---|---|---|
@@ -64,8 +64,8 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 | BR-021 | Plusieurs postes et le web partagent les mêmes données ; la synchronisation est automatique, jamais silencieuse en cas d'échec ; la règle de conflit dépend de la nature de la donnée. | guide bloc 16 | P | M |
 | BR-022 | Un compte se crée, se modifie, s'archive, se réactive ; l'admin réinitialise un mot de passe oublié (temporaire, changement forcé) ; pas de réinitialisation par e-mail. | guide bloc 2 | P | M |
 | BR-023 | Sauvegarde de la base, restauration contrôlée, remise à zéro des données de test derrière double verrou. | F8 ; guide D-SRV-7 | C | M |
-| BR-024 | Importation en masse par tableur xlsx (stocks d'abord) avec modèle à télécharger : « très important » selon le client. N'existe NI dans logialvia NI dans AgriERP : conception à valider. | guide bloc 21 | D | M |
-| BR-025 | Le web est installable (PWA). Le travail hors connexion DANS LE NAVIGATEUR n'existe pas dans AgriERP : seulement si le client le confirme. | guide bloc 20 ; `agrierp_laravel/tests/Feature/PwaEtPolicesLocalesTest.php` | D | S |
+| BR-024 | Importation en masse par tableur xlsx (stocks d'abord) avec modèle à télécharger : « très important » selon le client. N'existe NI dans logialvia NI dans LogiAgriERP : conception à valider. | guide bloc 21 | D | M |
+| BR-025 | Le web est installable (PWA). Le travail hors connexion DANS LE NAVIGATEUR n'existe pas dans LogiAgriERP : seulement si le client le confirme. | guide bloc 20 ; `agrierp_laravel/tests/Feature/PwaEtPolicesLocalesTest.php` | D | S |
 | BR-026 | Créances et dettes : aucune échéance n'est inventée ; sans délai fixé, la créance est « Sans échéance », jamais « en retard ». | F4 « Échéances de paiement » | C | M |
 | BR-027 | Le stock de produits finis est valorisé au coût de revient (jamais au prix de vente) ; un article sans coût est « Non valorisé » et sort des totaux. | F4 « Coût de revient » | C | M |
 | BR-028 | Le Mobile Money n'est qu'une information de traçabilité, pas une transaction bancaire réelle. | B1 §6 | C | M |
@@ -73,7 +73,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 | BR-030 | Une donnée inconnue s'affiche « — », jamais 0 (moyenne sur zéro échantillon, total non calculable). | F2 ; guide 14.1 | C | M |
 | BR-031 | Rapports et exports : PDF pour tous les états ; export tableur (xlsx) ; lettre de relance. | F7 ; J2 ; guide bloc 7 | P | S |
 | BR-032 | Notifications : alertes de stock sous seuil, mortalité anormale, soins à venir ou en retard, éclosion imminente, rappels de prophylaxie. | F2 ; guide bloc 18 | P | M |
-| BR-033 | Module Paie/RH : B1 §6 le déclare hors périmètre ; AgriERP en possède un complet (barème béninois). Décision du client requise. | B1 §6 ; `agrierp_laravel/app/Services/PayrollCalculationService.php` | D | C |
+| BR-033 | Module Paie/RH : B1 §6 le déclare hors périmètre ; LogiAgriERP en possède un complet (barème béninois). Décision du client requise. | B1 §6 ; `agrierp_laravel/app/Services/PayrollCalculationService.php` | D | C |
 | BR-034 | Pisciculture : les stades, la mortalité, la biomasse, le cycle bassin, l'aliment et la vente au poids ne sont définis que partiellement (voir `15_REGLES_METIER.md` §7). | F3 ; configuration_espece.dart | D | M |
 | BR-035 | Pintades : stades et durées, rations, reproducteurs distincts non confirmés. | F3 ; I2 | D | M |
 | BR-036 | Goliaths : barème de ration générique, à valider avec la Gérante. | configuration_espece.dart `noteRationnement` | D | M |
@@ -106,7 +106,7 @@ Statut : **C** = confirmé par une source de logialvia ; **P** = proposé (repri
 
 | Réf. | Constat | Décision proposée |
 |---|---|---|
-| E-ROL | B1 §5, B2 §3, B3 SRS-F-09 parlent de 4 rôles (« Comptable ») ; I1 (corrigé par K4) prouvait 3 rôles ; AgriERP en a 4. | **TRANCHÉ (DV-07)** : 4 rôles (admin, comptable, caissier, animalier). Corriger I1/K4 dans logialvia. |
+| E-ROL | B1 §5, B2 §3, B3 SRS-F-09 parlent de 4 rôles (« Comptable ») ; I1 (corrigé par K4) prouvait 3 rôles ; LogiAgriERP en a 4. | **TRANCHÉ (DV-07)** : 4 rôles (admin, comptable, caissier, animalier). Corriger I1/K4 dans logialvia. |
 | E-SRV | B1 §6 : « pas de synchronisation multi-postes, pas de serveur central » ; A1 §5 : « pas de backend » ; F3 : « aucun serveur HTTP n'est embarqué ». | Périmètre élargi par la décision du 07/11/2026 (BR-020/021) ; amender B1 §6 et A1 §5. |
 | E-MOB | B1 §6 : « application mobile hors périmètre ». | Le web est responsive/PWA ; mobile natif reste hors périmètre ; hors ligne navigateur : BR-025 (D). |
 | E-RH | B1 §6 : RH/paie hors périmètre ; le client la liste dans la mission « paie ». | BR-033 (D) ; module `27_MODULE_RH_PAIE.md` écrit en option. |

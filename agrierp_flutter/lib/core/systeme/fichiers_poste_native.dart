@@ -5,11 +5,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-/// Écrit [octets] dans `Documents\AgriERP\[nom]` (créé au besoin) et rend le chemin complet : comportement du poste Windows,
+/// Écrit [octets] dans `Documents\LogiAgriERP\[nom]` (créé au besoin) et rend le chemin complet : comportement du poste Windows,
 /// INCHANGÉ (c'est celui que les écrans annoncent).
 Future<String> livrerFichier(String nom, List<int> octets) async {
   final racine = await getApplicationDocumentsDirectory();
-  final dossier = Directory(p.join(racine.path, 'AgriERP'));
+  final dossier = Directory(p.join(racine.path, 'LogiAgriERP'));
   if (!dossier.existsSync()) dossier.createSync(recursive: true);
   final chemin = p.join(dossier.path, nom);
   File(chemin).writeAsBytesSync(octets);

@@ -616,7 +616,7 @@ class ImportationRepository {
     final version = celluleMeta('B2');
 
     if (modele.isEmpty) {
-      throw ImportationRefusee("Ce fichier n'est pas un modèle AgriERP : téléchargez le modèle « ${m.libelle} » (version ${m.version}) à l'étape 2.");
+      throw ImportationRefusee("Ce fichier n'est pas un modèle LogiAgriERP : téléchargez le modèle « ${m.libelle} » (version ${m.version}) à l'étape 2.");
     }
     if (modele != m.cle) {
       final autre = module(modele);

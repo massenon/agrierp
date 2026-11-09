@@ -55,7 +55,7 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
-  // ---- AgriERP : fenetre sans cadre qui respecte la barre des taches ----------
+  // ---- LogiAgriERP : fenetre sans cadre qui respecte la barre des taches ----------
   //
   // La fenetre est un `WS_POPUP`. Un `ShowWindow(SW_SHOWMAXIMIZED)` sur un
   // popup le fait couvrir TOUT le moniteur, barre des taches comprise. Ces

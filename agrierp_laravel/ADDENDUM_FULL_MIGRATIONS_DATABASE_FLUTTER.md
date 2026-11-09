@@ -1,4 +1,4 @@
-# AgriERP — ADDENDUM_FULL_MIGRATIONS_DATABASE_FLUTTER.md
+# LogiAgriERP — ADDENDUM_FULL_MIGRATIONS_DATABASE_FLUTTER.md
 ### 4 tables construites côté Laravel, absentes du schéma Drift documenté — à incorporer côté chat Flutter
 
 > ⚠️ **Même limite que le document source** : Dart n'est pas disponible

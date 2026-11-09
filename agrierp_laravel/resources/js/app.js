@@ -5,7 +5,7 @@ import './hors-ligne/activation-page';
 import './hors-ligne/deconnexion-web';
 
 /**
- * AgriERP — resources/js/app.js
+ * LogiAgriERP — resources/js/app.js
  *
  * Décision d'architecture (Sprint 0, ticket 0.2, documentée) :
  * Le prototype statique (assets/js/common.js) pilotait sidebar/dropdowns/

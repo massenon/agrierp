@@ -50,7 +50,7 @@ class DepensesModificationArchivageTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->admin = User::create([
             'name' => 'Direction', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
 
@@ -308,7 +308,7 @@ class DepensesModificationArchivageTest extends TestCase
         $d = $this->depenseSansPiece();
         $comptable = User::create([
             'name' => 'Comptable', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $comptable->assignRole('comptable');   // pas `manage-achats`
 

@@ -109,7 +109,7 @@
 | FR-VTE-12 | Clients : 4 KPI (Clients enregistrés, Solde total restant dû, Soldes anciens > 10 j, Événements CRM 7 j), 3 tableaux ; « Marquer contacté » horodate. | pas de faux envoi | F4 |
 | FR-VTE-13 | Catalogue : SKU `PRD-NNN` jamais réécrit ; produit vendu non supprimable (message explicatif) ; coût de revient ≤ tarif, ≥ 0. | RM-STK-04 | F4 |
 | FR-VTE-14 | Devis : client, objet, montant > 0, validité entière ≥ 1 (défaut 15) ; cycle brouillon → envoyé → accepté/refusé. | validations | H1 ; `docs/prd/devis-poste.md` |
-| FR-VTE-15 | Retours et avoirs : quantité ≤ vendu − déjà retourné ; montant ≤ ligne − déjà crédité ; tout jugé AVANT d'écrire (exercice clos, plan incomplet) ; une seule transaction. | RM-VTE-07 | guide / AgriERP `AvoirClientService` — à valider |
+| FR-VTE-15 | Retours et avoirs : quantité ≤ vendu − déjà retourné ; montant ≤ ligne − déjà crédité ; tout jugé AVANT d'écrire (exercice clos, plan incomplet) ; une seule transaction. | RM-VTE-07 | guide / LogiAgriERP `AvoirClientService` — à valider |
 | FR-VTE-16 | Facture simple jamais transmise ; normalisée : nom du client obligatoire, IFU vide ou 13 chiffres, AIB 5 % défaut / 1 % / N/A ; une normalisée n'est plus modifiable ni annulable : « Facture normalisée : corrigez-la par un avoir. » | scénarios bloc 19 | guide bloc 19 |
 | FR-VTE-17 | Avoir `FA-AAAA-NNN` désigne la facture d'origine (`origineRef`), ne la modifie jamais. | contre-passation | `facturation_mecef_tables.dart` |
 | FR-VTE-18 | Lettre de relance PDF ; sans échéance : « Rappel de Solde ». | contenu | F4, F7 |
@@ -129,7 +129,7 @@
 | FR-STK-07 | Fabrication de provende : atomique, composition par défaut 25/10/5/3/2 kg (Maïs/Soja/Coquille/Poudre de poisson/Tourteau de palmiste), alerte dès la saisie, référence commune `FAB-AAAA-NNNN`, quantités signées négatives. | un 3e intrant en dépassement bloque les cinq | F5 |
 | FR-STK-08 | Achats : 3 KPI, statuts Commandé/Livré/Partiel ; Fournisseurs : 2 tableaux et 4 KPI miroir des clients. | structure | F5 |
 | FR-STK-09 | Valorisation : intrants au PMP, produits finis au coût de revient ; sans coût = « Non valorisé », hors totaux. | RM-STK-03 | F4 |
-| FR-STK-10 | Dépense : un en-tête + N lignes, total = Σ lignes, une écriture. | `docs/prd/depenses-multilignes.md` | AgriERP |
+| FR-STK-10 | Dépense : un en-tête + N lignes, total = Σ lignes, une écriture. | `docs/prd/depenses-multilignes.md` | LogiAgriERP |
 | FR-STK-11 | Stock négatif après synchronisation d'une vente hors ligne : signalé (notification), jamais refusé. | notification | guide bloc 18 |
 | FR-STK-12 | `/inventaire` réservé à l'administrateur (et au responsable stock s'il existe) ; caissier : redirection `/dashboard`, entrée de menu absente. TRANCHÉ (DV-06). | test par (rôle, route) | `16_` DV-06 |
 
@@ -150,8 +150,8 @@
 | FR-CPT-11 | Clôture gardée : échéance passée, étapes 1 et 2 faites, N-1 clos, à-nouveau équilibré ; confirmation textuelle « CLOTURER ». | refus avec motif | J1 ; guide bloc 11 |
 | FR-CPT-12 | Immobilisations : registre, acquisition, sortie (jamais suppression), dotation datée idempotente. | **À DÉFINIR** méthode et durées (Q-CPT-4) | guide bloc 13e |
 | FR-CPT-13 | États : Bilan SYSCOHADA (actif, passif), compte de résultat en cascade, TAFIRE, 5 notes annexes. | Actif = Passif | F6 §4 |
-| FR-CPT-14 | TVA activable : inactive → aucune ligne 443/445, montants HT ; active → TTC. | RM-TVA-01 | AgriERP `TvaSettingService` — Q-TVA-1 |
-| FR-CPT-15 | Déclaration de TVA : seules les ventes réellement transmises (normalisées) sont retenues. | à confirmer avec le cabinet | AgriERP — Q-TVA-1 |
+| FR-CPT-14 | TVA activable : inactive → aucune ligne 443/445, montants HT ; active → TTC. | RM-TVA-01 | LogiAgriERP `TvaSettingService` — Q-TVA-1 |
+| FR-CPT-15 | Déclaration de TVA : seules les ventes réellement transmises (normalisées) sont retenues. | à confirmer avec le cabinet | LogiAgriERP — Q-TVA-1 |
 | FR-CPT-16 | Comptabilité analytique : ventilation par axe (`axeAnalytique`) ; charges communes non réparties sans clé validée. | somme des axes + non affecté = total | F6 §7, v19 |
 | FR-CPT-17 | Aucune écriture comptable n'est supprimable ni restaurable ; correction = contre-passation exacte (même axe analytique) puis nouvelle écriture ; l'écriture n'entre jamais en corbeille. TRANCHÉ (DV-05). | test : aucune route de suppression d'écriture | `16_` DV-05 |
 

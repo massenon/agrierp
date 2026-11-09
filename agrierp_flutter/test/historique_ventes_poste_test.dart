@@ -390,7 +390,7 @@ void main() {
         onNouvelleVente: () => nouvelleVente++,
         enregistrer: (pdf) async {
           enregistres.add(pdf);
-          return r'C:\Users\Caisse\Documents\AgriERP\vente-BBBBBBBB.pdf';
+          return r'C:\Users\Caisse\Documents\LogiAgriERP\vente-BBBBBBBB.pdf';
         },
       );
       await tester.pumpWidget(
@@ -683,7 +683,7 @@ void main() {
 
       expect(client.demandes, [uuid('a')]);
       expect(enregistres.single.fichier, 'vente-BBBBBBBB.pdf');
-      expect(find.textContaining(r'Ticket enregistré : C:\Users\Caisse\Documents\AgriERP\vente-BBBBBBBB.pdf'), findsOneWidget);
+      expect(find.textContaining(r'Ticket enregistré : C:\Users\Caisse\Documents\LogiAgriERP\vente-BBBBBBBB.pdf'), findsOneWidget);
       ToastAgri.toutRetirer();
       await tester.pumpAndSettle(const Duration(seconds: 5));
     });

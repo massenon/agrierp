@@ -90,13 +90,13 @@ try {
     await page.goto(`${base}/login`);
     await page.waitForLoadState('networkidle');
     await page.fill('#identifiant', 'caisse');
-    await page.fill('#password', 'AgriERP@2026');
+    await page.fill('#password', 'LogiAgriERP@2026');
     await Promise.all([page.waitForURL('**/dashboard', { timeout: 30000 }), page.click('[dusk=login-submit]')]);
     ok('connexion web (session Laravel) du compte « caisse »');
 
     await page.goto(`${base}/mode-hors-ligne`);
     await page.waitForSelector('#hl-mdp');
-    await page.fill('#hl-mdp', 'AgriERP@2026');
+    await page.fill('#hl-mdp', 'LogiAgriERP@2026');
     await page.fill('#hl-pin', '4821');
     await page.fill('#hl-pin2', '4821');
     await page.click('#hl-activer');

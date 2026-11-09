@@ -40,7 +40,7 @@ class BilanPrixProvendeTest extends TestCase
         $role->givePermissionTo(['view-elevage', 'manage-elevage']);
         $user = User::create([
             'name' => 'Animalier', 'email' => 'elevage@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

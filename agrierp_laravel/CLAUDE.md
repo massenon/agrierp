@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-The **real Laravel 12 application** of AgriERP — Ferme École OLOUWACHEGOUN (Ikpinlè, Benin), PAEB / Cabinet FAGUEZ SARL. Laravel 12.65 + Livewire 3 + Alpine + Tailwind CLI, PHP 8.3, MySQL, served under Laragon at `C:\laragon\www\agrierp`.
+The **real Laravel 12 application** of LogiAgriERP — Ferme École OLOUWACHEGOUN (Ikpinlè, Benin), PAEB / Cabinet FAGUEZ SARL. Laravel 12.65 + Livewire 3 + Alpine + Tailwind CLI, PHP 8.3, MySQL, served under Laragon at `C:\laragon\www\agrierp`.
 
 It is one of **three** codebases in this project:
 
@@ -251,7 +251,7 @@ Three things live outside the Blade/Livewire layer and are easy to break by acci
 
 Bump `VERSION` in `sw.js` on every deploy that changes a cached asset — `activate` purges older caches. A machine that already visited keeps serving the old file from disk otherwise.
 
-**⚠️ DOCTRINE RÉVISÉE LE 08/11/2026 (décision du client : « ON DÉMARRE LA CONSTRUCTION », ticket PWA-1).** L'ancien refus (« cette PWA ne fait pas travailler AgriERP hors ligne ; un cache de navigateur qui prétend prendre des ventes hors ligne crée deux sources de vérité ») est LEVÉ pour **un périmètre minimal : la caisse** — et pour lui seul. Ce qui change, ce qui reste interdit :
+**⚠️ DOCTRINE RÉVISÉE LE 08/11/2026 (décision du client : « ON DÉMARRE LA CONSTRUCTION », ticket PWA-1).** L'ancien refus (« cette PWA ne fait pas travailler LogiAgriERP hors ligne ; un cache de navigateur qui prétend prendre des ventes hors ligne crée deux sources de vérité ») est LEVÉ pour **un périmètre minimal : la caisse** — et pour lui seul. Ce qui change, ce qui reste interdit :
 
 | Change | Reste INTERDIT (les trois règles ci-dessus tiennent, assertées par `PwaEtPolicesLocalesTest`) |
 |---|---|
@@ -326,7 +326,7 @@ Live at `https://agrierp.fermeolouwachegoun.com`. Probed from outside, not assum
 
 ## The user manual
 
-The client deliverable `Manuel_Utilisation_AgriERP.pdf` (92 pages) is **not built by hand**. Sources live in `C:\Projects\agrierp_laravel\manuel\`:
+The client deliverable `Manuel_Utilisation_LogiAgriERP.pdf` (92 pages) is **not built by hand**. Sources live in `C:\Projects\agrierp_laravel\manuel\`:
 
 - `src/part0..6.html` — the content, one file per group of chapters
 - `build.py` — assembles, renumbers figures, then calls `imprimer.php`
@@ -362,7 +362,7 @@ One ticket = one session. Never batch-convert screens without intermediate verif
 
 **`README_SPRINT0.md` exists in two places and must stay byte-identical**: here and at `C:\Projects\agrierp_laravel\README_SPRINT0.md`. Append every ticket to **both**. They had drifted by ~2400 lines, and that gap hid six unbuilt tickets and swallowed ticket 14.25 entirely. Compare hashes of both files before appending, not by eye.
 
-Seeded demo accounts, password `AgriERP@2026` — login accepts the **short username or the e-mail** (ticket 14.50): `admin` (contact@), `compta`, `caisse`, `elevage`, all `@fermeolouwachegoun.com`. The e-mail column stays (contact, uniqueness, `login` by e-mail) but no longer carries any password reset: MDP-1 removed the e-mail reset (see below).
+Seeded demo accounts, password `LogiAgriERP@2026` — login accepts the **short username or the e-mail** (ticket 14.50): `admin` (contact@), `compta`, `caisse`, `elevage`, all `@fermeolouwachegoun.com`. The e-mail column stays (contact, uniqueness, `login` by e-mail) but no longer carries any password reset: MDP-1 removed the e-mail reset (see below).
 
 Root-level `*.md` files are project artifacts, not generic Laravel docs: `RUNBOOK_DEPLOIEMENT_CPANEL.md` (exact deployment commands for this repo), `CHECKLIST_PRE_DEPLOIEMENT.md`, `STRATEGIE_BASCULE_PAPIER_NUMERIQUE.md` (paper → digital cutover, with the data-entry gaps it exposed), `SETUP_API_SANCTUM.md`, `ADDENDUM_FULL_MIGRATIONS_DATABASE_FLUTTER.md` (Drift tables the Flutter side still lacks).
 

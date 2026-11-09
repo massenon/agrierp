@@ -123,7 +123,7 @@ class AuditRbacRoutesTest extends TestCase
             $user = User::create([
                 'name' => 'Audit '.$nomRole,
                 'email' => $nomRole.'.rbac@fermeolouwachegoun.com',
-                'password' => bcrypt('AgriERP@2026'),
+                'password' => bcrypt('LogiAgriERP@2026'),
             ]);
             $user->assignRole($role);
 

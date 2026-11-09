@@ -1,6 +1,6 @@
 # Plan type : synchronisation multi-postes hors ligne (web + postes) — à reprendre dans un autre projet
 
-Tiré du code réel d'AgriERP (Laravel 12 + Flutter/Drift). Chaque règle ci-dessous a coûté un défaut réel ; les fichiers
+Tiré du code réel d'LogiAgriERP (Laravel 12 + Flutter/Drift). Chaque règle ci-dessous a coûté un défaut réel ; les fichiers
 cités sont les références à relire. Tout est adaptable à une autre pile (le serveur peut être Node, Django…, le poste
 Electron, Android…) : ce sont les **règles**, pas les frameworks, qui comptent.
 
@@ -132,7 +132,7 @@ la liste « à envoyer » (ne part jamais, sans erreur) ; marquer `synced` à l'
 un référentiel du poste en bloc et perdre une bascule non acquittée ; un envoi plus gros que la limite du mandataire
 (413) sur une journée indivisible.
 
-## Fichiers de référence (AgriERP)
+## Fichiers de référence (LogiAgriERP)
 
 Serveur : `app/Http/Controllers/Api/{AuthController,SyncController,SupervisionSynchronisationController}.php`,
 `app/Services/{DemandeSynchronisationService,ResynchronisationPostesService,ReinitialisationDonneesService}.php`,

@@ -358,7 +358,7 @@ class ConversionDevisFactureTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-cv'.User::count(), 'email' => $role.'-cv'.User::count().'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         if ($permissionsEnPlus !== []) {
@@ -371,7 +371,7 @@ class ConversionDevisFactureTest extends TestCase
         $this->flushHeaders();
         $this->app['auth']->forgetGuards();
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => $utilisateur->username, 'password' => 'AgriERP@2026', 'device_name' => 'poste-'.$utilisateur->username,
+            'identifiant' => $utilisateur->username, 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-'.$utilisateur->username,
         ])->assertOk()->json('token');
     }
 

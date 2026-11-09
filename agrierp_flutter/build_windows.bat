@@ -1,9 +1,9 @@
 @echo off
 rem ============================================================================
-rem  build_windows.bat - AgriERP Desktop (poste Windows offline-first)
+rem  build_windows.bat - LogiAgriERP Desktop (poste Windows offline-first)
 rem
 rem  Compile l'application Flutter en mode release puis genere l'installateur
-rem  AgriERP-Setup-<version>.exe avec Inno Setup.
+rem  LogiAgriERP-Setup-<version>.exe avec Inno Setup.
 rem
 rem  Prerequis sur le poste de compilation :
 rem    - Flutter SDK (stable, Dart >= 3.12.2) dans le PATH
@@ -27,7 +27,7 @@ rem      -demo (1.2.0-demo+3, 1.2.0-demo.2+3). Elle est REFUSEE en production :
 rem      un installateur de demonstration remis a la ferme enverrait ses saisies
 rem      de demonstration au vrai serveur. Tout autre suffixe est invalide.
 rem    - Hors production, le nom de l'installateur porte l'environnement :
-rem      AgriERP-Setup-<version>-<env>.exe.
+rem      LogiAgriERP-Setup-<version>-<env>.exe.
 rem ============================================================================
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
@@ -119,10 +119,10 @@ if "%DEMO%"=="1" if /i "%ENVIRONNEMENT%"=="production" (
   exit /b 1
 )
 
-set "NOM_INSTALLATEUR=AgriERP-Setup-%VERSION_COURTE%"
+set "NOM_INSTALLATEUR=LogiAgriERP-Setup-%VERSION_COURTE%"
 if /i not "%ENVIRONNEMENT%"=="production" set "NOM_INSTALLATEUR=%NOM_INSTALLATEUR%-%ENVIRONNEMENT%"
 
-echo === AgriERP Desktop %VERSION% - environnement %ENVIRONNEMENT% ===
+echo === LogiAgriERP Desktop %VERSION% - environnement %ENVIRONNEMENT% ===
 
 where flutter >nul 2>nul || (echo [ERREUR] Flutter introuvable dans le PATH. & exit /b 1)
 

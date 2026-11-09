@@ -1,9 +1,9 @@
-# Spécimens de présentation — AgriERP
+# Spécimens de présentation — LogiAgriERP
 
 > **SPÉCIMENS DE DÉMONSTRATION — aucune facture réelle, rien n'a été transmis à la DGI.**
 > Noms, montants, IFU (`9999999999999`, `8888888888888`), NIM, code MeCeF, compteurs et QR sont **fictifs** et marqués « FICTIF » ou « SPÉCIMEN ». Ne pas scanner les QR, ne pas utiliser ces fichiers comme pièces.
 
-Tous les PDF sont produits par le **vrai code** d'AgriERP (`PdfExportService`, vues Blade `exports.*`, `MecefFactureBuilder`), à partir de données de démonstration. Seuls le filigrane et le bandeau « SPÉCIMEN » sont ajoutés après coup, page par page.
+Tous les PDF sont produits par le **vrai code** d'LogiAgriERP (`PdfExportService`, vues Blade `exports.*`, `MecefFactureBuilder`), à partir de données de démonstration. Seuls le filigrane et le bandeau « SPÉCIMEN » sont ajoutés après coup, page par page.
 
 | Fichier | Contenu | Produit par |
 |---|---|---|

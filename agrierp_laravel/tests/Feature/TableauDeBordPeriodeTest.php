@@ -28,7 +28,7 @@ class TableauDeBordPeriodeTest extends TestCase
         parent::setUp();
         Carbon::setTestNow('2026-07-15 10:00:00');
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        $u = User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $u = User::create(['name' => 'Admin', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $u->assignRole('admin');
         $this->actingAs($u);
         FiscalYear::create(['year' => 2026, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31', 'status' => 'ouvert']);

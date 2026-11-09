@@ -48,7 +48,7 @@ class _ConnectiviteReelle implements Connectivity {
 void main() {
   const adresse = 'http://127.0.0.1:8002';
   const identifiant = 'admin';
-  const motDePasse = 'AgriERP@2026';
+  const motDePasse = 'LogiAgriERP@2026';
 
   late AppDatabase db;
   late Dio client;

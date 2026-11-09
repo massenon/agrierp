@@ -4,9 +4,9 @@
 >
 > - **Quand l'utiliser.** Pendant la construction du lien web ↔ poste de LogiALVIA : le jour où le client a décidé « on va créer le web » et où le poste Flutter existant doit se rattacher au serveur. Ce fichier est la version « PROMPT » détaillée des blocs 15 à 18 du guide (`GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md`), plus la construction des automatismes (alertes, rappels, rationnement, prophylaxie).
 > - **Ordre (strict).** 1) Socle web et tables UUID (`02_ARCHITECTURE_WEB_ET_STACK.md`, `30_DATABASE.md`) → 2) **Section 1 : appairage** → 3) **Section 2 : synchronisation, étapes S0 à S5** → 4) **Section 3 : modale de synchronisation** (web d'abord) → 5) **Section 4 : alertes et rappels** (serveur planifié, puis poste) → 6) **Sections 5 et 6 : rationnement et prophylaxie** (règles dans `15_REGLES_METIER.md`). Ne pas inverser : une alerte, une modale ou un tirage sans appairage ne se testent pas.
-> - **Entrées requises.** Le web de LogiALVIA (Laravel 12 + Livewire 3) ; le poste `logialvia_app/` ; `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md` d'AgriERP lu **en entier** ; les règles métier de LogiALVIA (`15_REGLES_METIER.md`, `logialvia/docs/B6_Regles_Metier.md`).
+> - **Entrées requises.** Le web de LogiALVIA (Laravel 12 + Livewire 3) ; le poste `logialvia_app/` ; `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md` d'LogiAgriERP lu **en entier** ; les règles métier de LogiALVIA (`15_REGLES_METIER.md`, `logialvia/docs/B6_Regles_Metier.md`).
 > - **Sorties.** Appairage révocable ; moteur de synchronisation prouvé par l'essai multipostes ; bouton et modale « Synchroniser » (web + poste) ; notifications serveur planifiées + cloche du poste copiée du serveur ; fenêtre « Rappels du jour » ; rationnement et prophylaxie branchés sur des règles uniques.
-> - **Ce fichier ne recopie pas le blueprint** : il le résume, y renvoie, et ajoute les étapes de construction avec critères. En cas de doute, **le blueprint et le code d'AgriERP font foi**.
+> - **Ce fichier ne recopie pas le blueprint** : il le résume, y renvoie, et ajoute les étapes de construction avec critères. En cas de doute, **le blueprint et le code d'LogiAgriERP font foi**.
 > - **Voir aussi.** `15_REGLES_METIER.md`, `20_MODULES_*`, `40_PWA_HORS_LIGNE.md` (un « poste navigateur » est un poste de plus), `41_MECEF_EMECEF.md` (transmission au serveur), `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `31_TESTING_QA.md`.
 
 ### Cadre commun à coller en tête de CHAQUE prompt (P0)
@@ -45,7 +45,7 @@ Libellés de l'onglet « Appairage » du poste (relus) : « Adresse du serveur �
 
 OBJECTIF : rattacher chaque poste Windows de LogiALVIA au serveur de façon TRAÇABLE et RÉVOCABLE : un jeton par poste, nommé d'après le poste ; PIN local ; 401/403 → suspension ; l'administrateur voit les postes et peut en couper un. Spécification : 1.1 de /home/user/agrierp/docs/logialvia/43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md.
 
-PRÉREQUIS : le web de LogiALVIA tourne avec Sanctum et un rôle administrateur (droit équivalent à manage-users) ; une table des utilisateurs avec `is_active` ; le poste a `dio`, `uuid`, `connectivity_plus`, `flutter_secure_storage` (versions d'AgriERP : /home/user/agrierp/agrierp_flutter/pubspec.yaml). État actuel de logialvia : authentification LOCALE (logialvia_app/lib/administration/domain/usecases/connecter_utilisateur_usecase.dart, hachage_mot_de_passe.dart SHA-256 + sel), aucun réseau.
+PRÉREQUIS : le web de LogiALVIA tourne avec Sanctum et un rôle administrateur (droit équivalent à manage-users) ; une table des utilisateurs avec `is_active` ; le poste a `dio`, `uuid`, `connectivity_plus`, `flutter_secure_storage` (versions d'LogiAgriERP : /home/user/agrierp/agrierp_flutter/pubspec.yaml). État actuel de logialvia : authentification LOCALE (logialvia_app/lib/administration/domain/usecases/connecter_utilisateur_usecase.dart, hachage_mot_de_passe.dart SHA-256 + sel), aucun réseau.
 
 RÉFÉRENCES (lecture seule) : /home/user/agrierp/agrierp_laravel/app/Http/Controllers/Api/AuthController.php, app/Http/Middleware/CompteActif.php, ChangementMotDePasseObligatoireApi.php, app/Http/Controllers/Api/AdministrationEnLigneController.php, app/Livewire/Parametres/PostesAppairage.php, config/sanctum.php, routes/api.php ; /home/user/agrierp/agrierp_flutter/lib/core/auth/auth_service.dart, verrou_local.dart, lib/core/config/parametres_poste.dart, environnement.dart, lib/features/parametres/appairage_poste.dart, onglet_appairage.dart, lib/features/verrou/porte_session.dart, lib/features/auth/login_screen.dart ; tests : tests/Feature/SyncPosteJetonTest.php, SyncPullDroitsEtCompteActifTest.php, SupervisionSynchronisationTest.php, ReinitialisationMotDePasseAdminTest.php ; flutter : test/verrou_local_test.dart, echec_synchronisation_test.dart, synchronisation_automatique_test.dart, migration_bases_reelles_test.dart.
 
@@ -60,7 +60,7 @@ A7 (poste) — onglet « Appairage » : identifiant du poste, adresse (« effect
 A8 (poste) — 401/403 du serveur : la synchronisation automatique est SUSPENDUE ; `pending` conservé ; « Synchroniser maintenant » possible et explique ; reprise après réappairage.
 
 CONTRAINTES : mot de passe jamais stocké au poste ; jeton uniquement au coffre ; jamais d'appairage unique au nom de l'administrateur ; aucun aller-retour serveur obligatoire au démarrage (l'application doit s'ouvrir les jours de coupure) ; réessais infinis après 401 interdits ; durée de vie du jeton lue de la configuration, jamais en dur.
-INTERDITS : constante partagée comme identifiant de poste ; Hash::check sur un mot de passe temporaire sans le refus 403 du reste de l'API ; adresse du serveur non normalisée ; recopier le contrôleur d'AgriERP sans adapter les rôles (3 rôles de LogiALVIA, pas ceux d'AgriERP).
+INTERDITS : constante partagée comme identifiant de poste ; Hash::check sur un mot de passe temporaire sans le refus 403 du reste de l'API ; adresse du serveur non normalisée ; recopier le contrôleur d'LogiAgriERP sans adapter les rôles (3 rôles de LogiALVIA, pas ceux d'LogiAgriERP).
 
 CRITÈRES D'ACCEPTATION (chacun a un test)
 1. Deux postes, deux jetons : le jeton de l'un ne peut pas signer au nom de l'autre (403).
@@ -74,11 +74,11 @@ CRITÈRES D'ACCEPTATION (chacun a un test)
 9. Audit présent (`api.login`, `login.failed`, `sync.appairage_revoque`).
 10. Suites verte côté serveur et côté poste (`flutter analyze`, `flutter test`).
 
-PIÈGES PAYÉS (par AgriERP) : identifiant de poste partagé (deux postes indiscernables, révocation impossible) ; Hash::check d'un mot de passe temporaire sans le 403 du reste de l'API (le compte contourne le changement forcé) ; aller-retour serveur au démarrage (application inutilisable les jours de coupure) ; réessais infinis après 401 (chaque tentative = un refus de plus au journal) ; adresse non normalisée (panne déroutante).
+PIÈGES PAYÉS (par LogiAgriERP) : identifiant de poste partagé (deux postes indiscernables, révocation impossible) ; Hash::check d'un mot de passe temporaire sans le 403 du reste de l'API (le compte contourne le changement forcé) ; aller-retour serveur au démarrage (application inutilisable les jours de coupure) ; réessais infinis après 401 (chaque tentative = un refus de plus au journal) ; adresse non normalisée (panne déroutante).
 ~~~~
 
 ### 1.3 Questions au client
-Durée de vie du jeton (90 jours) ? Un poste par utilisateur, ou plusieurs utilisateurs sur un poste (AgriERP : jeton par utilisateur ET par poste) ? Qui révoque (administrateur seul) ? Un poste neuf peut-il s'amorcer hors ligne (non : première connexion en ligne) ?
+Durée de vie du jeton (90 jours) ? Un poste par utilisateur, ou plusieurs utilisateurs sur un poste (LogiAgriERP : jeton par utilisateur ET par poste) ? Qui révoque (administrateur seul) ? Un poste neuf peut-il s'amorcer hors ligne (non : première connexion en ligne) ?
 
 ---
 
@@ -86,7 +86,7 @@ Durée de vie du jeton (90 jours) ? Un poste par utilisateur, ou plusieurs utili
 
 ### 2.1 Résumé opérationnel (le blueprint est la référence, rien n'est recopié)
 
-Lire `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md` d'AgriERP, dont les sections : §1 architecture, §2 identité (appairage), §3 envoyer/recevoir, §4 une règle de conflit par nature de donnée, §5 « Renvoyer vers tous les postes », §6 remise à zéro, §7 installation/mise à jour/désinstallation, §8 sécurité, §9 checklist d'un nouveau projet, §10 pièges déjà payés.
+Lire `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md` d'LogiAgriERP, dont les sections : §1 architecture, §2 identité (appairage), §3 envoyer/recevoir, §4 une règle de conflit par nature de donnée, §5 « Renvoyer vers tous les postes », §6 remise à zéro, §7 installation/mise à jour/désinstallation, §8 sécurité, §9 checklist d'un nouveau projet, §10 pièges déjà payés.
 
 Points durs à retenir (vérifiés dans `agrierp_laravel/app/Http/Controllers/Api/SyncController.php` et `routes/api.php`) :
 - **Pull puis push**, jamais deux synchronisations en même temps. `GET /api/sync/pull?since=…&page=…&curseur_page=…` (limite 120/min) ; `POST /api/sync/push` (limite 30/min).
@@ -121,7 +121,7 @@ S1 — LE MOTEUR SUR UNE TABLE DE RÉFÉRENCE (ex. produits) : login (section 1)
 S2 — LES DÉCLENCHEURS (SynchronisationAutomatique) et le compteur « à envoyer » dont la liste de tables est PROUVÉE ÉGALE à celle de l'envoi (modèle : agrierp_flutter/test/compteur_attente_test.dart).
   Critères S2 : déclenchement à l'ouverture, au retour du réseau, par minuterie, après un geste (agrégé), à la fermeture, sur demande ; réessais 30 s/2 min/5 min/15 min/1 h ; 4xx non réessayé ; 401/403 suspend ; le compteur égale la liste d'envoi (test qui compare les deux listes).
 S3 — L'EXTENSION TABLE PAR TABLE, par ordre de dépendance, chacune avec sa règle de conflit et son test : référentiels → clients/fournisseurs → ventes et lignes (faits indépendants) → mouvements de stock (rejoués par l'action unique) → fiches d'élevage (dernier écrivain) → demandes (comptabilité, clôtures, paie). Un bloc de code par table sur le modèle du contrôleur. Table mixte : jamais d'écrasement d'un pending/conflict. Droits : lecture par PERMISSIONS_DE_TIRAGE-équivalent, écriture contrôlée table par table.
-  Critères S3 : pour chaque table, un test serveur d'envoi (accepté, refusé avec motif français, idempotent) et un test poste d'absorption stricte (ligne incohérente refusée) ; une vente en rupture de stock reçue d'un poste est ACCEPTÉE et SIGNALÉE (recommandation d'AgriERP D-SYNC-4 ; décision client à confirmer) ; une pièce descend toujours avec toutes ses lignes.
+  Critères S3 : pour chaque table, un test serveur d'envoi (accepté, refusé avec motif français, idempotent) et un test poste d'absorption stricte (ligne incohérente refusée) ; une vente en rupture de stock reçue d'un poste est ACCEPTÉE et SIGNALÉE (recommandation d'LogiAgriERP D-SYNC-4 ; décision client à confirmer) ; une pièce descend toujours avec toutes ses lignes.
 S4 — LE WEB FAIT REVENIR LES DONNÉES VERS LES POSTES : demande de synchronisation (drapeau valable 60 min, lu toutes les 30 s), renvoi complet (curseur mémorisé par poste, acquittement), journal serveur et curseurs par poste.
   Critères S4 : drapeau servi UNE fois par poste ; renvoi complet lève un drapeau qui reste levé jusqu'à l'acquittement ; un poste au jeton expiré ne reçoit aucun drapeau (message d'erreur au web).
 S5 — REMISE À ZÉRO, ESSAI À PLUSIEURS POSTES, MIGRATION DEPUIS VIEILLES BASES, DÉSINSTALLATION/RÉINSTALLATION : marque `data_reset_at` (409 si inconnue), purge au tirage suivant, compte des saisies perdues ; essai multipostes (cinq postes, coupures aléatoires) avec des invariants CHOISIS pour LogiALVIA depuis B6 (trésorerie, stock, dettes égaux partout) ; migration d'une base réelle du poste (fournie par le client ; sinon fabriquée ET dit fabriquée) ; même AppId = données intactes.
@@ -201,7 +201,7 @@ PIÈGES PAYÉS : compteur « en attente » faux (tables omises, le compteur d'or
 ~~~~
 
 ### 3.3 Questions au client
-Qui voit le bouton au web (administrateur seul) ? Seuil d'inactivité (3 jours) ? La modale du poste doit-elle lister les autres postes (AgriERP : non) ?
+Qui voit le bouton au web (administrateur seul) ? Seuil d'inactivité (3 jours) ? La modale du poste doit-elle lister les autres postes (LogiAgriERP : non) ?
 
 ---
 
@@ -240,7 +240,7 @@ RÉFÉRENCES (lecture seule) : /home/user/agrierp/agrierp_laravel/routes/console
 
 TÂCHES
 N1 (serveur) — table `notifications` (UUID, user_id nullable, target_role, type, severity, title, message, icon, link_url, is_read, read_at, created_at) ; types et gravités = valeurs AUTORISÉES seulement (liste fermée dans le code) ; modèle avec portée « visibles du rôle » ; synchronisée en TIRAGE SEUL (serveur seul).
-N2 (serveur) — service d'émission (modèle AlertesElevageService) qui REPREND les règles que logialvia calcule déjà dans AlertesViewModel/TableauBordRepository : JAMAIS un seuil nouveau. Une notification par objet et par jour (même type + même lien) : relancer la tâche n'empile rien. Destinataires par rôle (stock → admin, élevage → animalier, comme AgriERP : décision client).
+N2 (serveur) — service d'émission (modèle AlertesElevageService) qui REPREND les règles que logialvia calcule déjà dans AlertesViewModel/TableauBordRepository : JAMAIS un seuil nouveau. Une notification par objet et par jour (même type + même lien) : relancer la tâche n'empile rien. Destinataires par rôle (stock → admin, élevage → animalier, comme LogiAgriERP : décision client).
 N3 (serveur) — tâches planifiées à l'heure du Bénin dans routes/console.php (alertes 06:05, prophylaxie 06:00, purge hebdomadaire des notifications lues depuis plus de 90 jours, rappel hebdomadaire de sauvegarde au rôle admin) ; `onOneServer()` ; DEUX crons documentés (schedule:run ET queue:work, ou QUEUE_CONNECTION=sync) ; test que la tâche planifiée écrit réellement dans `notifications`.
 N4 (serveur) — événementiel : alerte d'autonomie à l'enregistrement d'une fiche (jamais bloquante), stock négatif / vente sous délai d'attente à la RÉCEPTION d'une vente du poste (le serveur accepte et signale).
 N5 (web) — cloche (lue à chaque rendu ; aucun faux « temps réel » promis), Centre de notifications, « marquer lue » / supprimer ; fenêtre « Rappels du jour » décidée CÔTÉ SERVEUR (une fois par session de navigateur, rouverte à la connexion, « Ne plus afficher aujourd'hui » l'emporte, jamais vide, droit d'élevage exigé).
@@ -263,11 +263,11 @@ CRITÈRES D'ACCEPTATION
 9. Fenêtre « Rappels du jour » : au lancement après le PIN et à chaque connexion ; JAMAIS à un déverrouillage ; « Ne plus afficher aujourd'hui » ; aucun rappel ⇒ aucune fenêtre ; sans droit d'élevage ⇒ aucune fenêtre.
 10. Suites vertes ; les limites (pas de temps réel, pas d'e-mail) écrites dans le CLAUDE.md.
 
-PIÈGES PAYÉS (par AgriERP) : alertes seulement AFFICHÉES sur leurs écrans (personne n'en était averti ; la cloche ne recevait que l'autonomie : ticket 15.49) ; aucun seuil inventé ; colonne type/severity hors valeurs autorisées (MySQL strict refuse l'écriture) ; fuseau du planificateur ; lu/supprimé local hors ligne qui fait réapparaître la notification ; tâches en file SANS travailleur (jamais exécutées, sans erreur) ; Reverb non câblé (ne pas promettre l'instantané).
+PIÈGES PAYÉS (par LogiAgriERP) : alertes seulement AFFICHÉES sur leurs écrans (personne n'en était averti ; la cloche ne recevait que l'autonomie : ticket 15.49) ; aucun seuil inventé ; colonne type/severity hors valeurs autorisées (MySQL strict refuse l'écriture) ; fuseau du planificateur ; lu/supprimé local hors ligne qui fait réapparaître la notification ; tâches en file SANS travailleur (jamais exécutées, sans erreur) ; Reverb non câblé (ne pas promettre l'instantané).
 ~~~~
 
 ### 4.3 Questions au client
-Qui reçoit quelle alerte (stock → admin, élevage → animalier, comme AgriERP) ? Heure d'émission (06:00 / 06:05, Bénin) ? Notification instantanée voulue (Reverb : non câblé même dans AgriERP) ? E-mail ou SMS en plus de la cloche (nécessite `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md` écran (b)) ? Délai de rappel des soins (3 jours) ? La formule de mortalité (pire jour ≥ 5 % ou cumul hebdomadaire) ?
+Qui reçoit quelle alerte (stock → admin, élevage → animalier, comme LogiAgriERP) ? Heure d'émission (06:00 / 06:05, Bénin) ? Notification instantanée voulue (Reverb : non câblé même dans LogiAgriERP) ? E-mail ou SMS en plus de la cloche (nécessite `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md` écran (b)) ? Délai de rappel des soins (3 jours) ? La formule de mortalité (pire jour ≥ 5 % ou cumul hebdomadaire) ?
 
 ---
 
@@ -325,7 +325,7 @@ PIÈGES PAYÉS : `diffInDays` flottant (traitements d'un jour manqués) ; fenêt
 ~~~~
 
 ### 6.2 Questions au client (rationnement et prophylaxie)
-Barèmes à confirmer par filière (Goliaths, Pintades : barème générique réutilisé ; Poissons-Chats : non confirmé dans AgriERP). Seuil d'autonomie : 3 jours ? Produit de provende rattaché à quelle filière ? Fenêtre au lancement ET à chaque connexion ? Délai N (3 jours) ? Le caissier la reçoit-il ? Les entrées « le 1er du mois » du calendrier : décision NON tranchée à AgriERP (non évaluées).
+Barèmes à confirmer par filière (Goliaths, Pintades : barème générique réutilisé ; Poissons-Chats : non confirmé dans LogiAgriERP). Seuil d'autonomie : 3 jours ? Produit de provende rattaché à quelle filière ? Fenêtre au lancement ET à chaque connexion ? Délai N (3 jours) ? Le caissier la reçoit-il ? Les entrées « le 1er du mois » du calendrier : décision NON tranchée à LogiAgriERP (non évaluées).
 
 ---
 

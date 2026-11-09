@@ -343,7 +343,7 @@ class BandesSaisieWebTest extends TestCase
         $this->archiverLaBande();
         $caissier = User::create([
             'name' => 'Caisse', 'username' => 'caisse-bs2', 'email' => 'caisse-bs2@olouwachegoun.bj',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
         $this->actingAs($caissier);
@@ -366,7 +366,7 @@ class BandesSaisieWebTest extends TestCase
     {
         $caissier = User::create([
             'name' => 'Caisse', 'username' => 'caisse-bs', 'email' => 'caisse-bs@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
         $this->actingAs($caissier);

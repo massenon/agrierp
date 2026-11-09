@@ -26,7 +26,7 @@ class PdfRecu {
   }
 }
 
-/// Ce que le poste fait d'un [PdfRecu] : l'écrire dans `Documents\AgriERP`, ou
+/// Ce que le poste fait d'un [PdfRecu] : l'écrire dans `Documents\LogiAgriERP`, ou
 /// ouvrir la boîte d'impression de Windows (qui sait aussi « Enregistrer au
 /// format PDF »). Injectés dans les écrans : les tests n'ont ni disque ni
 /// imprimante.

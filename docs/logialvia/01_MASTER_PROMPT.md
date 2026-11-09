@@ -49,9 +49,9 @@ Du plus fort au plus faible, pour un module donné :
    D1 modèle de données, E1 à E9 composants, I1 à I3 droits et sécurité, K1/K2/K4 standards, recette, bugs réels).
    Les docs peuvent être obsolètes : `logialvia/docs/02_ARCHITECTURE.md` et `11_SETUP_INSTALLATION.md` ne décrivent
    plus le code réel (voir le guide de portage, §0, contradiction 10). Le code l'emporte sur un doc périmé.
-4. **Les règles reportées d'AgriERP** : `agrierp_laravel/CLAUDE.md`, `agrierp_flutter/CLAUDE.md`, `docs/DOCTRINE_PORTAGE.md`,
+4. **Les règles reportées d'LogiAgriERP** : `agrierp_laravel/CLAUDE.md`, `agrierp_flutter/CLAUDE.md`, `docs/DOCTRINE_PORTAGE.md`,
    le guide de portage. Elles servent de réservoir de pièges déjà payés et de patrons d'architecture. Elles ne
-   remplacent JAMAIS une règle métier de LogiALVIA : un barème, une catégorie, un libellé d'AgriERP n'est pas celui de
+   remplacent JAMAIS une règle métier de LogiALVIA : un barème, une catégorie, un libellé d'LogiAgriERP n'est pas celui de
    LogiALVIA.
 
 RÈGLE D'OR : si une règle (formule, seuil, libellé, couleur, droit, état) n'est dans AUCUNE des quatre sources, tu NE
@@ -65,7 +65,7 @@ est une faute plus grave qu'un manque signalé.
    donnée synchronisée, `docs/PLAN_FINALISATION.md` (tickets restants, décisions en attente), puis le fichier source
    en entier. Ne convertis jamais un écran « de mémoire ».
 2. SPÉCIFIER : skill `prd` (PRD dans `docs/prd/<slug>.md`), puis skill `plan` (plan du ticket). Les deux skills vivent
-   dans `.claude/skills/{prd,plan}/SKILL.md` du monorepo AgriERP ; à copier dans le dépôt LogiALVIA et à adapter
+   dans `.claude/skills/{prd,plan}/SKILL.md` du monorepo LogiAgriERP ; à copier dans le dépôt LogiALVIA et à adapter
    (rôles = 3, filières, chemins) AVANT le premier ticket (voir `32_SKILLS_LIBRARY.md`).
 3. ANNONCER LE PLAN avant d'écrire du code : migrations, modèles, Actions/Services, composants Livewire, vues,
    tests, fichiers touchés, ce qui est hors périmètre, questions ouvertes. Attendre l'accord si le ticket est ambigu.
@@ -100,7 +100,7 @@ rapport, il ne se corrige pas en silence dans le même ticket.
 - **Droits à deux niveaux, toujours les deux** : (1) route `->middleware(['auth', 'can:view-{module}'])` ; (2)
   `$this->authorize('manage-{module}');` en PREMIÈRE ligne de toute méthode qui modifie. Masquer un menu n'est pas
   une autorisation. Rôles de LogiALVIA : TROIS (`admin`, `caissier`, `animalier` ; `logialvia/docs/I1_Matrice_RBAC.md`),
-  pas les quatre d'AgriERP ; la comptabilité est réservée à `admin`. Pas de `Gate::before` qui ouvre tout à l'admin.
+  pas les quatre d'LogiAgriERP ; la comptabilité est réservée à `admin`. Pas de `Gate::before` qui ouvre tout à l'admin.
 - **Aucune donnée inventée** : ni barème, ni seuil, ni libellé, ni donnée de démonstration affichée comme réelle.
   Une valeur inconnue s'affiche **« — »**, JAMAIS `0` (un zéro se lit comme une mesure : « rien ne s'est passé » ;
   un tiret se lit « le système ne sait pas »). Un `0` n'est affiché que s'il est le résultat d'un calcul réel.
@@ -159,7 +159,7 @@ Logique et données
     pintade dure 28 jours, pas 27 ; les libellés « couveuse », « Nés », « Alevins » ne sont pas interchangeables
     d'une filière à l'autre (F3, glossaire des filières). Toute valeur d'une filière vient de SA source.
 
-Interface (pièges payés sur AgriERP, sans message d'erreur quand on les commet)
+Interface (pièges payés sur LogiAgriERP, sans message d'erreur quand on les commet)
 13. Jamais de modale pilotée par `@if($showModal)` : modales événementielles (`dispatch('open-modal', name: …)`).
 14. Jamais de classe Tailwind construite dynamiquement (`"border-l-{$color}"`) : tableaux de correspondance de
     chaînes COMPLÈTES, sinon la classe disparaît silencieusement du build.
@@ -204,7 +204,7 @@ Les onglets de la fiche Poulets/Pondeuses : `logialvia/docs/H2_Onglets_Fiche_Pou
   confirmés » ; quels sont les bons barèmes ? La ration d'un poisson se mesure-t-elle en g/j par poisson ou en % de
   biomasse ? Quelle unité d'effectif (poissons, bassins) ? Qu'appelle-t-on « mortalité » et « vente » (au poids, à la pièce) ?
 - Q-FIL-3 Cycle de vie : existe-t-il un stade de passage automatique d'une catégorie à la suivante (E4 du guide) et à
-  quel âge/poids, filière par filière ? (non défini dans les sources ; ne pas déduire des durées d'AgriERP).
+  quel âge/poids, filière par filière ? (non défini dans les sources ; ne pas déduire des durées d'LogiAgriERP).
 - Q-FIL-4 Plusieurs bandes d'une même filière coexistent-elles (le poste a UNE fiche par espèce et par jour,
   `UNIQUE(espece, date)`) ? Si oui, la fiche devient par bande (guide, E2).
 - Q-FIL-5 Alertes de maturité (poids/âge) : seuls Goliaths (2800 g) ont des seuils dans le code ; les valeurs des
@@ -253,7 +253,7 @@ Pas de commit, pas de push : le rapport s'arrête à « prêt à relire ».
 
 ## Critères d'acceptation de CE prompt (comment juger qu'une session l'a respecté)
 
-1. La première réponse de la session cite au moins un fichier de `logialvia/docs/` ET un fichier d'AgriERP lus pour le ticket.
+1. La première réponse de la session cite au moins un fichier de `logialvia/docs/` ET un fichier d'LogiAgriERP lus pour le ticket.
 2. Un plan est annoncé avant la première écriture de code (visible dans l'historique de la session).
 3. `grep -rn "Alpine.start\|import Alpine" logialvia_web/resources/js` (à créer) ne renvoie rien.
 4. `grep -rn "fonts.googleapis\|cdn\." logialvia_web/resources` (à créer) ne renvoie aucune balise `<link>`/`<script>` (les commentaires sont tolérés comme dans le test `agrierp_laravel/tests/Feature/PwaEtPolicesLocalesTest.php`).

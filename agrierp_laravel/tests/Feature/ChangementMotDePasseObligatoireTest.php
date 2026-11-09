@@ -200,7 +200,7 @@ class ChangementMotDePasseObligatoireTest extends TestCase
 
     public function test_le_tirage_sert_le_drapeau_jamais_le_mot_de_passe(): void
     {
-        $admin = User::create(['name' => 'Directeur', 'username' => 'dg', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $admin = User::create(['name' => 'Directeur', 'username' => 'dg', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $admin->assignRole('admin');
 
         $reponse = $this->actingAs($admin, 'sanctum')->getJson('/api/sync/pull')->assertOk();

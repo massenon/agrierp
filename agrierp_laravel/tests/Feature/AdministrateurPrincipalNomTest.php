@@ -28,7 +28,7 @@ class AdministrateurPrincipalNomTest extends TestCase
         $this->assertSame('M. Olouchègoun', $admin->name);
         $this->assertTrue($admin->hasRole('admin'));
         $this->assertTrue($admin->is_active);
-        $this->assertTrue(Hash::check('AgriERP@2026', $admin->password));
+        $this->assertTrue(Hash::check('LogiAgriERP@2026', $admin->password));
 
         // Les trois autres comptes gardent leur nom.
         $this->assertSame('Comptable Ferme École', User::where('username', 'compta')->value('name'));
@@ -58,7 +58,7 @@ class AdministrateurPrincipalNomTest extends TestCase
         $this->seed(DemoUsersSeeder::class);
 
         $reponse = $this->postJson('/api/auth/login', [
-            'identifiant' => 'admin', 'password' => 'AgriERP@2026', 'device_name' => 'poste-test',
+            'identifiant' => 'admin', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-test',
         ]);
 
         $reponse->assertOk();

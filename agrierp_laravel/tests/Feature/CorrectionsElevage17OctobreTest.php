@@ -53,7 +53,7 @@ class CorrectionsElevage17OctobreTest extends TestCase
             Permission::findOrCreate($nom, 'web');
         }
         Role::findOrCreate('admin', 'web')->givePermissionTo(['view-elevage', 'manage-elevage']);
-        $admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $admin->assignRole('admin');
         $this->actingAs($admin);
 

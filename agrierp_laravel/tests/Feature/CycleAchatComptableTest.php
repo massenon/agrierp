@@ -51,7 +51,7 @@ class CycleAchatComptableTest extends TestCase
         $user = User::create([
             'name' => 'Acheteur',
             'email' => 'achat@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'),
+            'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole($role);
         $this->actingAs($user);

@@ -104,7 +104,7 @@ Chaque garde-fou : (1) échoue d'abord sur un échantillon cassé (T2), (2) donn
 
 ### 4.1 Seeders de démonstration
 
-- Modèle : `DemoDataSeeder` d'AgriERP. Principe fondateur : **tout passe par les vraies Actions, jamais par des insertions directes** (`AdjustStockAction`, `RecordPurchaseAccountingEntryAction`, `RecordSaleAccountingEntryAction`, …). Sinon rien ne garantit Σ débits = Σ crédits, le stock ne réconcilie pas ses mouvements, et la démonstration diverge du logiciel.
+- Modèle : `DemoDataSeeder` d'LogiAgriERP. Principe fondateur : **tout passe par les vraies Actions, jamais par des insertions directes** (`AdjustStockAction`, `RecordPurchaseAccountingEntryAction`, `RecordSaleAccountingEntryAction`, …). Sinon rien ne garantit Σ débits = Σ crédits, le stock ne réconcilie pas ses mouvements, et la démonstration diverge du logiciel.
 - Ordre porteur de dépendances (à reproduire pour LogiALVIA) : 1 Tiers → 2 Achats (établissent le PMP) → 3 Élevage (consomme la provende, produit les sujets vendus) → 4 Ventes → 5 RH (**seulement si décidé, Q2 de `30`**) → 6 Administration → 7 Comptabilité (arrêtée en dernier).
 - Lancement : `php artisan migrate:fresh --seed && php artisan db:seed --class=DemoDataSeeder`.
 - Jeu LogiALVIA : même structure `Demo/`, avec UNE ou plusieurs bandes **par filière** (poissons-chats, pintades, goliaths, + lapins, poulets, pondeuses) pour que chaque fiche, chaque ration et chaque vente ventilée soit exercée. Les produits de démonstration (alevins, pintadeaux, goliaths) portent le nom que le client emploie ; aucun tarif n'est inventé : **les prix de démonstration sont marqués « DÉMO » et jamais repris par le seeder de production**.
@@ -135,7 +135,7 @@ Source : `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` § 2 et § 6, « calculé à la 
 | Fiche journalière d'une filière avec les catégories 30/60/110 (Alevin/Juvénile/Mature, Poussins/Pintadau/Mature, Poussins/Goliathau/Mature) : effectifs, mortalité, dons, ventes sur la catégorie commercialisée, achats/naissances sur la catégorie jeune | `configuration_espece.dart` + Doc 05 §1 de logialvia + GUIDE § 2 | À écrire : la règle générique existe, les chiffres sont à calculer |
 | Alerte de maturité goliaths (2 800 g ET/OU 120 jours) | `configuration_espece.dart` (`poidsMaturiteGrammes`, `ageMaturiteJours`) | **La combinaison (ET ou OU) n'est pas tranchée dans mes sources : À DÉFINIR AVEC LE CLIENT** |
 | Autonomie alimentaire | GUIDE § 6 + DV-04 : deux seuils paramétrables (alerte 7 j, critique 3 j) ; rupture ou sans produit = critique | TRANCHÉ (DV-04) : cas T-DV04-* ci-dessous |
-| Vente avec avance, créance, avoir | `docs/B6_Regles_Metier.md` de logialvia ; Actions AgriERP | à calculer au ticket |
+| Vente avec avance, créance, avoir | `docs/B6_Regles_Metier.md` de logialvia ; Actions LogiAgriERP | à calculer au ticket |
 | Montants FCFA entiers : conversion d'un `REAL` de logialvia | règle d'arrondi inconnue | **À DÉFINIR AVEC LE CLIENT** (Q9 de `30`) |
 | TVA / groupes de taxe, e-MECeF | `41_MECEF_EMECEF.md` | voir ce fichier |
 | Clôture d'exercice, balance | `J1_Bascule_Cloture_Exercice.md` de logialvia | à calculer |
@@ -265,7 +265,7 @@ Tirés des sections « Environment traps » et « Working rhythm » des `CLAUDE.
 | Tests `integration` sans serveur | rouge permanent qu'on finit par ignorer | ils se marquent SAUTÉS, jamais échoués ; le script d'essai exige `AGRIERP_ESSAI_URL` (jamais contre le serveur de développement par accident) |
 | Deux copies du journal de tickets (`README_SPRINT0.md`) qui divergent | six tickets non livrés cachés | comparer les empreintes avant d'ajouter, jamais « à l'œil » ; **pour LogiALVIA : un seul journal, un seul emplacement** |
 | Rejeu d'une graine d'essai multipostes | les coupures de chaque poste se rejouent fidèlement, **pas** l'entrelacement des cinq postes (dépend de l'horloge) | rejouer plusieurs graines, noter le fuseau (`TZ`) |
-| Aucun dépôt git dans le poste AgriERP historique | pas d'historique à consulter | le journal de tickets fait foi ; LogiALVIA a un dépôt public : commits en français |
+| Aucun dépôt git dans le poste LogiAgriERP historique | pas d'historique à consulter | le journal de tickets fait foi ; LogiALVIA a un dépôt public : commits en français |
 | `app_database.g.dart` | édité à la main = écrasé au prochain `build_runner` | `dart run build_runner build` |
 | Mot de passe de démonstration | un compte démo en production | `DemoUsersSeeder` refuse en production ; changer le mot de passe à la livraison |
 
@@ -285,7 +285,7 @@ Tirés des sections « Environment traps » et « Working rhythm » des `CLAUDE.
 
 ## 8. UAT : scénarios de recette par rôle et par module
 
-Les **rôles** de LogiALVIA sont ceux de `docs/I1_Matrice_RBAC.md` (dépôt logialvia) : ne pas supposer les noms d'AgriERP (`admin`, `compta`, `caisse`, `elevage`). Un compte par rôle, créé par `RolesAndPermissionsSeeder`. Colonne « Rôle » ci-dessous : **catégorie fonctionnelle** à rattacher aux rôles réels de la matrice.
+Les **rôles** de LogiALVIA sont ceux de `docs/I1_Matrice_RBAC.md` (dépôt logialvia) : ne pas supposer les noms d'LogiAgriERP (`admin`, `compta`, `caisse`, `elevage`). Un compte par rôle, créé par `RolesAndPermissionsSeeder`. Colonne « Rôle » ci-dessous : **catégorie fonctionnelle** à rattacher aux rôles réels de la matrice.
 
 Format d'un scénario : identifiant · rôle · pré-condition · étapes · résultat attendu · preuve (capture ou valeur relevée). Les valeurs chiffrées attendues viennent de la section 4.2 ; sinon « calculer avec le client avant la recette ».
 
@@ -531,7 +531,7 @@ INTERDITS : pointer Dusk sur la base de développement ; test vert à vide ; com
 
 ```text
 RÔLE : ingénieur test, méthode du projet (le test qui aurait attrapé le défaut).
-CONTEXTE : module <X> (fichier docs/logialvia/20_MODULES_<X>.md). Lis ce fichier, docs/logialvia/15_REGLES_METIER.md (règles du module), docs/logialvia/30_DATABASE_ENGINEERING.md (tables du module) et docs/logialvia/31_TESTING_QA.md (sections 3, 4, 7, 9). Modèles d'AgriERP à imiter : /home/user/agrierp/agrierp_laravel/tests/Feature/ (par ex. FicheLapinsEffectifAutomatiqueTest.php, AlerteAutonomieAlimentaireTest.php, ClotureGardeeTest.php, AutorisationsMethodesMutantesTest.php).
+CONTEXTE : module <X> (fichier docs/logialvia/20_MODULES_<X>.md). Lis ce fichier, docs/logialvia/15_REGLES_METIER.md (règles du module), docs/logialvia/30_DATABASE_ENGINEERING.md (tables du module) et docs/logialvia/31_TESTING_QA.md (sections 3, 4, 7, 9). Modèles d'LogiAgriERP à imiter : /home/user/agrierp/agrierp_laravel/tests/Feature/ (par ex. FicheLapinsEffectifAutomatiqueTest.php, AlerteAutonomieAlimentaireTest.php, ClotureGardeeTest.php, AutorisationsMethodesMutantesTest.php).
 TÂCHES :
 1. Liste les règles du module et pour chacune : valeur attendue CALCULÉE À LA MAIN (cite la règle ; si elle est absente des sources, écris « À DÉFINIR AVEC LE CLIENT » et un test `skip` portant la question).
 2. Écris les tests E2 (fonctions pures), E3 (Feature Livewire sqlite mémoire : rendu, validation française sous le champ, persistance, droit refusé pour un rôle de lecture, refus motivé avec message exact).

@@ -38,7 +38,7 @@ import 'historique_ventes_repository.dart';
 /// pas encore eu lieu au poste : l'écran l'écrit « … — le stock sera réintégré à la synchronisation. » (ÉCART ASSUMÉ).
 ///
 /// ⚠️ ÉCARTS ASSUMÉS (hors ligne) : « Télécharger PDF » exige le réseau (le ticket est produit par le serveur) et ENREGISTRE
-/// le fichier dans Documents\AgriERP au lieu de le télécharger dans un navigateur ; sous la pastille d'une vente pas encore
+/// le fichier dans Documents\LogiAgriERP au lieu de le télécharger dans un navigateur ; sous la pastille d'une vente pas encore
 /// reçue du serveur, la mention « Non envoyée » ; le bouton « Annuler » est grisé sans `manage-ventes` (le web 403 à
 /// l'envoi), comme `@lectureSeule` le grise quand l'exercice affiché est clos.
 class HistoriqueVentesOnglet extends StatefulWidget {
@@ -841,7 +841,7 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
     );
   }
 
-  /// `exportSaleTicketPdf()` : le ticket de la vente, produit par le serveur, enregistré dans Documents\AgriERP.
+  /// `exportSaleTicketPdf()` : le ticket de la vente, produit par le serveur, enregistré dans Documents\LogiAgriERP.
   Future<void> _telechargerPdf(String id) async {
     if (!widget.peutExporter) {
       ToastAgri.afficher(context, 'Votre rôle ne permet pas d\'exporter le ticket d\'une vente.', type: TypeToast.erreur);

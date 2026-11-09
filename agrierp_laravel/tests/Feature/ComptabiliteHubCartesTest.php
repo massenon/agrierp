@@ -40,7 +40,7 @@ class ComptabiliteHubCartesTest extends TestCase
         Permission::findOrCreate('view-comptabilite', 'web');
         $role = Role::findOrCreate('comptable-hub', 'web');
         $role->syncPermissions(['view-comptabilite']);
-        $u = User::create(['name' => 'Comptable', 'email' => 'hub@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026')]);
+        $u = User::create(['name' => 'Comptable', 'email' => 'hub@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026')]);
         $u->assignRole($role);
         $this->actingAs($u);
 

@@ -48,7 +48,7 @@ class TotalDocument extends LigneDocument {
   final bool premiere;
 }
 
-/// Un document officiel AgriERP, prêt à imprimer.
+/// Un document officiel LogiAgriERP, prêt à imprimer.
 ///
 /// Transposition de `prototype_html/assets/js/pdf-export.js` —
 /// `exportOfficialPDF(opts)`.

@@ -2,11 +2,11 @@
 
 > **USAGE**
 >
-> - **Quand l'utiliser.** (1) Pour **comprendre** la facture normalisée du Bénin et dire au client ce qui est livré dans AgriERP, ce qui ne l'est pas et ce qui n'a jamais été vérifié. (2) Pour **construire** le module MeCeF de LogiALVIA côté serveur et retirer la transmission du poste (prompt de la section 7).
+> - **Quand l'utiliser.** (1) Pour **comprendre** la facture normalisée du Bénin et dire au client ce qui est livré dans LogiAgriERP, ce qui ne l'est pas et ce qui n'a jamais été vérifié. (2) Pour **construire** le module MeCeF de LogiALVIA côté serveur et retirer la transmission du poste (prompt de la section 7).
 > - **Ordre.** Après le socle web (`02_ARCHITECTURE_WEB_ET_STACK.md`), l'appairage et la synchronisation (`43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`, S0 à S5) et les écrans de configuration (`42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, écran (a)). **Avant le web : ne PAS toucher au module actuel de `logialvia_app/`** (il marche comme « à transmettre »).
 > - **Entrées requises.** Réponses du client (section 8) ; compte e-MECeF existant (IFU, jeton, environnement d'essai) ; règles de TVA de LogiALVIA (`15_REGLES_METIER.md`) ; le guide `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` bloc 19.
 > - **Sorties.** Un module MeCeF serveur (passerelle, constructeur unique, choix simple/normalisée, réglage, test de configuration), la migration des factures existantes, le poste allégé, les tests `Http::fake`, la procédure du premier essai réel.
-> - **Avertissements en tête (à répéter au client).** **AUCUN essai réel contre la DGI n'a été fait**, ni dans AgriERP ni dans LogiALVIA (ni jeton ni IFU de test). Les adresses de l'API et les noms de champs viennent d'un paquet **non officiel** ; aucune documentation DGI n'a pu être consultée. Le traitement de l'**AIB** est une lecture de ce paquet : **à confirmer**.
+> - **Avertissements en tête (à répéter au client).** **AUCUN essai réel contre la DGI n'a été fait**, ni dans LogiAgriERP ni dans LogiALVIA (ni jeton ni IFU de test). Les adresses de l'API et les noms de champs viennent d'un paquet **non officiel** ; aucune documentation DGI n'a pu être consultée. Le traitement de l'**AIB** est une lecture de ce paquet : **à confirmer**.
 > - **Voir aussi.** `15_REGLES_METIER.md` (TVA, ventes), `20_MODULES_*` (Ventes, Facturation), `30_DATABASE.md`, `31_TESTING_QA.md`, `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `40_PWA_HORS_LIGNE.md` (hors ligne : « demandée — en attente »).
 
 ---
@@ -23,21 +23,21 @@ Deux façons d'obtenir cette certification (les deux existent, d'après les déc
 | Principe | API en ligne de la DGI : le logiciel envoie la facture, la DGI la certifie | Un appareil branché à un PC, piloté en HTTP local |
 | Qui transmet | le **serveur** (jeton secret, jamais sur les postes) | le **poste** où le boîtier est branché (le serveur hébergé ne peut pas joindre `localhost`) |
 | Prérequis | compte e-MECeF de l'IFU, **jeton** (JWT) délivré par le portail de la DGI | boîtier acheté et déclaré, pilote installé |
-| État dans AgriERP | **livré** (MECEF-1, MECEF-3) | **squelette** : réglage enregistré, rien n'est transmis (MECEF-2 à faire) |
+| État dans LogiAgriERP | **livré** (MECEF-1, MECEF-3) | **squelette** : réglage enregistré, rien n'est transmis (MECEF-2 à faire) |
 
 ### 1.2 Vocabulaire
 - **IFU** : Identifiant Fiscal Unique, **13 chiffres** (celui de l'entreprise vendeuse ; celui du client, **facultatif**).
 - **NIM** : Numéro d'Identification de la Machine, attribué par la DGI ; il s'imprime sur chaque facture normalisée (`mecef_nim`). Exemple de réponse du pilote CC300 : `"NIM": "ED04000623"`.
-- **AIB** : taux appliqué à l'acheteur « si applicable » ; valeurs du boîtier : `1%`, `5%`, `N/A` (`bill.spec.json`). Développement du sigle, assiette et décideur : **à confirmer avec la DGI ou le cabinet** (AgriERP propose **5 % par défaut**, 1 %, ou « Aucun (N/A) »).
-- **Groupes de taxe** (lettres imprimées en face de chaque ligne), d'après `bill.spec.json` du pilote : **A** Exonéré · **B** Taxable · **C** Exportation de produits taxables · **D** TVA régime d'exception · **E** Régime fiscal TPS · **F** Réservé (taxe de séjour : l'article doit s'appeler « TAXE DE SEJOUR »). **AgriERP n'utilise que A (0 %) et B (18 %)** et **refuse tout autre taux avec son motif** (`MecefFactureBuilder::GROUPES_TAXE`).
-- **Types de facture** (champ `vt` / `rt` du boîtier) : vente **FV** (copie CV) · vente à l'exportation **EV** (copie EC) · avoir **FA** (copie CA) · avoir à l'exportation **EA** (copie ER). **AgriERP n'émet que FV et FA.** EV/EA (exportation) : non construits, à décider avec le client s'il exporte.
+- **AIB** : taux appliqué à l'acheteur « si applicable » ; valeurs du boîtier : `1%`, `5%`, `N/A` (`bill.spec.json`). Développement du sigle, assiette et décideur : **à confirmer avec la DGI ou le cabinet** (LogiAgriERP propose **5 % par défaut**, 1 %, ou « Aucun (N/A) »).
+- **Groupes de taxe** (lettres imprimées en face de chaque ligne), d'après `bill.spec.json` du pilote : **A** Exonéré · **B** Taxable · **C** Exportation de produits taxables · **D** TVA régime d'exception · **E** Régime fiscal TPS · **F** Réservé (taxe de séjour : l'article doit s'appeler « TAXE DE SEJOUR »). **LogiAgriERP n'utilise que A (0 %) et B (18 %)** et **refuse tout autre taux avec son motif** (`MecefFactureBuilder::GROUPES_TAXE`).
+- **Types de facture** (champ `vt` / `rt` du boîtier) : vente **FV** (copie CV) · vente à l'exportation **EV** (copie EC) · avoir **FA** (copie CA) · avoir à l'exportation **EA** (copie ER). **LogiAgriERP n'émet que FV et FA.** EV/EA (exportation) : non construits, à décider avec le client s'il exporte.
 - **Avoir** : une facture normalisée **ne se modifie ni ne s'annule** ; elle se corrige par un **avoir FA lié à la facture d'origine**. Côté API en ligne, la référence de l'avoir est l'`uid` de la facture d'origine (`reference` = `mecef_uid`). Côté boîtier, la référence attendue est au format **« NIM-TC »** (NIM de la machine d'origine, TC de la facture d'origine) : ce n'est **pas** le même champ ni la même valeur (voir 4.3).
 - **QR code** : donnée renvoyée par la DGI (`qrCode`), dessinée sur la facture avec le code MeCeF/DGI, le NIM, les compteurs, la date et l'heure. Exemple de forme renvoyée par le pilote : `F;ED04000623;NW34NID6ZHANFNMZ2IU7LL3H;3201910768821;20200503135002`.
-- **Facture simple** (AgriERP) : facture PDF **sans certification**, mention « Facture simple — non normalisée DGI » ; **jamais transmise**. **Facture normalisée** : choisie à la caisse ; nom et prénom du client obligatoires, IFU facultatif, taux d'AIB.
+- **Facture simple** (LogiAgriERP) : facture PDF **sans certification**, mention « Facture simple — non normalisée DGI » ; **jamais transmise**. **Facture normalisée** : choisie à la caisse ; nom et prénom du client obligatoires, IFU facultatif, taux d'AIB.
 
 ---
 
-## 2. Ce qui est LIVRÉ dans AgriERP (07/11/2026) — vérifié dans le code
+## 2. Ce qui est LIVRÉ dans LogiAgriERP (07/11/2026) — vérifié dans le code
 
 Sources : `agrierp_laravel/CLAUDE.md` (MECEF-1, MECEF-3, VC-5), `docs/PLAN_FINALISATION.md` (MECEF-1, MECEF-3, MECEF-2), code sous `agrierp_laravel/app/Services/Mecef/`.
 
@@ -94,7 +94,7 @@ Pilote relu : `/home/user/issotina/eltrade-cc300-driver/` (`Readme.md`, `bill.sp
 | Schéma `/bill` | `seller_id`, `seller_name` (≤ 30), `payments` [{`mode` V/C/M/D/E/A, `amount`}], `products` [{`label` ≤ 60, `tax` A à F, `price` TTC, `items` (quantité), `original_price`, `price_change_explanation` ≤ 24, `specific_tax`…}], `buyer_ifu`, `buyer_name`, `aib` (`1%`/`5%`/`N/A`) ; **vente** : `vt` (FV/CV/EV/EC) ; **avoir** : `rt` (FA/CA/EA/ER) + `rn` (« NIM-TC ») |
 
 ### 3.1 MECEF-2 (non construit, faute de boîtier)
-Contrat défini dans `docs/PLAN_FINALISATION.md` : le poste appelle `http://localhost:38917/check` puis `/bill`, **vérifie que `qr_code` est rempli**, puis synchronise le résultat. Question ouverte d'AgriERP : le constructeur étant en PHP, MECEF-2 le fera soit porter en Dart avec parité exécutée, soit servir la charge par le serveur.
+Contrat défini dans `docs/PLAN_FINALISATION.md` : le poste appelle `http://localhost:38917/check` puis `/bill`, **vérifie que `qr_code` est rempli**, puis synchronise le résultat. Question ouverte d'LogiAgriERP : le constructeur étant en PHP, MECEF-2 le fera soit porter en Dart avec parité exécutée, soit servir la charge par le serveur.
 
 ### 3.2 ⚠️ Précision à apporter au guide et au plan (écart relevé)
 Le guide (bloc 19) et le plan disent que le boîtier utilisera « le MÊME `MecefFactureBuilder` ». **Ce n'est vrai que pour la logique** (prix entiers, répartition de remise, arrondi, groupes de taxe, libellés ≤ 60). Le **JSON** produit par `MecefFactureBuilder::enveloppe` suit l'API en ligne (`items`/`taxGroup`/`payment`/`type`/`reference`/`aib` = `A|B`) ; le pilote attend un **autre schéma** (`products`/`tax`/`payments`/`vt`|`rt`/`rn`/`aib` = `"1%"|"5%"|"N/A"`, `seller_id`, `seller_name`). MECEF-2 nécessite donc une **couche de traduction** (et, pour l'avoir, la référence « NIM-TC » au lieu de l'`uid`). Ne pas promettre « même charge utile ».
@@ -110,7 +110,7 @@ Le guide (bloc 19) et le plan disent que le boîtier utilisera « le MÊME `Mece
 5. Détection de l'expiration et reprise par confirmation seule ; comportement d'une **confirmation d'une facture déjà confirmée** ; arrondis des prix non entiers : non vérifiés.
 6. MySQL/MariaDB réel (migration `mecef_status` enum → texte essayée sous SQLite seulement) ; **rendu Windows réel du QR du PDF du poste** ; suites complètes.
 7. Mode boîtier : rien n'est transmis (squelette).
-8. Texte d'erreur d'AgriERP à corriger dans LogiALVIA (incohérence relevée) : `EmecefGateway` renvoie « renseignez-le dans Paramètres, Données de l'Entreprise », alors que le formulaire du jeton est l'onglet **« Facturation normalisée (e-MECeF) »**. Dans LogiALVIA, citer le bon onglet.
+8. Texte d'erreur d'LogiAgriERP à corriger dans LogiALVIA (incohérence relevée) : `EmecefGateway` renvoie « renseignez-le dans Paramètres, Données de l'Entreprise », alors que le formulaire du jeton est l'onglet **« Facturation normalisée (e-MECeF) »**. Dans LogiALVIA, citer le bon onglet.
 
 ---
 
@@ -137,10 +137,10 @@ Source : `docs/PLAN_FINALISATION.md` (MECEF-3, « Parcours du premier essai rée
 Un module MeCeF **complet côté poste**, qui transmet lui-même : `logialvia_app/lib/commercial/domain/services/transmission_mecef.dart` (`ClientMecefHttp`, paquet `http`, **un seul `POST {url}/invoice`** avec jeton porteur, délai 20 s ; `ReponseMecef.depuisJson` essaie plusieurs noms de champs ; `DepotJetonMecef` dans `flutter_secure_storage`), `logialvia_app/lib/commercial/domain/entities/facture_mecef.dart` (`TypeFacture` FV/FA, `StatutFacture` `a_transmettre` · `normalisee` · `rejetee`, `GroupeTaxe` modifiable, groupe par défaut A exonéré), `logialvia_app/lib/commercial/data/tables/facturation_mecef_tables.dart`, `logialvia_app/lib/commercial/data/repositories/factures_mecef_repository_drift.dart`, `logialvia_app/lib/commercial/presentation/viewmodels/factures_mecef_view_model.dart`, `logialvia_app/lib/commercial/presentation/screens/factures_mecef_screen.dart`, `logialvia_app/lib/commercial/presentation/screens/documents_mecef.dart`, réglages `mecefActif`/`mecefUrl`/`mecefNim` dans `logialvia_app/lib/administration/data/tables/parametres_entreprise_table.dart` (BR-ADM-004 : activable seulement si IFU **et** RCCM), test `logialvia_app/test/commercial/factures_mecef_test.dart`. Le fichier de transmission **dit lui-même** que son contrat « n'a pas été éprouvé contre le service réel ».
 
 **Écarts à connaître avant d'aligner (relevés dans `ClientMecefHttp._corps`)** :
-- il envoie `price: l.prixUnitaireHt` (**hors taxe**) alors que le pilote documente le prix **avec TVA** (`bill.spec.json` : « Prix avec TVA ») et qu'AgriERP envoie du **TTC** (`items[].price` TTC dans le constructeur) : **à trancher et prouver** ; une facture à prix HT serait fausse ;
-- noms de champs différents de ceux d'AgriERP (`client.nom` ↔ `client.name`, `dateTime`, `reference_origine`, `motif`) : **aucun des deux jeux n'est confirmé par la DGI** ;
+- il envoie `price: l.prixUnitaireHt` (**hors taxe**) alors que le pilote documente le prix **avec TVA** (`bill.spec.json` : « Prix avec TVA ») et qu'LogiAgriERP envoie du **TTC** (`items[].price` TTC dans le constructeur) : **à trancher et prouver** ; une facture à prix HT serait fausse ;
+- noms de champs différents de ceux d'LogiAgriERP (`client.nom` ↔ `client.name`, `dateTime`, `reference_origine`, `motif`) : **aucun des deux jeux n'est confirmé par la DGI** ;
 - pas d'étape de confirmation, pas d'`uid` gardé, pas de verrou : un renvoi peut produire deux factures ;
-- groupes de taxe modifiables « non figés » (AgriERP : 0 % = A, 18 % = B, le reste refusé) ;
+- groupes de taxe modifiables « non figés » (LogiAgriERP : 0 % = A, 18 % = B, le reste refusé) ;
 - numérotation `FV`/`FA` propre à logialvia (clé texte `ref`).
 
 ---
@@ -156,17 +156,17 @@ PRÉREQUIS (si l'un manque : ARRÊTE-TOI et dis lequel)
 - Réponses du client à la section 8 de `41_MECEF_EMECEF.md` (surtout : TVA autres que 0 et 18 %, AIB, boîtier ou non, qui saisit le jeton, reprise des factures existantes).
 - Avant ces prérequis : NE TOUCHE PAS `logialvia_app/lib/commercial/domain/services/transmission_mecef.dart`.
 
-LECTURE OBLIGATOIRE (référence AgriERP, lecture seule)
+LECTURE OBLIGATOIRE (référence LogiAgriERP, lecture seule)
 /home/user/agrierp/agrierp_laravel/config/mecef.php ; app/Support/MecefMode.php, MecefEtat.php, AibTaux.php, FactureType.php ; app/Services/Mecef/MecefGatewayFactory.php, MecefGatewayInterface.php, MecefAvoirGatewayInterface.php, EmecefGateway.php, BoitierMecefGateway.php, FakeMecefGateway.php, MecefFactureBuilder.php, FacturationMecefService.php, ChoixFactureService.php, MecefReglage.php, MecefReglageService.php, MecefConfigurationTesteur.php ; app/Livewire/Parametres/FacturationEmecef.php ; migrations database/migrations/2026_11_07_000001_add_mecef_reglage_to_company_settings.php à …000005_add_delivery_in_total_to_sales_table.php ; tests tests/Feature/Mecef*.php, FactureNormaliseeVerrouTest.php, AvoirMecefTest.php, ModuleMecefDesactiveTest.php, EchecMecefEnvoiAuditTest.php ; poste : agrierp_flutter/lib/features/ventes/choix_facture.dart, agrierp_flutter/test/choix_facture_parite_php_test.dart, mecef_emecef_poste_test.dart, mecef_tirage_test.dart. Et /home/user/agrierp/docs/logialvia/41_MECEF_EMECEF.md (ce fichier), sections 2 à 4.
 LogiALVIA (lecture seule) : /home/user/massenon/logialvia/logialvia_app/lib/commercial/domain/services/transmission_mecef.dart, domain/entities/facture_mecef.dart, data/tables/facturation_mecef_tables.dart, data/repositories/factures_mecef_repository_drift.dart, presentation/viewmodels/factures_mecef_view_model.dart, presentation/screens/factures_mecef_screen.dart, documents_mecef.dart, widgets/modale_facture_vente.dart, widgets/onglet_pos.dart ; administration/data/tables/parametres_entreprise_table.dart ; test/commercial/factures_mecef_test.dart.
 
 TÂCHES (une tâche = un commit ; chacune finit vert)
 
-M1 — Décisions écrites. Crée docs/MECEF_DECISIONS.md : taux de TVA admis et groupes de taxe (AgriERP : 0 % = A, 18 % = B, tout autre taux REFUSÉ avec son motif ; ne copie pas sans l'accord du client), AIB (liste, défaut, assiette : « à confirmer »), boîtier oui/non, types FV/FA seulement (EV/EA hors périmètre sauf demande), qui saisit le jeton (administrateur, au web), retransmission automatique oui/non, numérotation de la facture normalisée (celle du serveur ; le code MeCeF/DGI est celui de la DGI), prix envoyés (TTC : à confirmer et à prouver).
+M1 — Décisions écrites. Crée docs/MECEF_DECISIONS.md : taux de TVA admis et groupes de taxe (LogiAgriERP : 0 % = A, 18 % = B, tout autre taux REFUSÉ avec son motif ; ne copie pas sans l'accord du client), AIB (liste, défaut, assiette : « à confirmer »), boîtier oui/non, types FV/FA seulement (EV/EA hors périmètre sauf demande), qui saisit le jeton (administrateur, au web), retransmission automatique oui/non, numérotation de la facture normalisée (celle du serveur ; le code MeCeF/DGI est celui de la DGI), prix envoyés (TTC : à confirmer et à prouver).
 
 M2 — Schéma (serveur ET Drift identiques, UUID, colonnes de synchro).
  company_settings : mecef_mode (desactive|emecef|boitier, NULL = jamais réglé), mecef_api_url, mecef_operateur_id, mecef_operateur_nom, mecef_jeton_encrypted (cast `encrypted`, JAMAIS au poste), ifu (13 chiffres exigés en mode emecef).
- ventes : facture_type (simple défaut|normalisee), client_ifu (13 chiffres, nullable), client_nom_facture (≤150), aib_taux ('5%'|'1%'|'N/A', nullable), mecef_status, mecef_uid, mecef_code, mecef_qr_ref, mecef_nim, mecef_compteurs, mecef_normalise_le, mecef_message, mecef_aib_montant ; avoirs : mêmes colonnes mecef_*. Clés d'état PROPRES dès le départ : en_attente · normalisee · refusee · expiree (pas les anciens noms d'AgriERP).
+ ventes : facture_type (simple défaut|normalisee), client_ifu (13 chiffres, nullable), client_nom_facture (≤150), aib_taux ('5%'|'1%'|'N/A', nullable), mecef_status, mecef_uid, mecef_code, mecef_qr_ref, mecef_nim, mecef_compteurs, mecef_normalise_le, mecef_message, mecef_aib_montant ; avoirs : mêmes colonnes mecef_*. Clés d'état PROPRES dès le départ : en_attente · normalisee · refusee · expiree (pas les anciens noms d'LogiAgriERP).
  clients : ifu (13 chiffres, facultatif).
  Le poste n'ÉCRIT jamais les colonnes mecef_* ; il écrit seulement facture_type, client_ifu, client_nom_facture, aib_taux (liste blanche des champs du poste, comme VENTE_CHAMPS_DU_POSTE).
  Côté Flutter : lib/core/database/app_database.dart puis `dart run build_runner build` ; ne JAMAIS éditer le fichier généré à la main.
@@ -224,7 +224,7 @@ PIÈGES DÉJÀ PAYÉS PAR AGRIERP
 - Clés d'état conservées d'un ancien jeu (`transmise`, `erreur`) : 1 500 occurrences à migrer plus tard.
 - Pilote du boîtier : 200 même en échec ; lire `qr_code`.
 
-RAPPORT FINAL : fichiers, tests (verts/rouges/sautés), points « NON VÉRIFIÉ contre la DGI », écarts de champs entre logialvia et AgriERP et choix retenu, questions restées ouvertes.
+RAPPORT FINAL : fichiers, tests (verts/rouges/sautés), points « NON VÉRIFIÉ contre la DGI », écarts de champs entre logialvia et LogiAgriERP et choix retenu, questions restées ouvertes.
 ~~~~
 
 ---
@@ -232,18 +232,18 @@ RAPPORT FINAL : fichiers, tests (verts/rouges/sautés), points « NON VÉRIFIÉ 
 ## 8. Questions au client
 
 1. **Compte e-MECeF existant** : IFU, jeton d'**essai** puis de **production** ? Qui les obtient sur le portail de la DGI ?
-2. **Boîtier** (modèle, achat prévu) ou **seulement l'API en ligne** ? (le mode boîtier n'est pas construit, même dans AgriERP)
+2. **Boîtier** (modèle, achat prévu) ou **seulement l'API en ligne** ? (le mode boîtier n'est pas construit, même dans LogiAgriERP)
 3. **Qui saisit le jeton** (administrateur, au web, `manage-parametres`) ? Qui le renouvelle à son expiration ?
 4. **TVA** : autres taux que 0 % et 18 % ? Groupes C à F nécessaires (export, régime d'exception, TPS, taxe de séjour) ?
 5. **AIB** : taux (5 % / 1 %), qui le décide, sur quelle assiette ? (à confirmer avec la DGI ou le cabinet) Défaut 5 % acceptable ?
-6. **Prix envoyés** : TTC (cas d'AgriERP et du pilote) ? Les prix de LogiALVIA sont-ils HT ou TTC ?
+6. **Prix envoyés** : TTC (cas d'LogiAgriERP et du pilote) ? Les prix de LogiALVIA sont-ils HT ou TTC ?
 7. Les ventes **sans client identifié** : facture simple par défaut ?
 8. La **Déclaration de TVA** doit-elle inclure les factures simples ? (à confirmer avec le cabinet comptable)
 9. **Numérotation** de la facture normalisée : celle du serveur, celle de la DGI (code MeCeF/DGI) ?
 10. **Livraison facturée** incluse au total ? **Exportations** (EV/EA) ?
-11. **Retransmission automatique** des factures « En attente » (AgriERP : manuelle seulement) ?
+11. **Retransmission automatique** des factures « En attente » (LogiAgriERP : manuelle seulement) ?
 12. **Reprise** des factures existantes de LogiALVIA (statuts) : acceptez-vous le rangement en « simple » de tout ce qui n'est pas déjà normalisé ?
-13. **BR-ADM-004** de LogiALVIA (module activable seulement si IFU **et** RCCM) : conservé ? (AgriERP exige seulement l'IFU à 13 chiffres en mode e-MECeF.)
+13. **BR-ADM-004** de LogiALVIA (module activable seulement si IFU **et** RCCM) : conservé ? (LogiAgriERP exige seulement l'IFU à 13 chiffres en mode e-MECeF.)
 14. **NIM** : saisi à la main dans LogiALVIA aujourd'hui (`mecefNim`) ; en e-MECeF il revient de la DGI par facture : garder le champ pour le boîtier seulement ?
 
 ---

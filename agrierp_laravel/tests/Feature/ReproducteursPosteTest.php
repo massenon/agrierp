@@ -69,12 +69,12 @@ class ReproducteursPosteTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-bs3', 'email' => $role.'-bs3@olouwachegoun.bj',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         $this->app['auth']->forgetGuards();
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => $role.'-bs3', 'password' => 'AgriERP@2026', 'device_name' => 'poste-'.$role,
+            'identifiant' => $role.'-bs3', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-'.$role,
         ])->assertOk()->json('token');
     }
 

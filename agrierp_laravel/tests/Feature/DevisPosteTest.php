@@ -82,13 +82,13 @@ class DevisPosteTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-dev', 'email' => $role.'-dev@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         $this->compte = $utilisateur;
         $this->app['auth']->forgetGuards();
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => $role.'-dev', 'password' => 'AgriERP@2026', 'device_name' => 'poste-'.$role,
+            'identifiant' => $role.'-dev', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-'.$role,
         ])->assertOk()->json('token');
     }
 

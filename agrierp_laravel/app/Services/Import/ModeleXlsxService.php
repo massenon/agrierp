@@ -52,7 +52,7 @@ class ModeleXlsxService
     public function construire(ModuleImport $module): Spreadsheet
     {
         $classeur = new Spreadsheet();
-        $classeur->getProperties()->setCreator('AgriERP')->setTitle('Modèle d\'importation « '.$module->libelle().' », version '.$module->version());
+        $classeur->getProperties()->setCreator('LogiAgriERP')->setTitle('Modèle d\'importation « '.$module->libelle().' », version '.$module->version());
 
         $instructions = $classeur->getActiveSheet();
         $instructions->setTitle(LecteurXlsx::FEUILLE_INSTRUCTIONS);

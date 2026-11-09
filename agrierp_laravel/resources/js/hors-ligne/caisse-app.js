@@ -71,7 +71,7 @@ async function demarrer() {
         if (lireMarqueur(MARQUEUR_ACTIVE) === '1') {
             const n = Number(lireMarqueur(MARQUEUR_EN_ATTENTE) ?? 0);
             $('inactif-titre').textContent = 'Les données de cet appareil ont disparu';
-            $('inactif-texte').textContent = `Les saisies non envoyées de cet appareil ont disparu : ${n} vente(s) perdue(s) possible(s). Le navigateur a probablement vidé son stockage. Réactivez le mode hors ligne en ligne, puis vérifiez l'historique des ventes dans AgriERP.`;
+            $('inactif-texte').textContent = `Les saisies non envoyées de cet appareil ont disparu : ${n} vente(s) perdue(s) possible(s). Le navigateur a probablement vidé son stockage. Réactivez le mode hors ligne en ligne, puis vérifiez l'historique des ventes dans LogiAgriERP.`;
             try { localStorage.removeItem(MARQUEUR_ACTIVE); } catch { /* ignoré */ }
         }
         montrer('ecran-inactif');

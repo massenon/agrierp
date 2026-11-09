@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:sqlite3/sqlite3.dart' as raw;
 
-/// 🔴 « Le logiciel ne s'ouvre pas » — poste où AgriERP avait DÉJÀ été installé puis désinstallé (la base reste dans le profil
+/// 🔴 « Le logiciel ne s'ouvre pas » — poste où LogiAgriERP avait DÉJÀ été installé puis désinstallé (la base reste dans le profil
 /// Windows) : le processus restait en arrière-plan, sans fenêtre, parce que la migration de la VRAIE base échouait avant
 /// `runApp`. Un poste neuf, lui, s'ouvrait.
 ///

@@ -76,12 +76,12 @@ description: <une à trois phrases, en français : CE QUE le skill produit + QUA
 |---|---|
 | Skills du dépôt | `/home/user/agrierp/.claude/skills/prd/SKILL.md`, `.claude/skills/plan/SKILL.md` |
 | Doctrine et plan | `/home/user/agrierp/docs/DOCTRINE_PORTAGE.md`, `docs/PLAN_FINALISATION.md`, `docs/AUDIT_FIDELITE_ECRANS.md`, `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md`, `docs/COMPARAISON_METHODE_TATACORA.md`, `docs/prd/` |
-| Migrations AgriERP | `/home/user/agrierp/agrierp_laravel/database/migrations/` |
+| Migrations LogiAgriERP | `/home/user/agrierp/agrierp_laravel/database/migrations/` |
 | Modèles / Actions / Services | `agrierp_laravel/app/Models/`, `app/Actions/` (ex. `AdjustStockAction.php`, `AnnulerVenteAction.php`, `RecordSaleAccountingEntryAction.php`), `app/Services/` (ex. `AccountingEntryService.php`, `EffectifParCategorieService.php`, `RappelsDuJourService.php`, `PdfExportService.php`, `ImportModuleService.php`, `BankReconciliationService.php`, `SauvegardeService.php`, `TransactionRejouable.php`), `app/Support/` (ex. `MessagesErreurFr.php`, `MotifsRefusPush.php`, `DatesValidationFr.php`) |
 | Composants Livewire | `agrierp_laravel/app/Livewire/{Elevage,Ventes,Comptabilite,Parametres,Facturation,Shared,Stocks,Achats,RH,Rapports,Dashboard,Auth,Profil,Notifications,PublicPages}/` ; hubs : `Comptabilite/ComptabiliteHub.php`, `Ventes/VentesDevisHub.php`, `Ventes/CreancesClientsHub.php`, `Parametres/ParametresHub.php`, `Elevage/SoinsVaccinsHub.php` |
 | Composants Blade | `agrierp_laravel/resources/views/components/` : `datatable`, `modal`, `modal-confirm-delete`, `modal-confirm-hard-delete`, `modal-confirm-permanent-delete`, `kpi-card`, `kpi-accordion`, `tab-page`, `pagination`, `toast-container`, `flash-toast`, `pwa-install`, `verrou-session`, `aide-flottante`, `autonomie-alimentaire`, `prophylaxie-du-jour`, `cycle-reminder` |
 | Exports PDF | `agrierp_laravel/resources/views/exports/*.blade.php` ; `app/Services/PdfExportService.php` (`render(view, data, title, period, orientation)`) ; poste : `agrierp_flutter/lib/core/export/{document_officiel,export_tableur,pdf_attestation,pdf_recu}.dart` |
-| Import / export tableur | web : bouton « Excel » = CSV (`app/Livewire/Rapports/`), `maatwebsite/excel` déclaré dans `composer.json` ; import relevé : `BankReconciliationService::importCsv` ; **import xlsx de données métier : n'existe pas dans AgriERP (À CONCEVOIR, GUIDE bloc 21)** |
+| Import / export tableur | web : bouton « Excel » = CSV (`app/Livewire/Rapports/`), `maatwebsite/excel` déclaré dans `composer.json` ; import relevé : `BankReconciliationService::importCsv` ; **import xlsx de données métier : n'existe pas dans LogiAgriERP (À CONCEVOIR, GUIDE bloc 21)** |
 | Synchronisation (serveur) | `agrierp_laravel/app/Http/Controllers/Api/SyncController.php` (routes `/api/sync/pull`, `/api/sync/push` dans `routes/api.php`) ; `app/Services/{JournalSynchronisationService,DemandeSynchronisationService,CoherenceSynchronisationService,ResynchronisationPostesService,FusionReferentielsService}.php` ; `app/Livewire/Shared/EtatSynchronisationPostes.php` ; `app/Livewire/Parametres/PostesAppairage.php` |
 | Synchronisation (poste) | `agrierp_flutter/lib/core/sync/{sync_engine,synchronisation_automatique,modale_synchronisation,perimetre_tirage,fusion_referentiels,agregats_coherence,gestes_importants}.dart` ; `lib/core/database/sync_columns.dart`, `app_database.dart` ; `lib/features/sync/synchronisation_screen.dart` |
 | Écrans / dépôts Drift du poste | `agrierp_flutter/lib/features/{elevage,ventes,stocks,achats,comptabilite,parametres,rh,clients,notifications,pilotage,verrou,sync,…}/` ; widgets partagés `lib/core/widgets/{modale_agri,carte_kpi,grille_kpi,pagination_agri,toast_agri,champs_date_agri,selecteur_exercice,bandeau_exercice}.dart` |
@@ -236,7 +236,7 @@ Format de chaque fiche : **Déclencheur · Entrées · Étapes · Sorties · Cri
 ### SK-11 — Export xlsx (`logialvia-export-xlsx`)
 - **Déclencheur** : « Excel », « export tableur ».
 - **Entrées** : tableau source (le même `DocumentOfficiel`/jeu de lignes que le PDF) ; droit `export-rapports`.
-- **Étapes** : builder pur (aucune E/S) à partir de la structure du PDF ; cellules = texte tel qu'affiché, **aucun montant reformaté** ; nom d'onglet ≤ 31 caractères sans `: \ / ? * [ ]` ; web : `maatwebsite/excel` (déjà au `composer.json`) ; ⚠️ **dans AgriERP le bouton « Excel » du web produit un CSV, et l'export xlsx est un ajout du poste au-delà de la maquette** : décider avec le client (question Q-SK1) avant de promettre du xlsx au web ; poste : paquet `excel`, `export_tableur.dart`.
+- **Étapes** : builder pur (aucune E/S) à partir de la structure du PDF ; cellules = texte tel qu'affiché, **aucun montant reformaté** ; nom d'onglet ≤ 31 caractères sans `: \ / ? * [ ]` ; web : `maatwebsite/excel` (déjà au `composer.json`) ; ⚠️ **dans LogiAgriERP le bouton « Excel » du web produit un CSV, et l'export xlsx est un ajout du poste au-delà de la maquette** : décider avec le client (question Q-SK1) avant de promettre du xlsx au web ; poste : paquet `excel`, `export_tableur.dart`.
 - **Sorties** : builder, bouton gardé par le droit, test (relire le fichier, comparer aux valeurs).
 - **Critères** : relecture du xlsx = valeurs de l'écran ; nom d'onglet conforme ; droit refusé = pas d'export.
 - **Interdits** : copie du PDF en tableur ; formule Excel injectée depuis une donnée utilisateur (préfixer `'` toute cellule commençant par `= + - @`).
@@ -245,7 +245,7 @@ Format de chaque fiche : **Déclencheur · Entrées · Étapes · Sorties · Cri
 ### SK-12 — Import xlsx en masse (`logialvia-import-xlsx`)
 - **Déclencheur** : « importer un fichier Excel », « import en masse ».
 - **Entrées** : table cible, colonnes attendues, droit.
-- **Étapes** : ⚠️ **cette fonction n'existe pas dans AgriERP (À CONCEVOIR) : PRD d'abord (SK-22)**. Principes à reprendre des imports existants : liste blanche de colonnes et de table (jamais déduite du fichier) ; valeurs liées, jamais d'exécution du contenu ; aperçu avant écriture avec lignes rejetées comptées et montrées ; **idempotence par `import_id`** (un import déjà joué n'est pas rejoué) ; taille maximale (message français) ; passage par l'Action de la table (SK-03), pas d'insertion directe ; transaction unique ; rapport (créées, ignorées, refusées + motif).
+- **Étapes** : ⚠️ **cette fonction n'existe pas dans LogiAgriERP (À CONCEVOIR) : PRD d'abord (SK-22)**. Principes à reprendre des imports existants : liste blanche de colonnes et de table (jamais déduite du fichier) ; valeurs liées, jamais d'exécution du contenu ; aperçu avant écriture avec lignes rejetées comptées et montrées ; **idempotence par `import_id`** (un import déjà joué n'est pas rejoué) ; taille maximale (message français) ; passage par l'Action de la table (SK-03), pas d'insertion directe ; transaction unique ; rapport (créées, ignorées, refusées + motif).
 - **Sorties** : PRD, service d'import, écran avec aperçu, tests (fichier valide, ligne invalide, rejeu, fichier trop gros, colonne inconnue).
 - **Critères** : un fichier rejoué n'écrit rien de plus ; aucune ligne invalide n'est écrite en silence ; totaux du rapport = recomptage.
 - **Interdits** : exécuter du SQL ou une formule du fichier ; accepter une colonne non listée ; importer sans aperçu.
@@ -325,7 +325,7 @@ Format de chaque fiche : **Déclencheur · Entrées · Étapes · Sorties · Cri
 
 ### SK-21 — Rappel VMS, fenêtre « Rappels du jour » (`logialvia-rappel-vms`)
 - **Déclencheur** : « rappels du jour », « vaccins, médicaments, soins à venir ».
-- **Entrées** : horizon N jours ; règles R-SOINS-01 et R-RAPPELS-01 (à lire dans le PRD `docs/prd/popup-rappels.md` d'AgriERP).
+- **Entrées** : horizon N jours ; règles R-SOINS-01 et R-RAPPELS-01 (à lire dans le PRD `docs/prd/popup-rappels.md` d'LogiAgriERP).
 - **Étapes** : service unique `RappelsDuJourService` qui APPELLE `AlertesElevageService::soinsAVenir()` et `ProtocoleDuJourService::pourBande()` (ne rien recopier) ; composant `Shared/RappelsDuJour` monté dans le layout sous `@can('view-elevage')`, qui décide **côté serveur** ; le navigateur ne transmet que `sessionStorage` (une fois par session) et `localStorage` (« Ne plus afficher aujourd'hui », par utilisateur) ; réouverture à chaque connexion ; aucune fenêtre vide ; erreur journalisée, silencieuse ; poste : calcul local identique, parité exécutée. ⚠️ « VMS » : la signification exacte de l'acronyme pour LogiALVIA n'est pas dans mes sources : **À DÉFINIR AVEC LE CLIENT (Q-SK2)** ; le skill s'appuie sur le périmètre de « Rappels du jour » (soins, traitements du barème, fins de délai d'attente).
 - **Sorties** : service, composant, vue, poste, tests, parité.
 - **Critères** : jamais de fenêtre vide ; rôle sans `view-elevage` ne la reçoit pas ; parité Dart ↔ PHP verte.
@@ -403,7 +403,7 @@ Format de chaque fiche : **Déclencheur · Entrées · Étapes · Sorties · Cri
 ### SK-29 — Réglages SMTP, logo, favicon (`logialvia-reglages-smtp-logo-favicon`)
 - **Déclencheur** : « SMTP », « logo », « favicon », « données entreprise ».
 - **Entrées** : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
-- **Étapes** : table singleton `company_settings` ; mot de passe SMTP en `smtp_password_encrypted` (cast `encrypted`), **jamais renvoyé à l'écran** (champ vide = inchangé) ni au poste ; e-mail d'essai ; logo et favicon : validation type et taille, stockage hors `public` direct ou disque `public` avec `storage:link`, chemins en base ; poste : fichiers tirés par un point d'accès dédié ; document PDF et en-tête lisent le logo ; **pas de SMS** (retiré d'AgriERP) ; droit `manage-parametres`.
+- **Étapes** : table singleton `company_settings` ; mot de passe SMTP en `smtp_password_encrypted` (cast `encrypted`), **jamais renvoyé à l'écran** (champ vide = inchangé) ni au poste ; e-mail d'essai ; logo et favicon : validation type et taille, stockage hors `public` direct ou disque `public` avec `storage:link`, chemins en base ; poste : fichiers tirés par un point d'accès dédié ; document PDF et en-tête lisent le logo ; **pas de SMS** (retiré d'LogiAgriERP) ; droit `manage-parametres`.
 - **Sorties** : écrans `EmailSmtp`, `DonneesEntreprise`, service, tests.
 - **Critères** : lecture brute en base ≠ clair ; réponse API sans secret ; fichier trop gros ou type interdit refusé avec message.
 - **Interdits** : secret dans Drift ; SVG non assaini en favicon/logo (script embarqué) : n'accepter que des types listés.
@@ -474,7 +474,7 @@ Format de chaque fiche : **Déclencheur · Entrées · Étapes · Sorties · Cri
 
 ## 6. Trois exemples complets de SKILL.md prêts à déposer
 
-Chaque bloc ci-dessous est le contenu intégral du fichier indiqué. Les chemins de référence sont ceux du monorepo AgriERP vérifiés ; une fois dans le dépôt LogiALVIA, remplacer le préfixe `/home/user/agrierp/agrierp_laravel/` par la racine du web LogiALVIA lorsqu'un fichier y a été recréé.
+Chaque bloc ci-dessous est le contenu intégral du fichier indiqué. Les chemins de référence sont ceux du monorepo LogiAgriERP vérifiés ; une fois dans le dépôt LogiALVIA, remplacer le préfixe `/home/user/agrierp/agrierp_laravel/` par la racine du web LogiALVIA lorsqu'un fichier y a été recréé.
 
 ### 6.1 `.claude/skills/logialvia-migration-domaine/SKILL.md`
 
@@ -491,7 +491,7 @@ Un domaine = une session. Tout est en français. Ne rien committer.
 ## Avant d'écrire
 
 1. Lire `docs/logialvia/30_DATABASE_ENGINEERING.md` : sections 1 (principes), 3 (conventions), 5 (dictionnaire), 7 (contraintes), 8 (ordre et pièges MariaDB) et l'ERD du domaine demandé (section 4).
-2. Lire les tables Drift de logialvia du domaine (`/home/user/massenon/logialvia/logialvia_app/lib/<domaine>/data/tables/`, lecture seule) et, pour le modèle, les migrations d'AgriERP : `agrierp_laravel/database/migrations/2026_02_10_000001_create_livestock_lots_table.php`, `2026_10_23_000001_create_corbeille_operations_table.php`.
+2. Lire les tables Drift de logialvia du domaine (`/home/user/massenon/logialvia/logialvia_app/lib/<domaine>/data/tables/`, lecture seule) et, pour le modèle, les migrations d'LogiAgriERP : `agrierp_laravel/database/migrations/2026_02_10_000001_create_livestock_lots_table.php`, `2026_10_23_000001_create_corbeille_operations_table.php`.
 3. Tout ce qui n'est écrit dans aucune source est « À DÉFINIR AVEC LE CLIENT » : ne pas créer la colonne, ajouter la question à la section 14 de `30_DATABASE_ENGINEERING.md`.
 
 ## Étapes
@@ -537,7 +537,7 @@ Un seul composant générique, paramétré par la configuration de la filière :
 
 1. Lire `/home/user/massenon/logialvia/logialvia_app/lib/elevage/domain/entities/configuration_espece.dart` (catégories, rations, libellés, seuils), puis `docs/05_LOGIQUE_CALCUL_FORMULAIRES.md` et `F3_Module_Production_Elevage.md` de logialvia.
 2. Lire `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md`, bloc 1 (règle d'effectif exacte et jeu de cas) sans le réécrire.
-3. Modèles AgriERP : `agrierp_laravel/app/Services/EffectifParCategorieService.php`, `app/Livewire/Elevage/FicheLapins.php`, `FichePondeuses.php`, tests `tests/Feature/FicheLapinsEffectifAutomatiqueTest.php`.
+3. Modèles LogiAgriERP : `agrierp_laravel/app/Services/EffectifParCategorieService.php`, `app/Livewire/Elevage/FicheLapins.php`, `FichePondeuses.php`, tests `tests/Feature/FicheLapinsEffectifAutomatiqueTest.php`.
 4. Vérifier le schéma : `docs/logialvia/30_DATABASE_ENGINEERING.md` §5.4 à §5.6.
 
 ## Étapes
@@ -611,10 +611,10 @@ Exclusion par motif large ; garde-fou sans preuve de mutation ; garde-fou qui li
 
 | # | Question | Skill concerné |
 |---|---|---|
-| Q-SK1 | Les exports « Excel » du web doivent-ils produire du xlsx (AgriERP : CSV au web, xlsx seulement au poste) ou du CSV ? | SK-11 |
+| Q-SK1 | Les exports « Excel » du web doivent-ils produire du xlsx (LogiAgriERP : CSV au web, xlsx seulement au poste) ou du CSV ? | SK-11 |
 | Q-SK2 | Que désigne « VMS » dans l'énoncé du projet ? Mes sources décrivent la fenêtre « Rappels du jour » (soins, traitements du barème, délais d'attente) mais pas cet acronyme. | SK-21 |
-| Q-SK3 | L'import xlsx en masse est-il voulu, pour quelles tables, avec quels gabarits de colonnes ? (n'existe pas dans AgriERP) | SK-12 |
+| Q-SK3 | L'import xlsx en masse est-il voulu, pour quelles tables, avec quels gabarits de colonnes ? (n'existe pas dans LogiAgriERP) | SK-12 |
 | Q-SK4 | Pisciculture, pintades, goliaths : bassins, qualité de l'eau, pesées, durée d'incubation, barèmes validés, définition de la maturité (voir `30` §6.2 et §14) | SK-24, SK-25 |
-| Q-SK5 | Seuil d'autonomie alimentaire (3 jours chez AgriERP) valable pour LogiALVIA ? | SK-25 |
+| Q-SK5 | Seuil d'autonomie alimentaire (3 jours chez LogiAgriERP) valable pour LogiALVIA ? | SK-25 |
 | Q-SK6 | Une remise en stock accompagne-t-elle un avoir sur un animal vivant ? | SK-27 |
-| Q-SK7 | Les skills `prd` et `plan` d'AgriERP sont-ils copiés dans le dépôt LogiALVIA (adaptés) ou partagés ? | SK-22, SK-23 |
+| Q-SK7 | Les skills `prd` et `plan` d'LogiAgriERP sont-ils copiés dans le dépôt LogiALVIA (adaptés) ou partagés ? | SK-22, SK-23 |

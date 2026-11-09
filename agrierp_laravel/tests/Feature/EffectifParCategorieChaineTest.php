@@ -606,7 +606,7 @@ class EffectifParCategorieChaineTest extends TestCase
     public function test_le_tirage_sert_les_nouvelles_colonnes_a_null_pour_les_anciennes_fiches(): void
     {
         $this->fiche($this->lapins, '2026-10-01', ['achat' => 1]);
-        $mdp = 'AgriERP@2026';
+        $mdp = 'LogiAgriERP@2026';
         Permission::findOrCreate('view-ventes', 'web');
         Role::findOrCreate('caissier', 'web')->givePermissionTo(['view-ventes']);
         User::create(['name' => 'C', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt($mdp), 'is_active' => true])->assignRole('caissier');

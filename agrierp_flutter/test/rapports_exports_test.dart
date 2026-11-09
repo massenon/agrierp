@@ -1162,7 +1162,7 @@ void main() {
             },
             enregistrer: (classeur, _) async {
               enregistres.add(classeur);
-              return r'C:\Documents\AgriERP\rapport.xlsx';
+              return r'C:\Documents\LogiAgriERP\rapport.xlsx';
             },
           ),
         ),
@@ -1449,7 +1449,7 @@ void main() {
 
       expect(enregistres, hasLength(1));
       expect(
-        find.textContaining(r'C:\Documents\AgriERP\rapport.xlsx'),
+        find.textContaining(r'C:\Documents\LogiAgriERP\rapport.xlsx'),
         findsOneWidget,
       );      await tester.pump(ToastAgri.duree);
     });

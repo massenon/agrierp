@@ -4,7 +4,7 @@
 
 - **Quand l'utiliser** : après le BRS (`10_BRS_BUSINESS_REQUIREMENTS.md`), avant d'écrire une ligne de code d'un module ; à relire à chaque jalon. Pour UN ticket précis, utiliser en plus le skill `prd` du dépôt (`.claude/skills/`) puis `plan`.
 - **Ordre** : `10_BRS` → **`11_PRD`** → `12_SRS` → `13_FRS` → `14_NFRS` → `15_REGLES_METIER` → `20_MODULES_INDEX` et modules.
-- **Entrées** : `logialvia/docs/B2_PRD_Product_Requirements.md`, `B1_BRS_Business_Requirements.md`, `03_INVENTAIRE_31_ECRANS.md`, `INDEX_MAITRE.md`, `I1_Matrice_RBAC.md`, `I2_Gestion_Modules_Actifs.md`, `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (§1 ordre de portage, bloc 14), `docs/prd/*.md` (modèles de PRD d'AgriERP), `docs/PLAN_FINALISATION.md`.
+- **Entrées** : `logialvia/docs/B2_PRD_Product_Requirements.md`, `B1_BRS_Business_Requirements.md`, `03_INVENTAIRE_31_ECRANS.md`, `INDEX_MAITRE.md`, `I1_Matrice_RBAC.md`, `I2_Gestion_Modules_Actifs.md`, `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (§1 ordre de portage, bloc 14), `docs/prd/*.md` (modèles de PRD d'LogiAgriERP), `docs/PLAN_FINALISATION.md`.
 - **Sorties** : ce fichier à jour (personas, parcours, exigences `PR-nnn` avec critère d'acceptation, phasage, métriques, risques).
 - **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` (lecture seule) ; sans préfixe = monorepo `/home/user/agrierp`.
 
@@ -17,7 +17,7 @@
 > **Tâches.** (1) Pour chaque persona, décris les parcours quotidiens réels (matin, caisse, fin de journée) ; (2) pour chaque module de `20_MODULES_INDEX.md`, écris les exigences produit `PR-nnn` au format « En tant que <rôle>, je veux <geste> afin de <valeur> » + critère d'acceptation mesurable ; (3) précise pour chaque exigence la surface (Web / Poste / Les deux) et le comportement hors ligne ; (4) tiens à jour phasage, hors périmètre, métriques, risques ; (5) liste les questions ouvertes.
 > **Contraintes.** Fidélité au prototype et aux fiches papier (B2 §4 : « contrainte produit non négociable ») ; français ; une exigence = un geste vérifiable ; pas de règle métier inventée (À DÉFINIR AVEC LE CLIENT + question) ; pas d'exigence décorative (A1 §2.3) ; le web est le maître, le poste suit (doctrine : `docs/DOCTRINE_PORTAGE.md` art. 0 et 5).
 > **Critères d'acceptation.** (a) ≥ 60 lignes `PR-` ; (b) chacune a Surface + Rôle + Hors ligne + Critère ; (c) chaque écran de `03_INVENTAIRE_31_ECRANS.md` est couvert par au moins une `PR-` (vérifier par les 31 noms de route) ; (d) le phasage reprend l'ordre du guide §1 ; (e) les statuts À DÉFINIR renvoient à une question numérotée.
-> **Interdits.** Ne pas décrire une fonction d'AgriERP comme déjà présente dans LogiALVIA ; ne pas écrire de code ; ne pas affirmer que la PWA hors ligne, l'import xlsx ou la paie existent (ils n'existent pas : guide blocs 20, 21 ; B1 §6).
+> **Interdits.** Ne pas décrire une fonction d'LogiAgriERP comme déjà présente dans LogiALVIA ; ne pas écrire de code ; ne pas affirmer que la PWA hors ligne, l'import xlsx ou la paie existent (ils n'existent pas : guide blocs 20, 21 ; B1 §6).
 
 ---
 
@@ -128,7 +128,7 @@ Reprise de B2 §7 (Fondations → Élevage → Commercial → Comptabilité → 
 
 ## 7. Hors périmètre (reprise B1 §6, mise à jour)
 
-Passerelle Mobile Money réelle ; application mobile native ; paie (sauf décision, BR-033) ; PWA hors ligne (sauf décision, BR-025) ; SMS (AgriERP les a supprimés, AUT-3).
+Passerelle Mobile Money réelle ; application mobile native ; paie (sauf décision, BR-033) ; PWA hors ligne (sauf décision, BR-025) ; SMS (LogiAgriERP les a supprimés, AUT-3).
 
 ## 8. Risques produit
 

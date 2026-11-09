@@ -44,7 +44,7 @@ use Livewire\Component;
  *    00 §4) — nécessaire pour ne pas laisser le mécanisme d'envoi de lien
  *    sans destination (Document 00 §2.2, zéro fonctionnalité inachevée).
  *    Ajoutée en tant que `Livewire\Auth\ResetPassword`, minimale, stylée
- *    cohérence AgriERP — À VALIDER explicitement avec le promoteur au
+ *    cohérence LogiAgriERP — À VALIDER explicitement avec le promoteur au
  *    prochain point de synchronisation, puisqu'elle sort du périmètre
  *    strict des 94 pages recensées.
  * 6. Journalisation d'audit de connexion (`AuditLog::record('login', 'auth')`)

@@ -38,7 +38,7 @@ class SyncPointageTest extends TestCase
         $this->utilisateur = User::create([
             'name' => "Chef d'équipe", 'username' => 'rh',
             'email' => 'rh@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
 
         // Ticket S1 : l'envoi du poste exige désormais le rôle qui écrit chaque table.

@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/images/social-preview.png" alt="AgriERP — Gestion intégrée de la Ferme École OLOUWACHEGOUN" width="100%">
+<img src="docs/images/social-preview.png" alt="LogiAgriERP — Gestion intégrée de la Ferme École OLOUWACHEGOUN" width="100%">
 
-# AgriERP
+# LogiAgriERP
 
 **Le logiciel de gestion d'une ferme, du poulailler jusqu'au bilan comptable.**
 
@@ -14,7 +14,7 @@
 
 ## Le projet
 
-AgriERP est un projet personnel : un système de gestion intégrée conçu pour la **Ferme École OLOUWACHEGOUN** (Ikpinlè, commune d'Adja-Ouèrè, Bénin).
+LogiAgriERP est un projet personnel : un système de gestion intégrée conçu pour la **Ferme École OLOUWACHEGOUN** (Ikpinlè, commune d'Adja-Ouèrè, Bénin).
 
 Il remplace les cahiers, les tableurs et les calculs à la main. On y enregistre chaque œuf ramassé, chaque sac de provende acheté, chaque vente et chaque paie, et le logiciel en déduit **les stocks, les marges par bande, les écritures comptables, les factures et les états de gestion**, sans ressaisie.
 

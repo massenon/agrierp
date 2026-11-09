@@ -1,18 +1,18 @@
-# Méthode de synchronisation TATACORA ↔ AgriERP — ce qui est déjà là, ce qui manque
+# Méthode de synchronisation TATACORA ↔ LogiAgriERP — ce qui est déjà là, ce qui manque
 
 **Date :** 19/10/2026 · **Source :** la note « reprendre la méthode et la structure » transmise par le client (7 sections).
-**Règle de lecture :** la méthode et la structure se transposent ; le code se réécrit sur les tables d'AgriERP. Une
+**Règle de lecture :** la méthode et la structure se transposent ; le code se réécrit sur les tables d'LogiAgriERP. Une
 décision déjà prise par le client (D-SYNC-1 à D-SYNC-7, `docs/PLAN_FINALISATION.md`) n'est pas rouverte sans lui.
 
 Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé en comparant, corrigé.
 
 ## 1. Installateur Windows
 
-| Point de la note | AgriERP | État |
+| Point de la note | LogiAgriERP | État |
 |---|---|---|
 | `build_windows.bat` + script Inno Setup | `agrierp_flutter/build_windows.bat`, `installer/agrierp.iss` | ✅ |
 | `AppId` propre (sinon il remplace TATACORA sur le même PC) | GUID propre `69B3D13F-…` | ✅ |
-| `AppName`, `AppPublisher`, `DefaultDirName`, `OutputBaseFilename` | AgriERP, Dr MASSENON Rhodes – Ferme École OLOUWACHEGOUN, `{autopf}\AgriERP`, `AgriERP-Setup-<version>` | ✅ |
+| `AppName`, `AppPublisher`, `DefaultDirName`, `OutputBaseFilename` | LogiAgriERP, Dr MASSENON Rhodes – Ferme École OLOUWACHEGOUN, `{autopf}\LogiAgriERP`, `LogiAgriERP-Setup-<version>` | ✅ |
 | Version lue dans `pubspec.yaml`, vérification des outils (Inno Setup, VC++) | oui (ticket A7) | ✅ |
 | Adresses des serveurs par version (dev, recette, production) | S-T8 : `lib/core/config/environnement.dart`, choisi par `--dart-define=AGRIERP_ENV` (`build_windows.bat --env`, défaut production) ; toujours réglable dans Paramètres du poste. Adresse de recette **à confirmer** | ✅ |
 | Refus de la version démo | S-T8 : version `x.y.z-demo` de `pubspec.yaml` refusée en production par `build_windows.bat` et par `agrierp.iss` (`#error`) | ✅ |
@@ -20,7 +20,7 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 
 ## 2. Principes de synchronisation
 
-| Principe | AgriERP | État |
+| Principe | LogiAgriERP | État |
 |---|---|---|
 | UUID né sur le poste, au geste | oui (règle du schéma, jamais régénéré par le serveur) | ✅ |
 | Le poste lit sa base locale, aucune branche « si connecté » | oui pour les écrans métier ; quelques gestes passent par le serveur (export de fiche sujet, attestations, contact éditeur) et le disent | 🟡 |
@@ -32,7 +32,7 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 
 ## 3. Serveur
 
-| Élément | AgriERP | État |
+| Élément | LogiAgriERP | État |
 |---|---|---|
 | `POST /api/v1/sync`, lots de 50 opérations + table de déduplication par `uuid_operation` | `POST /api/sync/push` par tables, lots de 50 (H13b) ; idempotence par l'UUID de chaque enregistrement (vente connue = succès silencieux, ajustement rejoué par `client_ref`). **Décision D-SYNC-1 du client : ne pas réécrire le protocole** | ✅ (autre forme, décidé) |
 | Registre des gestionnaires par table (droits, service, 4 cas) | un bloc par table dans `SyncController::push`, droits par table (S1), création / modification / inconnu / déjà enregistré traités table par table | ✅ (autre forme) |
@@ -47,7 +47,7 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 
 ## 4. Poste
 
-| Élément | AgriERP | État |
+| Élément | LogiAgriERP | État |
 |---|---|---|
 | File `operations_sync` + ajout refusé hors transaction | colonnes `sync_status` sur chaque table (pas de file) | ✅ (autre forme, D-SYNC-1) |
 | Contenu figé au contrat du serveur, conversions à un seul endroit | sérialiseurs `_xxxEnJson` du moteur, un par table | ✅ |
@@ -63,16 +63,16 @@ Légende : ✅ en place · 🟡 en partie · ❌ absent · 🔴 défaut trouvé 
 
 ## 5. Questions de PO
 
-| Question | AgriERP |
+| Question | LogiAgriERP |
 |---|---|
 | Comptabilité : chaque poste ses écritures, ou celles du serveur descendent ? | **Le serveur seul écrit les écritures** (rejeu des Actions) ; le journal descend au poste (F0.84) |
 | Numérotation légale | attribuée par le **serveur** (factures MeCeF, courriers `CR-AAAA-NNN`) ; le poste affiche « — » en attendant |
 | Annuler un document d'un autre poste | les ventes ne se modifient pas au poste ; annulation au web, avec droits |
 | Ce qui est unique dans l'établissement | une fiche par (bande, jour) : refus motivé au second poste ; un exercice ouvert par date ; un code de bande |
 
-## 6. Pièges de la note, vérifiés sur AgriERP
+## 6. Pièges de la note, vérifiés sur LogiAgriERP
 
-| Piège | AgriERP |
+| Piège | LogiAgriERP |
 |---|---|
 | Date métier ≠ date d'audit | ✅ `sold_at`, `updated_at` = instant de saisie (14.71, F0.31) |
 | Table de liaison qui ne touche pas `updated_at` (matrice des droits) | S-T7 : le tirage sert `roles` en entier (le piège était masqué) ; toute écriture de `role_has_permissions` date désormais le rôle (`App\Models\Role`, `App\Models\Permission`) |

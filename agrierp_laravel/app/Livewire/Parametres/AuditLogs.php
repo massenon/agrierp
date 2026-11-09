@@ -11,7 +11,7 @@ use Livewire\Component;
 /**
  * DERNIER ONGLET DU HUB PARAMÈTRES — SPRINT 11 COMPLET UNE FOIS CE
  * TICKET LIVRÉ. audit-logs.html → Livewire\Parametres\AuditLogs
- * "Historique horodaté des actions sensibles effectuées dans AgriERP."
+ * "Historique horodaté des actions sensibles effectuées dans LogiAgriERP."
  *
  * `AuditLog` existait déjà en intégralité (~90 clés `action` réellement
  * utilisées dans tout le projet, recensées et traduites dans ce même

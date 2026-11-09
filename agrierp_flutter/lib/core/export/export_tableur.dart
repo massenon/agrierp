@@ -75,7 +75,7 @@ class ExportTableur {
     return Uint8List.fromList(octets);
   }
 
-  /// Écrit le classeur dans « Documents\AgriERP » et rend son chemin complet.
+  /// Écrit le classeur dans « Documents\LogiAgriERP » et rend son chemin complet.
   ///
   /// ⚠️ **AUCUNE BOÎTE DE DIALOGUE ICI, ET C'EST DÉLIBÉRÉ.** Un sélecteur de
   /// fichier demanderait une dépendance de plus sur un poste qui doit rester
@@ -127,7 +127,7 @@ class ExportTableur {
     return Uint8List.fromList(octets);
   }
 
-  /// Écrit [classeur] dans « Documents\AgriERP » sous le NOM DU WEB ([nomClasseur]) et rend son chemin complet.
+  /// Écrit [classeur] dans « Documents\LogiAgriERP » sous le NOM DU WEB ([nomClasseur]) et rend son chemin complet.
   ///
   /// ⚠️ Deux éditions du même rapport le même jour portent le même nom, comme deux téléchargements du web : le
   /// navigateur garde les deux (« nom (1).csv ») ; le poste fait de même (« nom (1).xlsx »), sans rien écraser.
@@ -140,7 +140,7 @@ class ExportTableur {
       return PlateformePoste.livreurNavigateur(nomClasseur(classeur, maintenant), construireTableau(classeur));
     }
     final racine = await getApplicationDocumentsDirectory();
-    final dossier = Directory(p.join(racine.path, 'AgriERP'));
+    final dossier = Directory(p.join(racine.path, 'LogiAgriERP'));
     if (!dossier.existsSync()) dossier.createSync(recursive: true);
 
     final chemin = cheminLibre(

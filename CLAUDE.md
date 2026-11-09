@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Ce fichier guide Claude Code (claude.ai/code) à la racine du monorepo AgriERP.
+Ce fichier guide Claude Code (claude.ai/code) à la racine du monorepo LogiAgriERP.
 
 ## Structure
 

@@ -41,7 +41,7 @@ class SyncPaieDemandeTest extends TestCase
 
         $this->rh = User::create([
             'name' => 'RH', 'username' => 'rh', 'email' => 'rh@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->rh->assignRole('admin');
 
@@ -146,7 +146,7 @@ class SyncPaieDemandeTest extends TestCase
 
     public function test_sans_le_role_rh_la_demande_est_refusee(): void
     {
-        $caisse = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $caisse = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $caisse->assignRole('caissier');
 
         $reponse = $this->pousser([$this->demande()], $caisse)->assertOk();
@@ -196,7 +196,7 @@ class SyncPaieDemandeTest extends TestCase
         $this->assertEquals(3.6, $rh['company_settings']['cnss_employee_rate']);
 
         // `view-rapports` sans `view-rh` (le comptable du seeder) : la vue réduite, rien de plus (protection S3).
-        $compta = User::create(['name' => 'Compta', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $compta = User::create(['name' => 'Compta', 'username' => 'compta', 'email' => 'compta@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $compta->assignRole('comptable');
         $this->assertFalse($compta->can('view-rh'), 'le comptable du seeder ne lit pas la RH');
         $reduit = $this->tirage($compta);

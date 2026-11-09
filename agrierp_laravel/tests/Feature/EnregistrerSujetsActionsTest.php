@@ -225,7 +225,7 @@ class EnregistrerSujetsActionsTest extends TestCase
 
         $caissier = User::create([
             'name' => 'Caisse', 'username' => 'caisse-bs2', 'email' => 'caisse-bs2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
         $this->actingAs($caissier);
@@ -238,7 +238,7 @@ class EnregistrerSujetsActionsTest extends TestCase
         // Un compte qui saisit sans pouvoir archiver : modifier oui, archiver non.
         $saisisseur = User::create([
             'name' => 'Saisie', 'username' => 'saisie-bs2', 'email' => 'saisie-bs2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $saisisseur->givePermissionTo(['view-elevage', 'manage-elevage']);
         $this->actingAs($saisisseur);
@@ -258,7 +258,7 @@ class EnregistrerSujetsActionsTest extends TestCase
 
         $lecteur = User::create([
             'name' => 'Lecteur', 'username' => 'lecteur-bs2', 'email' => 'lecteur-bs2@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $lecteur->givePermissionTo('view-elevage');
         $this->actingAs($lecteur);

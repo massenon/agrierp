@@ -61,7 +61,7 @@ class SyncMotifsRefusFrancaisTest extends TestCase
 
         $this->admin = User::create([
             'name' => 'Gestionnaire', 'username' => 'gest', 'email' => 'gest@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('gestionnaire');
 

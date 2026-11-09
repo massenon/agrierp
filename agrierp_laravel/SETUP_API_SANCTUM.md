@@ -120,7 +120,7 @@ Puis, dans un autre terminal (ou Postman/Insomnia) :
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"dg@fermeolouwachegoun.com","password":"AgriERP@2026","device_name":"test-curl"}'
+  -d '{"email":"dg@fermeolouwachegoun.com","password":"LogiAgriERP@2026","device_name":"test-curl"}'
 ```
 
 Réponse attendue : un JSON avec `token` (chaîne longue commençant par un

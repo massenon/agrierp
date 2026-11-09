@@ -1,6 +1,6 @@
-# Cloner AgriERP en local et le faire tourner (Windows)
+# Cloner LogiAgriERP en local et le faire tourner (Windows)
 
-Ce guide part d'un poste Windows vierge et aboutit à quatre résultats vérifiables : le site web servi en local, la suite de tests Laravel verte, le poste Flutter lancé contre ce site, et l'installateur `AgriERP-Setup-<version>.exe`.
+Ce guide part d'un poste Windows vierge et aboutit à quatre résultats vérifiables : le site web servi en local, la suite de tests Laravel verte, le poste Flutter lancé contre ce site, et l'installateur `LogiAgriERP-Setup-<version>.exe`.
 
 > ⚠️ **L'historique Git a été réécrit le 17/10/2026** (retrait de `database/agrierp_db.sql`, qui contenait des hash de mots de passe et des jetons). **Toute copie clonée avant cette date doit être supprimée et reclonée.** Un `git pull` sur une ancienne copie réintroduirait les anciens commits.
 
@@ -18,7 +18,7 @@ Ce guide part d'un poste Windows vierge et aboutit à quatre résultats vérifia
 | Visual Studio 2022 | charge « Développement Desktop en C++ » | compilation Windows du poste |
 | [Inno Setup 6](https://jrsoftware.org/isdl.php) | 6.x | installateur `.exe` |
 
-⚠️ Laragon livre parfois PHP 8.1 par défaut : AgriERP exige **8.3**. Vérifier avec `php -v` dans le terminal de Laragon.
+⚠️ Laragon livre parfois PHP 8.1 par défaut : LogiAgriERP exige **8.3**. Vérifier avec `php -v` dans le terminal de Laragon.
 
 ## 2. Cloner
 
@@ -50,7 +50,7 @@ php artisan storage:link               # justificatifs et photos (sans lui, des 
 php artisan serve --port=8002          # http://127.0.0.1:8002
 ```
 
-Comptes de démonstration (mot de passe `AgriERP@2026`) : `admin`, `compta`, `caisse`, `elevage`.
+Comptes de démonstration (mot de passe `LogiAgriERP@2026`) : `admin`, `compta`, `caisse`, `elevage`.
 
 Au premier passage de l'administrateur sur le tableau de bord, l'**assistant de démarrage** liste ce qui manque encore (exercice ouvert, trésorerie, modules…). Il ne bloque rien.
 
@@ -89,11 +89,11 @@ build_windows.bat --sans-installateur  # dossier Release seulement, sans Inno Se
 
 Le script **échoue** (code de sortie 1) si la version de `pubspec.yaml` n'est pas de la forme `x.y.z+n`, si une DLL du runtime Visual C++ manque dans `System32`, si Inno Setup est absent (sauf `--sans-installateur`), ou si l'installateur n'a pas été produit.
 
-Résultat : `agrierp_flutter\installer\Output\AgriERP-Setup-1.0.0.exe`.
+Résultat : `agrierp_flutter\installer\Output\LogiAgriERP-Setup-1.0.0.exe`.
 
 ### À vérifier sur la machine de compilation (le script n'a jamais été exécuté hors Windows)
 
-1. Le script finit par `=== Termine : installer\Output\AgriERP-Setup-<version>.exe ===`.
+1. Le script finit par `=== Termine : installer\Output\LogiAgriERP-Setup-<version>.exe ===`.
 2. Sur une machine **neuve** (sans Visual Studio ni Flutter), l'installateur s'installe et `agrierp.exe` démarre. S'il ne démarre pas, il manque une DLL du runtime : le signaler.
 3. La désinstallation ne supprime pas la base locale (elle vit dans le profil Windows de l'utilisateur, pas dans `Program Files`).
 

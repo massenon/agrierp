@@ -26,12 +26,12 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 | DV-07 | 08/11/2026 | 4 rôles : administrateur, comptable, caissier, animalier | validé par le client | Q-ROL-1, C-9, E-ROL | périmètre exact du comptable |
 | DV-08 | 08/11/2026 | Caissier : voit l'onglet « Retours et Avoirs » de `/ventes` et y enregistre un retour client | validé par le client | Q-DV-6 | limite : aucun avoir MeCeF/FA (DV-06) |
 | DV-09 | 08/11/2026 | Premier stade des pintades : libellé du glossaire « Poussin(s) » (remplace « pintadeaux » de DV-03 pour le libellé) | validé par le client | Q-DV-8 | catégorie 2 « Pintadau » : inchangée (glossaire) |
-| DV-10 | 08/11/2026 | Départ par stade : demandé à l'ouverture de la fiche (comportement AgriERP conservé), pas à la création de la bande | validé par le client | — | — |
+| DV-10 | 08/11/2026 | Départ par stade : demandé à l'ouverture de la fiche (comportement LogiAgriERP conservé), pas à la création de la bande | validé par le client | — | — |
 | DV-11 | 08/11/2026 | Règles d'incubation modifiables : formulaire « Incubation et règles » dans Paramètres Élevage | validé par le client | — | valeurs numériques = repères à valider |
 | DV-12 | 08/11/2026 | Estimation du nombre de sujets d'une vente de poisson : arrondi, écarts, poids minimum, poids moyen initial | recommandé, à confirmer avec le technicien | Q-DV-2 (en « recommandé ») | validation technicien |
 | DV-13 | 08/11/2026 | Pintadeaux : alertes de mortalité 1 %/2 % du jour, 10 %/20 % cumulés ; repères de poussinière | recommandé, à confirmer avec le technicien | Q-DV-3 (en « recommandé ») | validation technicien |
 | DV-14 | 08/11/2026 | Autonomie de provende : critique = délai fournisseur ; alerte = délai + marge de 4 j | recommandé, à confirmer avec le technicien | Q-DV-4 (en « recommandé ») | délai réel du fournisseur |
-| DV-15 | 08/11/2026 | `/inventaire` réservé à l'administrateur ; comptable calqué sur AgriERP | décision par défaut (aucune réponse du client) ; **remplacée par DV-20** | — | — |
+| DV-15 | 08/11/2026 | `/inventaire` réservé à l'administrateur ; comptable calqué sur LogiAgriERP | décision par défaut (aucune réponse du client) ; **remplacée par DV-20** | — | — |
 | DV-16 | 08/11/2026 | PWA tous modules : PHASE 0 (3 jours, preuve dans Chrome) AVANT tout engagement ; caisse hors ligne JS conservée | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | — | résultat de la phase 0 (critères d'arrêt de `44_`) |
 | DV-17 | 08/11/2026 | Incubation : pintade 28 j (fenêtre 26–28), goliath 21 j, couveuse artificielle par défaut ; protocole d'observation sur 3 lots | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | — | durées ajustées après 3 lots |
 | DV-18 | 08/11/2026 | Délai fournisseur de provende mesuré sur les 5 derniers bons de commande : critique = le plus long, alerte = critique + 4 j | recommandé et ADOPTÉ (« je vais suivre »), à confirmer sur le terrain | précise DV-14 | mesure sur la ferme ; indicateur « délai constaté » (non construit) |
@@ -96,7 +96,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 - **Statut** : validé par le client le 08/11/2026.
 
 ### DV-05 — Corbeille : les écritures comptables n'y entrent jamais
-- **Décision (texte normatif).** Les **écritures comptables n'entrent JAMAIS dans la corbeille** (intangibilité OHADA) : une écriture **ne se supprime pas et ne se restaure pas** ; elle se **CONTRE-PASSE**, puis on en saisit une nouvelle. LogiALVIA retire les écritures de sa corbeille (AgriERP avait raison) : `supprimerPiece` est supprimée, le type `Ecriture` sort de la liste blanche `TypeArchivable`.
+- **Décision (texte normatif).** Les **écritures comptables n'entrent JAMAIS dans la corbeille** (intangibilité OHADA) : une écriture **ne se supprime pas et ne se restaure pas** ; elle se **CONTRE-PASSE**, puis on en saisit une nouvelle. LogiALVIA retire les écritures de sa corbeille (LogiAgriERP avait raison) : `supprimerPiece` est supprimée, le type `Ecriture` sort de la liste blanche `TypeArchivable`.
 - **Justification réglementaire.** Les principes comptables SYSCOHADA/OHADA exigent l'intangibilité et la traçabilité des écritures : toute correction laisse la trace de l'écriture d'origine et de son extourne. Restaurer une écriture supprimée ferait diverger le Bilan.
 - **Impact par fichier** : `15_` RM-CPT-09 (nouvelle), §9 (C-10), §8 ; `26_` §4 ; `29_` onglet 6 « Corbeille » (7 types au lieu de 8) ; `12_` SR-007 (déjà conforme) ; `13_` FR-ADM-08, FR-CPT-08, FR-CPT-17 ; `30_` ; `31_` cas T-DV05-* ; `10_` BR-019, BR-047.
 - **Reste À DÉFINIR.** Rien sur le principe. Reprise : les écritures déjà présentes dans une corbeille existante du poste doivent être restituées au journal par migration (hors périmètre de ce registre).
@@ -116,8 +116,8 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 
 ### DV-07 — Quatre rôles
 - **Décision (texte normatif).** Quatre rôles : **administrateur (`admin`), comptable (`comptable`), caissier (`caissier`), animalier (`animalier`)**. Celui qui encaisse n'est pas celui qui comptabilise. LogiALVIA n'en avait que trois (le comptable était rattaché à `admin`).
-- **Justification.** Séparation des fonctions ; alignement sur le web d'AgriERP (`RolesAndPermissionsSeeder.php` : `admin`, `comptable`, `caissier`, `animalier`).
-- **Périmètre du comptable (PROPOSÉ, calqué sur AgriERP, à confirmer)** : `view/manage-comptabilite`, `export` et `view-rapports`/`export-rapports` ; consultation des ventes, de la facturation et des achats ; **gestes de facturation que le caissier n'a pas** (annuler, retransmettre, avoir) ; `close-fiscal-year` : à confirmer entre comptable et admin ; aucune saisie d'encaissement, aucun accès élevage ni paramètres.
+- **Justification.** Séparation des fonctions ; alignement sur le web d'LogiAgriERP (`RolesAndPermissionsSeeder.php` : `admin`, `comptable`, `caissier`, `animalier`).
+- **Périmètre du comptable (PROPOSÉ, calqué sur LogiAgriERP, à confirmer)** : `view/manage-comptabilite`, `export` et `view-rapports`/`export-rapports` ; consultation des ventes, de la facturation et des achats ; **gestes de facturation que le caissier n'a pas** (annuler, retransmettre, avoir) ; `close-fiscal-year` : à confirmer entre comptable et admin ; aucune saisie d'encaissement, aucun accès élevage ni paramètres.
 - **Impact par fichier** : `20_` §3 ; `21_` §2, §8 ; `26_` §2 ; `29_` onglet 3 (libellés de rôle : « Comptable » à ajouter) et §4 ; `10_` BR-017, BR-049, E-ROL ; `11_` §2 (persona comptable) ; `12_` SR-057 ; `13_` FR-ADM-13 ; `31_` `RbacParRouteTest` ; `15_` §9 (C-9, C-12).
 - **Reste À DÉFINIR.** Périmètre exact du comptable : valeur par défaut DV-15 (Q-DV-7 ouverte) (RH et paie si le module existe : Q-RH-1/Q-PAI-1) ; libellé affiché du rôle (« Comptable »).
 - **Statut** : validé par le client le 08/11/2026.
@@ -130,18 +130,18 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 - **Statut** : validé par le client le 08/11/2026.
 
 ### DV-09 — Premier stade des pintades : on garde le glossaire (« Poussin(s) »)
-- **Décision (texte normatif).** Le premier stade des pintades s'appelle **« Poussin(s) »**, comme dans le code de LogiALVIA et le glossaire / dictionnaire Élevage (volailles) partagé avec AgriERP. Cela **remplace « pintadeaux » de DV-03 pour le LIBELLÉ** ; le terme « Alevins » reste interdit pour une pintade.
+- **Décision (texte normatif).** Le premier stade des pintades s'appelle **« Poussin(s) »**, comme dans le code de LogiALVIA et le glossaire / dictionnaire Élevage (volailles) partagé avec LogiAgriERP. Cela **remplace « pintadeaux » de DV-03 pour le LIBELLÉ** ; le terme « Alevins » reste interdit pour une pintade.
 - **Conséquence.** L'erreur à corriger dans le barème semé est « Alevins » → **« Poussins »** : le rapprochement du barème avec la catégorie se fait par **libellé exact**, donc le libellé du barème doit être celui du glossaire. Catégories des pintades : **Poussins · Pintadau (immatures) · Mature** (inchangées). « Pintadeau » peut rester un mot d'usage courant dans le texte, jamais un libellé d'écran ni de barème.
 - **Impact par fichier** : `15_` §7.2 et C-4 ; `23_` §4.4 ; `13_` FR-ELV-32 ; `31_` UAT-ELV-11.
 - **Statut** : validé par le client le 08/11/2026. **Q-DV-8 fermée.**
 
 ### DV-10 — Départ par stade : demandé à l'ouverture de la fiche (comportement actuel conservé)
-- **Décision (texte normatif).** On **laisse** le comportement d'AgriERP : la **répartition de départ** par catégorie/stade est demandée **à l'ouverture de la fiche** de la bande, **pas à la création** de la bande. Explication et exemple chiffré : `23_` §5.
+- **Décision (texte normatif).** On **laisse** le comportement d'LogiAgriERP : la **répartition de départ** par catégorie/stade est demandée **à l'ouverture de la fiche** de la bande, **pas à la création** de la bande. Explication et exemple chiffré : `23_` §5.
 - **Statut** : validé par le client le 08/11/2026.
 
 ### DV-11 — Réglages d'incubation et règles modifiables dans « Paramètres Élevage »
 - **Décision (texte normatif).** Un **formulaire** (section « Incubation et règles » de `/parametres/elevage`) permet d'**éditer** les règles d'incubation par espèce (pintade, poule, autre volaille si présente) : durée, fenêtre d'éclosion, mode, jours de mirage, jour de transfert, rappels, délai de conservation des œufs, repères d'incubateur (avertissement). Droit `manage-elevage`, validations françaises, audit, synchronisation vers le poste. Spécification champ par champ : `29_` §4b et `23_` §6b ; construction et prompt : `23_` §6b et §13.
-- **Constat AgriERP.** AgriERP **n'a pas de module d'incubation de pintades**. Ses durées de cycle de reproduction (lapins, porcs : palpation, sevrage) sont des dates attendues portées par chaque événement `livestock_reproduction_events`, calculées dans `SuiviReproduction.php` (valeurs fixes dans le code : palpation à +14 j, sevrage à +42 j), **non éditables dans un formulaire de réglage** ; seuls sont éditables dans `ParametresElevage` les barèmes, la prophylaxie, les provendes, les formats de numérotation (`elevage_numbering_settings`) et le délai de rappel des soins (`company_settings.rappel_soins_jours`, entier 0–30). Ces deux derniers servent de **modèle de construction**.
+- **Constat LogiAgriERP.** LogiAgriERP **n'a pas de module d'incubation de pintades**. Ses durées de cycle de reproduction (lapins, porcs : palpation, sevrage) sont des dates attendues portées par chaque événement `livestock_reproduction_events`, calculées dans `SuiviReproduction.php` (valeurs fixes dans le code : palpation à +14 j, sevrage à +42 j), **non éditables dans un formulaire de réglage** ; seuls sont éditables dans `ParametresElevage` les barèmes, la prophylaxie, les provendes, les formats de numérotation (`elevage_numbering_settings`) et le délai de rappel des soins (`company_settings.rappel_soins_jours`, entier 0–30). Ces deux derniers servent de **modèle de construction**.
 - **Impact par fichier** : `23_` §6 et §8 ; `29_` ; `30_` ; `13_` FR-ELV-34, FR-ADM-14 ; `31_` T-DV11-*.
 - **Statut** : validé par le client le 08/11/2026 (valeurs numériques : repères à valider).
 
@@ -166,7 +166,7 @@ Statut de chaque ligne ci-dessous : **validé par le client** (la règle) ; les 
 
 ### DV-15 — Responsable stock et comptable : valeurs par défaut (aucune réponse du client)
 - **Responsable stock.** `/inventaire` **réservé à l'administrateur**. Si un « responsable stock » existe, on lui donnera **un droit dédié plus tard** ; **pas de 5ᵉ rôle**. **Q-DV-5 reste OUVERTE** avec cette valeur par défaut.
-- **Comptable.** Périmètre par défaut **calqué sur AgriERP** (les gestes de facturation de DV-07 sont conservés) : comptabilité et exercices en gestion, rapports, TVA, **lecture** des ventes, achats et stocks ; **ni caisse ni élevage**. **Q-DV-7 reste OUVERTE** avec cette valeur par défaut. (Précision : « lecture des stocks » ne donne PAS l'accès à `/inventaire`, qui reste administrateur seul ; voir « Contradictions » ci-dessous.)
+- **Comptable.** Périmètre par défaut **calqué sur LogiAgriERP** (les gestes de facturation de DV-07 sont conservés) : comptabilité et exercices en gestion, rapports, TVA, **lecture** des ventes, achats et stocks ; **ni caisse ni élevage**. **Q-DV-7 reste OUVERTE** avec cette valeur par défaut. (Précision : « lecture des stocks » ne donne PAS l'accès à `/inventaire`, qui reste administrateur seul ; voir « Contradictions » ci-dessous.)
 - **Statut** : décision par défaut, non validée par le client. **Remplacée par DV-20 (08/11/2026)** : le responsable stock reste « pas de 5ᵉ rôle » ; le périmètre du comptable est arrêté (voir DV-20, qui résout l'écart avec DV-07).
 
 ### DV-16 — PWA tous modules : phase 0 de preuve avant tout engagement [recommandé et ADOPTÉ par le client le 08/11/2026 (« je vais suivre »), à confirmer sur le terrain]
@@ -253,7 +253,7 @@ Aucune filière ruminants n'existe aujourd'hui. **Non adopté, pour plus tard** 
 - **DV-04 ↔ DV-14** : DV-04 fixe 7 j / 3 j par défaut ; DV-14 les dérive (délai + 4 j / délai). Compatibles seulement pour un délai de 3 j ; avec un autre délai les seuils recommandés changent, donc DV-04 reste la valeur initiale et DV-14 la méthode de réglage.
 - **DV-06/DV-08 ↔ DV-15** : le caissier voit « Retours et Avoirs » mais n'émet pas d'avoir FA ; et « lecture des stocks » du comptable (DV-15) ne contredit pas DV-06 car `/inventaire` exige `view-stocks` réservé à l'administrateur. À arbitrer si le client veut que le comptable lise l'inventaire.
 - **DV-07 ↔ DV-15** : DV-07 proposait pour le comptable les gestes de facturation (annuler, retransmettre, avoir) ; DV-15 ne les citait pas. **Résolue par DV-20** : retransmettre et créer des avoirs, oui ; annuler une vente, non.
-- **DV-11 ↔ AgriERP** : la consigne présupposait des durées de cycle lapins/porcs déjà éditables ; vérification faite dans le code, elles ne le sont pas (voir DV-11).
+- **DV-11 ↔ LogiAgriERP** : la consigne présupposait des durées de cycle lapins/porcs déjà éditables ; vérification faite dans le code, elles ne le sont pas (voir DV-11).
 
 ## 5. Critères d'acceptation du registre
 

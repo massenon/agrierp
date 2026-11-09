@@ -131,7 +131,7 @@ import 'core/auth/verrou_local.dart';
 import 'features/verrou/changement_pin.dart';
 import 'features/verrou/porte_session.dart';
 
-/// AgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
+/// LogiAgriERP Desktop — Ferme École OLOUWACHEGOUN (Ikpinlè, Bénin).
 ///
 /// Client Windows offline-first. La base locale fait foi ; la synchronisation
 /// avec la surface web Laravel intervient ensuite, à la demande.

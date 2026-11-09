@@ -1,4 +1,4 @@
-; Inno Setup 6 - installateur AgriERP Desktop
+; Inno Setup 6 - installateur LogiAgriERP Desktop
 ; Compile par build_windows.bat (ISCC /DAppVersion=x.y.z[-demo] /DAppVersionNum=x.y.z
 ; /DAppEnv=dev|recette|production /DNomInstallateur=... installer\agrierp.iss).
 ;
@@ -26,7 +26,7 @@
   #define AppEnv "production"
 #endif
 #ifndef NomInstallateur
-  #define NomInstallateur "AgriERP-Setup-" + AppVersion
+  #define NomInstallateur "LogiAgriERP-Setup-" + AppVersion
 #endif
 
 ; Ticket S-T8 : une version demo (suffixe -demo) n'est JAMAIS construite pour la
@@ -42,7 +42,7 @@
 #endif
 
 [Setup]
-; Meme AppId pour tous les environnements : un seul AgriERP par poste Windows.
+; Meme AppId pour tous les environnements : un seul LogiAgriERP par poste Windows.
 AppId={{69B3D13F-4283-4B8E-ABD1-456845FC5182}
 AppName=LogiAgriERP
 AppVersion={#AppVersion}
@@ -50,7 +50,7 @@ AppVerName=LogiAgriERP {#AppVersion}{#LibelleEnv}
 VersionInfoVersion={#AppVersionNum}
 AppPublisher=Dr MASSENON Rhodes - Ferme Ecole OLOUWACHEGOUN
 AppPublisherURL=https://agrierp.fermeolouwachegoun.com
-DefaultDirName={autopf}\AgriERP
+DefaultDirName={autopf}\LogiAgriERP
 DefaultGroupName=LogiAgriERP
 DisableProgramGroupPage=yes
 OutputDir=Output
@@ -85,12 +85,12 @@ Filename: "{app}\agrierp.exe"; Description: "{cm:LaunchProgram,LogiAgriERP}"; Fl
 
 ; Tickets DES-1 / DES-2 : la desinstallation retire TOUT ce que le poste a pose hors du dossier d'installation :
 ; la base locale, demarrage.log, le logo, les sauvegardes (dossier des donnees), les archives et exports PDF/Excel
-; (Documents\AgriERP) et les justificatifs copies (Documents\agrierp_justificatifs). Une SAUVEGARDE AUTOMATIQUE est proposee avant
-; (Documents\AgriERP-Sauvegarde-AAAA-MM-JJ_HHMM, jamais supprimee par la desinstallation).
+; (Documents\LogiAgriERP) et les justificatifs copies (Documents\agrierp_justificatifs). Une SAUVEGARDE AUTOMATIQUE est proposee avant
+; (Documents\LogiAgriERP-Sauvegarde-AAAA-MM-JJ_HHMM, jamais supprimee par la desinstallation).
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\OLOUWACHEGOUN\donnees"
 Type: dirifempty; Name: "{userappdata}\OLOUWACHEGOUN"
-Type: filesandordirs; Name: "{userdocs}\AgriERP"
+Type: filesandordirs; Name: "{userdocs}\LogiAgriERP"
 Type: filesandordirs; Name: "{userdocs}\agrierp_justificatifs"
 
 [Code]
@@ -117,10 +117,10 @@ begin
   // Le poste est ferme d'abord : une base ouverte ne se copie pas de facon coherente.
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM agrierp.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
 
-  Dossier := ExpandConstant('{userdocs}\AgriERP-Sauvegarde-') + GetDateTimeString('yyyy/mm/dd_hhnn', '-', #0);
+  Dossier := ExpandConstant('{userdocs}\LogiAgriERP-Sauvegarde-') + GetDateTimeString('yyyy/mm/dd_hhnn', '-', #0);
   Result := ForceDirectories(Dossier)
     and CopierDossier(ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees'), Dossier + '\donnees-du-poste')
-    and CopierDossier(ExpandConstant('{userdocs}\AgriERP'), Dossier + '\archives-et-exports')
+    and CopierDossier(ExpandConstant('{userdocs}\LogiAgriERP'), Dossier + '\archives-et-exports')
     and CopierDossier(ExpandConstant('{userdocs}\agrierp_justificatifs'), Dossier + '\justificatifs');
 end;
 
@@ -132,7 +132,7 @@ begin
   Result := MsgBox(
     'ATTENTION - la desinstallation d''LogiAgriERP supprime DEFINITIVEMENT, sur ce poste :' + #13#10#13#10 +
     '  - la base locale et les journaux (' + ExpandConstant('{userappdata}\OLOUWACHEGOUN\donnees') + ')' + #13#10 +
-    '  - les archives et documents exportes (' + ExpandConstant('{userdocs}\AgriERP') + ')' + #13#10 +
+    '  - les archives et documents exportes (' + ExpandConstant('{userdocs}\LogiAgriERP') + ')' + #13#10 +
     '  - les justificatifs et recus (' + ExpandConstant('{userdocs}\agrierp_justificatifs') + ')' + #13#10#13#10 +
     'Les ventes, fiches, depenses et autres saisies faites HORS LIGNE et pas encore' + #13#10 +
     'synchronisees seront PERDUES. Synchronisez le poste avant de continuer.' + #13#10#13#10 +
@@ -143,7 +143,7 @@ begin
 
   if MsgBox(
     'Voulez-vous faire une SAUVEGARDE AUTOMATIQUE avant la suppression ?' + #13#10#13#10 +
-    'Elle sera enregistree dans votre dossier Documents (AgriERP-Sauvegarde-...) et ne sera pas supprimee.',
+    'Elle sera enregistree dans votre dossier Documents (LogiAgriERP-Sauvegarde-...) et ne sera pas supprimee.',
     mbConfirmation, MB_YESNO or MB_DEFBUTTON1) = IDYES then
   begin
     if SauvegarderAvantSuppression(Dossier) then

@@ -2,16 +2,16 @@
 
 > **USAGE**
 >
-> - **Quand l'utiliser.** Quand le web de LogiALVIA a son hub « Paramètres » et que l'on construit, écran par écran, les quatre réglages que le client a demandés : (a) configuration MeCeF, (b) configuration e-mail SMTP avec envoi d'essai, (c) logo de l'entreprise, (d) favicon (icône d'onglet). Ce fichier donne, pour chaque écran, la **spécification relue dans AgriERP** puis **deux prompts : web d'abord, poste ensuite** (doctrine : la vue web est le maître, le poste lui est fidèle).
+> - **Quand l'utiliser.** Quand le web de LogiALVIA a son hub « Paramètres » et que l'on construit, écran par écran, les quatre réglages que le client a demandés : (a) configuration MeCeF, (b) configuration e-mail SMTP avec envoi d'essai, (c) logo de l'entreprise, (d) favicon (icône d'onglet). Ce fichier donne, pour chaque écran, la **spécification relue dans LogiAgriERP** puis **deux prompts : web d'abord, poste ensuite** (doctrine : la vue web est le maître, le poste lui est fidèle).
 > - **Ordre.** Socle web et hub Paramètres → rôles et droits (`manage-parametres`) → (b) SMTP (le plus simple, il sert d'étalon) → (c) logo → (d) favicon → (a) MeCeF (après `41_MECEF_EMECEF.md`, tâches M1 à M3). Chaque écran : web, puis poste (le poste exige l'appairage et la synchronisation : `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`).
-> - **Entrées requises.** Le web de LogiALVIA avec le hub Paramètres ; la table des réglages d'entreprise (AgriERP : `company_settings`, ligne unique) ; l'appairage ; `04_UI_UX_DESIGN_SYSTEM.md` pour les composants (modale unique, toasts, dropzone) ; `03_DEVELOPMENT_STANDARDS.md`.
+> - **Entrées requises.** Le web de LogiALVIA avec le hub Paramètres ; la table des réglages d'entreprise (LogiAgriERP : `company_settings`, ligne unique) ; l'appairage ; `04_UI_UX_DESIGN_SYSTEM.md` pour les composants (modale unique, toasts, dropzone) ; `03_DEVELOPMENT_STANDARDS.md`.
 > - **Sorties.** Quatre écrans web + quatre écrans poste, leurs services « point de passage unique », migrations, audit, tests de garde, et la liste des écarts assumés.
-> - **Avertissements.** (1) Le jeton MeCeF et le mot de passe SMTP du web sont des **secrets** : jamais servis au poste. (2) Le **logo et le favicon** téléversés au web d'AgriERP **ne servent à rien en l'état** (voir (c), « Écart n° 1 ») : LogiALVIA doit les utiliser réellement. (3) Les adresses de l'API MeCeF ne sont **pas confirmées** par la DGI : ne rien inventer.
+> - **Avertissements.** (1) Le jeton MeCeF et le mot de passe SMTP du web sont des **secrets** : jamais servis au poste. (2) Le **logo et le favicon** téléversés au web d'LogiAgriERP **ne servent à rien en l'état** (voir (c), « Écart n° 1 ») : LogiALVIA doit les utiliser réellement. (3) Les adresses de l'API MeCeF ne sont **pas confirmées** par la DGI : ne rien inventer.
 > - **Voir aussi.** `41_MECEF_EMECEF.md`, `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`, `04_UI_UX_DESIGN_SYSTEM.md`, `31_TESTING_QA.md`, `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (blocs 13, 15, 19).
 
 ---
 
-## 0. Socle commun aux quatre écrans (AgriERP, relu)
+## 0. Socle commun aux quatre écrans (LogiAgriERP, relu)
 
 | Sujet | Règle (source) |
 |---|---|
@@ -63,7 +63,7 @@ Notes d'affichage par mode : boîtier → « Mode boîtier : la transmission se 
 
 **Poste (relu : `agrierp_flutter/lib/features/parametres/reglages_ferme_ui.dart`, `PageFacturationEmecef`) :** même onglet, mêmes libellés, mêmes deux préréglages ; le jeton est seulement « •••••••••••• » ou « Aucun jeton enregistré », avec « Secret : chiffré sur le serveur, jamais affiché, jamais envoyé aux postes. Il se saisit, se remplace, s'efface et se teste sur le web (« Tester la configuration »). » ; **pas de bouton « Tester »** ; enregistrement refusé tant que l'identité de la ferme n'est pas synchronisée (« Identité de la ferme non synchronisée : lancez une synchronisation avant de régler la facturation normalisée. »).
 
-**Tests de garde d'AgriERP à reprendre :** serveur `agrierp_laravel/tests/Feature/MecefModeReglageTest.php` (l'écran enregistre mode et champs, chiffre le jeton ; IFU 13 chiffres exigé en e-MECeF et rien d'écrit sinon ; demande d'un poste ancien sans clés mecef laisse le réglage), `agrierp_laravel/tests/Feature/MecefTestConfigurationTest.php` (`Http::fake` : tous les messages ci-dessus, **jamais** `POST /invoice`) ; poste `agrierp_flutter/test/mecef_emecef_poste_test.dart`, `agrierp_flutter/test/mecef_tirage_test.dart`, `agrierp_flutter/test/reglages_ferme_poste_test.dart`.
+**Tests de garde d'LogiAgriERP à reprendre :** serveur `agrierp_laravel/tests/Feature/MecefModeReglageTest.php` (l'écran enregistre mode et champs, chiffre le jeton ; IFU 13 chiffres exigé en e-MECeF et rien d'écrit sinon ; demande d'un poste ancien sans clés mecef laisse le réglage), `agrierp_laravel/tests/Feature/MecefTestConfigurationTest.php` (`Http::fake` : tous les messages ci-dessus, **jamais** `POST /invoice`) ; poste `agrierp_flutter/test/mecef_emecef_poste_test.dart`, `agrierp_flutter/test/mecef_tirage_test.dart`, `agrierp_flutter/test/reglages_ferme_poste_test.dart`.
 
 ### a.2 PROMPT — Écran (a) WEB
 
@@ -80,7 +80,7 @@ TÂCHES
 1. Service MecefReglageService (règles, messages, `enregistrer`, `effacerJeton`, `colonnes`, `aChange`) : reprise adaptée ; `verifierIfu` refuse AVANT toute écriture un IFU qui n'a pas 13 chiffres en mode e-MECeF.
 2. Service MecefConfigurationTesteur : reprise adaptée, mêmes contrôles locaux puis UN seul GET {adresse}/info/status ; messages exacts de a.1 ; teste la saisie sans l'enregistrer ; jamais le jeton ni le message d'une exception dans le résultat.
 3. Composant Livewire FacturationEmecef + vue Blade : champs, libellés, notes, boutons, toasts et bloc de résultat EXACTS de a.1. Le jeton n'est JAMAIS relu : l'état Livewire ne le porte que le temps de la frappe et il est vidé à l'enregistrement. Le champ « Adresse » et le jeton n'apparaissent qu'en mode e-MECeF.
-4. `mount()` : `abort_unless(Gate::allows('manage-parametres'), 403)` (écart assumé par rapport à AgriERP, à consigner dans le CLAUDE.md : `// ECART_DELIBERE`). Chaque action : `$this->authorize('manage-parametres')`.
+4. `mount()` : `abort_unless(Gate::allows('manage-parametres'), 403)` (écart assumé par rapport à LogiAgriERP, à consigner dans le CLAUDE.md : `// ECART_DELIBERE`). Chaque action : `$this->authorize('manage-parametres')`.
 5. Onglet `facturation` dans le hub, placé juste avant « Email (SMTP) », et renvoi depuis « Données de l'Entreprise » (« Le mode de facturation normalisée, le jeton et l'adresse de l'API e-MECeF se règlent dans l'onglet Facturation normalisée (e-MECeF). »).
 6. Audit : `company_settings.mecef_updated` (sans valeur), `company_settings.updated` quand l'IFU change.
 7. Corrige les messages de la passerelle qui citent « Paramètres, Données de l'Entreprise » : le jeton se règle dans l'onglet « Facturation normalisée (e-MECeF) ».
@@ -121,7 +121,7 @@ INTERDITS : coffre ou base locale pour le jeton ; appel réseau vers la DGI ; é
 
 **Ce que c'est et à quoi ça sert (une seule configuration pour toute l'application web) :** relances clients par e-mail (`agrierp_laravel/app/Services/RelanceClientService.php`, `Ventes/RelancesClients`), « Contactez l'Éditeur » (`app/Livewire/Contact/Index.php`, `app/Http/Controllers/Api/ContactController.php`, `app/Mail/ContactEditorMail.php`), notifications et réinitialisation des mots de passe. Chaque envoi appelle `CompanySetting::current()->applyMailConfig()` : si `smtp_host` est vide, **rien n'est changé** et Laravel utilise `MAIL_MAILER` (`.env.example` : `MAIL_MAILER=log`, `config/mail.php` : défaut `log`).
 
-> **[corrigé par CONF-1, 08/11/2026]** (AgriERP : `RelanceClientService` refuse désormais la relance e-mail sans SMTP réel — voir `agrierp_laravel/CLAUDE.md`, CONF-1.)
+> **[corrigé par CONF-1, 08/11/2026]** (LogiAgriERP : `RelanceClientService` refuse désormais la relance e-mail sans SMTP réel — voir `agrierp_laravel/CLAUDE.md`, CONF-1.)
 >
 > ⚠️ **PIÈGE `MAIL_MAILER=log`.** Avec `log` (défaut) et aucun hôte SMTP enregistré, `Mail::send` **réussit** en écrivant le message dans `storage/logs` : l'application croit avoir envoyé. `RelanceClientService::envoyerEmail` n'a aucun garde : la relance est tracée « envoyée » (`journaliser`, audit `customer_reminder.sent_email`) alors qu'**aucun e-mail n'est parti**. Dans LogiALVIA : (1) en production, `MAIL_MAILER=smtp` ou refus explicite d'envoyer quand aucun hôte n'est enregistré (« Aucun serveur d'e-mail n'est configuré : Paramètres > Email (SMTP). ») ; (2) garder `log` pour le développement et les tests ; (3) ne jamais écrire la trace d'une relance sans envoi réel.
 
@@ -148,7 +148,7 @@ Carte « **Envoyer un e-mail de test** » : « Le test emploie la configuration 
 
 **Poste :** réglages **locaux** par poste (clés `smtp.hote`, `smtp.port`, `smtp.securite`, `smtp.utilisateur`, `smtp.expediteur` dans `app_settings`, jamais synchronisées) ; **mot de passe au coffre du système** (`flutter_secure_storage`, clé `agrierp.smtp.mot_de_passe`), **jamais en base**, jamais synchronisé ; même onglet, mêmes libellés, mêmes messages (prouvé par `agrierp_flutter/test/email_smtp_blade_test.dart` : textes, choix de sécurité dans l'ordre du web, toasts, modale d'effacement, messages de validation, place de l'onglet). L'envoi d'essai et les relances partent **du poste lui-même** par le paquet `mailer` (`envoi_email_test.dart`, `envoi_email.dart`), **jamais par le serveur** ; **hors ligne, l'envoi est refusé en le disant** (« Poste hors ligne : l'e-mail exige le réseau. Réessayez une fois le poste connecté. ») ; refus avant envoi : « L'adresse e-mail du destinataire n'est pas valide. » · « Enregistrez d'abord l'hôte SMTP (Paramètres > Email (SMTP)) avant d'envoyer un e-mail. » · « Renseignez l'adresse d'expédition (ou l'utilisateur SMTP) avant d'envoyer un e-mail. » ; délai d'envoi 30 s ; la trace d'une relance n'est écrite **qu'après** un envoi réussi. Expéditeur du poste : adresse d'expédition, sinon e-mail de contact descendu du serveur, sinon utilisateur SMTP.
 
-**Tests de garde d'AgriERP :** serveur `agrierp_laravel/tests/Feature/ParametresConfigurationsTest.php` (mot de passe jamais en clair en base, champ vidé après enregistrement, audit, ordre des onglets) ; poste `agrierp_flutter/test/email_smtp_blade_test.dart`, `agrierp_flutter/test/parametres_smtp_test.dart` (seules les clés de `clesReglages` s'écrivent dans `app_settings`), `agrierp_flutter/test/relances_poste_test.dart`, `agrierp_flutter/test/administration_locale_test.dart`.
+**Tests de garde d'LogiAgriERP :** serveur `agrierp_laravel/tests/Feature/ParametresConfigurationsTest.php` (mot de passe jamais en clair en base, champ vidé après enregistrement, audit, ordre des onglets) ; poste `agrierp_flutter/test/email_smtp_blade_test.dart`, `agrierp_flutter/test/parametres_smtp_test.dart` (seules les clés de `clesReglages` s'écrivent dans `app_settings`), `agrierp_flutter/test/relances_poste_test.dart`, `agrierp_flutter/test/administration_locale_test.dart`.
 
 ### b.2 PROMPT — Écran (b) WEB
 
@@ -170,7 +170,7 @@ TÂCHES
 8. Tests : mot de passe chiffré en base (valeur brute ≠ clair), champ vidé après enregistrement, vide = inchangé, effacement explicite, test d'envoi avec `Mail::fake()` ET un test d'intégration contre un serveur SMTP local jetable si le dépôt en dispose (sinon dit qu'il n'a pas été joué), droit 403, audit, jeu de messages de validation, refus d'envoi sans hôte en production.
 
 CRITÈRES D'ACCEPTATION : libellés/messages identiques à b.1 (test qui lit la vue) ; le mot de passe n'apparaît ni dans le HTML rendu, ni dans l'état Livewire sérialisé, ni dans /api/sync/pull, ni dans le journal, ni dans le toast d'échec ; un e-mail de test part vraiment avec une configuration valide (essai manuel documenté) ; relance sans hôte : refusée, aucune ligne `customer_reminders` écrite ; suite verte.
-INTERDITS : réafficher le mot de passe ; l'envoyer au poste ; simuler un succès ; saisir le SMTP à deux endroits (AgriERP l'a payé : deux jeux de valeurs).
+INTERDITS : réafficher le mot de passe ; l'envoyer au poste ; simuler un succès ; saisir le SMTP à deux endroits (LogiAgriERP l'a payé : deux jeux de valeurs).
 PIÈGES PAYÉS : configuration SMTP saisie à DEUX endroits ; `TLS` vs `tls` (le transport attend des minuscules) ; champ vide écrasant le mot de passe et coupant tous les e-mails sans rien dire ; MAIL_MAILER=log qui « envoie » dans un fichier.
 ~~~~
 
@@ -181,7 +181,7 @@ PIÈGES PAYÉS : configuration SMTP saisie à DEUX endroits ; `TLS` vs `tls` (le
 
 OBJECTIF : l'onglet « Email (SMTP) » du poste de LogiALVIA, fidèle à la vue web (b.1), avec réglages LOCAUX, mot de passe au coffre, envoi d'essai réel et envoi des relances par le SMTP du poste.
 
-PRÉREQUIS : l'onglet web (b.2) passe ; flutter_secure_storage est déjà une dépendance ; ajouter `mailer` et `connectivity_plus` (versions d'AgriERP : /home/user/agrierp/agrierp_flutter/pubspec.yaml).
+PRÉREQUIS : l'onglet web (b.2) passe ; flutter_secure_storage est déjà une dépendance ; ajouter `mailer` et `connectivity_plus` (versions d'LogiAgriERP : /home/user/agrierp/agrierp_flutter/pubspec.yaml).
 
 RÉFÉRENCES (lecture seule) : /home/user/agrierp/agrierp_flutter/lib/features/parametres/onglet_email_smtp.dart ; lib/core/config/parametres_smtp.dart, envoi_email.dart, envoi_email_test.dart ; test/email_smtp_blade_test.dart, parametres_smtp_test.dart, relances_poste_test.dart ; lib/features/parametres/parametres_generaux_screen.dart (ongletEmailSmtp).
 
@@ -211,7 +211,7 @@ INTERDITS : synchroniser le SMTP du poste avec le serveur ; envoyer l'e-mail du 
 
 **Synchronisation vers le poste (ticket AUT-2) :** le tirage sert `logo_path` ; le poste télécharge `GET /api/sync/company-file/logo` quand le chemin change (`agrierp_laravel/routes/api.php`, `SyncController::fichierEntreprise` : 404 « Aucun fichier. » si absent ; réservé aux comptes authentifiés) ; le poste garde le fichier **hors base, hors réseau** (`<dossier de données>/entreprise/logo.<ext>` + `logo.source` = chemin du serveur). Un logo choisi au poste est enregistré **tout de suite** puis envoyé au serveur dans la demande `entreprise` (`logoB64`, `EntrepriseService::fichiersDepuisBase64` : mêmes limites que le web, 2 048 Ko ; refus « Le logo doit être une image (png, jpg, gif, bmp ou webp). » / « Le logo ne doit pas dépasser 2048 Ko. » ; ⚠️ la boucle du service écrit le logo AVANT de valider le favicon : si le favicon est refusé, le logo déjà rangé sur le disque reste orphelin — LogiALVIA valide les deux fichiers avant d'en écrire un). Poste : zone « Cliquer pour choisir un logo » (sélecteur de fichier, **pas** de glisser-déposer), formats png/jpg/jpeg/gif/bmp/webp.
 
-### c.2 Écarts et défauts relevés dans AgriERP (à NE PAS reproduire, à corriger dans LogiALVIA)
+### c.2 Écarts et défauts relevés dans LogiAgriERP (à NE PAS reproduire, à corriger dans LogiALVIA)
 
 1. **[corrigé par CONF-1, 08/11/2026 : onglet, en-tête des PDF ; CONF-2 (décision du client du 08/11/2026) : le logo choisi ne sert QU'AUX DOCUMENTS et à l'ONGLET — le menu, la connexion et le verrouillage gardent le TRACTEUR (icône `agriculture`, marque « LogiAgriERP ») ; défaut = logo officiel de la ferme ; l'attestation garde son logo fixe, mesuré sur le modèle du client]** **Écart n° 1 — le logo téléversé ne sert à rien au web.** Recherche faite dans `agrierp_laravel/app` et `agrierp_laravel/resources` : `logo_path` n'est lu que par l'écran de réglage (aperçu) et par le tirage du poste. L'en-tête des PDF web (`agrierp_laravel/resources/views/exports/layout.blade.php` via `PdfExportService` : `public_path('assets/images/logo.png')`), l'attestation (`AttestationService` : `resource_path('attestation/images/logo-ferme.png')`), la page de connexion et le menu utilisent des **fichiers fixes**. **Seul le poste** utilise le logo choisi, pour ses PDF (`FichiersEntreprise.logoPourPdf`, PNG ou JPEG seulement, repli sur le logo embarqué) : le poste est en avance sur le web, contre la doctrine (le web est le maître). **LogiALVIA doit utiliser le logo téléversé partout dès le web** : menu/barre latérale, page de connexion, en-tête de la facture PDF et des documents (attestations, bons, rapports), avec repli sur le logo d'installation.
 2. **[corrigé par CONF-1, 08/11/2026]** **« Glisser-déposer » n'est pas câblé** : la zone est un `<label>` autour d'un `<input type="file" class="hidden">` et **aucun gestionnaire `dragover`/`drop` n'existe** dans la vue (recherche faite). Le texte promet un geste que la vue ne traite pas (**à vérifier dans un navigateur** : un dépôt de fichier sur la zone ouvre en général le fichier au lieu de le téléverser). LogiALVIA : soit câbler un vrai dépôt (Alpine `@dragover.prevent`, `@drop.prevent`, transmission du fichier à Livewire), soit retirer « Glisser-déposer » du texte.
@@ -234,7 +234,7 @@ TÂCHES
 2. Service unique EntrepriseService::enregistrerFichier(genre, fichier) : validation, rangement sur le disque public, dossier `company`, nom GÉNÉRÉ (jamais le nom d'origine), suppression de l'ancien fichier du même genre APRÈS l'écriture réussie ; service `supprimerFichier(genre)` ; constantes de messages communes au web, à l'API et au poste.
 3. Carte web : zone en pointillés, icône `add_photo_alternate`, « Glisser-déposer ou cliquer pour choisir un logo » (remplacé par le nom du fichier choisi), « PNG carré, fond transparent recommandé, max 2 Mo », aperçu du logo actuel, bouton « Remplacer » (reclic sur la zone) et bouton « Supprimer le logo » avec confirmation par modale (événement). Le glisser-déposer doit FONCTIONNER (Alpine @dragover.prevent / @drop.prevent → upload Livewire) et se tester avec Playwright (`setInputFiles` ET un vrai événement `drop`).
 4. Validation : `nullable|image|max:2048` ; messages exacts de c.1 ; refus d'un SVG (script embarqué) ; vérifie le contenu réel (`getimagesizefromstring`), pas seulement l'extension.
-5. Droit manage-parametres à l'ouverture et à chaque écriture. Audit : `company_settings.logo_updated` et `company_settings.logo_deleted` (nouveaux : écart assumé par rapport à AgriERP qui ne distingue pas ; sans valeur).
+5. Droit manage-parametres à l'ouverture et à chaque écriture. Audit : `company_settings.logo_updated` et `company_settings.logo_deleted` (nouveaux : écart assumé par rapport à LogiAgriERP qui ne distingue pas ; sans valeur).
 6. UTILISATION (obligatoire, c'est l'écart n° 1) : un helper unique `logoEntreprise()` (URL du logo téléversé, repli sur l'asset d'installation) utilisé par l'en-tête de la facture PDF et de tous les documents PDF (CONF-2 : PAS par le menu, la connexion ni le verrouillage, qui gardent l'icône de tracteur ; repli = logo officiel de la ferme, `logo_ferme_ecole_officiel.png`, et favicon `.ico` / `.png` de la ferme) (attestations, bons, rapports) ; le moteur PDF reçoit un chemin disque lisible ou une image encodée, jamais une URL distante ; paramètre de cache (`?v=<updated_at>`) pour que le changement se voie tout de suite.
 7. Tirage vers le poste : `logo_path` dans `company_settings` du tirage ; `GET /api/sync/company-file/logo` (authentifié, 404 « Aucun fichier. » si absent, jamais d'autre chemin que celui de la colonne).
 8. Tests : téléversement valide (fichier présent sur le disque, colonne écrite, ancien fichier supprimé), refus d'un fichier non image, d'un fichier > 2 048 Ko, d'un SVG, d'un utilisateur sans manage-parametres (403), suppression (fichier et colonne effacés, repli sur le logo d'installation), audit, présence du logo dans le HTML du menu, de la connexion et dans le PDF d'une facture (octets de l'image présents), endpoint company-file (200 / 404).
@@ -250,7 +250,7 @@ INTERDITS : garder le nom d'origine du fichier ; accepter un SVG ; stocker le lo
 
 OBJECTIF : la zone « Logo de l'Entreprise » du poste de LogiALVIA, fidèle à la vue web (c.1 et c.3) : choix, aperçu, remplacement, suppression, synchronisation, usage dans les PDF et l'interface.
 
-PRÉREQUIS : l'écran web (c.3) passe ; le tirage sert `logo_path` ; `GET /api/sync/company-file/{genre}` existe ; ajouter `file_picker` (version d'AgriERP : /home/user/agrierp/agrierp_flutter/pubspec.yaml).
+PRÉREQUIS : l'écran web (c.3) passe ; le tirage sert `logo_path` ; `GET /api/sync/company-file/{genre}` existe ; ajouter `file_picker` (version d'LogiAgriERP : /home/user/agrierp/agrierp_flutter/pubspec.yaml).
 
 RÉFÉRENCES (lecture seule) : /home/user/agrierp/agrierp_flutter/lib/core/config/fichiers_entreprise.dart ; lib/features/parametres/reglages_ferme_ui.dart (_depotFichier, choisirImage) ; reglages_ferme_repository.dart ; lib/core/sync/sync_engine.dart (_tirerFichiersEntreprise, envoi de logoB64) ; lib/core/export/document_officiel.dart (chargerLogo) ; test/reglages_ferme_poste_test.dart.
 
@@ -273,7 +273,7 @@ INTERDITS : nom d'origine du fichier ; octets du logo dans la base ou dans la fi
 
 **Zone web (carte « Favicon (Icône d'Onglet) »)** : même cadre en pointillés, icône `web`, texte « **Glisser-déposer ou cliquer pour choisir un favicon** », consigne « **ICO ou PNG 32x32px, max 500 Ko** », aperçu du favicon actuel (hauteur 32 px, `alt="Favicon actuel"`). Validation web : `faviconFile` : `nullable|image|max:500`. Messages (attribut « icône du site ») : « Le champ icône du site doit être une image. » · « Le fichier icône du site ne doit pas dépasser 500 kilo-octets. » Stockage : même disque et dossier `company`, colonne `favicon_path`. Synchronisation : `GET /api/sync/company-file/favicon`. Poste : « Cliquer pour choisir un favicon », mêmes formats que le logo, 500 Ko ; **le poste n'a pas d'onglet de navigateur** : il garde et montre le fichier dans l'écran de réglage seulement (relu : seul l'écran des réglages l'affiche).
 
-### d.2 Écarts et défauts relevés dans AgriERP
+### d.2 Écarts et défauts relevés dans LogiAgriERP
 
 1. **[corrigé par CONF-1, 08/11/2026]** **Écart n° 2 — la consigne dit « ICO » mais la validation le REFUSE.** La règle `image` de Laravel 12 n'accepte que jpg, jpeg, png, gif, bmp, webp (`ValidatesAttributes::validateImage`) : un fichier `.ico` est refusé (« Le champ icône du site doit être une image. »). Le sélecteur (`accept="image/*"`) l'offre pourtant. Le poste et l'API (`EntrepriseService::EXTENSIONS`, `FichiersEntreprise.extensions`) le refusent aussi. **LogiALVIA doit trancher** : (a) accepter ICO et PNG (règle `mimes:png,ico` + contrôle du contenu ; `getimagesizefromstring` lit les ICO) et ajouter `image/vnd.microsoft.icon` aux types admis du service ; ou (b) corriger la consigne en « PNG 32x32 px ». Le test doit couvrir **le cas annoncé par la consigne**.
 2. **[corrigé par CONF-1, 08/11/2026]** **Écart n° 3 — le favicon téléversé ne sert à rien.** Les deux layouts (`agrierp_laravel/resources/views/layouts/app.blade.php` et `guest.blade.php`, ligne 8) posent `<link rel="icon" type="image/png" href="{{ asset('assets/images/logo_favicon.webp') }}">` : un fichier **fixe** ; `favicon_path` n'est jamais lu pour l'onglet. (Et le type déclaré `image/png` ne correspond pas à un `.webp`.) Le service worker précache aussi cet asset fixe (`SOCLE` de `public/sw.js`).
@@ -320,7 +320,7 @@ TÂCHES
 4. Test qui LIT la vue Blade pour les textes ; tests de validation (format, 500 Ko), d'enregistrement immédiat, de téléchargement au changement de chemin.
 
 CRITÈRES D'ACCEPTATION : fichier hors base ; survit au redémarrage ; synchronisé dans les deux sens ; textes identiques au web ; flutter analyze et flutter test verts.
-INTERDITS : prétendre que le favicon change l'icône de la fenêtre Windows (ce n'est pas le cas ; l'icône de l'application vient de l'installateur : voir `build_windows.bat` d'AgriERP, bloc 10 du guide).
+INTERDITS : prétendre que le favicon change l'icône de la fenêtre Windows (ce n'est pas le cas ; l'icône de l'application vient de l'installateur : voir `build_windows.bat` d'LogiAgriERP, bloc 10 du guide).
 ~~~~
 
 ---
@@ -328,7 +328,7 @@ INTERDITS : prétendre que le favicon change l'icône de la fenêtre Windows (ce
 ## 1. Questions au client (pour ces quatre écrans)
 
 1. **MeCeF** : voir `41_MECEF_EMECEF.md` section 8 (jeton, environnement, qui saisit).
-2. **SMTP** : fournisseur d'e-mail de la ferme (hôte, port, chiffrement, compte d'envoi) ? Le poste doit-il envoyer lui-même (cas d'AgriERP) ou toujours via le serveur ? Adresse d'expédition à afficher aux clients ?
+2. **SMTP** : fournisseur d'e-mail de la ferme (hôte, port, chiffrement, compte d'envoi) ? Le poste doit-il envoyer lui-même (cas d'LogiAgriERP) ou toujours via le serveur ? Adresse d'expédition à afficher aux clients ?
 3. **Relances** : acceptez-vous le refus d'envoi (au lieu d'une relance « tracée mais non partie ») quand aucun SMTP n'est configuré ?
 4. **Logo** : formats acceptés (PNG/JPEG seulement, ou aussi GIF/WebP/SVG nettoyé) ? Où doit-il apparaître (menu, connexion, factures, attestations, rapports, courriels) ?
 5. **Favicon** : **ICO accepté** (oui/non) ? Contrôle des dimensions (32x32 strict, carré minimum, aucun) ?

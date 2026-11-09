@@ -867,7 +867,7 @@ class _Essai {
       await Future<void>.delayed(attente);
     }
     _connexions.add(DateTime.now());
-    await p.connecter('AgriERP@2026');
+    await p.connecter('LogiAgriERP@2026');
   }
 
   /// Reconnexion après un refus de session : nouvelle connexion, nouvelle session (synchronisation à l'ouverture).

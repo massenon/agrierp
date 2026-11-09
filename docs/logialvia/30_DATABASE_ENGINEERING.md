@@ -3,9 +3,9 @@
 > **USAGE**
 > - **Quand l'utiliser** : après `02_ARCHITECTURE_WEB_ET_STACK.md` (pile et conventions figées) et après `10_BRS…` à `15_REGLES_METIER` (ce qu'on stocke), AVANT d'écrire le moindre modèle Eloquent, composant Livewire ou fichier `20_MODULES_*`. Toute table du web naît ici.
 > - **Ordre** : (1) lire ce fichier en entier ; (2) lancer le **prompt P0** (audit de départ) ; (3) lancer les prompts **P1 à P9**, UN domaine par session (règle « un ticket = une session », `agrierp_laravel/CLAUDE.md` § Working rhythm) ; (4) lancer **P10** (plan de migration des données de logialvia) ; (5) **P11** (seeders) ; (6) **P12** (contrôle de parité du schéma Laravel ↔ Drift).
-> - **Entrées** : ce fichier ; `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (à lire, pas à réécrire : il fixe l'ordre de portage et les pièges déjà payés) ; le schéma réel d'AgriERP (`agrierp_laravel/database/migrations/`, `agrierp_flutter/lib/core/database/app_database.dart`, schéma Drift v85) ; le schéma réel de logialvia (`/home/user/massenon/logialvia/logialvia_app/lib/*/data/tables/`, schéma Drift v26, + `docs/04_MODELE_DONNEES_PERSISTANCE.md`, `docs/D1_Modele_Donnees_ERD_Dictionnaire.md`, `docs/05_LOGIQUE_CALCUL_FORMULAIRES.md`).
+> - **Entrées** : ce fichier ; `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (à lire, pas à réécrire : il fixe l'ordre de portage et les pièges déjà payés) ; le schéma réel d'LogiAgriERP (`agrierp_laravel/database/migrations/`, `agrierp_flutter/lib/core/database/app_database.dart`, schéma Drift v85) ; le schéma réel de logialvia (`/home/user/massenon/logialvia/logialvia_app/lib/*/data/tables/`, schéma Drift v26, + `docs/04_MODELE_DONNEES_PERSISTANCE.md`, `docs/D1_Modele_Donnees_ERD_Dictionnaire.md`, `docs/05_LOGIQUE_CALCUL_FORMULAIRES.md`).
 > - **Sorties** : migrations Laravel (`agrierp_laravel`-like : `<web LogiALVIA>/database/migrations/`), modèles, seeders, tables Drift jumelles, tests de schéma, mise à jour du dictionnaire ci-dessous (ce fichier reste la source : tout écart est corrigé ICI dans le même commit).
-> - **Règle d'or** : aucune règle métier inventée. Ce qui n'est écrit dans aucune source est marqué **« À DÉFINIR AVEC LE CLIENT »** et listé dans la section 14 (questions). Les noms de colonnes d'AgriERP sont réutilisés tels quels quand la notion est identique (un seul vocabulaire pour les deux produits).
+> - **Règle d'or** : aucune règle métier inventée. Ce qui n'est écrit dans aucune source est marqué **« À DÉFINIR AVEC LE CLIENT »** et listé dans la section 14 (questions). Les noms de colonnes d'LogiAgriERP sont réutilisés tels quels quand la notion est identique (un seul vocabulaire pour les deux produits).
 > - **Fichiers frères** : `01_MASTER_PROMPT.md`, `02_ARCHITECTURE_WEB_ET_STACK.md`, `03_DEVELOPMENT_STANDARDS.md`, `15_REGLES_METIER.md`, `20_MODULES_*`, `40_PWA_HORS_LIGNE.md`, `41_MECEF_EMECEF.md`, `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`, `31_TESTING_QA.md`, `32_CLAUDE_CODE_SKILLS_LIBRARY.md`.
 
 ---
@@ -35,8 +35,8 @@
 1. **UUID partout.** Toute clé primaire est un UUID (`$table->uuid('id')->primary()`, `HasUuids` côté Eloquent, `TextColumn` côté Drift). Aucun `increments()`, `id()`, `bigIncrements()`. Les lignes de comptage internes (`accounting_reference_sequences`) ont une clé composite métier, pas d'entier auto. Conséquence directe sur logialvia : 25 colonnes `autoIncrement` à convertir (section 9).
 2. **Le web est le maître du schéma** (doctrine, article 0) ; le poste Drift le reproduit. Toute table synchronisable modifiée d'un côté l'est de l'autre, dans le même ticket (section 11).
 3. **Suppression logique seulement** sur toute donnée comptable, zootechnique ou commerciale : `is_active = false` ou énumération `status`. `DELETE` physique interdit, sauf référentiels non référencés via la Corbeille (mot « SUPPRIMER »). Les écritures comptables ne se restaurent jamais : on les contre-passe.
-4. **Montants entiers en FCFA** : `unsignedBigInteger` (ou `bigInteger` si un solde peut être négatif). Aucun `float`, aucun `decimal` pour de l'argent. Les quantités physiques (kg, litres, sujets partiels) restent `decimal`. ⚠️ AgriERP utilise encore `decimal(14,2)` (vérifié dans `2026_02_16_000002_create_sales_and_lines_tables.php`) : LogiALVIA, nouveau produit, applique l'entier dès le départ. Ne pas copier `decimal(14,2)` d'AgriERP.
-5. **Dates en heure du Bénin** (`Africa/Porto-Novo`, UTC+1, pas d'heure d'été) : `APP_TIMEZONE=Africa/Porto-Novo` (AgriERP laisse `env('APP_TIMEZONE','UTC')` dans `config/app.php` : LogiALVIA fixe la valeur dans `.env.example` ET dans `config/app.php`). Un « jour » (fiche journalière, échéance) est une colonne `date`, jamais un `timestamp`.
+4. **Montants entiers en FCFA** : `unsignedBigInteger` (ou `bigInteger` si un solde peut être négatif). Aucun `float`, aucun `decimal` pour de l'argent. Les quantités physiques (kg, litres, sujets partiels) restent `decimal`. ⚠️ LogiAgriERP utilise encore `decimal(14,2)` (vérifié dans `2026_02_16_000002_create_sales_and_lines_tables.php`) : LogiALVIA, nouveau produit, applique l'entier dès le départ. Ne pas copier `decimal(14,2)` d'LogiAgriERP.
+5. **Dates en heure du Bénin** (`Africa/Porto-Novo`, UTC+1, pas d'heure d'été) : `APP_TIMEZONE=Africa/Porto-Novo` (LogiAgriERP laisse `env('APP_TIMEZONE','UTC')` dans `config/app.php` : LogiALVIA fixe la valeur dans `.env.example` ET dans `config/app.php`). Un « jour » (fiche journalière, échéance) est une colonne `date`, jamais un `timestamp`.
 6. **Chaque table synchronisable porte** `device_id`, `sync_status`, `updated_at` (section 3.4).
 7. **Un seul point de passage** pour toute règle qui écrit (Action ou Service) ; la base garde les invariants qu'elle peut garder (clés étrangères, uniques, CHECK).
 8. **Les migrations ne se modifient jamais après livraison** : on en ajoute une. Elles sont idempotentes (`hasTable`/`hasColumn`).
@@ -46,7 +46,7 @@
 
 | Sujet | Chemin |
 |---|---|
-| Migrations AgriERP (141 fichiers) | `/home/user/agrierp/agrierp_laravel/database/migrations/` |
+| Migrations LogiAgriERP (141 fichiers) | `/home/user/agrierp/agrierp_laravel/database/migrations/` |
 | Exemple FK + enum + index | `.../2026_02_10_000001_create_livestock_lots_table.php` |
 | Table singleton de réglages (SMTP, logo, favicon) | `.../2026_02_20_000001_create_company_settings_table.php` |
 | Réglage MeCeF | `.../2026_11_07_000001_add_mecef_reglage_to_company_settings.php`, `..._000002_add_mecef_normalisation_to_sales_and_credit_notes.php` |
@@ -55,8 +55,8 @@
 | Migration idempotente | `.../2026_10_23_000001_create_corbeille_operations_table.php` |
 | Enum étendu, MariaDB vs SQLite | `.../2026_02_28_000003_add_retard_to_attendance_records_status_enum.php`, `.../2026_11_05_000005_add_quatre_to_livestock_transfers_categorie.php` |
 | Plan SYSCOHADA (1 332 comptes) | `agrierp_laravel/database/data/plan-comptable-syscohada-revise.csv`, `app/Services/ImporterPlanSyscohadaService.php` (retourne `empreinte` SHA-256 du fichier) |
-| Seeders AgriERP | `agrierp_laravel/database/seeders/` (`RolesAndPermissionsSeeder`, `ChartOfAccountsSeeder`, `FeedRationStandardsSeeder`, `ModulesConfigSeeder`, `LivestockSpeciesSeeder`, `DemoDataSeeder` + `Demo/`) |
-| Schéma Drift AgriERP (v85) | `/home/user/agrierp/agrierp_flutter/lib/core/database/app_database.dart` (`schemaVersion => 85`) ; généré : `app_database.g.dart` (jamais à la main) |
+| Seeders LogiAgriERP | `agrierp_laravel/database/seeders/` (`RolesAndPermissionsSeeder`, `ChartOfAccountsSeeder`, `FeedRationStandardsSeeder`, `ModulesConfigSeeder`, `LivestockSpeciesSeeder`, `DemoDataSeeder` + `Demo/`) |
+| Schéma Drift LogiAgriERP (v85) | `/home/user/agrierp/agrierp_flutter/lib/core/database/app_database.dart` (`schemaVersion => 85`) ; généré : `app_database.g.dart` (jamais à la main) |
 | Tests de schéma / migrations du poste | `agrierp_flutter/test/migration_toutes_versions_test.dart`, `migration_bases_reelles_test.dart`, `corbeille_schema_test.dart`, `avoirs_schema_test.dart` |
 | Essai multipostes MariaDB | `agrierp_flutter/outils/essai_multipostes.sh` |
 | Tables Drift de logialvia (22 fichiers) | `/home/user/massenon/logialvia/logialvia_app/lib/{administration,approvisionnement,commercial,comptabilite,elevage}/data/tables/` ; schéma `versionSchema = 26` dans `logialvia_app/lib/core/database/app_database.dart` |
@@ -82,14 +82,14 @@
 
 ### 3.2 Énumérations
 
-Deux techniques coexistent dans AgriERP ; choisir **texte + validation** pour toute liste susceptible de grandir :
+Deux techniques coexistent dans LogiAgriERP ; choisir **texte + validation** pour toute liste susceptible de grandir :
 
 - `enum` MySQL : valeurs figées (`livestock_lots.status`). Piège : étendre une enum exige `ALTER TABLE ... MODIFY COLUMN` en MariaDB et une conversion en `string` sous SQLite (voir 8.3).
 - `string(n)` + règle `Rule::in()` côté Action + `CHECK` quand le moteur le permet : à préférer pour `payment_mode`, `species_code`, `categorie`. Côté Drift : `textEnum<…>()` ou `TextColumn` + test de garde.
 
 ### 3.3 Nommage
 
-`snake_case` anglais pour les tables et colonnes réutilisées d'AgriERP (`livestock_lots`, `sale_lines`, `chart_of_accounts`, `accounting_entries`) ; `snake_case` français pour les tables nées de la synchronisation (`journal_synchronisation`, `demandes_synchronisation`). Libellés d'interface, messages d'erreur et commentaires : toujours en français.
+`snake_case` anglais pour les tables et colonnes réutilisées d'LogiAgriERP (`livestock_lots`, `sale_lines`, `chart_of_accounts`, `accounting_entries`) ; `snake_case` français pour les tables nées de la synchronisation (`journal_synchronisation`, `demandes_synchronisation`). Libellés d'interface, messages d'erreur et commentaires : toujours en français.
 
 ### 3.4 Colonnes de synchronisation (toute table synchronisable)
 
@@ -100,7 +100,7 @@ Deux techniques coexistent dans AgriERP ; choisir **texte + validation** pour to
 | `updated_at` | `timestamp` | oui | `NULL` | curseur de tirage (`> dernier updated_at`), indexé |
 | `is_active` | `boolean` | non | `true` | suppression logique |
 
-Règles : (a) `updated_at` est posé par Eloquent côté web ET par le poste à chaque écriture ; (b) index `updated_at` sur toute table tirée (`2026_10_19_000002_add_updated_at_index_to_stock_movements_table.php`) ; (c) les tables **propres au serveur** (journal, demandes, correspondances, corbeille_operations, recovery_codes) n'ont PAS ces colonnes et ne sont jamais tirées ni poussées ; (d) AgriERP applique `device_id`/`sync_status` aux « tables terrain » (ventes, bandes, fiches, avances…) mais pas partout (`animals` n'en a pas, voir `2026_08_16_000005_create_animals_table.php`) : LogiALVIA tient la **liste des tables synchronisables** dans un seul fichier `docs/logialvia/SCHEMA_SYNCHRONISABLE.md` (à créer par P12) et le garde-fou la compare au code.
+Règles : (a) `updated_at` est posé par Eloquent côté web ET par le poste à chaque écriture ; (b) index `updated_at` sur toute table tirée (`2026_10_19_000002_add_updated_at_index_to_stock_movements_table.php`) ; (c) les tables **propres au serveur** (journal, demandes, correspondances, corbeille_operations, recovery_codes) n'ont PAS ces colonnes et ne sont jamais tirées ni poussées ; (d) LogiAgriERP applique `device_id`/`sync_status` aux « tables terrain » (ventes, bandes, fiches, avances…) mais pas partout (`animals` n'en a pas, voir `2026_08_16_000005_create_animals_table.php`) : LogiALVIA tient la **liste des tables synchronisables** dans un seul fichier `docs/logialvia/SCHEMA_SYNCHRONISABLE.md` (à créer par P12) et le garde-fou la compare au code.
 
 ## 4. ERD par domaine
 
@@ -202,7 +202,7 @@ erDiagram
     }
 ```
 
-⚠️ **Divergence entre les deux produits à trancher (question Q1)** : AgriERP stocke la fiche journalière **par lot** (`livestock_daily_entries.lot_id`, unique (lot, jour)) ; logialvia la stocke **par filière et par jour** (`FICHE_JOURNEE`, unique (`espece`, `date`), avec une note explicite : « elle ne redécoupe pas FICHE_JOURNEE » par bande). Le web de LogiALVIA reprend **la clé de logialvia** (filière + jour) tant que le client n'a pas décidé autrement : c'est la seule fidèle aux données déjà saisies. `lot_id` (bande) est alors **nullable et indicatif**.
+⚠️ **Divergence entre les deux produits à trancher (question Q1)** : LogiAgriERP stocke la fiche journalière **par lot** (`livestock_daily_entries.lot_id`, unique (lot, jour)) ; logialvia la stocke **par filière et par jour** (`FICHE_JOURNEE`, unique (`espece`, `date`), avec une note explicite : « elle ne redécoupe pas FICHE_JOURNEE » par bande). Le web de LogiALVIA reprend **la clé de logialvia** (filière + jour) tant que le client n'a pas décidé autrement : c'est la seule fidèle aux données déjà saisies. `lot_id` (bande) est alors **nullable et indicatif**.
 
 ### 4.3 Pisciculture, pintades, goliaths (spécificités)
 
@@ -266,7 +266,7 @@ erDiagram
         unsigned manual_total_amount }
 ```
 
-Règle d'AgriERP à garder : `sale_lines.manual_total_amount` est la SOURCE du montant d'une ligne ; `unit_price` n'est que dérivé (`2026_02_16_000002_create_sales_and_lines_tables.php`). logialvia a `LIGNES_VENTE.pu` et `qte` réels : à vérifier avec le client avant de reprendre cette règle (Q4).
+Règle d'LogiAgriERP à garder : `sale_lines.manual_total_amount` est la SOURCE du montant d'une ligne ; `unit_price` n'est que dérivé (`2026_02_16_000002_create_sales_and_lines_tables.php`). logialvia a `LIGNES_VENTE.pu` et `qte` réels : à vérifier avec le client avant de reprendre cette règle (Q4).
 
 ### 4.5 Stocks et achats
 
@@ -302,7 +302,7 @@ erDiagram
         timestamp updated_at }
 ```
 
-logialvia sépare `intrants` (provende, marchandises, vétérinaire ; PK `code`) et `produits_vendables` (PK entier). AgriERP les unifie dans `products` + `product_categories`. Décision proposée : **une seule table `products`** avec catégorie (Q5 à valider : cela change l'écran Stocks de logialvia).
+logialvia sépare `intrants` (provende, marchandises, vétérinaire ; PK `code`) et `produits_vendables` (PK entier). LogiAgriERP les unifie dans `products` + `product_categories`. Décision proposée : **une seule table `products`** avec catégorie (Q5 à valider : cela change l'écran Stocks de logialvia).
 
 ### 4.6 Comptabilité et exercices
 
@@ -348,7 +348,7 @@ erDiagram
     }
 ```
 
-⚠️ Écart logialvia : `ECRITURE_COMPTABLE` est UNE ligne (un compte, `debit`/`credit`, `numeroPiece` pour regrouper) ; AgriERP sépare `accounting_entries` (en-tête) et `accounting_entry_lines`. Le web adopte l'en-tête + lignes (équilibre vérifiable par pièce) ; la migration de données regroupe les lignes logialvia par `numeroPiece` (section 9.5). `PLAN_COMPTABLE.numeroCompte` (PK texte, « immuable ») devient `chart_of_accounts.code` UNIQUE avec un UUID comme clé.
+⚠️ Écart logialvia : `ECRITURE_COMPTABLE` est UNE ligne (un compte, `debit`/`credit`, `numeroPiece` pour regrouper) ; LogiAgriERP sépare `accounting_entries` (en-tête) et `accounting_entry_lines`. Le web adopte l'en-tête + lignes (équilibre vérifiable par pièce) ; la migration de données regroupe les lignes logialvia par `numeroPiece` (section 9.5). `PLAN_COMPTABLE.numeroCompte` (PK texte, « immuable ») devient `chart_of_accounts.code` UNIQUE avec un UUID comme clé.
 
 ### 4.7 Ressources humaines
 
@@ -371,7 +371,7 @@ erDiagram
     }
 ```
 
-⚠️ **logialvia n'a AUCUN module RH** (aucune table Drift RH, vérifié : 22 fichiers, domaines administration/approvisionnement/commercial/comptabilite/elevage). Toute la paie, les attestations et le barème de l'ITS d'AgriERP ne sont donc **pas dans le périmètre connu**. Ce domaine reste **À DÉFINIR AVEC LE CLIENT** (Q2) ; ne pas le générer sans décision. Le diagramme ci-dessus est un point de départ calqué sur AgriERP.
+⚠️ **logialvia n'a AUCUN module RH** (aucune table Drift RH, vérifié : 22 fichiers, domaines administration/approvisionnement/commercial/comptabilite/elevage). Toute la paie, les attestations et le barème de l'ITS d'LogiAgriERP ne sont donc **pas dans le périmètre connu**. Ce domaine reste **À DÉFINIR AVEC LE CLIENT** (Q2) ; ne pas le générer sans décision. Le diagramme ci-dessus est un point de départ calqué sur LogiAgriERP.
 
 ### 4.8 Paramètres, MeCeF, SMTP, logo, favicon
 
@@ -447,7 +447,7 @@ Légende : « Nul » = acceptation de NULL ; **S** = table synchronisable (porte
 | `id` | uuid | non | | PK | identifiant |
 | `name` | string(150) | non | | | nom affiché |
 | `username` | string(50) | non | | UK | identifiant court de connexion (`2026_08_17_000009_add_username_to_users.php`) |
-| `email` | string(150) | non | | UK | contact ; plus de réinitialisation par e-mail (décision AgriERP MDP-1, à confirmer Q3) |
+| `email` | string(150) | non | | UK | contact ; plus de réinitialisation par e-mail (décision LogiAgriERP MDP-1, à confirmer Q3) |
 | `password` | string | non | | | hash ; jamais tiré |
 | `must_change_password` | boolean | non | false | hors `$fillable` | changement forcé après réinitialisation |
 | `verrouillage_minutes` | unsigned smallint | oui | NULL | CHECK ≥ 1 | délai du verrou de session |
@@ -479,7 +479,7 @@ Rôles : `roles`, `permissions`, `model_has_roles`… (tables spatie, clés UUID
 | `libelle_naissances` | string(40) | non | | | colonne 2 (« Nés (Couveuse) », « Nés (Mise bas) », « Nés ») |
 | `is_active` | boolean | non | true | | filière affichée |
 
-Équivalent AgriERP : `2026_02_01_000001_create_livestock_species_table.php`.
+Équivalent LogiAgriERP : `2026_02_01_000001_create_livestock_species_table.php`.
 
 ### 5.4 `species_categories` — catégories d'âge et rations normatives
 
@@ -554,7 +554,7 @@ Règle de calcul de l'effectif : **ne pas la recoder ici** ; elle est dans `GUID
 
 ### 5.7 `livestock_lots` (S) — bandes
 
-Reprend `2026_02_10_000001_create_livestock_lots_table.php` : `id`, `code` UK, `species_id` FK, `stage` (enum à REVOIR : AgriERP `reproduction/croissance/ponte/engraissement` ; logialvia n'a pas de `stage`, seulement `espece`, `code`, `dateMiseEnBande`, `effectifInitial` indicatif, `dateCloture`, `observations`), `initial_quantity`, `created_date`, `status` (`actif`/`cloture`), `is_active`. **Le `stage` n'existe pas dans les sources de logialvia : nullable, À DÉFINIR (Q6).** Équivalent logialvia : `BANDES`.
+Reprend `2026_02_10_000001_create_livestock_lots_table.php` : `id`, `code` UK, `species_id` FK, `stage` (enum à REVOIR : LogiAgriERP `reproduction/croissance/ponte/engraissement` ; logialvia n'a pas de `stage`, seulement `espece`, `code`, `dateMiseEnBande`, `effectifInitial` indicatif, `dateCloture`, `observations`), `initial_quantity`, `created_date`, `status` (`actif`/`cloture`), `is_active`. **Le `stage` n'existe pas dans les sources de logialvia : nullable, À DÉFINIR (Q6).** Équivalent logialvia : `BANDES`.
 
 ### 5.8 `cycles_couveuse` (S) et `machines_incubateur`
 
@@ -600,7 +600,7 @@ Table Drift équivalente `IncubationRules` (`app_database.dart`, puis `dart run 
 
 ### 5.9 `soins` : `infirmerie`, `soins_calendrier`, `calendrier_prophylaxie`, `veterinary_records`
 
-- `calendrier_prophylaxie` (logialvia : `espece`, `jourCycle`, `traitement`, `produit`, `remanenceJours` défaut 0) → `prophylaxis_schedule_standards` (AgriERP, `cycle_day` ajouté par `2026_03_06_000001_...`). UK recommandée (`species_id`,`cycle_day`,`traitement`).
+- `calendrier_prophylaxie` (logialvia : `espece`, `jourCycle`, `traitement`, `produit`, `remanenceJours` défaut 0) → `prophylaxis_schedule_standards` (LogiAgriERP, `cycle_day` ajouté par `2026_03_06_000001_...`). UK recommandée (`species_id`,`cycle_day`,`traitement`).
 - `soins_calendrier` : `espece`, `datePrevue`, `typeSoin`, `statut` IN (`Planifié`,`Effectué`,`En retard`,`Traitement en cours`), `observations`. Les échéances se déduisent du jour de cycle de la bande (`BANDES.dateMiseEnBande` = J1).
 - `infirmerie`, `veterinary_withdrawal_periods` : voir `logialvia_app/lib/elevage/data/tables/infirmerie_table.dart` et `2026_02_13_000002_create_veterinary_withdrawal_periods_table.php` (délai d'attente avant vente d'un animal traité : la vente est bloquée ou signalée, jamais silencieuse).
 
@@ -636,13 +636,13 @@ Table Drift équivalente `IncubationRules` (`app_database.dart`, puis `dart run 
 - `fiscal_years` : `id`, `year` UK, `status` (`ouvert`/`cloture`), `closed_at` NOT NULL si clôturé (Action), `step1_confirmed_at`. logialvia : `EXERCICE_COMPTABLE(annee PK, isCloture, dateCloture)`.
 - `chart_of_accounts` : `id`, `code` string(20) UK, `label` string(**255**, élargi par `2026_10_10_000001_widen_chart_of_accounts_label.php`), `class` unsignedTinyInteger CHECK 1..8, `parent_id`, `is_active` (logialvia : `archive` ; un compte archivé n'est plus proposé mais ses écritures restent). **Le code et la classe d'un compte portant une écriture sont immuables.**
 - `accounting_entries` : `id`, `fiscal_year_id` FK RESTRICT, `journal` string(10) IN (`VT`,`AC`,`CA`,`OD`, …), `reference` UK par (journal, exercice), `entry_date`, `piece_number`, `sale_id`/`purchase_id` nullables (origine automatique, BR-CPT-003), `is_locked` (exercice clôturé), `cost_center_id` nullable. Index sur `reference` (`2026_10_09_000005`).
-- **Intangibilité (TRANCHÉ DV-05)** : aucune écriture n'est supprimable ni restaurable ; aucune ligne de `corbeille_operations` ne porte le type écriture ; contre-passation = nouvelle écriture inverse reliée par `accounting_entries.reverses_entry_id` (uuid NULL, FK `accounting_entries` RESTRICT, UK : une écriture n'est contre-passée qu'une fois) et `is_reversed` boolean défaut faux sur l'originale (colonnes à ajouter si absentes ; vérifier la migration réelle d'AgriERP avant).
+- **Intangibilité (TRANCHÉ DV-05)** : aucune écriture n'est supprimable ni restaurable ; aucune ligne de `corbeille_operations` ne porte le type écriture ; contre-passation = nouvelle écriture inverse reliée par `accounting_entries.reverses_entry_id` (uuid NULL, FK `accounting_entries` RESTRICT, UK : une écriture n'est contre-passée qu'une fois) et `is_reversed` boolean défaut faux sur l'originale (colonnes à ajouter si absentes ; vérifier la migration réelle d'LogiAgriERP avant).
 - `accounting_entry_lines` : `id`, `entry_id` FK CASCADE, `account_id` FK RESTRICT, `debit`, `credit` unsigned bigint, `label`, CHECK `(debit = 0) <> (credit = 0)` (**exactement un des deux > 0**, règle de D1), et pièce équilibrée vérifiée par l'Action (Σdébit = Σcrédit).
 - `accounting_reference_sequences` : clé composite (`journal`,`fiscal_year_id`), `last_number`. Compteur attribué DANS la transaction, sous verrou : jamais de trou ni de doublon.
 
 ### 5.14 `company_settings` (singleton, S partiel)
 
-**Seuils de ferme (DV-04, DV-03)** : `autonomy_alert_days` unsigned tinyint défaut **7**, `autonomy_critical_days` unsigned tinyint défaut **3**, CHECK `autonomy_critical_days < autonomy_alert_days` (paramétrables par ferme, admin seul, journalisés) ; `autonomy_supplier_lead_days` unsigned tinyint NULL et `autonomy_safety_margin_days` unsigned tinyint défaut **4** (DV-14, recommandé : seuil critique = délai fournisseur, seuil d'alerte = délai + marge) ; **les règles d'incubation ne sont plus dans `company_settings`** : elles vivent dans `incubation_rules` (5.8b, DV-11) ; paramètres recommandés, éditables (DV-12, DV-13) : `fish_estimate_gap_pct` défaut 20, `fish_avg_weight_range_min_pct` 50, `fish_avg_weight_range_max_pct` 150, `fish_min_sale_weight_g` 500, `fish_weight_stale_days` 30, `guinea_mort_day_warn_pct` 1, `guinea_mort_day_crit_pct` 2, `guinea_mort_cum_warn_pct` 10, `guinea_mort_cum_crit_pct` 20 (decimal(4,1), CHECK warn < crit). Colonnes d'AgriERP à reprendre : identité (`company_name`, `promoter_name`, `address`, `phone`, `email`, `ifu`, `rccm`), SMTP (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_user`, `smtp_password_encrypted` cast `encrypted`, `smtp_from_address`), `logo_path`, `favicon_path`, `mecef_*` (5.15), `onboarding_completed_at`, `demo_mode`, `data_reset_at`, `rappel_soins_jours`. **SMS : non repris** (AgriERP l'a supprimé, AUT-3 ; logialvia n'en a jamais eu). Une seule ligne : garde-fou « `company_settings` a exactement 1 ligne ». Réglages SMTP/logo/favicon : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
+**Seuils de ferme (DV-04, DV-03)** : `autonomy_alert_days` unsigned tinyint défaut **7**, `autonomy_critical_days` unsigned tinyint défaut **3**, CHECK `autonomy_critical_days < autonomy_alert_days` (paramétrables par ferme, admin seul, journalisés) ; `autonomy_supplier_lead_days` unsigned tinyint NULL et `autonomy_safety_margin_days` unsigned tinyint défaut **4** (DV-14, recommandé : seuil critique = délai fournisseur, seuil d'alerte = délai + marge) ; **les règles d'incubation ne sont plus dans `company_settings`** : elles vivent dans `incubation_rules` (5.8b, DV-11) ; paramètres recommandés, éditables (DV-12, DV-13) : `fish_estimate_gap_pct` défaut 20, `fish_avg_weight_range_min_pct` 50, `fish_avg_weight_range_max_pct` 150, `fish_min_sale_weight_g` 500, `fish_weight_stale_days` 30, `guinea_mort_day_warn_pct` 1, `guinea_mort_day_crit_pct` 2, `guinea_mort_cum_warn_pct` 10, `guinea_mort_cum_crit_pct` 20 (decimal(4,1), CHECK warn < crit). Colonnes d'LogiAgriERP à reprendre : identité (`company_name`, `promoter_name`, `address`, `phone`, `email`, `ifu`, `rccm`), SMTP (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_user`, `smtp_password_encrypted` cast `encrypted`, `smtp_from_address`), `logo_path`, `favicon_path`, `mecef_*` (5.15), `onboarding_completed_at`, `demo_mode`, `data_reset_at`, `rappel_soins_jours`. **SMS : non repris** (LogiAgriERP l'a supprimé, AUT-3 ; logialvia n'en a jamais eu). Une seule ligne : garde-fou « `company_settings` a exactement 1 ligne ». Réglages SMTP/logo/favicon : `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`.
 
 ### 5.15 MeCeF : colonnes et tables
 
@@ -656,7 +656,7 @@ Table Drift équivalente `IncubationRules` (`app_database.dart`, puis `dart run 
 | `sales` | `choix_facture` (`2026_11_07_000004`), `delivery_in_total` (`..._000005`) | | | à reprendre tels quels |
 | `tax_groups` | `code` (A à F…), `label`, `rate`, `position` | | | groupes de taxe ; logialvia : `GROUPES_TAXE(code PK, libelle, taux, ordre)` |
 
-La règle de normalisation elle-même : `41_MECEF_EMECEF.md`. Ici, uniquement le schéma. ⚠️ logialvia a une table `FACTURES(ref PK, type, venteRef, origineRef, totalHt, totalTaxe, totalTtc, statut, codeMecef, nim, compteur, lienVerification, dateNormalisation, erreurTransmission…)` + `LIGNES_FACTURE`. Décision proposée : **ne pas reprendre `factures` en table distincte** ; les colonnes de normalisation vivent sur `sales` et `credit_notes` (modèle AgriERP). À valider (Q7) car cela fusionne deux notions de logialvia.
+La règle de normalisation elle-même : `41_MECEF_EMECEF.md`. Ici, uniquement le schéma. ⚠️ logialvia a une table `FACTURES(ref PK, type, venteRef, origineRef, totalHt, totalTaxe, totalTtc, statut, codeMecef, nim, compteur, lienVerification, dateNormalisation, erreurTransmission…)` + `LIGNES_FACTURE`. Décision proposée : **ne pas reprendre `factures` en table distincte** ; les colonnes de normalisation vivent sur `sales` et `credit_notes` (modèle LogiAgriERP). À valider (Q7) car cela fusionne deux notions de logialvia.
 
 ### 5.16 Tables propres au serveur (synchronisation)
 
@@ -758,7 +758,7 @@ Aucune liste n'est chargée entière. Livewire : `WithPagination`, 15 à 25 lign
 
 Toute migration d'ajout commence par `if (Schema::hasTable(...)) return;` ou `if (! Schema::hasColumn(...))`. Elle ne « répare » jamais : elle constate. `down()` : réversible quand c'est possible ; sinon commentaire explicite « irréversible ». Modèle : `2026_10_23_000001_create_corbeille_operations_table.php`. Une migration qui touche des DONNÉES (reprise, renommage de libellés) est écrite pour pouvoir être rejouée sans effet (`2026_10_14_000001_renomme_libelles_bareme_lapins.php`, `2026_10_20_000001_reprendre_les_ecritures_anterieures_en_a_nouveau_initial.php`).
 
-### 8.3 Pièges `->change()` et MariaDB (déjà payés dans AgriERP)
+### 8.3 Pièges `->change()` et MariaDB (déjà payés dans LogiAgriERP)
 
 1. **`->change()` sur un `enum` ne se comporte pas pareil sous SQLite et MariaDB.** SQLite (tests) ne sait pas modifier une colonne : Laravel reconstruit la table ; MariaDB exige `ALTER TABLE … MODIFY COLUMN … ENUM(...)`. Modèle à copier : `2026_02_28_000003_add_retard_to_attendance_records_status_enum.php` (branche `isMysql()` → `DB::statement('ALTER TABLE ... MODIFY COLUMN ... ENUM(...) NOT NULL DEFAULT ...')`, sinon `string()->change()`). Voir aussi `2026_11_05_000005_add_quatre_to_livestock_transfers_categorie.php`.
 2. **`->change()` redéclare TOUTES les propriétés de la colonne** : oublier `->nullable()` ou `->default()` les retire. Toujours réécrire nullité, défaut, longueur. Exemple de l'oubli corrigé : `->string('channel')->nullable(false)->change()` dans `2026_02_20_000003_add_sms_to_customer_reminders_channel_enum.php`.
@@ -887,7 +887,7 @@ Un test lit les migrations Laravel ET `app_database.dart` ; pour chaque table de
 
 ## 12. Sauvegarde et restauration
 
-- **Serveur** : commande planifiée quotidienne (`agrierp:backup` à 02:00 dans AgriERP, `routes/console.php`) → équivalent `logialvia:backup` ; `SauvegardeService` (`agrierp_laravel/app/Services/SauvegardeService.php`) ; rétention définie (Q11) ; rappel hebdomadaire de téléchargement ; **hors du dossier public** ; jamais d'export versionné. Restauration testée : `SauvegardesTest`, `SauvegardeCompteurEcrituresTest` (le compteur d'écritures survit à la restauration).
+- **Serveur** : commande planifiée quotidienne (`agrierp:backup` à 02:00 dans LogiAgriERP, `routes/console.php`) → équivalent `logialvia:backup` ; `SauvegardeService` (`agrierp_laravel/app/Services/SauvegardeService.php`) ; rétention définie (Q11) ; rappel hebdomadaire de téléchargement ; **hors du dossier public** ; jamais d'export versionné. Restauration testée : `SauvegardesTest`, `SauvegardeCompteurEcrituresTest` (le compteur d'écritures survit à la restauration).
 - **Poste** : `VACUUM INTO` (fichier daté), restauration installée AU LANCEMENT avant l'ouverture de la base (`administration_locale.dart`, `appliquerRestaurationEnAttente`).
 - **Exigences** : (a) sauvegarde AVANT toute migration de schéma (9.3 étape 1) ; (b) test de restauration à blanc à chaque version (restaurer, `migrate`, lancer `controles_coherence`) ; (c) les secrets chiffrés restent chiffrés dans la sauvegarde — la clé `APP_KEY` se sauvegarde séparément, sinon `smtp_password_encrypted` et `mecef_jeton_encrypted` sont illisibles après restauration ; (d) `ReinitialisationDonneesService` (remise à zéro) exige une sauvegarde préalable.
 
@@ -898,14 +898,14 @@ Chaque prompt est autonome : copier le bloc dans Claude Code, à la racine du mo
 ### P0 — Audit de départ (avant tout code)
 
 ```text
-RÔLE : ingénieur base de données Laravel/MariaDB + Drift, fidèle à AgriERP.
+RÔLE : ingénieur base de données Laravel/MariaDB + Drift, fidèle à LogiAgriERP.
 CONTEXTE : on crée le web LogiALVIA (Laravel 12 + Livewire 3). Lis docs/logialvia/30_DATABASE_ENGINEERING.md en entier, puis docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md (sans le réécrire), puis agrierp_laravel/CLAUDE.md (sections Working rhythm et Environment traps).
 TÂCHES :
 1. Vérifie par `ls` chaque chemin cité en section 2 de 30_DATABASE_ENGINEERING.md ; liste ceux qui n'existent pas.
 2. Compte les autoIncrement de /home/user/massenon/logialvia/logialvia_app/lib (attendu : 25 occurrences dans 22 fichiers) ; signale tout écart avec la section 9.1.
 3. Relis les tables Drift de logialvia et signale toute colonne ou table absente du dictionnaire (section 5).
 4. Produis la liste des questions ouvertes (section 14) à jour.
-CONTRAINTES : lecture seule. Ne modifie ni logialvia ni AgriERP.
+CONTRAINTES : lecture seule. Ne modifie ni logialvia ni LogiAgriERP.
 CRITÈRES D'ACCEPTATION : un rapport avec (a) chemins manquants, (b) écarts de décompte, (c) tables non documentées, (d) questions. Chaque affirmation cite un chemin:ligne.
 INTERDITS : inventer une règle ; corriger un fichier ; committer.
 ```
@@ -915,10 +915,10 @@ INTERDITS : inventer une règle ; corriger un fichier ; committer.
 Gabarit (remplacer `<DOMAINE>`, `<TABLES>`, `<SOURCES>`) :
 
 ```text
-RÔLE : ingénieur base de données Laravel 12 / MariaDB 10.11 + SQLite (tests), convention AgriERP.
+RÔLE : ingénieur base de données Laravel 12 / MariaDB 10.11 + SQLite (tests), convention LogiAgriERP.
 CONTEXTE : web LogiALVIA. Domaine : <DOMAINE>. Tables : <TABLES>. Lis d'abord : docs/logialvia/30_DATABASE_ENGINEERING.md (sections 1, 3, 5, 7, 8 et l'ERD du domaine), puis les sources : <SOURCES>.
 TÂCHES (dans cet ordre, annonce le plan avant d'écrire) :
-1. Une migration par table, nommée AAAA_MM_JJ_NNNNNN_create_<table>_table.php, dans l'ordre de dépendance de la section 8.1. Docblock en français : ticket, pourquoi, source (fichier et ligne de logialvia ou d'AgriERP).
+1. Une migration par table, nommée AAAA_MM_JJ_NNNNNN_create_<table>_table.php, dans l'ordre de dépendance de la section 8.1. Docblock en français : ticket, pourquoi, source (fichier et ligne de logialvia ou d'LogiAgriERP).
 2. Clés : uuid('id')->primary() ; foreignUuid()->constrained() avec action explicite (restrict / cascade / null) ; AUCUN increments().
 3. Montants : unsignedBigInteger (FCFA). Quantités : decimal(10,2). Jour : date. Instant : timestamp.
 4. Colonnes de synchro (section 3.4) pour toute table synchronisable : device_id, sync_status (défaut 'synced'), updated_at indexé, is_active. Table propre au serveur : aucune de ces colonnes.
@@ -944,7 +944,7 @@ Valeurs par domaine :
 | P5 | Ventes | `customers`, `sales`, `sale_lines`, `quotes`, `credit_notes`, `receivables`, `receivable_payments`, `customer_advances`, `advance_imputations`, `fiche_ventes_jour` | `2026_02_16_*`, `2026_02_17_*`, `2026_02_18_*`, `2026_02_19_*`, `2026_10_09_000001/000002`, `2026_10_28_000001` ; `commercial/data/tables/*` ; `F4_Module_Ventes_Clients.md`, `H1_Onglets_Ventes.md` |
 | P6 | Stocks et achats | `product_categories`, `products`, `stock_movements`, `suppliers`, `purchases`, `purchase_lines`, `purchase_orders`(+lignes), `payables`, `supplier_payments`, `supplier_refunds`, `purchase_returns` | `2026_02_01_000002/3`, `2026_02_21_*`, `2026_02_24_*`, `2026_10_08_000001`, `2026_10_09_000006/7` ; `approvisionnement/data/tables/*` ; `F5_Module_Stocks_Achats.md` |
 | P7 | Comptabilité et exercices | `fiscal_years`, `chart_of_accounts`, `accounting_entries`, `accounting_entry_lines`, `accounting_reference_sequences`, `cost_centers`, `treasury_accounts`, `bank_statement_lines`, `periodic_closures`, `fixed_assets`, `notes_annexes` | `2026_02_01_000004/5`, `2026_03_03_*`, `2026_10_09_000004/5`, `2026_10_10_*` ; `comptabilite/data/tables/comptabilite_tables.dart` ; `F6_Module_Comptabilite.md`, `J1_Bascule_Cloture_Exercice.md` |
-| P8 | RH — **ne pas lancer avant la réponse Q2** | `employees`, `attendance_records`, `payslips`, `internships`, `attestation_*`, `income_tax_brackets` | `2026_02_27_*`, `2026_08_17_*` (AgriERP) ; logialvia : aucune source |
+| P8 | RH — **ne pas lancer avant la réponse Q2** | `employees`, `attendance_records`, `payslips`, `internships`, `attestation_*`, `income_tax_brackets` | `2026_02_27_*`, `2026_08_17_*` (LogiAgriERP) ; logialvia : aucune source |
 | P9 | Paramètres, MeCeF, SMTP, logo, favicon, modules, synchronisation | `company_settings`, `modules_config`, `tax_groups`, `journal_synchronisation`, `demandes_synchronisation`(+`_servies`), `correspondances_identifiants`, `corbeille_operations`, `poste_synchronisations`, `controles_coherence` | `2026_02_20_*`, `2026_11_07_*`, `2026_10_19_*`, `2026_10_21_000002_create_poste_synchronisations_table.php`, `2026_10_23_000001_create_corbeille_operations_table.php` ; `42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md`, `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` |
 
 ### P10 — Plan de migration des données de logialvia
@@ -987,10 +987,10 @@ INTERDITS : éditer app_database.g.dart à la main ; committer.
 
 | # | Question | Impact |
 |---|---|---|
-| Q1 | La fiche journalière reste-t-elle « par filière et par jour » (logialvia) ou devient-elle « par bande et par jour » (AgriERP) ? | clé unique de `livestock_daily_entries` |
+| Q1 | La fiche journalière reste-t-elle « par filière et par jour » (logialvia) ou devient-elle « par bande et par jour » (LogiAgriERP) ? | clé unique de `livestock_daily_entries` |
 | Q2 | Le web LogiALVIA comprend-il des RH (employés, pointage, paie, stagiaires) ? logialvia n'en a pas. | domaine 4.7 entier (P8) |
-| Q3 | Réinitialisation du mot de passe : administrateur seul (comme AgriERP) ou autre ? | `users`, `recovery_codes` |
-| Q4 | Le montant d'une ligne de vente est-il saisi en total (règle `manual_total_amount` d'AgriERP) ou calculé prix × quantité (logialvia : `pu`, `qte`) ? | `sale_lines` |
+| Q3 | Réinitialisation du mot de passe : administrateur seul (comme LogiAgriERP) ou autre ? | `users`, `recovery_codes` |
+| Q4 | Le montant d'une ligne de vente est-il saisi en total (règle `manual_total_amount` d'LogiAgriERP) ou calculé prix × quantité (logialvia : `pu`, `qte`) ? | `sale_lines` |
 | Q5 | Un seul référentiel `products` (intrants + produits vendables) ou deux tables comme aujourd'hui ? | stocks, ventes, migration 9.5 |
 | Q6 | Une bande a-t-elle un « stade » (reproduction/croissance/ponte/engraissement) ? | `livestock_lots.stage` |
 | Q7 | Les factures normalisées restent-elles une entité propre (`factures`) ou des colonnes de `sales`/`credit_notes` ? | MeCeF, migration 9.5 |
@@ -1000,7 +1000,7 @@ INTERDITS : éditer app_database.g.dart à la main ; committer.
 | Q11 | Durée de conservation des sauvegardes serveur et lieu de stockage ? | section 12 |
 | Q12 | Pisciculture : bassins, qualité de l'eau, récolte partielle, prophylaxie — lesquels au périmètre et avec quelles unités ? (pesées/échantillonnage et vente kg + sujets : TRANCHÉS, DV-01, DV-02) | D-PIS-1 à 4, D-ALL-1 |
 | Q13 | Pintades : durée d'incubation TRANCHÉE (DV-03). Goliaths : barème de rationnement validé par la Gérante, définition de « maturité » ? | D-PIN-1, D-GOL-1/2 |
-| Q14 | Plan comptable : le référentiel SYSCOHADA révisé d'AgriERP (1 332 comptes) convient-il, ou le cabinet de LogiALVIA en fournit-il un autre ? | seeder 10.2, empreinte |
+| Q14 | Plan comptable : le référentiel SYSCOHADA révisé d'LogiAgriERP (1 332 comptes) convient-il, ou le cabinet de LogiALVIA en fournit-il un autre ? | seeder 10.2, empreinte |
 
 ## 15. Critères d'acceptation globaux (« terminé » pour le schéma)
 

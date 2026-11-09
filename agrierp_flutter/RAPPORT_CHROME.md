@@ -53,7 +53,7 @@ Le prototype masque un GROUPE entier selon `data-role-group`. Le poste rend TOUS
 
 | Élément du prototype | Présent au poste | Gravité |
 |---|---|---|
-| En-tête « Agri**ERP** » (ERP en `accent-yellow`) + sous-titre « Ferme École Olouwachegoun » | **non** — le poste écrit 'AgriERP' d'une seule couleur, sans sous-titre | mineur |
+| En-tête « Agri**ERP** » (ERP en `accent-yellow`) + sous-titre « Ferme École Olouwachegoun » | **non** — le poste écrit 'LogiAgriERP' d'une seule couleur, sans sous-titre | mineur |
 | Bouton « Synchroniser » jaune en pied de barre | oui | — |
 | Bloc utilisateur (nom + rôle en capitales) | oui | — |
 | Menu flottant droit (`right-floating-menu`, barre repliée) | **non** — barre repliée : le poste ne propose pas les 6 raccourcis | majeur |
@@ -141,7 +141,7 @@ Le prototype écrit « Groupe > Page » (casse normale) dans l'en-tête de chaqu
 | majeur | barre latérale | largeur de la barre : prototype `w-72` = 288, poste 240 | sidebar.js ↔ main.dart |
 | majeur | barre supérieure | Fil d'Ariane : 18 pages sur 24 portent un TEXTE différent du prototype (« Élevage & Soins » ≠ « PRODUCTION ÉLEVAGE & SOINS », libellés de page renommés, groupe absent sur Facturation / Administration / Comptabilité). Cause : le poste dérive le fil de la barre latérale (`_situation`, main.dart), or le prototype ne l'écrit pas depuis la barre. | en-tête <header> des pages ↔ main.dart `_situation` |
 | majeur | barre supérieure | Menu déroulant de notifications (Toutes / Non lues, 4 lignes, « Voir toutes les notifications ») → aucun : un SnackBar renvoie au web | header ↔ barre_superieure.dart |
-| mineur | barre latérale | En-tête « Agri**ERP** » (ERP en `accent-yellow`) + sous-titre « Ferme École Olouwachegoun » — le poste écrit 'AgriERP' d'une seule couleur, sans sous-titre | sidebar.js |
+| mineur | barre latérale | En-tête « Agri**ERP** » (ERP en `accent-yellow`) + sous-titre « Ferme École Olouwachegoun » — le poste écrit 'LogiAgriERP' d'une seule couleur, sans sous-titre | sidebar.js |
 | mineur | barre latérale | taille du libellé d'entrée : prototype `text-[13px]` = 13, poste AgriTypography.xs = 13.6 | sidebar.js ↔ main.dart |
 | mineur | barre latérale | icône d'entrée : prototype `text-[20px]` = 20, poste 18 | sidebar.js ↔ main.dart |
 | mineur | barre latérale | titre de groupe : prototype `text-[10px]` gras, `tracking-wider`, blanc/40, poste fontSize 10, gras, letterSpacing 0.8, white38 | sidebar.js ↔ main.dart |

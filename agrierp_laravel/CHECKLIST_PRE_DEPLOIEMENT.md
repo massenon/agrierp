@@ -1,4 +1,4 @@
-# Checklist de Pré-Déploiement — AgriERP
+# Checklist de Pré-Déploiement — LogiAgriERP
 
 Ticket 13.2 (Sprint 13), Document 07 §7. Chaque point ci-dessous a été
 réellement vérifié depuis le bac à sable de développement quand c'était

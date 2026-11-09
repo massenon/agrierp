@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
         libelle: 'MOT DE PASSE',
         controleur: _motDePasse,
         icone: SymbolesAgri.lock_outline,
-        indice: 'AgriERP@2026',
+        indice: 'LogiAgriERP@2026',
         masque: !_motDePasseVisible,
         suffixe: IconButton(
           icon: Icon(

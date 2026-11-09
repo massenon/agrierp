@@ -37,7 +37,7 @@ class SyncFicheReduiteInconnueTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MDP = 'AgriERP@2026';
+    private const MDP = 'LogiAgriERP@2026';
 
     private const FICHE = '44444444-4444-4444-8444-444444444444';
 

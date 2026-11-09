@@ -66,7 +66,7 @@ par ce contenu exact plutôt que de deviner où est la virgule :
 {
     "name": "faguez-sarl/agrierp",
     "type": "project",
-    "description": "AgriERP — Système de gestion intégrée pour la Ferme École OLOUWACHEGOUN (PAEB / FAGUEZ SARL).",
+    "description": "LogiAgriERP — Système de gestion intégrée pour la Ferme École OLOUWACHEGOUN (PAEB / FAGUEZ SARL).",
     "keywords": ["laravel", "livewire", "erp", "agriculture"],
     "license": "proprietary",
     "require": {

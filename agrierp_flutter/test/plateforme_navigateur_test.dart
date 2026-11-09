@@ -61,7 +61,7 @@ void main() {
     });
   });
 
-  group('exports : TÉLÉCHARGEMENT au lieu de Documents\\AgriERP', () {
+  group('exports : TÉLÉCHARGEMENT au lieu de Documents\\LogiAgriERP', () {
     test('PDF : LivraisonPdf.enregistrer livre le nom horodaté, sans toucher au disque', () async {
       final message = await LivraisonPdf.enregistrer(
         PdfRecu(octets: Uint8List.fromList([1, 2, 3]), fichier: 'recu.pdf'),

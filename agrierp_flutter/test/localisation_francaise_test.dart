@@ -33,7 +33,7 @@ void main() {
       expect(LocalisationPoste.locale, const Locale('fr'));
       expect(LocalisationPoste.locales, [const Locale('fr')]);
 
-      // Deux MaterialApp dans lib/, pas un de plus : celui du poste et celui de l'écran « AgriERP ne peut pas démarrer »
+      // Deux MaterialApp dans lib/, pas un de plus : celui du poste et celui de l'écran « LogiAgriERP ne peut pas démarrer »
       // (montré AVANT que l'application existe). Un autre échapperait à la localisation ; et le second doit porter
       // EXACTEMENT la même localisation que le premier.
       final applications = Directory('lib')

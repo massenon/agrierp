@@ -656,7 +656,7 @@ void main() {
                     enregistrer ??
                     (pdf) async {
                       livrees.add(pdf);
-                      return r'C:\Documents\AgriERP\attestation.pdf';
+                      return r'C:\Documents\LogiAgriERP\attestation.pdf';
                     },
                 imprimer: (pdf) async => imprimees.add(pdf),
               ),
@@ -903,7 +903,7 @@ void main() {
         // ⚠️ Un VRAI PDF, fabriqué ici : pas la réponse du serveur.
         expect(String.fromCharCodes(livrees.single.octets.take(5)), '%PDF-');
         expect(find.byKey(const Key('att-reussi')), findsOneWidget);
-        expect(find.textContaining(r'C:\Documents\AgriERP\attestation.pdf'), findsOneWidget);
+        expect(find.textContaining(r'C:\Documents\LogiAgriERP\attestation.pdf'), findsOneWidget);
         expect(find.textContaining('N°04/2026/FEO/DG'), findsWidgets);
         expect(await FileEmissionsAttestation(db).lire(), isEmpty);
 

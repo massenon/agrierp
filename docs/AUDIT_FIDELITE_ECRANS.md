@@ -387,7 +387,7 @@ Neuf colonnes, quatre cartes (`border-l-info-blue` / `accent-yellow` / `brand-em
 | « Non envoyé » (avoir) / « Non envoyée » (vente) sous la pastille ; refus du serveur dit mot pour mot | la demande n'existe pas encore côté ferme | idem |
 | Toast du retour : « Retour enregistré sur ce poste — le stock sera réintégré à la synchronisation. Avoir comptabilisé (débit 701 / crédit 411) par le serveur. » | le web dit « réintégré » parce qu'il le fait à l'instant | `avoirs_blade_test` |
 | Toast d'annulation : « Vente annulée — le stock sera réintégré à la synchronisation. » | idem | `historique_ventes_blade_test` |
-| « Télécharger PDF » exige le réseau et ENREGISTRE le fichier (Documents\AgriERP) au lieu de le télécharger | le ticket est produit par le serveur ; pas de navigateur au poste | `historique_ventes_poste_test` |
+| « Télécharger PDF » exige le réseau et ENREGISTRE le fichier (Documents\LogiAgriERP) au lieu de le télécharger | le ticket est produit par le serveur ; pas de navigateur au poste | `historique_ventes_poste_test` |
 | « Annuler » grisé sans `manage-ventes` | le web laisse le bouton et refuse (403) à l'envoi ; au poste un bouton qui échouerait à la synchronisation tromperait | `historique_ventes_poste_test` |
 | Calendrier Flutter au lieu du `<input type="date">` natif | plateforme (voir § 9) | `champs_date_mise_en_page_test` |
 | Sous 640 px, défilement horizontal au lieu des cartes `rtable` | fenêtre de bureau (≥ 640 × 480) | — |

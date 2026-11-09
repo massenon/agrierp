@@ -26,7 +26,7 @@ pas celui qui a été validé) : pour chacun, un test garde-fou lit les sources.
 # TÂCHES
 1. Installe et configure l'outillage : `laravel/pint` avec `pint.json` (préréglage `laravel`), `.editorconfig`
    (UTF-8, LF, 4 espaces PHP/Blade, 2 espaces JS/CSS), et — SEULEMENT après accord du client — `larastan/larastan` (niveau
-   à définir ; AgriERP n'en a pas). Ajoute un script `composer qualite` = `pint --test` + tests Feature.
+   à définir ; LogiAgriERP n'en a pas). Ajoute un script `composer qualite` = `pint --test` + tests Feature.
 2. Écris les tests garde-fous listés à la section 10 ; chacun doit ÉCHOUER si on réintroduit le défaut (prouve-le en le réintroduisant
    une fois, puis en l'annulant).
 3. Audite le code existant du web contre chaque section (1 à 9) ; produis la liste des écarts (fichier:ligne, règle, correctif).
@@ -42,7 +42,7 @@ pas celui qui a été validé) : pour chacun, un test garde-fou lit les sources.
 - `php artisan test --testsuite=Feature` : vert, avec les gardes-fous de la section 10.
 - `grep -rn "{!!" resources/views` : uniquement des cas justifiés par un commentaire (HTML généré par le serveur, jamais saisi).
 - `grep -rLn "authorize(" app/Livewire` listé par composant mutant : aucun composant mutant sans `authorize()` (test `AutorisationsMethodesMutantesTest`
-  d'AgriERP comme modèle).
+  d'LogiAgriERP comme modèle).
 
 # INTERDITS
 Reformater en masse du code non concerné ; renommer des classes hors ticket ; introduire des règles de style personnelles.
@@ -53,7 +53,7 @@ Reformater en masse du code non concerné ; renommer des classes hors ticket ; i
 ## 1. Nommage
 
 Règle générale : **français** pour tout ce qui est métier (classes, méthodes, propriétés, variables, tests, vues), conformément au code
-réel de logialvia (`CalculFicheJournaliere`, `enregistrerJour`) et à AgriERP (`SaisieBandeAction`, `EffectifParCategorieService`).
+réel de logialvia (`CalculFicheJournaliere`, `enregistrerJour`) et à LogiAgriERP (`SaisieBandeAction`, `EffectifParCategorieService`).
 Les mots techniques du framework restent en anglais (`mount`, `render`, `boot`). Ne pas mélanger deux langues dans une même couche
 (constat de `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` §0, contradiction 1 : A1 §5 disait « anglais », le code est en français : suivre le code).
 
@@ -92,7 +92,7 @@ Un nom décrit l'action métier, pas l'implémentation : `enregistrerVente()`, p
 8. **Migrations** : jamais éditer une migration déjà déployée (en créer une nouvelle) ; UUID ; index sur toute clé étrangère et colonne de recherche ;
    `down()` réellement inverse. Lire en entier toute migration tierce avant de la publier (Sanctum, Spatie : interdit de publier).
 9. **Eloquent** : `with()` pour éviter le N+1 ; pas de requête dans une boucle de vue ; pas de `DB::raw` avec valeur utilisateur ; casts `encrypted`
-   pour les secrets. Pas d'usage de `#[Computed]` dans AgriERP : ne pas le présumer, et ne pas l'introduire sans décision d'équipe.
+   pour les secrets. Pas d'usage de `#[Computed]` dans LogiAgriERP : ne pas le présumer, et ne pas l'introduire sans décision d'équipe.
 10. **Erreurs** : messages d'erreur utilisateur en français, jamais un `SQLSTATE` affiché (cas réel : le POS web montrait `SQLSTATE 1062` et perdait la vente).
     Une collision d'unicité se relit sous verrou au lieu d'échouer.
 11. **Configuration** : jamais `env()` hors `config/*.php` ; réglages éditables par le client en base (jamais en dur : « Poste settings — never hard-code
@@ -104,7 +104,7 @@ Un nom décrit l'action métier, pas l'implémentation : `enregistrerVente()`, p
 1. **Pleine page** : `#[Layout('layouts.app')]` ; la vue du composant a UNE seule balise racine `<div>` (fragment, jamais un document HTML).
 2. **État d'onglet** : `#[Url] public string $tab = 'defaut';` (lien partageable) ; composant `<x-tab-page>`.
 3. **Hubs** = composants imbriqués (`<livewire:module.composant />`), jamais d'iframe ; un écran absent = `<x-module-pending>`.
-4. **Autorisation** : `$this->authorize('manage-…');` **PREMIÈRE ligne de TOUTE méthode publique qui écrit** (AgriERP : 166 sites). Aussi dans `mount()` si la
+4. **Autorisation** : `$this->authorize('manage-…');` **PREMIÈRE ligne de TOUTE méthode publique qui écrit** (LogiAgriERP : 166 sites). Aussi dans `mount()` si la
    page est sensible. Une propriété publique est modifiable par le client : jamais de `public $prix` lu sans revalidation ; verrouiller (`#[Locked]`) les
    identifiants qui ne doivent pas changer côté navigateur.
 5. **Validation** : règles dans `rules()` ou `#[Validate]`, messages dans `lang/fr/validation.php` ; `$this->validate()` avant toute écriture ; messages
@@ -113,7 +113,7 @@ Un nom décrit l'action métier, pas l'implémentation : `enregistrerVente()`, p
    `dispatch('close-modal', name: …)`. `@if($showModal)` est INTERDIT (la modale détruite perd son état et sa transition). `teleport` pour une modale posée dans un
    conteneur qui crée son empilement (en-tête collant z-30 sous la barre latérale z-50).
 7. **Toasts** : `$this->dispatch('toast', message: '…', type: 'success'|'warning'|'error');` capté par `components/toast-container.blade.php`. Pas de relais
-   `Livewire.on('toast')` en plus (il doublait les messages : supprimé d'AgriERP le 26/10/2026).
+   `Livewire.on('toast')` en plus (il doublait les messages : supprimé d'LogiAgriERP le 26/10/2026).
 8. **Rafraîchissement** : événements Livewire entre composants (`$this->dispatch('lot-modifie')`, `#[On('lot-modifie')]`) ; `wire:poll` seulement avec raison écrite (02, §4).
 9. **Performance** : pas de collection complète en propriété publique (elle est sérialisée à chaque requête) : propriété = identifiants/filtres, données lues dans `render()` ;
    pagination `WithPagination` avec UN nom de page par liste (`<x-pagination>`) ; `lazy` pour les blocs lourds ; `wire:key` stable dans toute boucle (sinon perte de focus).
@@ -148,7 +148,7 @@ Un nom décrit l'action métier, pas l'implémentation : `enregistrerVente()`, p
 2. Interactions simples en `x-data`/`x-show`/`x-on:click` DANS le composant Blade ; pas de fonctions globales (`window.openSidebar()`) ; pas de jQuery.
 3. Logique pure (minuteries, décisions) dans des modules `.js` SANS dépendance DOM (`verrou-logique.js`), testés par `node --test` (`tests/Js/*.test.mjs`) ; la partie DOM les importe.
 4. Écouteurs sur `window`/`document` posés UNE fois (module chargé une fois) ; ce qu'une page ajoute se détache à `livewire:navigate` / `Alpine.cleanup` (sinon fuite à chaque navigation).
-5. Aucun `<script>` inline dans les vues de composants (constat d'AgriERP : aucun) ; le seul script d'en-tête est marqué `data-navigate-once`.
+5. Aucun `<script>` inline dans les vues de composants (constat d'LogiAgriERP : aucun) ; le seul script d'en-tête est marqué `data-navigate-once`.
 6. Stockage navigateur : `localStorage` seulement pour des préférences d'interface (barre latérale repliée) ; jamais de donnée métier ni de jeton.
 7. Réseau : aucune requête `fetch` vers un domaine externe ; aucune ressource externe (voir 02, §7).
 8. Les tests Feature `Livewire::test()` n'exécutent AUCUN JavaScript : tout comportement qui vit dans le navigateur (Alpine, z-index, `wire:navigate`, `@persist`, modales) exige un test Dusk ou un essai réel.
@@ -191,7 +191,7 @@ Un nom décrit l'action métier, pas l'implémentation : `enregistrerVente()`, p
 - **Toast** (feedback immédiat) : `dispatch('toast', message:, type:)`, 3 types `success` / `warning` / `error`, disparition à 3500 ms, empilés en haut à droite (z-[200]).
   Les toasts « flash » posés en session sont lus APRÈS la navigation (`livewire:navigated`). Le conteneur est `@persist`.
 - **Cloche** (notifications persistées) : composant `livewire/shared/notification-bell` ; table `notifications` ; alertes générées par `AlertesElevageService` via une tâche planifiée
-  (stock sous seuil, mortalité anormale, soins planifiés à venir/en retard, échecs de reproduction : règles et seuils à reprendre de `15_REGLES_METIER.md`, pas d'AgriERP) ;
+  (stock sous seuil, mortalité anormale, soins planifiés à venir/en retard, échecs de reproduction : règles et seuils à reprendre de `15_REGLES_METIER.md`, pas d'LogiAgriERP) ;
   compteur de non lues ; lien « Voir tout » vers `/notifications` (`wire:navigate`). Détail : `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`.
 - **Rappels du jour** : fenêtre ouverte au plus une fois par jour et par session de navigateur (`sessionStorage`), jamais à chaque navigation.
 - Aucune notification n'est « décorative » : un toast de succès n'est émis qu'APRÈS l'écriture réelle.
@@ -200,7 +200,7 @@ Un nom décrit l'action métier, pas l'implémentation : `enregistrerVente()`, p
 
 **Git**. Messages de commit en français, à l'impératif, une ligne de résumé (≤ 72 caractères) puis un corps qui dit POURQUOI ; un sujet par commit ; référence du ticket en tête
 (`EL-3 : …`). **Une seule branche de travail** à la fois ; **pas de PR sans demande** ; pas de `push` sans demande ; jamais de `--force`, `reset --hard` ni `--no-verify`. Rien de
-secret ni de volumineux versionné : aucun `*.sql`, `*.zip`, `.env` (l'export `database/agrierp_db.sql` d'AgriERP contenait des hash de mots de passe : retiré de l'historique le 17/10/2026).
+secret ni de volumineux versionné : aucun `*.sql`, `*.zip`, `.env` (l'export `database/agrierp_db.sql` d'LogiAgriERP contenait des hash de mots de passe : retiré de l'historique le 17/10/2026).
 Attribution des commits : celle que l'environnement impose (voir le rappel de session).
 
 **Tests** (détail : `31_TESTING_QA.md`).
@@ -215,7 +215,7 @@ Attribution des commits : celle que l'environnement impose (voir le rappel de se
   `<x-kpi-card>`/`.kpi-card` ; (5) aucune classe Tailwind dynamique ; (6) toute méthode mutante a `authorize(` ; (7) toute route métier a `can:` ; (8) aucune couleur hexadécimale hors `tailwind.config.js` et `app.css` ;
   (9) toute migration métier a une clé UUID ; (10) tout chemin d'archivage appelle `AuditLog::record` et figure dans `ACTIONS_ARCHIVAGE` ; (11) libellés de chaque écran présents (`fidelite_libelles`, voir 04, §9).
 
-**Qualité**. Pint à zéro avant chaque livraison ; analyse statique **non installée dans AgriERP** (aucun `phpstan`/`larastan`) : la proposer au client (nouvelle dépendance) plutôt que de la supposer ;
+**Qualité**. Pint à zéro avant chaque livraison ; analyse statique **non installée dans LogiAgriERP** (aucun `phpstan`/`larastan`) : la proposer au client (nouvelle dépendance) plutôt que de la supposer ;
 pas de `dd()`, `dump()`, `var_dump()`, `console.log()`, `print` laissés ; pas de code mort ; fichier ≤ ~300 lignes recommandées par composant (au-delà : extraire un Service ou un sous-composant) ;
 duplication de plus de 5 lignes entre deux fichiers : extraire (A2 §12). La dette se marque `// TODO(dette):` avec le correctif attendu ; un `grep` périodique sur `TODO(dette)` donne la dette réelle.
 
@@ -243,5 +243,5 @@ Le relecteur vérifie en priorité les défauts invisibles : autorisation manqua
 ## 12. À DÉFINIR AVEC LE CLIENT
 
 1. **Analyse statique** (Larastan) : accord pour l'ajouter (nouvelle dépendance de développement) et niveau visé ?
-2. **Langue des noms de tables/colonnes** du schéma partagé : français (comme les entités Dart de logialvia) ou anglais (comme AgriERP) ? À figer UNE fois dans `30_DATABASE_ENGINEERING.md` avant la première migration.
+2. **Langue des noms de tables/colonnes** du schéma partagé : français (comme les entités Dart de logialvia) ou anglais (comme LogiAgriERP) ? À figer UNE fois dans `30_DATABASE_ENGINEERING.md` avant la première migration.
 3. **Format des messages de commit** : le client veut-il un préfixe de ticket (`EL-3 :`) ? (Proposition, non issue des sources.)

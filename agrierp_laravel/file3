@@ -1,5 +1,5 @@
 
-ECRIR UN PROMPT DE CHECKLIST DE CONFORMITÉ ET FIDELITE VISUELLE POUR LE PROJET AgriERP
+ECRIR UN PROMPT DE CHECKLIST DE CONFORMITÉ ET FIDELITE VISUELLE POUR LE PROJET LogiAgriERP
 Rôles dynamiques + Recherche globale + Synchronisation Laravel + Fidélité visuelle; Rappel de Prophylaxie du Jour, la gestion des TAB, la gestion des toast, la gestion des notification,gestion des kpis, 
 boutons d'action (*Éditer, Supprimer, Exporter PDF, Importer, Consulter/View, Filtrer*)
 Alertes Critiques de Stock, IMPRESSION PDF, 
@@ -10,7 +10,7 @@ Dettes Fournisseurs
 Rapport Élevage
 Rapport de Stocks
 
-AgriERP A 94 ECRANS 
+LogiAgriERP A 94 ECRANS 
 MOTEUR_DE_RECHERCHE_GLOBALE_ERP.md, fidèle à sa spécification :
 
 fidélité et conformite strict visuelle layout par layout interface dart avec le prototype, respect des couleurs, des typographies, des bordures, 

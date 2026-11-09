@@ -43,7 +43,7 @@ class SyncPosteAbsentTest extends TestCase
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         $this->admin = User::create([
             'name' => 'Admin', 'username' => 'admin', 'email' => 'admin@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
         $this->jeton = $this->admin->createToken('POSTE-BUREAU', ['*'], now()->addDays(90))->plainTextToken;

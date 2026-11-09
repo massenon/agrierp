@@ -46,7 +46,7 @@ class SauvegardeCompteurEcrituresTest extends TestCase
         Role::findOrCreate('admin', 'web')->givePermissionTo(['view-parametres', 'manage-parametres']);
         $admin = User::create([
             'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $admin->assignRole('admin');
         $this->actingAs($admin);

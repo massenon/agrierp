@@ -11,7 +11,7 @@ use Tests\TestCase;
 /**
  * Ticket 15.8 (Sprint 15) — LES TROIS STRUCTURES DU PROJET, CRÉDITÉES PARTOUT.
  *
- * Trois structures interviennent sur AgriERP, avec des rôles DISTINCTS :
+ * Trois structures interviennent sur LogiAgriERP, avec des rôles DISTINCTS :
  *
  *   • PAEB — Projet d'Appui à l'Entrepreneuriat au Bénin ... maîtrise d'ouvrage
  *   • Cabinet FAGUEZ SARL .................................. accompagnement des PME
@@ -59,7 +59,7 @@ class CreditsProjetTest extends TestCase
             'name' => 'Test Crédits',
             'username' => 'credits',
             'email' => 'credits@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'),
+            'password' => bcrypt('LogiAgriERP@2026'),
             'is_active' => true,
         ]);
         $u->assignRole($role);

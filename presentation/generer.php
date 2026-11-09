@@ -1,7 +1,7 @@
 <?php
 
 /**
- * CONF-2 — GÉNÈRE les SPÉCIMENS du dossier `presentation/` avec le VRAI code d'AgriERP (jamais dessinés à la main).
+ * CONF-2 — GÉNÈRE les SPÉCIMENS du dossier `presentation/` avec le VRAI code d'LogiAgriERP (jamais dessinés à la main).
  *
  *     php presentation/generer.php            # depuis la racine du monorepo (PHP 8.3, `composer install` fait dans agrierp_laravel/)
  *

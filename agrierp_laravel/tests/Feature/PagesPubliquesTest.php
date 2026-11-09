@@ -52,7 +52,7 @@ class PagesPubliquesTest extends TestCase
         $user = User::create([
             'name' => 'Test',
             'email' => 'test@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'),
+            'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole($role);
 
@@ -79,7 +79,7 @@ class PagesPubliquesTest extends TestCase
 
     /**
      * ⚠️ CHANGÉ LE 24/08/2026 : la racine mène à la CONNEXION, plus à la page
-     * d'accueil publique. AgriERP est un outil de travail — un employé de la
+     * d'accueil publique. LogiAgriERP est un outil de travail — un employé de la
      * ferme l'ouvre pour saisir une vente, pas pour lire une présentation.
      *
      * ⚠️ `/welcome` et `/presentation` restent servies : elles ne sont plus le

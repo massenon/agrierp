@@ -9,7 +9,7 @@ use Laravel\Dusk\TestCase as BaseTestCase;
 
 /**
  * Ticket 13.1 (Sprint 13) — base standard Laravel Dusk. Aucune
- * particularité AgriERP ici volontairement : garder ce fichier
+ * particularité LogiAgriERP ici volontairement : garder ce fichier
  * strictement conforme au boilerplate officiel facilite la maintenance
  * et évite toute divergence future difficile à diagnostiquer.
  *

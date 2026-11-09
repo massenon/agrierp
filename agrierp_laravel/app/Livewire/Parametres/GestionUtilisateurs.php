@@ -12,7 +12,7 @@ use Livewire\Component;
 
 /**
  * Suite du Sprint 11 — gestion-utilisateurs.html → Livewire\Parametres\GestionUtilisateurs
- * "Administration des comptes d'accès à AgriERP."
+ * "Administration des comptes d'accès à LogiAgriERP."
  *
  * CRUD réel sur `User` — `is_active` (archivage) et
  * `getRoleLabelAttribute()` existaient déjà, explicitement anticipés

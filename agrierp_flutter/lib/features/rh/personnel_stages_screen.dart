@@ -41,7 +41,7 @@ class PersonnelStagesScreen extends StatefulWidget {
   /// `null` : aucun accès aux attestations (tests sans serveur) — l'onglet le dit.
   final AttestationsRepository? attestations;
 
-  /// Écrit le PDF d'une attestation. Par défaut : Documents\AgriERP.
+  /// Écrit le PDF d'une attestation. Par défaut : Documents\LogiAgriERP.
   final Future<String> Function(PdfAttestation)? enregistrerAttestation;
 
   /// Ouvre la boîte d'impression. Par défaut : celle de Windows.

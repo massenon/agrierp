@@ -76,7 +76,7 @@ class AuditToutesLesRoutesTest extends TestCase
         $user = User::create([
             'name' => 'Auditeur',
             'email' => 'audit@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'),
+            'password' => bcrypt('LogiAgriERP@2026'),
         ]);
         $user->assignRole('admin');
 

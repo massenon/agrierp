@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   AgriERP — resources/css/app.css
+   LogiAgriERP — resources/css/app.css
    Fusion de assets/css/common.css (prototype, source de vérité DOM/classes)
    et Document 06 §1.3. Aucune classe renommée : les vues Blade portées
    depuis le prototype référencent ces mêmes noms de classe sans changement

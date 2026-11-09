@@ -35,7 +35,7 @@ l'autorité de référence ; le poste y est fidèle. LogiAgriERP a déjà payé 
 
 T1. SOCLE LARAVEL. `composer create-project laravel/laravel logialvia_web "^12.0"` PUIS lire et reproduire
     `agrierp_laravel/composer.json`, `package.json`, `tailwind.config.js`, `vite.config.js`, `postcss.config.js`,
-    `bootstrap/app.php`, `resources/js/app.js`, `resources/views/layouts/app.blade.php`. Piège PAYÉ : AgriERP est né
+    `bootstrap/app.php`, `resources/js/app.js`, `resources/views/layouts/app.blade.php`. Piège PAYÉ : LogiAgriERP est né
     d'un « overlay » sur un squelette incomplet ; vérifie que `tests/TestCase.php`, `app/Http/Controllers/Controller.php`,
     `routes/api.php`, `routes/console.php`, `AppServiceProvider` existent réellement. Ne présume rien.
 T2. DÉPENDANCES. N'installe QUE la liste de la section 6 (versions épinglées en `^` comme dans le modèle). Pour
@@ -84,13 +84,13 @@ iframe pour un hub ; Reverb/WebSocket sans besoin validé.
 
 ---
 
-## 1. Principes d'architecture (réels, vérifiés sur AgriERP)
+## 1. Principes d'architecture (réels, vérifiés sur LogiAgriERP)
 
 Source : `agrierp_laravel/CLAUDE.md`, sections « Layering » et « Single points of passage ».
 
 | Couche | Rôle | Règle |
 |---|---|---|
-| `app/Livewire/{Module}/` | Orchestre : validation, état de page, `authorize()`, événements | AgriERP : 97 composants groupés par module (Elevage, Ventes, Achats, Stocks, Comptabilite, RH, Facturation, Rapports, Parametres, Administration, Shared…). Aucune formule de calcul. |
+| `app/Livewire/{Module}/` | Orchestre : validation, état de page, `authorize()`, événements | LogiAgriERP : 97 composants groupés par module (Elevage, Ventes, Achats, Stocks, Comptabilite, RH, Facturation, Rapports, Parametres, Administration, Shared…). Aucune formule de calcul. |
 | `app/Actions/` | Effet de bord unique : « cet événement métier produit aussi son écriture / son mouvement de stock / sa mise à jour de fiche » | Appelées par Livewire ET par le contrôleur de synchro. Nom = verbe métier (`SaisieBandeAction`, `RecordSaleAccountingEntryAction`). |
 | `app/Services/` | Calcul multi-étapes, rapports, PDF, sauvegarde, corbeille | Pur autant que possible : testable sans HTTP. Ex. `EffectifParCategorieService` (effectif calculé). |
 | `app/Models/` | Eloquent seulement | UUID, casts, relations, scopes. Pas de logique de workflow. |
@@ -102,7 +102,7 @@ Pas de `app/Domain`, `app/Application`, `app/Infrastructure` : la structure Clea
 
 ### Points de passage uniques (à créer EN PREMIER ; chemins modèles vérifiés)
 
-| Mécanisme | Point d'entrée UNIQUE | Invariant | Modèle AgriERP |
+| Mécanisme | Point d'entrée UNIQUE | Invariant | Modèle LogiAgriERP |
 |---|---|---|---|
 | Écriture comptable | `AccountingEntryService::record()` / `recordManual()` | débit = crédit au centime, vérifié AVANT écriture ; date dans un exercice OUVERT (par couverture de date) ; saisie manuelle à 2 lignes : comptes distincts | `agrierp_laravel/app/Services/AccountingEntryService.php` |
 | Stock produit | `AdjustStockAction::execute()` | le mouvement `stock_movements` s'écrit dans le même appel | `agrierp_laravel/app/Actions/AdjustStockAction.php` |
@@ -125,7 +125,7 @@ tout mouvement d'argent met les deux à jour. Le plan comptable de LogiALVIA est
 - Suppression logique (`is_active` / `status`). `CorbeilleService` liste et restaure ; les écritures comptables en sont exclues
   par construction (on les contre-passe).
 - Montant d'une ligne de vente = `manual_total_amount` (source de vérité) ; `unit_price` dérivé pour l'affichage.
-  Règle d'AgriERP : à confirmer pour LogiALVIA dans `logialvia/docs/F4_Module_Ventes_Clients.md` (le POS du poste « demande le
+  Règle d'LogiAgriERP : à confirmer pour LogiALVIA dans `logialvia/docs/F4_Module_Ventes_Clients.md` (le POS du poste « demande le
   montant » : K2 A.1) avant de reproduire quoi que ce soit.
 - Le schéma est PARTAGÉ : une table synchronisable modifiée au web l'est aussi dans `logialvia_app/lib/core/database/app_database.dart`
   (puis `dart run build_runner build`) ; `app_database.g.dart` n'est jamais édité à la main.
@@ -174,7 +174,7 @@ semée est inaccessible à tous. Tests de référence : `agrierp_laravel/tests/F
 Règle : le poste ne contourne jamais un point de passage ; il envoie des FAITS ou des DEMANDES, le serveur recalcule.
 ```
 
-Règles de réconciliation reprises d'AgriERP (à confirmer pour LogiALVIA par `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` et
+Règles de réconciliation reprises d'LogiAgriERP (à confirmer pour LogiALVIA par `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` et
 `GUIDE_PORTAGE…`, blocs 15 et 16) : référentiels = le serveur gagne ; fiches journalières = dernier écrivain par `id`, colonne
 `vente` jamais prise du poste ; ventes = jamais fusionnées ; mouvements de stock = rejoués ; tout le `push` = une transaction
 rejouée 3 fois sur interblocage ; `pull` paginé par curseur `(updated_at, id)`. Détail et pièges : `agrierp_laravel/CLAUDE.md`
@@ -188,10 +188,10 @@ Tout chemin ci-dessous marqué (à créer) n'existe pas encore ; `logialvia_app/
 
 ```
 logialvia/                              dépôt massenon/logialvia (monorepo cible)
-├── CLAUDE.md                           (à créer) miroir du CLAUDE.md racine d'AgriERP
-├── .claude/skills/{prd,plan}/SKILL.md  (à créer) copies adaptées des skills d'AgriERP
+├── CLAUDE.md                           (à créer) miroir du CLAUDE.md racine d'LogiAgriERP
+├── .claude/skills/{prd,plan}/SKILL.md  (à créer) copies adaptées des skills d'LogiAgriERP
 ├── docs/                               existe (A1…K4, F1…F9, B1…B6) + docs/logialvia/ ou ce dossier de prompts
-│   ├── DOCTRINE_PORTAGE.md             (à créer) adaptée de docs/DOCTRINE_PORTAGE.md d'AgriERP
+│   ├── DOCTRINE_PORTAGE.md             (à créer) adaptée de docs/DOCTRINE_PORTAGE.md d'LogiAgriERP
 │   ├── PLAN_FINALISATION.md            (à créer) tickets restants et décisions client en attente
 │   └── prd/                            (à créer) un PRD par ticket
 ├── logialvia_app/                      existe : Flutter Windows (lib/<module>/{data,domain,presentation}, core/)
@@ -226,12 +226,12 @@ Modèle réel correspondant : `agrierp_laravel/` (`app/`, `bootstrap/`, `config/
 
 ## 4. Navigation rapide sans rechargement complet (« comme Vue/Node »)
 
-Réponse : **`wire:navigate`**, fourni par Livewire 3.8 (AgriERP : `livewire/livewire` v3.8.4). Livewire intercepte le clic,
+Réponse : **`wire:navigate`**, fourni par Livewire 3.8 (LogiAgriERP : `livewire/livewire` v3.8.4). Livewire intercepte le clic,
 charge la page voisine en arrière-plan, remplace le `<body>`, met à jour titre et URL (historique compris), SANS recharger
 scripts, feuilles de style ni polices. Ce n'est PAS une SPA : chaque navigation fait une requête serveur (page rendue en PHP) ;
 on économise le rechargement du navigateur (clignotement blanc, perte d'état), pas l'aller-retour réseau. Ni Vue, ni Inertia, ni
 Node en production : une réécriture de tous les composants pour aucun gain. Étude complète et plan par tickets :
-`docs/prd/navigation-sans-rechargement.md` (AgriERP) ; état réel : `wire:navigate` est déjà posé sur `components/sidebar-link.blade.php`,
+`docs/prd/navigation-sans-rechargement.md` (LogiAgriERP) ; état réel : `wire:navigate` est déjà posé sur `components/sidebar-link.blade.php`,
 `components/nav-card.blade.php`, l'Accès Rapide et la barre mobile de `resources/views/layouts/app.blade.php`, mais AUCUN `@persist`
 n'existe encore (vérifié par grep) : c'est un acquis à ne pas présumer.
 
@@ -287,7 +287,7 @@ titre et l'entrée active correspondent, que « Retour » fonctionne, et que le 
 | `agrierp_laravel/resources/js/app.js` | plugin collapse par `alpine:init` ; hook 419 ; pas d'`Alpine.start()` | couleur de progression |
 | `agrierp_laravel/vite.config.js` | `laravel-vite-plugin`, entrées `resources/css/app.css` + `resources/js/app.js`, `refresh: true` | — |
 | `agrierp_laravel/postcss.config.js` | `tailwindcss`, `autoprefixer` | — |
-| `agrierp_laravel/tailwind.config.js` | `content` (vues, `app/Livewire`, `app/View/Components`, pagination, `storage/framework/views`), jetons, `@tailwindcss/forms` | JETONS DE LOGIALVIA (voir 04) : navy/or, pas le vert d'AgriERP |
+| `agrierp_laravel/tailwind.config.js` | `content` (vues, `app/Livewire`, `app/View/Components`, pagination, `storage/framework/views`), jetons, `@tailwindcss/forms` | JETONS DE LOGIALVIA (voir 04) : navy/or, pas le vert d'LogiAgriERP |
 | `agrierp_laravel/resources/views/layouts/app.blade.php` | `<html lang="fr">`, preload des polices locales, manifeste, `@vite`, barre latérale `fixed lg:static`, barre du haut `h-16`, barre mobile `h-16`, Accès Rapide | libellés, menu, jeux d'icônes |
 | `agrierp_laravel/config/permission.php` | `model_morph_key = model_id` | — |
 
@@ -295,13 +295,13 @@ Tailwind : version **3.4** (3.4.17 dans `package.json`), pas la 4 : la configura
 en dépendent. Une migration vers Tailwind 4 est un ticket à part, jamais un effet de bord.
 
 Session / file / cache : `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`, `CACHE_STORE=database` (hébergement mutualisé, aucun Redis).
-`SESSION_LIFETIME=480`. En production : `SESSION_SECURE_COOKIE=true`. `BROADCAST_CONNECTION=reverb` figure dans `.env.example` d'AgriERP
+`SESSION_LIFETIME=480`. En production : `SESSION_SECURE_COOKIE=true`. `BROADCAST_CONNECTION=reverb` figure dans `.env.example` d'LogiAgriERP
 et `laravel/reverb` dans son `composer.json` MAIS aucune infrastructure Reverb n'est câblée (`app/Jobs/DailyProphylaxyReminderJob.php`
 le dit) : **ne pas installer Reverb dans LogiALVIA** sans besoin validé ; `BROADCAST_CONNECTION=log`.
 
 ---
 
-## 6. Dépendances à installer (liste fermée) — versions réellement résolues dans AgriERP
+## 6. Dépendances à installer (liste fermée) — versions réellement résolues dans LogiAgriERP
 
 ### Composer (`logialvia_web/composer.json`)
 
@@ -314,12 +314,12 @@ le dit) : **ne pas installer Reverb dans LogiALVIA** sans besoin validé ; `BROA
 | `spatie/laravel-permission` | `^7.0` | 7.4.2 | rôles/permissions (`User`, `Role`, `Permission`) | obligatoire avec `uuidMorphs` — NE PAS `vendor:publish` |
 | `barryvdh/laravel-dompdf` | `^3.0` | v3.1.2 (dompdf 3.1.6) | PDF (`PdfExportService`, attestations, GL, plan comptable) | obligatoire (polices PDF Unicode : voir 03) |
 | `simplesoftwareio/simple-qrcode` | `^4.2` | 4.2.0 | QR (fiche animal, facture normalisée) | conditionnel : seulement si fiche sujet / facture MeCeF QR (41_MECEF_EMECEF) |
-| `maatwebsite/excel` | `^3.1` | 3.1.69 (+ `phpoffice/phpspreadsheet` 1.30.6) | déclaré dans `composer.json` d'AgriERP (en DOUBLE) mais aucun `use Maatwebsite` dans `app/` : les exports sont des PDF et des flux `streamDownload` | conditionnel : à n'installer que pour l'export/import tableur (guide, blocs 7 et 21) ; déclarer UNE seule fois |
+| `maatwebsite/excel` | `^3.1` | 3.1.69 (+ `phpoffice/phpspreadsheet` 1.30.6) | déclaré dans `composer.json` d'LogiAgriERP (en DOUBLE) mais aucun `use Maatwebsite` dans `app/` : les exports sont des PDF et des flux `streamDownload` | conditionnel : à n'installer que pour l'export/import tableur (guide, blocs 7 et 21) ; déclarer UNE seule fois |
 | `laravel/tinker` | `^2.9` | v2.11.1 | dev/diagnostic | dev seulement en pratique |
 | `laravel/reverb` | `^1.0` | v1.11.0 | NON câblé | NE PAS installer |
 
 Dev : `laravel/dusk` (`^8.2`, v8.6.0, parcours navigateur), `laravel/pint` (`^1.13`, v1.30.5), `phpunit/phpunit` (`^11.0.1`, 11.5.56),
-`mockery/mockery`, `fakerphp/faker`, `nunomaduro/collision`, `laravel/pail`. Analyse statique : AgriERP n'en a PAS (aucun
+`mockery/mockery`, `fakerphp/faker`, `nunomaduro/collision`, `laravel/pail`. Analyse statique : LogiAgriERP n'en a PAS (aucun
 `phpstan`/`larastan` dans son `composer.json` : vérifié). Ajouter `larastan/larastan` (niveau à définir) est une proposition
 nouvelle, à valider (voir 03, « Qualité »). `laravel/sail` : inutile (Laragon/cPanel).
 
@@ -337,8 +337,8 @@ nouvelle, à valider (voir 03, « Qualité »). `laravel/sail` : inutile (Larago
 | `axios` | `^1.7.9` | présent dans le modèle ; à retirer s'il n'est pas utilisé (aucun appel XHR manuel : Livewire suffit) |
 | Tests JS | aucun paquet : `node --test tests/Js` (modules `.mjs`, `node:test`) | logique pure (verrou de session) |
 
-Aucune bibliothèque de graphiques, de date, d'UI (pas de Bootstrap/jQuery) n'est installée dans AgriERP. Si un graphique est nécessaire
-(courbe de croissance, CA vs dépenses), AgriERP en dessine un composant Blade/SVG (`resources/views/components/courbe-gmq.blade.php`) :
+Aucune bibliothèque de graphiques, de date, d'UI (pas de Bootstrap/jQuery) n'est installée dans LogiAgriERP. Si un graphique est nécessaire
+(courbe de croissance, CA vs dépenses), LogiAgriERP en dessine un composant Blade/SVG (`resources/views/components/courbe-gmq.blade.php`) :
 suivre ce précédent avant d'ajouter Chart.js (ajout = accord écrit).
 
 ---
@@ -350,18 +350,18 @@ suivre ce précédent avant d'ajouter Chart.js (ajout = accord écrit).
   (les docblocks citent `fonts.googleapis.com` pour expliquer l'interdit) et refuse les balises `<link>`/`<script>` externes.
 - **Police de texte** : variable `.woff2`, un fichier par sous-ensemble (`latin` toujours, `latin-ext` seulement si un caractère de la
   plage apparaît, via `unicode-range`), `@font-face` avec `font-weight: 100 900` (déclarer `400` ferait synthétiser un faux gras et
-  déformerait les titres), `font-display: swap`, `<link rel="preload" as="font" crossorigin>`. AgriERP : `Inter-latin.woff2` 48 Ko +
+  déformerait les titres), `font-display: swap`, `<link rel="preload" as="font" crossorigin>`. LogiAgriERP : `Inter-latin.woff2` 48 Ko +
   `Inter-latin-ext.woff2` 85 Ko dans `public/assets/fonts/`. **LogiALVIA : le poste embarque ROBOTO variable** (`logialvia/logialvia_app/assets/fonts/Roboto-Variable.ttf`,
   famille `Roboto`), pas Inter. Pour la conformité web <-> poste, le web doit servir Roboto (conversion `.ttf` -> `.woff2` en sous-ensembles
   `latin`/`latin-ext`, licence OFL-1.1 pour la variable, voir `logialvia/logialvia_app/assets/fonts/LICENSE-Roboto-variable-OFL-1.1.txt`).
   Garder Inter n'est qu'un choix du client qui impose de changer le poste aussi : À DÉFINIR AVEC LE CLIENT (Q-DS-1, voir 04).
-- **Icônes** : Material Symbols Outlined, police locale **sous-ensemble** (AgriERP : 37 Ko au lieu de 3,87 Mo), classe
+- **Icônes** : Material Symbols Outlined, police locale **sous-ensemble** (LogiAgriERP : 37 Ko au lieu de 3,87 Mo), classe
   `.material-symbols-outlined` avec `font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24` (réglages par défaut du poste via
   `material_symbols_icons`) ; `font-display: block` (pas de lettre « nue » en attendant la police). Générer le sous-ensemble à partir de la liste
   RÉELLE des noms d'icônes utilisés (`grep -o "material-symbols-outlined[^<]*<"` + noms passés en propriétés `icon=`) ; ajouter une icône = régénérer.
 - **Jetons** : uniquement dans `tailwind.config.js` (couleurs, `spacing` xs=4, sm=8, md=16, lg=24, xl=32 px, rayons, famille de police) ; aucune
   couleur inline dans une vue. Valeurs exactes et usage : `04_UI_UX_DESIGN_SYSTEM.md`.
-- **Mode sombre** : présent dans `app.css` d'AgriERP (`body.dark-mode`) ; le poste de LogiALVIA n'en a pas dans les sources lues : ne PAS le créer
+- **Mode sombre** : présent dans `app.css` d'LogiAgriERP (`body.dark-mode`) ; le poste de LogiALVIA n'en a pas dans les sources lues : ne PAS le créer
   (À DÉFINIR AVEC LE CLIENT si souhaité).
 
 ---
@@ -375,30 +375,30 @@ suivre ce précédent avant d'ajouter Chart.js (ajout = accord écrit).
 | CSRF | Actif (formulaires Livewire) ; `419` géré en français | `bootstrap/app.php`, `resources/js/app.js` |
 | Mots de passe | `Password::defaults()` ; changement obligatoire à la première connexion ; l'administrateur réinitialise (aucun envoi par e-mail) ; jamais en base du poste (le poste garde un jeton et un PIN) | `ChangementMotDePasseObligatoire`, guide de portage §0 (contradiction 6) |
 | Secrets | `.env` hors Git ; secrets de paramétrage (SMTP, MeCeF) chiffrés en base ; jamais dans les journaux | 42_CONFIG_MECEF_SMTP_LOGO_FAVICON.md |
-| CSP / en-têtes | **AgriERP n'en a AUCUN** (grep `Content-Security-Policy`/`X-Frame` dans `app/` et `public/.htaccess` : rien). Proposition (nouvelle, à valider) : `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, et une CSP en mode « report-only » d'abord (Alpine/Livewire exigent `unsafe-eval` ou la build CSP d'Alpine ; tester avant d'imposer). | À DÉFINIR AVEC LE CLIENT / à tester |
+| CSP / en-têtes | **LogiAgriERP n'en a AUCUN** (grep `Content-Security-Policy`/`X-Frame` dans `app/` et `public/.htaccess` : rien). Proposition (nouvelle, à valider) : `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, et une CSP en mode « report-only » d'abord (Alpine/Livewire exigent `unsafe-eval` ou la build CSP d'Alpine ; tester avant d'imposer). | À DÉFINIR AVEC LE CLIENT / à tester |
 | Uploads | Disque `public` via `storage:link` ; aucun fichier exécutable ; lien `/storage` NON bloqué par le `.htaccess` racine | `agrierp_laravel/htaccess` |
 | Audit | Toute action sensible : `AuditLog::record('sale.created', 'ventes', …)` ; échecs de connexion comptés sur l'action technique `login.failed` (jamais sur sa traduction) | `app/Models/AuditLog.php` |
 | Données | Aucun export de base, archive ni `.env` versionné ; la base se reconstruit par `php artisan migrate:fresh --seed` | `CLAUDE.md` racine |
 
 ## 9. Hébergement, déploiement, tâches planifiées
 
-- **Cible présumée : hébergement mutualisé cPanel** (AgriERP : `RUNBOOK_DEPLOIEMENT_CPANEL.md`, `CHECKLIST_PRE_DEPLOIEMENT.md`,
+- **Cible présumée : hébergement mutualisé cPanel** (LogiAgriERP : `RUNBOOK_DEPLOIEMENT_CPANEL.md`, `CHECKLIST_PRE_DEPLOIEMENT.md`,
   `docs/GUIDE_DEPLOIEMENT.md`). Pour LogiALVIA : À DÉFINIR AVEC LE CLIENT (hébergeur, sous-domaine, version de PHP, accès SSH/Composer, base MySQL).
 - **Racine du document = `public/`.** `.htaccess` de `public/` : réécriture Laravel canonique + `AddType application/manifest+json .webmanifest`
   (Apache ne connaît pas l'extension : le manifeste serait servi en `text/plain` et ignoré SANS erreur) + `no-cache` sur `sw.js` + cache long
   immuable sur `build/`. `.htaccess` à la racine du projet = filet de sécurité UNIQUEMENT (interdit le listing, refuse les fichiers sensibles,
   réécrit vers `public/`) ; `storage` y est volontairement absent de la liste de blocage. `php artisan serve` ne lit jamais `.htaccess` :
-  l'absence de ces deux fichiers a fait renvoyer 404 sur toutes les URL au premier déploiement d'AgriERP.
+  l'absence de ces deux fichiers a fait renvoyer 404 sur toutes les URL au premier déploiement d'LogiAgriERP.
 - **`.env.production.example`** (modèle : `agrierp_laravel/.env.production.example`) : `APP_ENV=production`, `APP_DEBUG=false`, `APP_TIMEZONE=Africa/Porto-Novo`
   (le Bénin : confirmer pour Natitingou, même fuseau), `APP_LOCALE=fr`, `APP_FALLBACK_LOCALE=fr`, `APP_FAKER_LOCALE=fr_FR`, `LOG_LEVEL=warning`,
   MySQL `utf8mb4_unicode_ci` avec utilisateur sans droits d'administration, `SESSION_DRIVER=database`, `SESSION_SECURE_COOKIE=true`,
   `QUEUE_CONNECTION=database`, `CACHE_STORE=database`, SMTP (`MAIL_MAILER=smtp`, port 587, TLS), `MECEF_ACTIF=false`. Toutes les valeurs sensibles
   en `<…>`, jamais une vraie.
 - **Tâches planifiées** : UN seul cron cPanel, `* * * * * cd /home/UTILISATEUR/logialvia_web && php artisan schedule:run >> /dev/null 2>&1` ; toutes
-  les tâches dans `routes/console.php` (`Schedule::command(...)` / `Schedule::job(...)->onOneServer()`). Modèles d'AgriERP : sauvegarde quotidienne
+  les tâches dans `routes/console.php` (`Schedule::command(...)` / `Schedule::job(...)->onOneServer()`). Modèles d'LogiAgriERP : sauvegarde quotidienne
   02:00, rappel de prophylaxie 06:00, alertes de la cloche 06:05, ouverture de l'exercice le 1er janvier 00:00, purge/GC hebdomadaires, rappel de
   téléchargement de sauvegarde. Fuseau `Africa/Porto-Novo`. Ne JAMAIS créer un cron par tâche.
-- **Files** : AgriERP n'a aucun `ShouldQueue` réel (`RUNBOOK_DEPLOIEMENT_CPANEL.md` §1). Ne pas déclarer de `queue:work` sans job réel. Si des jobs
+- **Files** : LogiAgriERP n'a aucun `ShouldQueue` réel (`RUNBOOK_DEPLOIEMENT_CPANEL.md` §1). Ne pas déclarer de `queue:work` sans job réel. Si des jobs
   deviennent nécessaires (envoi massif d'e-mails), ajouter alors UN cron `queue:work --stop-when-empty` avec accord du client.
 - **Cache** : `php artisan config:cache route:cache view:cache` au déploiement ; `storage:link` ; `npm run build` AVANT l'envoi (le serveur n'a pas Node) ;
   incrémenter `VERSION` de `public/sw.js` à chaque déploiement qui change un fichier mis en cache.
@@ -416,7 +416,7 @@ suivre ce précédent avant d'ajouter Chart.js (ajout = accord écrit).
 ## 11. À DÉFINIR AVEC LE CLIENT (questions précises)
 
 1. **Hébergement** : cPanel mutualisé, VPS ou autre ? Sous-domaine (ex. `logialvia.<domaine>`) ? PHP 8.3 disponible ? Accès SSH pour `composer install` ? (Conséquence : mode de déploiement et cron.)
-2. **Police** (Q-DS-1) : Roboto (identité du poste, par défaut) ou Inter (modèle AgriERP) ? Changer implique de changer aussi le poste.
+2. **Police** (Q-DS-1) : Roboto (identité du poste, par défaut) ou Inter (modèle LogiAgriERP) ? Changer implique de changer aussi le poste.
 3. **Plan comptable** : SYSCOHADA (mentionné par F6) confirmé ? Plan fourni par le client ou jeu par défaut ?
 4. **Mode sombre** : voulu ? (le poste n'en a pas dans les sources lues.)
 5. **PWA hors ligne** et **import xlsx** : le client les croit présents dans LogiAgriERP ; ils n'y sont pas (guide, E15). Les veut-il réellement pour LogiALVIA ?

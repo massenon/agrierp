@@ -24,7 +24,7 @@ class SyncReinitialisationMotDePasseTest extends TestCase
     {
         parent::setUp();
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        $this->admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $this->admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $this->admin->assignRole('admin');
         $this->cible = User::create(['name' => 'Afi', 'username' => 'afi', 'email' => 'afi@fermeolouwachegoun.com', 'password' => bcrypt('Ancien#2026'), 'is_active' => true]);
         $this->cible->assignRole('caissier');
@@ -76,7 +76,7 @@ class SyncReinitialisationMotDePasseTest extends TestCase
         $this->assertSame([], $reponse->json('users.accepted'));
         $this->assertStringContainsString('Vous ne pouvez pas réinitialiser votre propre mot de passe', $reponse->json('users.rejected.0.reason'));
         $this->assertFalse($this->admin->fresh()->must_change_password);
-        $this->assertTrue(Hash::check('AgriERP@2026', $this->admin->fresh()->password));
+        $this->assertTrue(Hash::check('LogiAgriERP@2026', $this->admin->fresh()->password));
     }
 
     public function test_le_temporaire_est_obligatoire_et_suit_la_politique(): void
@@ -91,7 +91,7 @@ class SyncReinitialisationMotDePasseTest extends TestCase
 
     public function test_sans_manage_users_la_reinitialisation_est_refusee(): void
     {
-        $caissier = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $caissier = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $caissier->assignRole('caissier');
 
         $reponse = $this->pousser([$this->ligne($this->cible, ['password' => 'Temp#Ferme2026', 'reset_password' => true])], $caissier)->assertOk();

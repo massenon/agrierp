@@ -38,7 +38,7 @@ class CorbeilleSyncTest extends TestCase
     {
         parent::setUp();
         $this->preparerDecorDepenses();
-        $this->caissier = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $this->caissier = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $this->caissier->assignRole('caissier');
     }
 

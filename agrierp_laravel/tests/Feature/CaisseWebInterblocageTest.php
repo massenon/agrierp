@@ -93,7 +93,7 @@ class CaisseWebInterblocageTest extends TestCase
 
         $caissiere = User::create([
             'name' => 'Caissière', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissiere->assignRole('caissier');
         $this->actingAs($caissiere);

@@ -239,7 +239,7 @@ class AttestationSignatairesTest extends TestCase
         $role = Role::findOrCreate('rh-att', 'web');
         $role->givePermissionTo(['view-rh', 'manage-rh']);
 
-        return User::create(['name' => 'Rh', 'username' => 'rh-att', 'email' => 'rh-att@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true])
+        return User::create(['name' => 'Rh', 'username' => 'rh-att', 'email' => 'rh-att@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true])
             ->assignRole($role);
     }
 

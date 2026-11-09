@@ -80,7 +80,7 @@ export async function activer({ identifiant, motDePasse, pin, fetchFn = (...a) =
         if (reponse.status === 429) throw new ErreurAppairage('Trop de tentatives : patientez une minute puis réessayez.', 'limite');
         if (reponse.status === 422) throw new ErreurAppairage(json?.errors?.identifiant?.[0] ?? json?.message ?? 'Identifiants incorrects.', 'identifiants');
         if (!reponse.ok || typeof json.token !== 'string') throw new ErreurAppairage(`Activation refusée par le serveur (${reponse.status}).`, 'refus');
-        if (json.must_change_password) throw new ErreurAppairage("Changez d'abord votre mot de passe temporaire dans AgriERP, puis réactivez le mode hors ligne.", 'mot-de-passe-temporaire');
+        if (json.must_change_password) throw new ErreurAppairage("Changez d'abord votre mot de passe temporaire dans LogiAgriERP, puis réactivez le mode hors ligne.", 'mot-de-passe-temporaire');
 
         const { cle, parametres } = await creerCoffre(pin, { iterations, cryptoApi });
         // Réactivation : les ventes déjà en file étaient chiffrées par l'ANCIENNE clé ; on ne les écrase pas en silence.
@@ -143,7 +143,7 @@ export async function deverrouiller(base, pin, { cryptoApi = globalThis.crypto, 
         const echecs = ((await base.meta('echecs_pin')) ?? 0) + 1;
         if (echecs >= ECHECS_MAXIMUM) {
             await purgerLocal({ base, idb });
-            throw new ErreurPin(`Trop d'échecs : les données de cet appareil ont été effacées. Reconnectez-vous à AgriERP en ligne pour réactiver le mode hors ligne.`);
+            throw new ErreurPin(`Trop d'échecs : les données de cet appareil ont été effacées. Reconnectez-vous à LogiAgriERP en ligne pour réactiver le mode hors ligne.`);
         }
         await base.poserMeta('echecs_pin', echecs);
         const restant = ECHECS_MAXIMUM - echecs;

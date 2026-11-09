@@ -184,14 +184,14 @@ void main() {
 
     /// Tickets DES-1 / DES-2 (décisions du client des 27 et 28/10/2026) : la DÉSINSTALLATION supprime TOUT ce que le poste a posé
     /// hors du dossier d'installation — données (`%APPDATA%\OLOUWACHEGOUN\donnees`, ), archives et
-    /// exports (`Documents\AgriERP`), justificatifs (`Documents\agrierp_justificatifs`) — après un avertissement, un choix Oui / Non
+    /// exports (`Documents\LogiAgriERP`), justificatifs (`Documents\agrierp_justificatifs`) — après un avertissement, un choix Oui / Non
     /// et une SAUVEGARDE AUTOMATIQUE proposée. Une MISE À JOUR, elle, n'y touche jamais.
     test('agrierp.iss : la désinstallation supprime les données, avertit et propose la sauvegarde (DES-1, DES-2)', () {
       final source = iss.readAsStringSync();
       expect(source, contains('[UninstallDelete]'));
       for (final dossier in [
         r'{userappdata}\OLOUWACHEGOUN\donnees',
-        r'{userdocs}\AgriERP"',
+        r'{userdocs}\LogiAgriERP"',
         r'{userdocs}\agrierp_justificatifs',
       ]) {
         expect(source, contains('Type: filesandordirs; Name: "$dossier'), reason: dossier);
@@ -201,7 +201,7 @@ void main() {
       expect(source, contains('MB_YESNO'));
       expect(source, contains('SAUVEGARDE AUTOMATIQUE'));
       expect(source, contains('function SauvegarderAvantSuppression(var Dossier: String): Boolean;'));
-      expect(source, contains(r"ExpandConstant('{userdocs}\AgriERP-Sauvegarde-')"), reason: 'sauvegarde hors des dossiers supprimés');
+      expect(source, contains(r"ExpandConstant('{userdocs}\LogiAgriERP-Sauvegarde-')"), reason: 'sauvegarde hors des dossiers supprimés');
       expect(source, isNot(contains('[InstallDelete]')), reason: 'une mise à jour ne touche pas aux données');
 
       final rc = File('windows/runner/Runner.rc').readAsStringSync();

@@ -1,4 +1,4 @@
-# PLAN DE FINALISATION — AgriERP
+# PLAN DE FINALISATION — LogiAgriERP
 
 **Ferme École OLOUWACHEGOUN · état au 19/10/2026 · monorepo `massenon/agrierp`**
 
@@ -159,7 +159,7 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 | B2 | Synchronisation **déclenchée automatiquement** : au retour du réseau, à intervalle (15 min, configurable dans Paramètres du poste) et à la fermeture de l'application. Jamais bloquante ; hors ligne = état normal, pas une erreur rouge. | 🔧 |
 | B3 | Écran Synchronisation : historique des dernières tentatives (date, poussés / tirés / refusés), filtre des conflits par table, relance d'un conflit après correction, export du journal pour le support. | 🔧 |
 | B4 | Indicateur permanent dans `BarreSuperieure` : nombre d'enregistrements en attente et âge de la dernière synchronisation réussie. | 🔧 absorbé par **H2** |
-| B5 | Sauvegarde locale de la base Drift (copie datée dans `Documents\AgriERP\sauvegardes`, rotation 7 jours) avant toute migration de schéma et chaque jour. | 🔧 |
+| B5 | Sauvegarde locale de la base Drift (copie datée dans `Documents\LogiAgriERP\sauvegardes`, rotation 7 jours) avant toute migration de schéma et chaque jour. | 🔧 |
 | B6 | Couches DDD : migrer progressivement les repositories qui renvoient des lignes Drift vers des entités de domaine (Doctrine §1.3), écran par écran et jamais en lot. | 🔧 continu |
 
 ---
@@ -183,7 +183,7 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 
 | # | Ticket | Statut |
 |---|---|---|
-| D1 | `agrierp_flutter/build_windows.bat` : enchaîne dépendances, génération Drift, analyse, tests, `flutter build windows --release`, copie du runtime VC++, puis installateur Inno Setup (`installer/agrierp.iss`) → `installer\Output\AgriERP-Setup-<version>.exe` | ✅ écrit le 17/10/2026, **pas encore exécuté sur une machine Windows** |
+| D1 | `agrierp_flutter/build_windows.bat` : enchaîne dépendances, génération Drift, analyse, tests, `flutter build windows --release`, copie du runtime VC++, puis installateur Inno Setup (`installer/agrierp.iss`) → `installer\Output\LogiAgriERP-Setup-<version>.exe` | ✅ écrit le 17/10/2026, **pas encore exécuté sur une machine Windows** |
 | D2 | Première exécution réelle sur le poste de compilation ; vérifier l'installation sur un Windows 10 vierge, sans redistribuable VC++ | 🔧 |
 | D3 | CI GitHub Actions `windows-latest` : analyse, tests, build, installateur publié en artefact à chaque tag `v*` | 🔧 |
 | D4 | Signature du code de l'exécutable (certificat éditeur), pour éviter l'alerte SmartScreen | ❓ achat du certificat |
@@ -485,7 +485,7 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 - **AV-Q4** Un retour en exercice clos ou sur plan comptable incomplet est désormais REFUSÉ au web et à l'envoi (avant : enregistré sans écriture). À faire confirmer par le cabinet FAGUEZ.
 - **AV-Q5** Export Excel / PDF en masse de l'historique : le web ne l'a pas (le poste retire ses deux boutons inertes). En vouloir un ? (web d'abord)
 
-**NON vérifié :** poste Windows réel (rendu du tiroir, du calendrier, de l'enregistrement du PDF dans Documents\AgriERP) ; navigateur (Dusk) pour les modifications du Blade (aucune : seul le composant a changé) ; une base MySQL / MariaDB peuplée (numérotation `AV-AAAA-NNN` par `MAX(CAST(...))` sous envois simultanés de deux postes : sérialisée par la transaction d'envoi, non éprouvée sur MariaDB) ; l'essai à cinq postes n'a pas été étendu aux retours.
+**NON vérifié :** poste Windows réel (rendu du tiroir, du calendrier, de l'enregistrement du PDF dans Documents\LogiAgriERP) ; navigateur (Dusk) pour les modifications du Blade (aucune : seul le composant a changé) ; une base MySQL / MariaDB peuplée (numérotation `AV-AAAA-NNN` par `MAX(CAST(...))` sous envois simultanés de deux postes : sérialisée par la transaction d'envoi, non éprouvée sur MariaDB) ; l'essai à cinq postes n'a pas été étendu aux retours.
 
 **Reste :** `VentesDevisRepository.charger()` et ses classes `DonneesHistorique` / `LigneHistorique` ne servent plus à rien (laissés pour ne pas heurter la branche `t-devis` ; à supprimer après la fusion).
 
@@ -957,7 +957,7 @@ Demande du client du 07/11/2026. (Le ticket « MECEF-2 » reste le mode boîtier
 
 ## PWA-1 ✅ (08/11/2026) — la caisse hors ligne du navigateur (PWA utilisable hors ligne, synchronisation à la reconnexion)
 
-**Décision du client (08/11/2026) : « ON DÉMARRE LA CONSTRUCTION ».** Elle LÈVE le refus d'origine de `agrierp_laravel/CLAUDE.md` (« cette PWA ne fait pas travailler AgriERP hors ligne ») pour un **périmètre minimal : la caisse**. Conception suivie : `docs/logialvia/40_PWA_HORS_LIGNE.md` (inchangé). Doctrine et pièces : `agrierp_laravel/CLAUDE.md`, sections « PWA » et « PWA-1 ».
+**Décision du client (08/11/2026) : « ON DÉMARRE LA CONSTRUCTION ».** Elle LÈVE le refus d'origine de `agrierp_laravel/CLAUDE.md` (« cette PWA ne fait pas travailler LogiAgriERP hors ligne ») pour un **périmètre minimal : la caisse**. Conception suivie : `docs/logialvia/40_PWA_HORS_LIGNE.md` (inchangé). Doctrine et pièces : `agrierp_laravel/CLAUDE.md`, sections « PWA » et « PWA-1 ».
 
 | Point | Livraison |
 |---|---|
@@ -986,7 +986,7 @@ Demande du client du 07/11/2026. (Le ticket « MECEF-2 » reste le mode boîtier
 Décision du client : « ON DÉMARRE LA CONSTRUCTION », « très important », écran dédié au poste et au web. Conception : guide logialvia bloc 21 / fichier 28. Détail : sections IMPORT-1 de `agrierp_laravel/CLAUDE.md` et `agrierp_flutter/CLAUDE.md`.
 - **Fait** : `App\Services\Import\*` (orchestrateur + un service par module, lecture et validation ligne par ligne, aperçu, confirmation, rapport xlsx, journal `import_batches`), modèles xlsx versionnés à télécharger, écran Livewire `/importation-masse` (six étapes, groupe ADMINISTRATION du menu), écran du poste fidèle, parité exécutée contre le vrai PHP, tests et contrôle par mutation.
 - **Décisions** : création SEULE (jamais d'écrasement) ; idempotence par clé naturelle (`FusionReferentielsService`) + UUID v5 déterministe ; produit déjà au catalogue IGNORÉ sans stock ajouté ; stock initial par `AdjustStockAction` (web) / règle existante du poste (serveur écrit le mouvement) ; ligne par ligne, pas de « tout ou rien » ; fournisseurs sans e-mail ; modèle du poste généré hors ligne sans listes déroulantes natives.
-- **Reste à décider avec le client** (questions Q-IMP du guide) : taille maximale (5 Mo / 5 000 lignes retenus provisoirement), option « tout ou rien », conservation du rapport (aujourd'hui au journal serveur), date d'ouverture du stock initial (aujourd'hui : jour de l'import), intrants distincts des produits vendables (AgriERP n'a qu'une table `products`).
+- **Reste à décider avec le client** (questions Q-IMP du guide) : taille maximale (5 Mo / 5 000 lignes retenus provisoirement), option « tout ou rien », conservation du rapport (aujourd'hui au journal serveur), date d'ouverture du stock initial (aujourd'hui : jour de l'import), intrants distincts des produits vendables (LogiAgriERP n'a qu'une table `products`).
 ### Phases suivantes (non construites, registre `ImportMasseService::REGISTRE` prêt)
 | Phase | Module | Point de passage |
 |---|---|---|

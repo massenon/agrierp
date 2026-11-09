@@ -14,10 +14,10 @@
 
 > **Rôle.** Ingénieur qualité et exploitation senior (performance, sécurité applicative, accessibilité, continuité de service).
 > **Contexte.** B5 fixe 20 exigences pour le poste Flutter seul. Le web ajoute : latence réseau, concurrence multi-postes, HTTPS, sessions, sauvegardes serveur, PWA, navigateurs, disponibilité.
-> **Tâches.** (1) Reprends les 20 exigences de B5 (`NFRS-…` → `NFR-`) avec colonne « Ancêtre » ; (2) ajoute les exigences du web et de la synchronisation ; (3) pour chacune : seuil chiffré, méthode de mesure (outil, jeu de données, environnement), source ; (4) marque PROPOSÉ ce qui vient d'AgriERP ou de la bonne pratique, À DÉFINIR ce qui dépend du client (volumes, hébergeur, durée hors ligne) ; (5) relie chaque `NFR-` à un test ou un contrôle de `31_TESTING_QA.md`.
+> **Tâches.** (1) Reprends les 20 exigences de B5 (`NFRS-…` → `NFR-`) avec colonne « Ancêtre » ; (2) ajoute les exigences du web et de la synchronisation ; (3) pour chacune : seuil chiffré, méthode de mesure (outil, jeu de données, environnement), source ; (4) marque PROPOSÉ ce qui vient d'LogiAgriERP ou de la bonne pratique, À DÉFINIR ce qui dépend du client (volumes, hébergeur, durée hors ligne) ; (5) relie chaque `NFR-` à un test ou un contrôle de `31_TESTING_QA.md`.
 > **Contraintes.** Français ; aucun chiffre inventé : tout chiffre sans source = PROPOSÉ ; les mesures s'écrivent avec un volume (« 5 000 lignes ») et un environnement (« poste Windows 10, 8 Go »). Sécurité : aucune dérogation à `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` D-SRV-5.
 > **Critères d'acceptation.** (a) ≥ 60 lignes `NFR-` ; (b) 100 % ont un seuil ou la mention À DÉFINIR + question ; (c) chaque ligne a une méthode de mesure ; (d) les 20 exigences de B5 sont présentes ; (e) les sections sécurité, accessibilité, compatibilité, disponibilité, sauvegardes, PWA, hors ligne existent.
-> **Interdits.** « Rapide », « sécurisé », « convivial » sans chiffre ; copier un SLA d'AgriERP ; promettre une disponibilité sans hébergeur choisi ; affaiblir un seuil pour qu'un test passe.
+> **Interdits.** « Rapide », « sécurisé », « convivial » sans chiffre ; copier un SLA d'LogiAgriERP ; promettre une disponibilité sans hébergeur choisi ; affaiblir un seuil pour qu'un test passe.
 
 ---
 
@@ -121,7 +121,7 @@
 | NFR-DISP-01 | Disponibilité du serveur web | À DÉFINIR avec l'hébergeur (Q-HEB-1) ; le poste reste utilisable serveur coupé | — | guide D-SRV-7 | D |
 | NFR-DISP-02 | Mise en production | serveur d'abord, postes ensuite ; essai multipostes vert sur plusieurs graines | procédure `docs/GUIDE_DEPLOIEMENT.md` | guide 14.3 W9 | C |
 | NFR-SAV-01 | Sauvegarde automatique avant migration de schéma ; refus de migrer si elle échoue | 100 % | test | guide D-SRV-3 | C |
-| NFR-SAV-02 | Sauvegarde quotidienne du serveur ; rappel hebdomadaire de téléchargement (lundi 08:00) au rôle admin | quotidienne 02:00 ; rétention À DÉFINIR | planificateur | `agrierp_laravel/CLAUDE.md` (AgriERP) | P |
+| NFR-SAV-02 | Sauvegarde quotidienne du serveur ; rappel hebdomadaire de téléchargement (lundi 08:00) au rôle admin | quotidienne 02:00 ; rétention À DÉFINIR | planificateur | `agrierp_laravel/CLAUDE.md` (LogiAgriERP) | P |
 | NFR-SAV-03 | Restauration : 4 contrôles avant le moindre octet ; base précédente conservée ; différée au redémarrage au poste | 4/4 | test | F8 | C |
 | NFR-SAV-04 | Restauration testée périodiquement sur une copie | À DÉFINIR (fréquence) | — | I3 / F8 « le jour où on en a besoin » | D |
 | NFR-SAV-05 | Planificateur : un seul cron `schedule:run` | 1 | revue | `agrierp_laravel/routes/console.php` | P |

@@ -25,7 +25,7 @@ Future<FichierChoisi?> choisirClasseurXlsx() async {
   return (nom: r.files.first.name, octets: Uint8List.fromList(octets));
 }
 
-/// Écrit un fichier dans « Documents\AgriERP » et rend son chemin (l'écran l'annonce : aucune boîte de dialogue, comme les exports).
+/// Écrit un fichier dans « Documents\LogiAgriERP » et rend son chemin (l'écran l'annonce : aucune boîte de dialogue, comme les exports).
 Future<String> enregistrerDansDocuments(String nom, List<int> octets) async {
   if (PlateformePoste.navigateur) return PlateformePoste.livreurNavigateur(nom, octets);
   return livrerFichier(nom, octets);

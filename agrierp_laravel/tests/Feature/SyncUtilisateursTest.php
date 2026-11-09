@@ -31,7 +31,7 @@ class SyncUtilisateursTest extends TestCase
 
         $this->admin = User::create([
             'name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
     }
@@ -148,7 +148,7 @@ class SyncUtilisateursTest extends TestCase
 
     public function test_sans_le_droit_manage_users_les_comptes_sont_refuses(): void
     {
-        $caissier = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $caissier = User::create(['name' => 'Caisse', 'username' => 'caisse', 'email' => 'caisse@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $caissier->assignRole('caissier');
 
         $reponse = $this->pousser(['users' => [$this->compte()]], $caissier)->assertOk();

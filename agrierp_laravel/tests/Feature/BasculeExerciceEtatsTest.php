@@ -314,7 +314,7 @@ class BasculeExerciceEtatsTest extends TestCase
         $this->jeuDuParagraphe5();
         $caissier = \App\Models\User::create([
             'name' => 'Caissier', 'username' => 'caisse-bascule', 'email' => 'caisse-bascule@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $caissier->assignRole('caissier');
         $jeton = $caissier->createToken('POSTE-CAISSE', ['*'], now()->addDays(90))->plainTextToken;

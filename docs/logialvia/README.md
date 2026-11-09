@@ -1,7 +1,7 @@
 # docs/logialvia — Dossier de prompts pour créer le WEB de LogiALVIA avec Claude Code
 
 > Ce dossier est un jeu de **prompts réutilisables** : chaque fichier commence par un en-tête **USAGE** (quand l'utiliser, dans quel ordre, entrées requises, sorties attendues), puis un prompt prêt à copier (rôle, contexte, tâches numérotées, contraintes, critères d'acceptation vérifiables, interdits), avec les chemins de référence RÉELS de LogiAgriERP et de LogiALVIA.
-> Il complète, sans le réécrire, `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (le guide des 21 blocs de portage d'AgriERP vers LogiALVIA) : on y renvoie, on ne le duplique pas.
+> Il complète, sans le réécrire, `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (le guide des 21 blocs de portage d'LogiAgriERP vers LogiALVIA) : on y renvoie, on ne le duplique pas.
 
 Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (cloné en LECTURE SEULE dans `/home/user/massenon/logialvia`) ; `agrierp_laravel/`, `agrierp_flutter/`, `docs/` = le monorepo LogiAgriERP (`/home/user/agrierp`) ; « (à créer) » = n'existe pas encore.
 
@@ -15,7 +15,7 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 4. **Droits à deux niveaux** : route `auth` + `can:view-*`, puis `$this->authorize('manage-*')` en première ligne de toute méthode qui écrit ; quatre rôles (`admin`, `comptable`, `caissier`, `animalier` : TRANCHÉ DV-07).
 5. **Navigation rapide « comme Vue/Node »** : `wire:navigate` de Livewire 3 (mode SPA-like) + barre de progression + `@persist` pour les toasts, le verrou de session, l'invitation PWA ; ni Vue, ni Inertia, ni Node en production.
 6. **Stack** : PHP 8.3, Laravel 12.65, Livewire 3.8, Sanctum 4 (jeton par poste), Spatie Permission 7, Tailwind 3.4 + PostCSS + Vite 5, Alpine fourni par Livewire (jamais démarré à la main), Material Symbols Outlined local.
-7. **Librairies Composer (liste fermée)** : `laravel/framework`, `livewire/livewire`, `laravel/sanctum`, `spatie/laravel-permission`, `barryvdh/laravel-dompdf` ; conditionnelles : `simple-qrcode` (QR), `maatwebsite/excel` (tableur, seulement si le client le confirme) ; dev : Dusk, Pint, PHPUnit. **Pas** de Reverb (jamais câblé chez AgriERP).
+7. **Librairies Composer (liste fermée)** : `laravel/framework`, `livewire/livewire`, `laravel/sanctum`, `spatie/laravel-permission`, `barryvdh/laravel-dompdf` ; conditionnelles : `simple-qrcode` (QR), `maatwebsite/excel` (tableur, seulement si le client le confirme) ; dev : Dusk, Pint, PHPUnit. **Pas** de Reverb (jamais câblé chez LogiAgriERP).
 8. **Librairies npm** : `vite`, `laravel-vite-plugin`, `tailwindcss`, `postcss`, `autoprefixer`, `@tailwindcss/forms`, `alpinejs` + `@alpinejs/collapse` (plugin sur l'instance Livewire), `node --test` pour la logique JS pure. Toute autre dépendance demande une justification écrite.
 9. **Hors ligne et synchro** : le poste Flutter Windows (Drift/SQLite) reste le client hors ligne ; il synchronise par `/api/sync/pull` et `/api/sync/push` ; la PWA web est volontairement étroite (aucune page authentifiée en cache).
 10. **Hébergement** : cPanel mutualisé présumé (à confirmer), racine du document = `public/`, `.htaccess` canonique, un seul cron `schedule:run`, `.env.production.example`, files et cache en base.
@@ -23,7 +23,7 @@ Convention de chemins : `logialvia/` = le dépôt public `massenon/logialvia` (c
 12. **Conformité de design** : chaque conteneur, ligne, colonne, espacement, alignement, animation et hiérarchie visuelle est IDENTIQUE au poste LogiALVIA : charte marine `#1F3864` + or `#B58B2A` (15 couleurs), espacements `xs/sm/md/lg/xl` = 4/8/16/24/32 px, `text-xs` = 13,6 px, rayon 8 px, modale ombre `shadow-xl`.
 13. **Responsive sur 4 classes** : Desktop ≥ 1280, Laptop 1024–1279, Tablet 641–1023, Mobile ≤ 640 (tableaux en cartes à 640 px exactement, barre latérale à `lg`=1024, KPI en 4 colonnes dès 768).
 14. **Preuve de conformité** : jetons partagés comparés par test, gardes qui lisent les sources (`conformite_structure`, `fidelite_libelles`), captures de référence à cinq largeurs, check-list K2 écran par écran, audit de conformité par écran (prompt B de `04_UI_UX_DESIGN_SYSTEM.md`).
-15. **Règle d'or** : rien d'inventé. Toute règle absente des sources et des décisions validées (`16_DECISIONS_VALIDEES.md`) (barème Goliaths, taux de ration des poissons, plan comptable, périmètre du comptable…) est marquée « À DÉFINIR AVEC LE CLIENT » avec une question précise ; les valeurs d'AgriERP ne remplacent JAMAIS celles de LogiALVIA.
+15. **Règle d'or** : rien d'inventé. Toute règle absente des sources et des décisions validées (`16_DECISIONS_VALIDEES.md`) (barème Goliaths, taux de ration des poissons, plan comptable, périmètre du comptable…) est marquée « À DÉFINIR AVEC LE CLIENT » avec une question précise ; les valeurs d'LogiAgriERP ne remplacent JAMAIS celles de LogiALVIA.
 
 ---
 
@@ -81,13 +81,13 @@ Règles de séquencement :
 
 1. **Une session = un ticket = un prompt.** Ouvrir une session neuve par ticket. Coller en premier le bloc « PROMPT (à copier) » du fichier choisi (ou le référencer par son chemin : « suis `docs/logialvia/02_ARCHITECTURE_WEB_ET_STACK.md`, PROMPT, tâche T3 »). Le `CLAUDE.md` du dépôt LogiALVIA (à créer) renvoie au MASTER PROMPT, de sorte que chaque session en hérite.
 2. **Lire avant d'écrire.** Chaque prompt demande de lire les fichiers sources EN ENTIER. Un chemin cité qui n'existe pas (`ls`) est une erreur à signaler, pas à contourner.
-3. **Plan avant code.** Skills `prd` puis `plan` (modèles : `.claude/skills/prd/SKILL.md`, `.claude/skills/plan/SKILL.md` du monorepo AgriERP ; à copier et adapter dans le dépôt LogiALVIA). Annoncer le plan, attendre l'accord si le ticket est ambigu.
+3. **Plan avant code.** Skills `prd` puis `plan` (modèles : `.claude/skills/prd/SKILL.md`, `.claude/skills/plan/SKILL.md` du monorepo LogiAgriERP ; à copier et adapter dans le dépôt LogiALVIA). Annoncer le plan, attendre l'accord si le ticket est ambigu.
 4. **Vérifier avant de dire « terminé ».** Tests exécutés (`php artisan test --testsuite=Feature`, Pint, `npm run build`) ; un chiffre se vérifie par recalcul indépendant ; un défaut qui vit dans le navigateur se vérifie en navigateur (Dusk), pas par `Livewire::test()`.
 5. **Rien d'inventé.** Question précise au client plutôt que valeur plausible : marquer « À DÉFINIR AVEC LE CLIENT ».
 6. **Périmètre strict.** Ne toucher que les fichiers du ticket. Ne pas modifier `logialvia/` (cloné en lecture seule). Pas de commit, pas de push, pas de PR sans demande ; jamais `pkill` ; jamais d'action destructive sur une base réelle.
 7. **Rapport au format du MASTER PROMPT** (ticket, fait, vérifié, non fait, écarts, questions, risques), court et factuel.
 8. **Documentation vivante.** Un doc faux découvert en route se corrige dans le même ensemble de changements (A2 §7 de logialvia) ; ces prompts eux-mêmes se mettent à jour quand une source change.
-9. **Sources en conflit** : on suit la hiérarchie du MASTER PROMPT (web validé -> poste/prototype -> docs de logialvia -> règles d'AgriERP) ; une contradiction se documente et se fait trancher, elle ne se résout pas en silence.
+9. **Sources en conflit** : on suit la hiérarchie du MASTER PROMPT (web validé -> poste/prototype -> docs de logialvia -> règles d'LogiAgriERP) ; une contradiction se documente et se fait trancher, elle ne se résout pas en silence.
 10. **Particularités LogiALVIA** : six filières déjà configurées (`goliaths`, `pintades`, `lapins`, `poissons-chats`, `poulets`, `pondeuses`) pilotées par UN écran générique ; le barème Goliaths est « non confirmé » dans les sources (question au client avant tout calcul de ration) ; la ration des poissons-chats est TRANCHÉE en % de biomasse (DV-01), ses taux restent des repères à valider.
 
 ---
@@ -97,7 +97,7 @@ Règles de séquencement :
 | Terme | Sens |
 |---|---|
 | **LogiALVIA** | Gestion intégrée d'ALLMANY ET COMPAGNIE (Natitingou, Bénin) : élevage, commerce annexe, stocks, achats, comptabilité, rapports ; Flutter Windows aujourd'hui, web à créer. |
-| **LogiAgriERP / AgriERP** | Produit jumeau (Ferme École OLOUWACHEGOUN) : web Laravel + poste Flutter ; réservoir de patrons et de pièges déjà payés. |
+| **LogiAgriERP / LogiAgriERP** | Produit jumeau (Ferme École OLOUWACHEGOUN) : web Laravel + poste Flutter ; réservoir de patrons et de pièges déjà payés. |
 | **Poste** | Client Flutter Windows hors ligne (Drift/SQLite). |
 | **Web** | Application Laravel + Livewire, serveur de référence une fois un module validé. |
 | **Doctrine de portage** | `docs/DOCTRINE_PORTAGE.md` : fidélité web <-> poste, « la vue web est la référence ». |
@@ -130,16 +130,16 @@ Règles de séquencement :
 
 - Le prototype HTML de LogiALVIA (31 pages) n'est PAS dans le dépôt cloné (`logialvia/` ne contient que `docs/`, `logialvia_app/`, `logo/`) : plusieurs mesures visuelles restent « à confirmer » tant qu'il n'est pas fourni.
 - Les outils `audit_typographie.py` / `apparier_typographie.py` cités par les docs de logialvia sont absents de `logialvia/logialvia_app/outils/`.
-- LogiALVIA est en Roboto (variable, locale), marine/or ; AgriERP en Inter, vert/jaune : ne pas mélanger les chartes.
+- LogiALVIA est en Roboto (variable, locale), marine/or ; LogiAgriERP en Inter, vert/jaune : ne pas mélanger les chartes.
 - Quatre rôles (TRANCHÉ DV-07, 08/11/2026 : `admin`, `comptable`, `caissier`, `animalier`) ; LogiALVIA n'en avait que trois (comptabilité réservée à `admin`).
-- Aucun CSP ni analyse statique chez AgriERP : ce sont des propositions nouvelles, pas des acquis.
-- Reverb et `maatwebsite/excel` figurent dans le `composer.json` d'AgriERP sans usage réel : ne pas les copier par réflexe.
+- Aucun CSP ni analyse statique chez LogiAgriERP : ce sont des propositions nouvelles, pas des acquis.
+- Reverb et `maatwebsite/excel` figurent dans le `composer.json` d'LogiAgriERP sans usage réel : ne pas les copier par réflexe.
 - Contrastes mesurés sous le seuil AA dans la charte de LogiALVIA (or sur blanc 3,14:1, `outline` sur fond de page 4,32:1, `success-deep` sur son fond 4,24:1) : décision du client requise (`04_UI_UX_DESIGN_SYSTEM.md`, §2 et Q-DS-2).
 
 ## 7. Questions ouvertes majeures au client (détail dans chaque fichier)
 
 1. Hébergement, sous-domaine, PHP 8.3, accès SSH (02).
-2. Police : Roboto (poste) ou Inter (AgriERP) (02, 04).
+2. Police : Roboto (poste) ou Inter (LogiAgriERP) (02, 04).
 3. Contrastes de la charte : or lisible sur fond clair, texte secondaire, badge succès (04).
 4. Classes d'écran validées ; usage réel en tablette/mobile (04).
 5. Barèmes de rationnement Goliaths ; taux de ration des poissons-chats en % de biomasse à valider par le technicien (DV-01) ; stades de passage ; plusieurs bandes par filière (01).

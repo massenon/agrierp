@@ -68,7 +68,7 @@ class FichesProphylaxieTest extends TestCase
 
     private function utilisateur(string $email, Role $role): User
     {
-        $user = User::create(['name' => 'Animalier', 'email' => $email, 'password' => bcrypt('AgriERP@2026')]);
+        $user = User::create(['name' => 'Animalier', 'email' => $email, 'password' => bcrypt('LogiAgriERP@2026')]);
         $user->assignRole($role);
 
         return $user;

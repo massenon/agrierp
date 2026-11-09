@@ -71,13 +71,13 @@ class BandesSujetsPosteTest extends TestCase
     {
         $utilisateur = User::create([
             'name' => $role, 'username' => $role.'-bs', 'email' => $role.'-bs@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $utilisateur->assignRole($role);
         // `actingAs` du décor (l'administrateur du web) primerait sur le jeton : on le retire, le poste parle seul.
         $this->app['auth']->forgetGuards();
         $this->jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => $role.'-bs', 'password' => 'AgriERP@2026', 'device_name' => 'poste-'.$role,
+            'identifiant' => $role.'-bs', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-'.$role,
         ])->assertOk()->json('token');
     }
 

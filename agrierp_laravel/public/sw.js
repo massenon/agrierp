@@ -1,5 +1,5 @@
 /**
- * AgriERP — Service Worker (ticket 15.4, élargi par PWA-1 : caisse hors ligne, 08/11/2026)
+ * LogiAgriERP — Service Worker (ticket 15.4, élargi par PWA-1 : caisse hors ligne, 08/11/2026)
  * =====================================================================
  *
  * Rôle : rendre l'application installable, lui donner une page d'attente correcte quand la liaison de la ferme tombe,

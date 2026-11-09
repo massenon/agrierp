@@ -40,7 +40,7 @@ trait DecorDepenses
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->admin = User::create([
             'name' => 'Direction', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true,
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true,
         ]);
         $this->admin->assignRole('admin');
         $this->actingAs($this->admin);

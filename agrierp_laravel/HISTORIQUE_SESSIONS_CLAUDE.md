@@ -1,7 +1,7 @@
-# Historique des sessions Claude Code — AgriERP
+# Historique des sessions Claude Code — LogiAgriERP
 
 > **À quoi sert ce document.** Il raconte, dans l'ordre, tout ce qui a été fait
-> avec Claude Code sur AgriERP depuis la commande `/init` : ce qui a été
+> avec Claude Code sur LogiAgriERP depuis la commande `/init` : ce qui a été
 > demandé, ce qui a été réellement trouvé, **quelles hypothèses se sont
 > révélées fausses**, et ce qui reste ouvert.
 >
@@ -246,7 +246,7 @@ de `sw.js` :
    après déconnexion sur le poste partagé du comptoir.
 3. **Seuls les fichiers statiques** sont mis en cache.
 
-**Ce PWA ne rend pas AgriERP utilisable hors ligne, et ce n'est pas un
+**Ce PWA ne rend pas LogiAgriERP utilisable hors ligne, et ce n'est pas un
 manque** : le travail déconnecté est le rôle du poste dédié. Un cache qui
 prétendrait encaisser des ventes créerait deux sources de vérité.
 

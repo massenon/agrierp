@@ -167,7 +167,7 @@ class ImportMasseModelesTest extends ImportMasseBase
         $user = $this->utilisateur(['manage-ventes']);
         $message = $this->refus(fn () => $this->analyser('clients', [['nom' => 'A']], $user, ['sans_meta' => true]));
 
-        $this->assertStringStartsWith('Ce fichier n\'est pas un modèle AgriERP', $message);
+        $this->assertStringStartsWith('Ce fichier n\'est pas un modèle LogiAgriERP', $message);
     }
 
     public function test_une_colonne_manquante_ou_renommee_est_nommee(): void

@@ -6,12 +6,12 @@
 |---|---|
 | **Quand l'utiliser** | (a) Une fois, au socle (« W0 ») : créer `tailwind.config.js`, `app.css`, le layout et les composants partagés AVEC les jetons de LogiALVIA ; (b) à chaque écran web : tenir la charte et passer l'audit final de ce fichier ; (c) à chaque changement de jeton : mettre à jour web ET poste ensemble. |
 | **Ordre** | Après `01_MASTER_PROMPT.md` et `02_ARCHITECTURE_WEB_ET_STACK.md` ; en parallèle de `03_DEVELOPMENT_STANDARDS.md`. Les modules (`20_MODULES_*`) y renvoient pour tout ce qui est visuel. |
-| **Entrées requises** | `logialvia/docs/01_DESIGN_SYSTEM.md`, `06_COMPOSANTS_REUTILISABLES.md`, `E4`–`E9`, `G1`, `G2`, `K2` ; le code du poste `logialvia/logialvia_app/lib/core/{theme,widgets}` ; les composants web modèles d'AgriERP ; si disponible, le prototype HTML de LogiALVIA (hors du dépôt cloné : à demander au client, jamais reconstruit de mémoire). |
+| **Entrées requises** | `logialvia/docs/01_DESIGN_SYSTEM.md`, `06_COMPOSANTS_REUTILISABLES.md`, `E4`–`E9`, `G1`, `G2`, `K2` ; le code du poste `logialvia/logialvia_app/lib/core/{theme,widgets}` ; les composants web modèles d'LogiAgriERP ; si disponible, le prototype HTML de LogiALVIA (hors du dépôt cloné : à demander au client, jamais reconstruit de mémoire). |
 | **Sorties attendues** | `logialvia_web/tailwind.config.js` (15 couleurs de LogiALVIA, espacements, rayons, police), `resources/css/app.css`, composants Blade partagés, garde-fous de conformité (section 11), fiche de recette visuelle signée par écran (section 12), rapport d'audit (PROMPT B). |
 
 ### Réponse courte : quelle conformité de design
 
-Le web LogiALVIA reprend la **charte de LogiALVIA (marine `#1F3864` + or `#B58B2A`, police Roboto)**, PAS le vert/Inter d'AgriERP : AgriERP fournit les *patrons de composants et de preuve*, jamais ses couleurs. Chaque conteneur, ligne, colonne, espacement, alignement, animation et hiérarchie visuelle est **identique au poste**, prouvé par des jetons partagés, des gardes qui lisent les sources, des captures de référence et la check-list K2.
+Le web LogiALVIA reprend la **charte de LogiALVIA (marine `#1F3864` + or `#B58B2A`, police Roboto)**, PAS le vert/Inter d'LogiAgriERP : LogiAgriERP fournit les *patrons de composants et de preuve*, jamais ses couleurs. Chaque conteneur, ligne, colonne, espacement, alignement, animation et hiérarchie visuelle est **identique au poste**, prouvé par des jetons partagés, des gardes qui lisent les sources, des captures de référence et la check-list K2.
 
 ---
 
@@ -24,7 +24,7 @@ Lis d'abord `01_MASTER_PROMPT.md`, puis ce fichier en entier.
 
 # CONTEXTE
 Le poste Flutter LogiALVIA est la référence visuelle existante (31 écrans validés par la Gérante). Le web doit lui être
-VISUELLEMENT IDENTIQUE : mêmes jetons, mêmes composants, même hiérarchie. Le design d'AgriERP est un MODÈLE DE MÉTHODE
+VISUELLEMENT IDENTIQUE : mêmes jetons, mêmes composants, même hiérarchie. Le design d'LogiAgriERP est un MODÈLE DE MÉTHODE
 (`agrierp_laravel/tailwind.config.js`, `resources/css/app.css`, `resources/views/components/`,
 `agrierp_flutter/lib/core/theme/agri_tokens.dart`), pas une source de valeurs.
 
@@ -47,7 +47,7 @@ VISUELLEMENT IDENTIQUE : mêmes jetons, mêmes composants, même hiérarchie. Le
 - Aucune couleur, taille ou espacement en dur dans une vue. Aucun CDN, aucune police externe.
 - `text-xs` = 13,6 px. Ne jamais l'écrire 12 px.
 - Décisions de mise en page sur la largeur de la FENÊTRE (media queries), jamais d'un conteneur.
-- Ne copie pas une valeur d'AgriERP quand LogiALVIA en a une propre (ex. en-têtes de tableau 12 px chez LogiALVIA, 10 px chez AgriERP).
+- Ne copie pas une valeur d'LogiAgriERP quand LogiALVIA en a une propre (ex. en-têtes de tableau 12 px chez LogiALVIA, 10 px chez LogiAgriERP).
 
 # CRITÈRES D'ACCEPTATION
 - Un test lit `tailwind.config.js` et `logialvia_app/lib/core/theme/app_colors.dart` et vérifie 15/15 couleurs identiques.
@@ -56,7 +56,7 @@ VISUELLEMENT IDENTIQUE : mêmes jetons, mêmes composants, même hiérarchie. Le
 - Chaque `<td>` d'un `x-datatable` porte `data-label`.
 
 # INTERDITS
-Couleur d'AgriERP dans une vue LogiALVIA ; `text-[12px]` à la place de `text-xs` pour du corps de tableau ; modale par `@if` ;
+Couleur d'LogiAgriERP dans une vue LogiALVIA ; `text-[12px]` à la place de `text-xs` pour du corps de tableau ; modale par `@if` ;
 classe Tailwind dynamique ; seconde instance d'Alpine ; animation non listée en section 8.
 ````
 
@@ -102,14 +102,14 @@ Le blanc (`white`, `#FFFFFF`) et le noir à opacité (`bg-black/50` pour les voi
 **Bordure sémantique gauche des KPI (4 px)** — `logialvia/docs/E7_Dashboards_KPI.md` §4 : information neutre = `info-blue` ; alerte/à traiter = `brand-gold` ; positif/confirmé = `success-deep` ; négatif/critique = `error-deep`.
 
 **Mesures qui demandent une décision du client (jamais corrigées en silence)** — calculées par ce dossier, ratio WCAG 2.x :
-- `brand-gold` sur blanc 3,14:1 : texte or sur fond clair illisible en petit (le même défaut que le « ERP » jaune d'AgriERP, ticket 15.7, 1,41:1, a obligé à créer `brand-maize-ink`). Règle provisoire : **l'or n'est jamais une couleur de texte sur fond clair** (icône ≥ 24 px ou bordure seulement) ; texte or uniquement sur navy/navy-dark (`brand-gold-light` : 5,3:1).
+- `brand-gold` sur blanc 3,14:1 : texte or sur fond clair illisible en petit (le même défaut que le « ERP » jaune d'LogiAgriERP, ticket 15.7, 1,41:1, a obligé à créer `brand-maize-ink`). Règle provisoire : **l'or n'est jamais une couleur de texte sur fond clair** (icône ≥ 24 px ou bordure seulement) ; texte or uniquement sur navy/navy-dark (`brand-gold-light` : 5,3:1).
 - `outline` sur `surface-bg` 4,32:1 : texte secondaire en dessous de 4,5 sur le fond gris de page ; sur carte blanche 4,83:1. Règle provisoire : le texte `outline` se pose sur `surface-card`/zebra, pas sur le fond de page.
 - `success-deep` sur `success-container` 4,24:1 : badge « Payée » juste sous le seuil.
 Ces trois points sont à soumettre au client (section 13, Q-DS-2) ; un jeton « or lisible sur blanc » n'est PAS inventé ici.
 
-**Correspondance de PORTAGE d'AgriERP vers LogiALVIA : par RÔLE, jamais par remplacement de nom.** AgriERP : `brand-forest` `#052e16`, `brand-forest-dark` `#00210D`, `brand-emerald` `#065F46`, `accent-yellow` `#FFD55F`, `error-red` `#DC2626`, `error-deep` `#BA1A1A`, `error-bg` `#FFDAD6`, `surface-bg` `#F8F9FA`, `surface-zebra` `#F3F4F5`, `outline-variant` `#BEC9C2`, `outline` `#6F7973`, `on-surface` `#191C1D` (14 couleurs, plus des alias dans `tailwind.config.js`).
+**Correspondance de PORTAGE d'LogiAgriERP vers LogiALVIA : par RÔLE, jamais par remplacement de nom.** LogiAgriERP : `brand-forest` `#052e16`, `brand-forest-dark` `#00210D`, `brand-emerald` `#065F46`, `accent-yellow` `#FFD55F`, `error-red` `#DC2626`, `error-deep` `#BA1A1A`, `error-bg` `#FFDAD6`, `surface-bg` `#F8F9FA`, `surface-zebra` `#F3F4F5`, `outline-variant` `#BEC9C2`, `outline` `#6F7973`, `on-surface` `#191C1D` (14 couleurs, plus des alias dans `tailwind.config.js`).
 
-| Rôle visuel | AgriERP | LogiALVIA |
+| Rôle visuel | LogiAgriERP | LogiALVIA |
 |---|---|---|
 | Bouton primaire / lien actif / puce de marque | `brand-emerald` (survol `brand-forest`) | `brand-navy` (survol `brand-navy-dark`) |
 | Dégradé de la barre latérale (180°) | `brand-forest` -> `brand-forest-dark` | `brand-navy` -> `brand-navy-dark` (`linear-gradient(180deg,#1F3864,#152847)`) |
@@ -118,13 +118,13 @@ Ces trois points sont à soumettre au client (section 13, Q-DS-2) ; un jeton « 
 | Succès | `brand-emerald` (toast, KPI) | `success-deep` (toast, KPI) ; fond `success-container` |
 | Information | `info-blue` | `info-blue` |
 
-Une recherche/remplacement mécanique `brand-emerald` -> `brand-navy` est INTERDITE : `brand-emerald` sert à la fois de primaire et de « succès » dans AgriERP, deux rôles que LogiALVIA sépare.
+Une recherche/remplacement mécanique `brand-emerald` -> `brand-navy` est INTERDITE : `brand-emerald` sert à la fois de primaire et de « succès » dans LogiAgriERP, deux rôles que LogiALVIA sépare.
 
 ---
 
 ## 3. Typographie
 
-**Police** : Roboto, **variable**, servie en LOCAL (`logialvia/logialvia_app/assets/fonts/Roboto-Variable.ttf` côté poste ; le web convertit en `.woff2` par sous-ensembles `latin`/`latin-ext`, `@font-face` `font-weight: 100 900`, `font-display: swap`, preload de `latin`). Pile de repli : `Roboto, Calibri, ui-sans-serif, system-ui` (celle du prototype). JAMAIS de CDN. Graisses réellement employées : 400, 600 (`font-semibold`), 700, 800 ; **aucun 500 ni 300** (`logialvia/docs/01_DESIGN_SYSTEM.md` §2) : ne pas en ajouter. (AgriERP, lui, sert Inter ; le client doit trancher si les deux produits ne se ressemblent plus : Q-DS-1.)
+**Police** : Roboto, **variable**, servie en LOCAL (`logialvia/logialvia_app/assets/fonts/Roboto-Variable.ttf` côté poste ; le web convertit en `.woff2` par sous-ensembles `latin`/`latin-ext`, `@font-face` `font-weight: 100 900`, `font-display: swap`, preload de `latin`). Pile de repli : `Roboto, Calibri, ui-sans-serif, system-ui` (celle du prototype). JAMAIS de CDN. Graisses réellement employées : 400, 600 (`font-semibold`), 700, 800 ; **aucun 500 ni 300** (`logialvia/docs/01_DESIGN_SYSTEM.md` §2) : ne pas en ajouter. (LogiAgriERP, lui, sert Inter ; le client doit trancher si les deux produits ne se ressemblent plus : Q-DS-1.)
 
 **Échelle en px réels** (racine 16 px ; `text-xs` surchargé) :
 
@@ -134,7 +134,7 @@ Une recherche/remplacement mécanique `brand-emerald` -> `brand-navy` est INTERD
 | `text-[12px]` | 12 px | hérité | **en-têtes de tableau** (202 relevés sur 205), **libellés de champ** (capitales grasses, couleur navy, 147 emplois), **intitulés de KPI** (capitales grasses, couleur outline, 86 emplois), pied d'en-tête de menu |
 | **`text-xs`** | **13,6 px** (`0.85rem !important`, `app.css`) | 16 px | **corps de tableau (`<td>`)**, boutons, champs de formulaire, texte le plus courant ; la classe la plus employée du prototype (1 381 emplois) |
 | `text-sm` | 14 px | 20 px | texte de modale, champs, texte courant |
-| `text-[15px]` | 15 px | — | **libellé d'entrée de la barre latérale au poste** (`shell/app_sidebar.dart`, 700 si active sinon 400) ; AgriERP fixe 14 px à la demande du client (`components/sidebar-link.blade.php`) : valeur de LogiALVIA à confirmer sur son prototype (`sidebar.js`) |
+| `text-[15px]` | 15 px | — | **libellé d'entrée de la barre latérale au poste** (`shell/app_sidebar.dart`, 700 si active sinon 400) ; LogiAgriERP fixe 14 px à la demande du client (`components/sidebar-link.blade.php`) : valeur de LogiALVIA à confirmer sur son prototype (`sidebar.js`) |
 | `text-base` | 16 px | 24 px | titres de section |
 | `text-lg` | 18 px | 28 px | titre de modale ; titre de la marque dans la barre latérale (800) |
 | `text-xl`/`text-2xl` | 20/24 px | — | titre de page ; **valeur de KPI : 24 px / 800** (`md:text-2xl`) |
@@ -155,13 +155,13 @@ Une recherche/remplacement mécanique `brand-emerald` -> `brand-navy` est INTERD
 | `lg` | 24 | marge de contenu bureau (`lg:p-lg`), marge horizontale de la barre du haut, padding de modale ≥ 640 px |
 | `xl` | 32 | espacement de grandes sections |
 
-AgriERP ajoute `2xl: 48 px` ; LogiALVIA n'en a pas dans ses sources : ne pas le créer sans besoin prouvé. Les noms remplacent l'échelle numérique de Tailwind pour les espacements nommés (`p-md` = 16 px), tandis que l'échelle numérique (`px-3`, `py-1.5`) reste disponible mais NE DOIT PAS servir pour reproduire une mesure du poste (utiliser le nom).
+LogiAgriERP ajoute `2xl: 48 px` ; LogiALVIA n'en a pas dans ses sources : ne pas le créer sans besoin prouvé. Les noms remplacent l'échelle numérique de Tailwind pour les espacements nommés (`p-md` = 16 px), tandis que l'échelle numérique (`px-3`, `py-1.5`) reste disponible mais NE DOIT PAS servir pour reproduire une mesure du poste (utiliser le nom).
 
-**Grille de page** (mesurée sur le gabarit d'AgriERP, à CONFIRMER pour LogiALVIA sur `sidebar.js`/`dashboard.html`) :
+**Grille de page** (mesurée sur le gabarit d'LogiAgriERP, à CONFIRMER pour LogiALVIA sur `sidebar.js`/`dashboard.html`) :
 - Coque : `flex h-screen w-full overflow-hidden` ; barre latérale `w-72` = **288 px** (identique au poste LogiALVIA : `AppSidebar.largeur = 288`) ; zone principale `flex-1`.
 - Barre du haut : `h-16` = **64 px**, `px-md lg:px-lg` (16 puis 24 px), fond blanc, bordure basse `outline-variant`, `sticky top-0 z-30`.
 - Contenu : `p-md lg:p-lg` (16 puis 24 px), fond `surface-bg`, défilement vertical interne ; en dessous de `lg` : `pb-56` (224 px) pour dégager barre mobile et boutons flottants.
-- Grilles : KPI `grid-cols-2 md:grid-cols-4 gap-md` (AgriERP ; `xl:grid-cols-4` au prototype de LogiALVIA, `E7_Dashboards_KPI.md` §2 : à lire sur la page, c'est le défaut n° 1 de responsive du projet jumeau) ; blocs `grid-cols-1 lg:grid-cols-12 gap-md` ; cartes de hub `grid-cols-1 md:grid-cols-2/3 gap-md`.
+- Grilles : KPI `grid-cols-2 md:grid-cols-4 gap-md` (LogiAgriERP ; `xl:grid-cols-4` au prototype de LogiALVIA, `E7_Dashboards_KPI.md` §2 : à lire sur la page, c'est le défaut n° 1 de responsive du projet jumeau) ; blocs `grid-cols-1 lg:grid-cols-12 gap-md` ; cartes de hub `grid-cols-1 md:grid-cols-2/3 gap-md`.
 - Largeur de contenu : pas de `max-w` global (le contenu occupe la zone). Une modale a son propre `max-w`.
 
 ---
@@ -170,7 +170,7 @@ AgriERP ajoute `2xl: 48 px` ; LogiALVIA n'en a pas dans ses sources : ne pas le 
 
 **Rayons** : `rounded-lg` = **8 px** (cartes, modales, champs, boutons rectangulaires) ; `rounded-full` (pilule) pour badges et boutons d'action principale ; `rounded` = 4 px (cas rares). LogiALVIA n'a pas de `xl` (12 px) dans ses sources.
 
-**Ombres** (Tailwind) : `shadow-sm` (cartes au repos, en-tête) `0 1px 2px 0 rgb(0 0 0 / 0.05)` ; `shadow-md` (cartes au survol) `0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1)` ; `shadow-lg` (toasts, bouton flottant) ; `shadow-xl` (modales) `0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1)`. Le web emploie les valeurs EXACTES de Tailwind. **Écart constaté** : `logialvia_app/lib/core/theme/app_shadows.dart` approxime `shadow-xl` (une seule ombre : flou 20, décalage 8, alpha 0,15, au lieu des deux couches de Tailwind) et `shadow-2xl` (`xxl`, carte de connexion seulement : flou 50, décalage 25, alpha 0,25) ; AgriERP, lui, transpose les valeurs réelles (`agri_tokens.dart`, classe `AgriShadows`). À aligner (le web fait foi une fois validé) : ticket de parité visuelle, pas de correction silencieuse.
+**Ombres** (Tailwind) : `shadow-sm` (cartes au repos, en-tête) `0 1px 2px 0 rgb(0 0 0 / 0.05)` ; `shadow-md` (cartes au survol) `0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1)` ; `shadow-lg` (toasts, bouton flottant) ; `shadow-xl` (modales) `0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1)`. Le web emploie les valeurs EXACTES de Tailwind. **Écart constaté** : `logialvia_app/lib/core/theme/app_shadows.dart` approxime `shadow-xl` (une seule ombre : flou 20, décalage 8, alpha 0,15, au lieu des deux couches de Tailwind) et `shadow-2xl` (`xxl`, carte de connexion seulement : flou 50, décalage 25, alpha 0,25) ; LogiAgriERP, lui, transpose les valeurs réelles (`agri_tokens.dart`, classe `AgriShadows`). À aligner (le web fait foi une fois validé) : ticket de parité visuelle, pas de correction silencieuse.
 
 **Hiérarchie visuelle** (G2 §10, à garder sur les 31 écrans) : action principale = bouton plein `brand-navy` (texte blanc, survol `brand-navy-dark`), action secondaire = bouton à contour (`border outline-variant`, texte `outline`, survol `surface-zebra`), action destructive = plein `error-deep` (survol rouge plus sombre). La couleur primaire n'est JAMAIS utilisée pour une action secondaire ni l'inverse. Primaire à DROITE, secondaire à GAUCHE dans une modale ; l'action principale d'une section est en haut à droite (G2 §5). Titre d'écran 22–24 px/800 ; titre de section 16 px/700 ; libellés 12 px capitales ; données 13,6 px.
 
@@ -180,17 +180,17 @@ AgriERP ajoute `2xl: 48 px` ; LogiALVIA n'en a pas dans ses sources : ne pas le 
 
 **Faits réconciliés** (tous vérifiés dans les sources) :
 - Tailwind par défaut : `sm` 640, `md` 768, `lg` 1024, `xl` 1280 (media queries `min-width`, donc sur la **fenêtre**, jamais sur un conteneur).
-- Tableaux d'AgriERP : `@media (max-width: 640px)` (`table.rtable`, `app.css`) -> **≤ 640 px inclus** : lignes empilées en cartes ; `kTableStackBreakpoint = 640` du poste (`agri_tokens.dart`) est défini mais **n'est utilisé par aucun fichier de `agrierp_flutter/lib`** (grep) : au poste l'empilement n'existe pas encore.
+- Tableaux d'LogiAgriERP : `@media (max-width: 640px)` (`table.rtable`, `app.css`) -> **≤ 640 px inclus** : lignes empilées en cartes ; `kTableStackBreakpoint = 640` du poste (`agri_tokens.dart`) est défini mais **n'est utilisé par aucun fichier de `agrierp_flutter/lib`** (grep) : au poste l'empilement n'existe pas encore.
 - Barre latérale : visible à partir de `lg` (1024) — `fixed lg:static`, `-translate-x-full lg:translate-x-0` ; barre mobile du bas `lg:hidden` ; bouton menu `lg:hidden`.
 - KPI : accordéon replié jusqu'à 767 px, 4 colonnes et toujours visible à partir de `md` (768) (`.kpi-mobile-collapsed`).
-- Fenêtre du poste : **AgriERP** initiale 1280×720 (`agrierp_flutter/windows/runner/main.cpp`), **minimale 640×480** (`win32_window.cpp`, `kMinLogicalWidth/Height`) ; **LogiALVIA** initiale 1440×900, **minimale 1024×700** (`logialvia_app/lib/main.dart`). Le « 1280×720 » n'est donc le MINIMUM d'aucun des deux postes : c'est la taille de départ d'AgriERP.
+- Fenêtre du poste : **LogiAgriERP** initiale 1280×720 (`agrierp_flutter/windows/runner/main.cpp`), **minimale 640×480** (`win32_window.cpp`, `kMinLogicalWidth/Height`) ; **LogiALVIA** initiale 1440×900, **minimale 1024×700** (`logialvia_app/lib/main.dart`). Le « 1280×720 » n'est donc le MINIMUM d'aucun des deux postes : c'est la taille de départ d'LogiAgriERP.
 - Contenu réel : fenêtre − barre latérale (288) − marges (2 × 24) : à 1280 -> 944 px ; à 1024 -> 688 px.
 
 **Les quatre classes** (décision de ce dossier, à valider : Q-DS-3) :
 
 | Classe | Largeur de fenêtre | Repères réels | Tailwind |
 |---|---|---|---|
-| **Desktop** | ≥ 1280 px | taille de lancement du poste (1440×900 LogiALVIA, 1280×720 AgriERP) ; contenu ≥ 944 px | `xl:` et au-delà |
+| **Desktop** | ≥ 1280 px | taille de lancement du poste (1440×900 LogiALVIA, 1280×720 LogiAgriERP) ; contenu ≥ 944 px | `xl:` et au-delà |
 | **Laptop** | 1024 – 1279 px | minimum du poste LogiALVIA (1024×700) ; barre latérale visible ; contenu 688–943 px | `lg:` sans `xl:` |
 | **Tablet** | 641 – 1023 px | barre latérale en tiroir ; barre mobile du bas ; tableaux encore en colonnes ; KPI 4 colonnes dès 768 | `sm:`/`md:` sans `lg:` |
 | **Mobile** | ≤ 640 px | tableaux en cartes ; KPI 2 colonnes en accordéon ; tiroir ; barre du bas | par défaut, sans préfixe |
@@ -224,18 +224,18 @@ Recouvrement d'un pixel connu : à **640 px exactement**, `sm:` s'applique ET le
 
 Références : poste `logialvia_app/lib/core/widgets/` ; web modèles `agrierp_laravel/resources/views/components/`.
 
-- **DataTable `<x-datatable>`** : carte blanche `rounded-lg border border-outline-variant shadow-sm overflow-hidden` ; zone de recherche en tête (`p-md`, bordure basse, champ pilule `bg-surface-zebra border rounded-full px-md py-xs max-w-xs`, icône `search` 16 px, `wire:model.live.debounce.300ms`) ; `<table class="rtable w-full text-left">` ; **en-tête `bg-surface-zebra`, `th px-md py-sm text-[12px] font-bold uppercase text-outline`** (12 px chez LogiALVIA ; AgriERP : 10) ; corps `text-xs` 13,6 px, cellules `px-md py-sm`, lignes alternées zebra ; **chaque `<td>` a `data-label`** ; colonne Actions : boutons icône Modifier/Supprimer (`IconActionButton`) avec `title` + `aria-label` ; `wire:loading.class="opacity-50"` sur le corps ; état vide : message + bouton de création ; pied : « Affichage de X à Y sur Z entrées » + pagination (`E4_DataTables_Complet.md` §1). Une recherche unique : jamais ré-implémentée par écran.
+- **DataTable `<x-datatable>`** : carte blanche `rounded-lg border border-outline-variant shadow-sm overflow-hidden` ; zone de recherche en tête (`p-md`, bordure basse, champ pilule `bg-surface-zebra border rounded-full px-md py-xs max-w-xs`, icône `search` 16 px, `wire:model.live.debounce.300ms`) ; `<table class="rtable w-full text-left">` ; **en-tête `bg-surface-zebra`, `th px-md py-sm text-[12px] font-bold uppercase text-outline`** (12 px chez LogiALVIA ; LogiAgriERP : 10) ; corps `text-xs` 13,6 px, cellules `px-md py-sm`, lignes alternées zebra ; **chaque `<td>` a `data-label`** ; colonne Actions : boutons icône Modifier/Supprimer (`IconActionButton`) avec `title` + `aria-label` ; `wire:loading.class="opacity-50"` sur le corps ; état vide : message + bouton de création ; pied : « Affichage de X à Y sur Z entrées » + pagination (`E4_DataTables_Complet.md` §1). Une recherche unique : jamais ré-implémentée par écran.
 - **Modale `<x-modal name="…">`** : voile `fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-md` ; panneau `bg-white rounded-lg shadow-xl w-full p-md sm:p-lg max-h-[85vh] max-h-[85dvh] overflow-y-auto` ; largeurs `max-w-sm` 384 / `md` 448 / `lg` 512 / `3xl` 768 / `5xl` 1024 px ; titre 18 px/700 navy + croix de fermeture à droite ; pied : `Annuler` (contour) à gauche, action principale (plein) à droite, séparateur au-dessus ; Échap et clic extérieur ferment ; ouverture par événement `open-modal` (jamais `@if`). `teleport` sous `<body>` si posée dans un conteneur empilé. **À confirmer** : `AppModal.maxWidth` du poste vaut 480 par défaut — pas une largeur Tailwind : relever le `max-w-*` réel de chaque modale du prototype.
 - **Formulaires** : libellé 12 px/700 capitales navy, `*` si requis, `mb-xs` ; champ `h-11` (44 px), `rounded-lg`, bordure `outline-variant`, texte `text-xs`/`text-sm`, focus `ring-2` couleur primaire, fond blanc ; invalide : bordure `error-deep` + fond rouge très pâle + message 11 px `error-deep` sous le champ (`.is-invalid` / `.invalid-feedback`) ; aucun envoi silencieux d'un formulaire invalide ; calculs en direct à chaque frappe (G2 §6) ; champs numériques via un composant unique (`ChampSaisieNombre` au poste).
-- **KPI `<x-kpi-card>`** : `bg-white rounded-lg border border-outline-variant shadow-sm`, `p-md`, **liseré gauche 4 px** de couleur sémantique ; libellé 12 px/700 capitales `outline` ; valeur `text-lg md:text-2xl font-extrabold` (24 px/800 en bureau) ; légende 11 px `outline` ; icône 18 px à droite ; **une carte est toujours présente** : valeur inconnue = « — » avec légende du motif, jamais `0` (Q-AFF-1). Hauteur uniforme sur tout le web ET le poste : AgriERP a figé `min-height: 112px` (`.kpi-card`) à la demande de son client ; pour LogiALVIA aucune valeur n'est dans les sources : À DÉFINIR (Q-DS-4). Une seule implémentation (`CarteKpi` au poste est née en 13 copies dont 2 divergentes).
+- **KPI `<x-kpi-card>`** : `bg-white rounded-lg border border-outline-variant shadow-sm`, `p-md`, **liseré gauche 4 px** de couleur sémantique ; libellé 12 px/700 capitales `outline` ; valeur `text-lg md:text-2xl font-extrabold` (24 px/800 en bureau) ; légende 11 px `outline` ; icône 18 px à droite ; **une carte est toujours présente** : valeur inconnue = « — » avec légende du motif, jamais `0` (Q-AFF-1). Hauteur uniforme sur tout le web ET le poste : LogiAgriERP a figé `min-height: 112px` (`.kpi-card`) à la demande de son client ; pour LogiALVIA aucune valeur n'est dans les sources : À DÉFINIR (Q-DS-4). Une seule implémentation (`CarteKpi` au poste est née en 13 copies dont 2 divergentes).
 - **Accordéon KPI** : < 768 px replié, `max-height` 0 -> 900 px, `transition: max-height .3s ease, opacity .2s ease`, chevron qui tourne de 180° (`.2s`), `aria-expanded`.
 - **Onglets `<x-tab-page>`** : barre `flex items-center gap-xs border-b border-outline-variant bg-white px-md py-xs flex-wrap` ; onglet `px-md py-2 text-xs font-bold border-b-2 rounded-t-lg` + icône 18 px ; actif = texte et bordure primaires, inactif = `outline` ; état dans `#[Url] public string $tab` ; `aria-selected` exposé.
 - **Boutons** (`AppButton`) : hauteur 40 px (`h-10`) ; variantes `primary` (plein navy), `outline`, `danger` (plein `error-deep`) ; coins `rounded-lg`, ou pilule (`rounded-full`) pour les actions principales de page ; icône 18 px + 6 px d'écart ; `transition-all` au survol seulement.
 - **Badge de statut** : pilule `rounded-full px-sm py-[2px] text-[11px] font-bold` ; tons `success` (`success-container`/`success-deep`), `error`, `info` (`info-blue` à 10 %), `neutre` (`outline-variant` à 30 %/`outline`).
-- **Toasts** : conteneur `fixed top-4 right-4 z-[200] flex flex-col gap-sm pointer-events-none` (**haut droite** : au poste le bas droit est pris par l'Accès Rapide et la Visite guidée, et le web d'AgriERP le fait déjà) ; carte `min-w-[260px] px-md py-sm rounded-lg shadow-lg border`, texte `text-sm font-semibold`, icône 20 px (`check_circle`, `error`, `warning`) ; 3 types (succès `success-deep`, erreur `error-deep`, avertissement `brand-gold` avec texte navy) ; disparition à **3 500 ms** ; entrée `toastIn` .3 s (glissé de 20 px) ; `@persist`.
+- **Toasts** : conteneur `fixed top-4 right-4 z-[200] flex flex-col gap-sm pointer-events-none` (**haut droite** : au poste le bas droit est pris par l'Accès Rapide et la Visite guidée, et le web d'LogiAgriERP le fait déjà) ; carte `min-w-[260px] px-md py-sm rounded-lg shadow-lg border`, texte `text-sm font-semibold`, icône 20 px (`check_circle`, `error`, `warning`) ; 3 types (succès `success-deep`, erreur `error-deep`, avertissement `brand-gold` avec texte navy) ; disparition à **3 500 ms** ; entrée `toastIn` .3 s (glissé de 20 px) ; `@persist`.
 - **Cloche** : icône `notifications` `outline`, pastille de compteur `error-deep`, panneau déroulant listant les dernières alertes, pied « Voir tout » (`wire:navigate`).
 - **Barre du haut** : 64 px ; gauche : bouton menu (< lg), bouton replier la barre (lg), fil d'Ariane `text-xs outline` ; droite : sélecteur d'exercice si le module existe, cloche, menu utilisateur (icône `account_circle`, nom, `expand_more`, entrées « Mon profil », « Aide », « Paramètres » en `text-xs`, `px-md py-sm`, survol zebra).
-- **Barre latérale** : 288 px, dégradé navy -> navy-dark, en-tête de marque (icône 26 px or, titre 18 px/800 blanc, sous-titre 12 px blanc 50 %), groupes d'entrées filtrés PAR RÔLE (menu masqué = cosmétique, jamais une autorisation), entrée `px-sm py-xs rounded-lg gap-sm`, icône 20 px, libellé 15 px au poste (14 chez AgriERP : à confirmer), active : fond `white/10`, libellé blanc 700, icône or ; défilement interne fin (5 px, pouce `#284f33` chez AgriERP : couleur de défilement de LogiALVIA À DÉFINIR) ; sous-menus : `max-height` 0 -> 600 px, `.3s ease` ; pied : nom et rôle.
+- **Barre latérale** : 288 px, dégradé navy -> navy-dark, en-tête de marque (icône 26 px or, titre 18 px/800 blanc, sous-titre 12 px blanc 50 %), groupes d'entrées filtrés PAR RÔLE (menu masqué = cosmétique, jamais une autorisation), entrée `px-sm py-xs rounded-lg gap-sm`, icône 20 px, libellé 15 px au poste (14 chez LogiAgriERP : à confirmer), active : fond `white/10`, libellé blanc 700, icône or ; défilement interne fin (5 px, pouce `#284f33` chez LogiAgriERP : couleur de défilement de LogiALVIA À DÉFINIR) ; sous-menus : `max-height` 0 -> 600 px, `.3s ease` ; pied : nom et rôle.
 - **Hub de cartes `<x-nav-card>`** : lien blanc `rounded-lg border border-outline-variant shadow-sm p-md flex items-center gap-md` ; **icône** dans un carré `w-12 h-12 rounded-lg bg-primaire/10` (icône 24 px primaire) ; **titre** `text-sm font-bold` primaire ; **description** `text-[11px] outline` ; **chevron** `chevron_right` `outline` à droite ; survol : bordure primaire, `shadow-md`, chevron qui glisse de 4 px (`group-hover:translate-x-1`) ; `transition-all`. À CONFIRMER : le dépôt LogiALVIA n'a pas d'équivalent « hub » identifié hors du Dashboard Élevage ; confronter au prototype avant de créer un hub.
 - **Accès Rapide** : bouton rond 48 px (`w-12 h-12 rounded-full`) fixe, panneau latéral droit `w-72 max-w-[85vw]` (288 px, identique au poste), voile `bg-black/40` (z-[65]), panneau z-[70], glissement `transition-transform duration-300`.
 - **Offcanvas de détail** (Historique des ventes, `OffcanvasPanel`) et **bandeaux** (exercice en lecture seule) : mêmes jetons, voile `bg-black/40`.
@@ -280,7 +280,7 @@ Principe : un défaut de conformité est **invisible à l'exécution** (l'écran
 2. **Gardes qui lisent les sources** (jamais le rendu) : (a) aucune couleur hexadécimale ni taille en dur hors jetons ; (b) `text-xs` n'est pas redéfini à 12 px ; (c) pas de `constraints`/largeur de conteneur pour choisir une mise en page (équivalent web : pas de `container queries` non listées) ; (d) une seule implémentation de la carte KPI, de la modale, du datatable ; (e) chaque `<td>` a `data-label` ; (f) aucune classe Tailwind dynamique. Modèles : `agrierp_flutter/test/conformite_portage_test.dart`, `agrierp_laravel/tests/Feature/CartesKpiUniformesTest.php`, `ContrasteMarqueTest.php`.
 3. **Tests de libellés `fidelite_libelles`** : chaque libellé du prototype existe dans une CHAÎNE littérale de la vue (pas dans un commentaire : `chainesDe` ; un garde qui validait des commentaires passait sur des « explications d'absence »). Deux listes d'exemption : globale (mots vraiment partout) et par page. Modèle : `agrierp_flutter/test/fidelite_libelles_test.dart`.
 4. **Tests `conformite_structure`** : séquence ORDONNÉE des `<th>` de chaque table et nombre de cartes KPI par page ET par panneau d'onglet, contre des fixtures extraites du prototype. Un en-tête à deux niveaux (`colspan`/`rowspan`) se compte en colonnes feuilles. Modèles : `agrierp_flutter/test/conformite_structure_test.dart`, `agrierp_flutter/outils/structure.py`. Les écarts assumés vont dans une carte `ecartsAssumes` avec leur raison ; un écart non corrigé dans `ecartsATraiter`, et un test interdit qu'une page soit dans les deux.
-5. **Captures de référence** : pour chaque écran, captures du prototype ET du web (Dusk `screenshot`) à 1440, 1280, 1024, 768 et 390 px, comparées côte à côte ; les captures de référence sont versionnées dans `tests/Browser/screenshots/` (dossier existant chez AgriERP). Tolérance : 0 différence de couleur ou de position perceptible, au pixel d'anti-aliasing près (K2). Modèle d'outillage : `agrierp_flutter/outils/captures.py`, `audit_chrome.py`, `emplacement.py`.
+5. **Captures de référence** : pour chaque écran, captures du prototype ET du web (Dusk `screenshot`) à 1440, 1280, 1024, 768 et 390 px, comparées côte à côte ; les captures de référence sont versionnées dans `tests/Browser/screenshots/` (dossier existant chez LogiAgriERP). Tolérance : 0 différence de couleur ou de position perceptible, au pixel d'anti-aliasing près (K2). Modèle d'outillage : `agrierp_flutter/outils/captures.py`, `audit_chrome.py`, `emplacement.py`.
 6. **Mesure typographique outillée** : un script relève la taille effective des `th`, `td`, libellés (`audit_typographie.py` et `apparier_typographie.py`, cités par `logialvia/docs/K2_Checklist_Recette_Visuelle.md` et `01_DESIGN_SYSTEM.md` mais ABSENTS de `logialvia/logialvia_app/outils/` du dépôt cloné : à récupérer ou à réécrire ; ils ne comptent que les tailles posées explicitement et refusent de résoudre l'héritage au-delà d'un niveau) ; les 376 cellules non résolues se lisent à la main.
 7. **Responsive prouvé** : test Dusk à 1440/1280/1024/768/390, aucun défilement horizontal caché (`agrierp_laravel/tests/Browser/ResponsiveTest.php`).
 8. **Accessibilité** : test de contraste (modèle `ContrasteMarqueTest.php`), balisage `aria-*` des composants.
@@ -349,7 +349,7 @@ Lis `04_UI_UX_DESIGN_SYSTEM.md` en entier, puis `01_MASTER_PROMPT.md` (règle : 
 # CONTRAINTES
 - Aucune modification de code. Aucune valeur inventée : une mesure impossible = « non mesurée, raison ».
 - Une divergence = défaut, écart assumé (avec raison citée) ou question client ; jamais « détail ».
-- Les couleurs/tailles d'AgriERP ne sont pas une référence pour LogiALVIA.
+- Les couleurs/tailles d'LogiAgriERP ne sont pas une référence pour LogiALVIA.
 
 # SORTIE ATTENDUE (format imposé)
 1. En-tête : écran, version du code (hash ou date), largeurs testées, sources lues (chemins).
@@ -373,12 +373,12 @@ Corriger le code ; juger « à l'œil » sans mesure ; fermer un défaut sans pr
 
 ## 13. À DÉFINIR AVEC LE CLIENT
 
-- **Q-DS-1 Police** : Roboto (celle du poste, retenue ici pour la conformité) ou Inter (AgriERP) ? Changer implique de changer le poste aussi.
+- **Q-DS-1 Police** : Roboto (celle du poste, retenue ici pour la conformité) ou Inter (LogiAgriERP) ? Changer implique de changer le poste aussi.
 - **Q-DS-2 Contrastes** : accepte-t-il (a) un jeton « or lisible sur fond clair » dérivé de `#B58B2A` (valeur à fixer ensemble ; elle n'est PAS inventée ici), (b) de réserver `outline` aux fonds blancs, (c) un texte `success-deep` plus sombre sur `success-container` ?
 - **Q-DS-3 Classes d'écran** : valide-t-il Desktop ≥ 1280, Laptop 1024–1279, Tablet 641–1023, Mobile ≤ 640 ? Le web doit-il être pleinement utilisable en Tablet/Mobile (caisse sur tablette ?) alors que le poste ne l'est pas (fenêtre minimale 1024×700) ?
-- **Q-DS-4 Hauteur des cartes KPI** : AgriERP a figé 112 px à la demande de son client ; LogiALVIA le veut-il (valeur à fixer, web ET poste) ?
-- **Q-DS-5 Barre latérale** : libellé d'entrée 15 px (poste LogiALVIA) ou 14 px (AgriERP, à la demande du client le 07/11/2026) ? Couleur de la barre de défilement ?
+- **Q-DS-4 Hauteur des cartes KPI** : LogiAgriERP a figé 112 px à la demande de son client ; LogiALVIA le veut-il (valeur à fixer, web ET poste) ?
+- **Q-DS-5 Barre latérale** : libellé d'entrée 15 px (poste LogiALVIA) ou 14 px (LogiAgriERP, à la demande du client le 07/11/2026) ? Couleur de la barre de défilement ?
 - **Q-DS-6 Ombres** : aligner `app_shadows.dart` (`xl` et `xxl` sont des approximations à une couche) sur les valeurs exactes de Tailwind utilisées par le web ?
 - **Q-DS-7 Modales** : largeur de chaque modale (le poste utilise 480 par défaut, valeur hors échelle Tailwind) : à relever sur le prototype.
-- **Q-DS-8 Mode sombre, rail d'icônes droit, hubs de cartes** : existent-ils dans le prototype de LogiALVIA ? (sources du dépôt cloné muettes ; ne pas les créer par imitation d'AgriERP.)
+- **Q-DS-8 Mode sombre, rail d'icônes droit, hubs de cartes** : existent-ils dans le prototype de LogiALVIA ? (sources du dépôt cloné muettes ; ne pas les créer par imitation d'LogiAgriERP.)
 - **Prototype HTML** : fournir sa copie (31 pages) : sans elle, la source visuelle de premier niveau manque et plusieurs valeurs ci-dessus restent « à confirmer ».

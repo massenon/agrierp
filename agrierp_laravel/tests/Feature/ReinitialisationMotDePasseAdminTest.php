@@ -33,7 +33,7 @@ class ReinitialisationMotDePasseAdminTest extends TestCase
         parent::setUp();
         $this->seed(RolesAndPermissionsSeeder::class);
 
-        $this->admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $this->admin = User::create(['name' => 'Directeur', 'username' => 'admin', 'email' => 'dg@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $this->admin->assignRole('admin');
         $this->caissier = User::create(['name' => 'Afi', 'username' => 'afi', 'email' => 'afi@fermeolouwachegoun.com', 'password' => bcrypt('Ancien#2026'), 'is_active' => true]);
         $this->caissier->assignRole('caissier');
@@ -88,7 +88,7 @@ class ReinitialisationMotDePasseAdminTest extends TestCase
             ->assertDispatched('toast', message: SaisieUtilisateurAction::MESSAGE_PROPRE_REINITIALISATION, type: 'error');
 
         $this->assertFalse($this->admin->fresh()->must_change_password);
-        $this->assertTrue(Hash::check('AgriERP@2026', $this->admin->fresh()->password));
+        $this->assertTrue(Hash::check('LogiAgriERP@2026', $this->admin->fresh()->password));
         $this->assertSame(0, AuditLog::where('action', 'user.password_reset')->count());
 
         // L'action seule refuse aussi (appelée par l'envoi des postes).

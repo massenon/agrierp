@@ -69,7 +69,7 @@ class VentesDateEffectiveTest extends TestCase
         }
         $role = Role::findOrCreate('caissier', 'web');
         $role->givePermissionTo(['view-ventes', 'manage-ventes']);
-        $user = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'de@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $user = User::create(['name' => 'Caissière', 'username' => 'caisse', 'email' => 'de@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $user->assignRole($role);
         $this->actingAs($user);
 
@@ -299,7 +299,7 @@ class VentesDateEffectiveTest extends TestCase
     public function test_le_tirage_sert_les_factures_dans_l_ordre_de_la_date_de_vente_et_garde_le_repli(): void
     {
         $jeton = $this->postJson('/api/auth/login', [
-            'identifiant' => 'caisse', 'password' => 'AgriERP@2026', 'device_name' => 'poste-01',
+            'identifiant' => 'caisse', 'password' => 'LogiAgriERP@2026', 'device_name' => 'poste-01',
         ])->json('token');
 
         $factures = $this->withHeader('Authorization', 'Bearer '.$jeton)

@@ -6,7 +6,7 @@
 - **Ordre** : `10_BRS` → `11_PRD` → `12_SRS` → `13_FRS` → `14_NFRS` → **`15_REGLES_METIER`** → `16_DECISIONS_VALIDEES` (décisions DV-01 à DV-22 du 08/11/2026 : « TRANCHÉ (DV-xx) » ci-dessous renvoie à ce registre) → modules `21_` à `29_` (qui citent les `RM-`). Le guide `docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (blocs 1 à 13) reste la référence détaillée des pièges ; ce fichier n'en recopie que les formules et les cas.
 - **Entrées** : `logialvia/docs/B6_Regles_Metier.md`, `05_LOGIQUE_CALCUL_FORMULAIRES.md`, `F3` à `F6`, `H2`, `J1`, `logialvia_app/lib/elevage/domain/entities/configuration_espece.dart`, `logialvia_app/lib/elevage/domain/services/*.dart`, `logialvia_app/lib/comptabilite/domain/services/moteur_comptable.dart`, `agrierp_laravel/app/Services/{EffectifParCategorieService,PayrollCalculationService,VatDeclarationService,TvaSettingService,AvoirClientService}.php`, `agrierp_laravel/database/seeders/IncomeTaxBracketsSeeder.php`.
 - **Sorties** : ce fichier à jour ; toute nouvelle règle reçoit un `BR-…` dans `logialvia/docs/B6_Regles_Metier.md` (convention de logialvia : numérotation `BR-ELV-011…`) PUIS un `RM-` ici.
-- **Légende** : **TRANCHÉ (DV-xx)** décision validée par le client le 08/11/2026 (`16_DECISIONS_VALIDEES.md`) : la RÈGLE est validée, les repères chiffrés zootechniques restent des ordres de grandeur à valider par le technicien ; **[LOGIALVIA]** règle écrite dans les sources de logialvia (CONFIRMÉE) ; **[AGRIERP→PROPOSÉE]** règle d'AgriERP proposée pour LogiALVIA (à valider par le client) ; **À DÉFINIR AVEC LE CLIENT** : aucune source ne la tranche, aucune formule n'est donnée.
+- **Légende** : **TRANCHÉ (DV-xx)** décision validée par le client le 08/11/2026 (`16_DECISIONS_VALIDEES.md`) : la RÈGLE est validée, les repères chiffrés zootechniques restent des ordres de grandeur à valider par le technicien ; **[LOGIALVIA]** règle écrite dans les sources de logialvia (CONFIRMÉE) ; **[AGRIERP→PROPOSÉE]** règle d'LogiAgriERP proposée pour LogiALVIA (à valider par le client) ; **À DÉFINIR AVEC LE CLIENT** : aucune source ne la tranche, aucune formule n'est donnée.
 - **Chemins** : `logialvia/…` = `/home/user/massenon/logialvia/…` (lecture seule) ; sans préfixe = monorepo `/home/user/agrierp`.
 
 ---
@@ -14,11 +14,11 @@
 ## 0. PROMPT — « Rédige / mets à jour les règles métier de LogiALVIA »
 
 > **Rôle.** Expert métier (zootechnie, comptabilité SYSCOHADA/Bénin, gestion de stocks) et ingénieur de test.
-> **Contexte.** Les règles de logialvia (B6, 05) couvrent un poste monoposte ; AgriERP en a affiné d'autres (départ obligatoire, passages de stade, ventes ventilées, exercices, avoirs, MeCeF, paie). Le web de LogiALVIA les centralisera en un point de passage serveur chacune.
+> **Contexte.** Les règles de logialvia (B6, 05) couvrent un poste monoposte ; LogiAgriERP en a affiné d'autres (départ obligatoire, passages de stade, ventes ventilées, exercices, avoirs, MeCeF, paie). Le web de LogiALVIA les centralisera en un point de passage serveur chacune.
 > **Tâches.** (1) Pour chaque règle : identifiant `RM-`, énoncé, formule exacte, source, statut ([LOGIALVIA] / [AGRIERP→PROPOSÉE] / À DÉFINIR), et AU MOINS un jeu de cas chiffré à la main avec résultat attendu ; (2) vérifie chaque cas par un calcul indépendant (tableur ou calculette), jamais en exécutant le code à tester ; (3) signale toute contradiction entre sources dans la section 9 ; (4) pour tout ce qui est À DÉFINIR, écris des questions fermées numérotées ; (5) ne crée AUCUNE règle de pisciculture, de pintade ou de goliath au-delà de ce que les sources et les décisions validées (`16_`) disent.
 > **Contraintes.** Formules sans ambiguïté (arrondi, plancher, ordre des opérations) ; entiers en FCFA ; planchers à 0 pour les effectifs ; dates à l'heure du Bénin ; messages de refus mot pour mot.
 > **Critères d'acceptation.** (a) chaque `RM-` a un jeu de cas avec entrées, calcul détaillé et résultat ; (b) une règle [AGRIERP→PROPOSÉE] n'est jamais présentée comme confirmée ; (c) la section 7 sépare « défini dans logialvia » de « À DÉFINIR » pour les trois filières ; (d) chaque contradiction de la section 9 a une question ou une décision proposée ; (e) les formules de ce fichier se retrouvent dans les tests (`31_TESTING_QA.md`).
-> **Interdits.** Inventer une durée de stade, une ration, un seuil de mortalité, un poids de maturité ou une formule de biomasse ; recopier un taux d'AgriERP comme s'il était celui d'ALLMANY ; valider un cas en lançant le code.
+> **Interdits.** Inventer une durée de stade, une ration, un seuil de mortalité, un poids de maturité ou une formule de biomasse ; recopier un taux d'LogiAgriERP comme s'il était celui d'ALLMANY ; valider un cas en lançant le code.
 
 ---
 
@@ -40,7 +40,7 @@ Poussins = 20 + 5 + 10 − 2 = **33** ; Goliathau = 40 − 8 − 1 − 3 = **28*
 
 ### RM-ELV-02 — Cascade [LOGIALVIA : BR-ELV-006 ; F3]
 Toute modification d'un jour recalcule tous les jours postérieurs déjà enregistrés. Un décès d'infirmerie, une vente de caisse ou un transfert passent par la MÊME fonction d'écriture. L'effectif de la bande affiché est celui de la DERNIÈRE fiche.
-**Cas** : jours 5, 6, 7 saisis ; on ajoute +5 achats au jour 5 → la catégorie Jeune des jours 6 et 7 augmente de 5 (si aucune autre contrainte). **Point ouvert Q-ELV-6** : logialvia s'arrête au premier jour non saisi ; AgriERP franchit les jours sautés.
+**Cas** : jours 5, 6, 7 saisis ; on ajoute +5 achats au jour 5 → la catégorie Jeune des jours 6 et 7 augmente de 5 (si aucune autre contrainte). **Point ouvert Q-ELV-6** : logialvia s'arrête au premier jour non saisi ; LogiAgriERP franchit les jours sautés.
 
 ### RM-ELV-03 — Départ obligatoire par catégorie [AGRIERP→PROPOSÉE : guide bloc 1 (D4) ; Q-ELV-5]
 Effectif de départ saisi UNE fois par bande ; somme des catégories = effectif total au début du jour de départ ; jamais déduit à l'insu de l'éleveur (le stade propose, un bouton « Reprendre la proposition… » reprend) ; demandé à l'ouverture de la fiche ; jours antérieurs non saisissables.
@@ -51,8 +51,8 @@ Messages exacts : « Effectif de départ incomplet : les trois catégories doive
 Transfert d'une catégorie source vers la suivante, total inchangé ; refusé au-delà de la source APRÈS ses autres mouvements du jour (plancher 0, entrée du passage précédent incluse) ; le passage appliqué est ramené à la source ; message : « Passage de stade refusé : 15 sujet(s) à faire passer, mais la catégorie source n'en compte que 12. »
 **Cas volailles reproductrices (VOL-1)** — veille R=10, P=20, J=30 ; achat 5, éclosions 8, vente_R 1, vente_J 4, mort_J 2, mort_P 1, passage Poussin→Jeune p=6 :
 R = 10 − 1 = **9** ; J = 30 + 5 − 4 − 2 + 6 = **35** ; P = 20 + 8 − 1 − 6 = **21** ; total **65** (veille 60 + 5 + 8 − 1 − 4 − 2 − 1 = 65 ✓). Refus si p=30 : source P après autres mouvements = 20 + 8 − 1 = 27 → appliqué 27 ; **P=0, J=56** (30+5−4−2+27).
-**Cas lapins** (famille à catégorie « inconnue », AgriERP) — veille R=10, S=5, J=20 ; achat 3, né 4, vente 6, mort_R 1, mort_J 2, passage 5 : R = **9** ; S_avant = 5+3+4 = 12, passage 5, S = **7** ; J = 20 + 5 − 6 − 2 = **17** ; total **33**. Passage demandé 15 → appliqué 12 : S=**0**, J = 20 + 12 − 6 − 2 = **24**.
-**Pondeuses VOL-2 (quatre stades)** — veille PP=100, PC=50, PL=30, PO=200 ; éclosions 20, achat 10, vente_PO 5, vente_PL 2, mort_PP 3, mort_PC 1, mort_PO 4, p1=40, p2=10, p3=5 : PP = 100+20−3−40 = **77** ; PC = 50−1+40−10 = **79** ; PL = 30+10−2+10−5 = **43** ; PO = 200−5−4+5 = **196** ; total **395**. (Dans AgriERP, l'achat va à Poulette ; dans logialvia `configuration_espece.dart`, achats et nés vont à Poussin Ponte : **Q-ELV-4**.)
+**Cas lapins** (famille à catégorie « inconnue », LogiAgriERP) — veille R=10, S=5, J=20 ; achat 3, né 4, vente 6, mort_R 1, mort_J 2, passage 5 : R = **9** ; S_avant = 5+3+4 = 12, passage 5, S = **7** ; J = 20 + 5 − 6 − 2 = **17** ; total **33**. Passage demandé 15 → appliqué 12 : S=**0**, J = 20 + 12 − 6 − 2 = **24**.
+**Pondeuses VOL-2 (quatre stades)** — veille PP=100, PC=50, PL=30, PO=200 ; éclosions 20, achat 10, vente_PO 5, vente_PL 2, mort_PP 3, mort_PC 1, mort_PO 4, p1=40, p2=10, p3=5 : PP = 100+20−3−40 = **77** ; PC = 50−1+40−10 = **79** ; PL = 30+10−2+10−5 = **43** ; PO = 200−5−4+5 = **196** ; total **395**. (Dans LogiAgriERP, l'achat va à Poulette ; dans logialvia `configuration_espece.dart`, achats et nés vont à Poussin Ponte : **Q-ELV-4**.)
 
 ### RM-ELV-05 — Ventes ventilées par catégorie [AGRIERP→PROPOSÉE : guide bloc 1 ; Q-ELV-7]
 Chaque produit vendable porte `categorie_effectif` (nullable). La vente décrémente cette catégorie. Refus AVANT toute écriture : produit sans catégorie ; bande sans départ ; vente datée avant le départ ; catégorie d'une autre famille. Aujourd'hui (logialvia) : toute vente va à la seule catégorie « commercialisée » (RM-ELV-01). **Poisson** : la vente porte le poids ET le nombre de sujets, voir RM-ELV-12 (TRANCHÉ DV-02).
@@ -75,7 +75,7 @@ SRH(J) = Stock final(J−1) (JAMAIS TS(J−1)) ; TS = (pondus − cassés) + SRH
 ### RM-ELV-08 — Mortalité (indicateurs) [LOGIALVIA : F3 §1, 05 §3]
 Taux du jour = morts ÷ effectif total de la veille × 100 (0 si veille = 0) ; taux du mois = Σ morts du mois ÷ effectif de début de mois × 100. Effectif de début de mois = reconstitué depuis la première journée saisie : fin + morts + dons + ventes − achats − nés.
 **Cas** : 5 morts / 200 = **2,5 %** ; mois : 12 morts / 240 = **5,0 %** ; première journée : fin 98, mort 2 → début **100**. Une semaine sans saisie s'affiche « — », jamais « 0 mort ».
-**Seuil d'alerte de mortalité anormale** : AgriERP = pire jour des 7 derniers jours ≥ 5 % (rôle animalier). **logialvia : aucun seuil défini** (B2 §3 cite l'alerte sans le chiffre) → **À DÉFINIR (Q-ALR-2)**.
+**Seuil d'alerte de mortalité anormale** : LogiAgriERP = pire jour des 7 derniers jours ≥ 5 % (rôle animalier). **logialvia : aucun seuil défini** (B2 §3 cite l'alerte sans le chiffre) → **À DÉFINIR (Q-ALR-2)**.
 
 ### RM-ELV-09 — Rationnement (g/j/sujet ; hors poissons : RM-ELV-09b) [LOGIALVIA : B6 BR-ELV-009 ; F3 ; guide bloc 5]
 Pour chaque catégorie : effectif calculé × ration (g/j/sujet) ; total = SOMME DE TOUTES les catégories ; `total_kg` = round(total_g ÷ 1000, 2) ; catégorie inconnue → total « — ». Clé de ration par libellé normalisé en égalité stricte (minuscules, sans accents, tranche d'âge entre parenthèses ignorée), jamais par sous-chaîne ; barème absent → valeur de référence de `ConfigurationEspece`, jamais 0.
@@ -94,7 +94,7 @@ Pour chaque catégorie de la fiche : biomasse (g) = effectif calculé × poids m
 - Échantillon : effectif 500, 36 poissons pesés pour 1 800 g → poids moyen **50 g** ; 36 ≥ 30 et 36 ÷ 500 = 7,2 % ∈ [5 %, 10 %] → valide. Effectif 300 : 5 % = 15 < 30 → au moins **30** poissons à peser. Effectif 20 : tout l'effectif (20).
 - Contrôle d'unité : la série 30/60/110 du code est en g/j PAR SUJET (`rationGrammesParJour`) : 1 000 juvéniles × 60 = 60 000 g/j serait 1,2 × la biomasse entière (50 000 g) : valeur absurde qui prouve l'écart d'unité ; elle n'est pas convertible en %.
 
-### RM-ELV-10 — Autonomie de provende [TRANCHÉ (DV-04) ; logialvia H2 : 7 jours ; AgriERP : 3 jours]
+### RM-ELV-10 — Autonomie de provende [TRANCHÉ (DV-04) ; logialvia H2 : 7 jours ; LogiAgriERP : 3 jours]
 Autonomie (jours) = provende disponible (g) ÷ provende journalière calculée (g). **Deux seuils paramétrables par ferme** (`autonomy_alert_days`, défaut **7** ; `autonomy_critical_days`, défaut **3** ; critique < alerte) : **alerte** (avertissement) dès autonomie ≤ seuil d'alerte ; **critique** dès autonomie ≤ seuil critique ; rupture ou aucun produit de provende = critique. Règle de calcul du seuil d'alerte : **délai d'approvisionnement du fournisseur + marge de sécurité** (7 est le défaut ; **DV-14, recommandé** : seuil critique = délai fournisseur, seuil d'alerte = délai + marge de 4 j (week-end 2 j + retard 1 j + livraison partielle 1 j) ; délai 3 j → 3 et 7, délai 5 j → 5 et 9, provende fabriquée sur place : délai = fabrication + achat des matières ; Q-DV-4 fermée en « recommandé », délai réel à demander au client). N'empêche JAMAIS l'enregistrement ; une alerte par objet et par jour. La comparaison est « inférieure ou égale » (comme le stock critique, RM-STK-02) : proposition à confirmer.
 **Cas** : ration du jour 6 080 g (Goliaths ci-dessus). Stock 50 kg → 50 000 ÷ 6 080 = **8,2 jours** : aucune alerte. Stock 30 kg → **4,9 jours** : alerte (≤ 7), pas critique (> 3). Stock 15 kg → **2,5 jours** : alerte ET critique. Bornes : 42 560 g = 6 080 × 7 → **7,0 j** : alerte ; 42 561 g → 7,0002 j : rien ; 18 240 g = 6 080 × 3 → **3,0 j** : critique ; 18 241 g : alerte seulement. Seuil d'alerte calculé : délai fournisseur 5 j + marge 2 j = **7** ; délai 10 j + marge 3 j = **13** (alors 13 × 6 080 = 79 040 g est la limite d'alerte). Seuils invalides refusés : critique 7 pour alerte 7 (critique doit être < alerte).
 
@@ -146,8 +146,8 @@ Une échéance reste due tant que la saisie manque ; un mirage oublié est signa
 
 ## 3. Santé animale
 
-### RM-PRO-01 — Jour de cycle et traitements dus [LOGIALVIA : `bande.dart`, `prophylaxie_de_la_bande.dart` ; F3 v25 ; AgriERP : `ProtocoleDuJourService`]
-Date du jour de cycle n = date de mise en bande + (n − 1) jours ; jour de cycle d'une date = écart en JOURS CALENDAIRES (minuit à minuit) + 1 ; traitement dû si `jour_debut ≤ J ≤ jour_fin` ; rien n'est projeté sans bande ; fin du délai d'attente = date prévue + rémanence (0 = aucun délai). Les entrées « le 1er du mois » (bornes nulles) ne sont jamais évaluées (AgriERP).
+### RM-PRO-01 — Jour de cycle et traitements dus [LOGIALVIA : `bande.dart`, `prophylaxie_de_la_bande.dart` ; F3 v25 ; LogiAgriERP : `ProtocoleDuJourService`]
+Date du jour de cycle n = date de mise en bande + (n − 1) jours ; jour de cycle d'une date = écart en JOURS CALENDAIRES (minuit à minuit) + 1 ; traitement dû si `jour_debut ≤ J ≤ jour_fin` ; rien n'est projeté sans bande ; fin du délai d'attente = date prévue + rémanence (0 = aucun délai). Les entrées « le 1er du mois » (bornes nulles) ne sont jamais évaluées (LogiAgriERP).
 **Cas** (calendrier semé de logialvia, Goliaths) : mise en bande le **01/11/2026** → J1 Déparasitage (Levamisole, rémanence 7) le 01/11, fin de délai **08/11** ; J5 Anti-coccidien (Amprolium, rémanence 5) le **05/11**, fin **10/11** ; J15 Vaccin Newcastle Rappel (HB1, rémanence 0) le **15/11**, aucun délai. Le 05/11 le jour de cycle vaut 5.
 Calendrier semé (11 échéances, confirmé = faux sauf lapins) : Goliaths J1, J5, J15 ; Pintades J1, J5, J6 (Complément Calcium), J12 (Vaccin Gumboro Rappel) ; Lapins J1, J9 ; Poissons-Chats J1 (Traitement antifongique du bassin, Bleu de Méthylène, rémanence 3), J14 (Contrôle oxygénation / ammoniac).
 
@@ -160,7 +160,7 @@ Le décès s'AJOUTE aux mouvements du jour via l'écriture de fiche (cascade), c
 **Cas** : fiche du jour avec mort Goliathau 1 ; décès infirmerie imputé à Goliathau → mort Goliathau **2**, vente du POS inchangée, effectif Goliathau recalculé et cascade propagée.
 
 ### RM-PRO-04 — Délai d'attente [LOGIALVIA : F3]
-Les produits d'un animal sous délai d'attente ne sont pas vendables : une bannière liste les délais en cours avec leur date de fin. AgriERP signale (notification) une vente sous délai sans la refuser. Refuser ou signaler : **Q-VTE-3**.
+Les produits d'un animal sous délai d'attente ne sont pas vendables : une bannière liste les délais en cours avec leur date de fin. LogiAgriERP signale (notification) une vente sous délai sans la refuser. Refuser ou signaler : **Q-VTE-3**.
 
 ---
 
@@ -186,7 +186,7 @@ Vente + lignes + décrément de stock + incrément de la fiche d'élevage : tout
 ### RM-VTE-06 — Facture normalisée MeCeF — voir RM-MEC (§5.4).
 
 ### RM-VTE-07 — Retours et avoirs [AGRIERP→PROPOSÉE : `AvoirClientService` ; Q-VTE-2]
-Retournable d'un produit sur une vente = vendu − déjà retourné (tous avoirs confondus) ; montant ≤ montant de la ligne − déjà crédité ; exercice absent/clos et plan comptable incomplet jugés AVANT d'écrire ; une seule transaction ; écriture inverse datée du jour du RETOUR (AgriERP : D 701 / D 443 / C 411 ; sans TVA : D 701 / C 411). Un avoir ne modifie jamais la facture d'origine.
+Retournable d'un produit sur une vente = vendu − déjà retourné (tous avoirs confondus) ; montant ≤ montant de la ligne − déjà crédité ; exercice absent/clos et plan comptable incomplet jugés AVANT d'écrire ; une seule transaction ; écriture inverse datée du jour du RETOUR (LogiAgriERP : D 701 / D 443 / C 411 ; sans TVA : D 701 / C 411). Un avoir ne modifie jamais la facture d'origine.
 **Cas** : vente de 10 plaquettes à 1 000 F (ligne 10 000). Retour de 4 (montant 4 000) accepté ; retour suivant de 7 → refusé (retournable 6) ; montant maximal restant 10 000 − 4 000 = **6 000**. Avoir commercial partiel : 3 000 accepté tant que ≤ 6 000.
 
 ### RM-STK-01 — PMP des intrants [LOGIALVIA : F5, « déduit, à confirmer » ; Q-STK-1]
@@ -206,7 +206,7 @@ Ajustement : stock physique remplace le théorique ; écart signé = physique �
 
 ## 5. Comptabilité SYSCOHADA, exercices, TVA, MeCeF
 
-### RM-CPT-01 — Équilibre débit = crédit [LOGIALVIA : B6 BR-CPT-003 ; `moteur_comptable.dart` ; AgriERP : `AccountingEntryService`]
+### RM-CPT-01 — Équilibre débit = crédit [LOGIALVIA : B6 BR-CPT-003 ; `moteur_comptable.dart` ; LogiAgriERP : `AccountingEntryService`]
 Une ligne porte un débit OU un crédit (jamais les deux, jamais aucun, jamais négatif) ; un lot (pièce) doit être équilibré à 0,01 F : sinon « Pièce déséquilibrée : débit X ≠ crédit Y. » ; date dans un exercice OUVERT ; archivage = contre-passation exacte.
 Comptes d'écritures automatiques de logialvia (`generer_ecritures_automatiques.dart`) : Caisse 531, Mobile Money 512, Clients 411, Clients avances 419, Fournisseurs 401, Ventes avicoles 701, Ventes marchandises 707, Achats matières 601, Achats marchandises 602, Frais vétérinaires 622 — numérotation reprise telle quelle, **à faire valider par l'expert-comptable** (Q-CPT-1).
 **Cas** : vente Espèces 8 000 sans TVA : D 531 8 000 / C 701 8 000. Vente à crédit : D 411 / C 701. Règlement client : D 531 / C 411. Achat à crédit : D 601 / C 401. Pièce D 531 8 000 + C 701 7 999 → refusée (écart 1).
@@ -226,7 +226,7 @@ Résultat = Σ produits (classe 7) − Σ charges (classe 6) ; UNE seule fonctio
 ### RM-CPT-05 — Clôture mensuelle [LOGIALVIA : B6 BR-CPT-006 ; F6 §6]
 Écriture d'un mois clôturé non modifiable, sauf déblocage exceptionnel par admin (journalisé) ; pas de report à nouveau ; vérification de la balance obligatoire.
 
-### RM-CPT-06 — Clôture annuelle et report à nouveau [LOGIALVIA : B6 BR-CPT-001/002 ; J1 ; AgriERP : guide bloc 11]
+### RM-CPT-06 — Clôture annuelle et report à nouveau [LOGIALVIA : B6 BR-CPT-001/002 ; J1 ; LogiAgriERP : guide bloc 11]
 1. Balance équilibrée ; 2. soldes des comptes de bilan (classes 1 à 5) ; 3. verrouillage de TOUTES les écritures (`isLocked`) ; 4. RAN dans N+1 pour chaque compte de bilan à solde non nul, même sens ; 5. exercice N+1 activé. Tout dans UNE transaction (atomicité renforcée). Confirmation textuelle « CLOTURER ».
 [AGRIERP→PROPOSÉE] étapes gardées : échéance passée (refus avant la fin de l'exercice), étape 1 et étape 2 (solde des comptes de gestion classes 6 et 7 vers le résultat) faites, N−1 clos, à-nouveau équilibré ; un compte de classe 8 avec solde bloque la clôture ; à-nouveau verrouillé ; jamais « historique + à-nouveau » dans les états.
 **Cas** (suite RM-CPT-03) : étape 2 solde 6 et 7 : D 701 8 000 / C 601 5 000 / C 131 3 000. RAN 2027 : 531 D 13 000 ; 101 C 10 000 ; 131 C 3 000 → D 13 000 = C 13 000 ✓. **Affectation du résultat (13 → 11/12)** : non définie par les sources → **Q-CPT-2**.
@@ -250,14 +250,14 @@ Drapeau « assujetti » (défaut oui). Inactif : montants HT, AUCUNE ligne 443/4
 ### RM-MEC-01 — Facture normalisée [AGRIERP→PROPOSÉE : guide bloc 19 ; logialvia `facturation_mecef_tables.dart` ; Q-MEC-1]
 Facture simple : jamais transmise. Normalisée : nom du client obligatoire, IFU vide (omis) ou 13 chiffres ; AIB 5 % (défaut), 1 % ou N/A ; MONTANT d'AIB jamais calculé localement (renvoyé par la DGI). Groupes de taxe : 0 % = A, 18 % = B, tout autre taux REFUSÉ avec motif (grille modifiable : logialvia n'amorce que « exonéré » et « 18 % »). Prix ENTIERS, une seule fonction d'arrondi ; remise globale répartie au plus fort reste ; écart d'arrondi absorbé par la plus grande ligne, facture REFUSÉE si l'écart dépasse le nombre de lignes ; prix unitaire = montant ÷ quantité si la division tombe juste, sinon quantité 1 et quantité réelle au libellé (60 caractères au plus). Une normalisée est verrouillée : correction par avoir `FA` lié (`origineRef`).
 **Cas remise** : lignes 600, 300, 100 (total 1 000), remise 52 → parts exactes 31,2 ; 15,6 ; 5,2 → planchers 31, 15, 5 (= 51) ; reste 1 → à la ligne au plus fort reste fractionnaire (15,6) → **31, 16, 5** (= 52 ✓). **Cas prix unitaire** : ligne 1 000 F pour 4 unités → 250 × 4 ; ligne 1 000 F pour 3 unités → quantité 1, prix 1 000, libellé portant « 3 ».
-États : `aTransmettre` (logialvia) = `en_attente` (AgriERP) → `normalisee` ou `rejetee`/`erreur` ; une facture « normalisée » n'est affichée que si les champs rendus par la DGI (code, NIM, compteur) sont présents.
+États : `aTransmettre` (logialvia) = `en_attente` (LogiAgriERP) → `normalisee` ou `rejetee`/`erreur` ; une facture « normalisée » n'est affichée que si les champs rendus par la DGI (code, NIM, compteur) sont présents.
 
 ---
 
 ## 6. Paie (OPTION — absente de logialvia ; Q-PAI-1)
 
-B1 §6 déclare RH/paie hors périmètre ; AgriERP la possède. **[AGRIERP→PROPOSÉE ; rien ici n'est une règle ALLMANY]** (`agrierp_laravel/app/Services/PayrollCalculationService.php`, barème semé `IncomeTaxBracketsSeeder.php` : validé par le client d'AgriERP, pas par ALLMANY).
-Formules (jours ouvrés 26) : retenue d'absence = round(brut ÷ 26 × jours d'absence, 2) ; salaire dû = max(0, brut − retenue) ; CNSS salariale = dû × 3,6 % ; net imposable = dû − CNSS salariale (jamais le brut) ; ITS = Σ par tranche de (min(net imposable, plafond) − plancher) × taux ; net = net imposable − ITS ; charges patronales (en plus, hors net) = dû × (VPS 4 % + pensions 6,4 % + prestations familiales 9 % + risques professionnels 2 % [1 à 4 % selon le risque]) ; coût employeur = dû + charges patronales. Barème d'AgriERP : 0–60 000 : 0 % ; 60 000–150 000 : 10 % ; 150 000–250 000 : 15 % ; 250 000–500 000 : 19 % ; > 500 000 : 30 % (en base, modifiable).
+B1 §6 déclare RH/paie hors périmètre ; LogiAgriERP la possède. **[AGRIERP→PROPOSÉE ; rien ici n'est une règle ALLMANY]** (`agrierp_laravel/app/Services/PayrollCalculationService.php`, barème semé `IncomeTaxBracketsSeeder.php` : validé par le client d'LogiAgriERP, pas par ALLMANY).
+Formules (jours ouvrés 26) : retenue d'absence = round(brut ÷ 26 × jours d'absence, 2) ; salaire dû = max(0, brut − retenue) ; CNSS salariale = dû × 3,6 % ; net imposable = dû − CNSS salariale (jamais le brut) ; ITS = Σ par tranche de (min(net imposable, plafond) − plancher) × taux ; net = net imposable − ITS ; charges patronales (en plus, hors net) = dû × (VPS 4 % + pensions 6,4 % + prestations familiales 9 % + risques professionnels 2 % [1 à 4 % selon le risque]) ; coût employeur = dû + charges patronales. Barème d'LogiAgriERP : 0–60 000 : 0 % ; 60 000–150 000 : 10 % ; 150 000–250 000 : 15 % ; 250 000–500 000 : 19 % ; > 500 000 : 30 % (en base, modifiable).
 **Cas A** brut 200 000, 0 absence : CNSS = 7 200 ; imposable **192 800** ; ITS = 90 000 × 10 % + 42 800 × 15 % = 9 000 + 6 420 = **15 420** ; net = **177 380** ; charges patronales = 8 000 + 12 800 + 18 000 + 4 000 = **42 800** ; coût employeur **242 800**.
 **Cas B** brut 130 000, 2 jours d'absence : retenue 130 000 ÷ 26 × 2 = **10 000** ; dû 120 000 ; CNSS **4 320** ; imposable **115 680** ; ITS = 55 680 × 10 % = **5 568** ; net **110 112**.
 **Cas C** brut 50 000 : CNSS 1 800 ; imposable 48 200 ; ITS **0** (sous 60 000) ; net **48 200**.
@@ -315,7 +315,7 @@ Tableau de configuration (source : `logialvia_app/lib/elevage/domain/entities/co
 - **Incubation : 28 jours** (corrigé par la Gérante ; `INDEX_MAITRE` et le prototype disaient 27 : à corriger) [`cycle_incubation.dart`, F3 v21] ; **TRANCHÉ (DV-03)** : durée PARAMÉTRABLE (défaut 28 j), fenêtre d'éclosion 26–28 j, deux modes (couveuse / couvaison naturelle), mirages J7 et J14, transfert à l'éclosoir vers J25 avec rappels : RM-COU-01 et RM-COU-06.
 - Ration : barème générique 30 / 60 / 110 g/j (« aucun barème spécifique confirmé », badge « Générique (Aviculture, à confirmer) » [seeder, F3]). **TRANCHÉ (DV-03)** : repères terrain à valider, 10–60 g/jour par sujet selon l'âge et 90–120 g/jour adulte (à confirmer avec la fiche de l'aliment). ⚠️ Le barème semé nomme « **Alevins** » le premier stade (`parametres_elevage_seeder.dart`) : terme de poisson, **interdit pour une pintade** ; le stade s'appelle « **Poussins** » (DV-09) ; le libellé du barème doit être égal au libellé de la catégorie de la fiche (rapprochement strict par libellé exact, RM-ELV-09) : C-4 TRANCHÉ, libellé exact : « Poussins » (DV-09, Q-DV-8 fermée).
 - Prophylaxie semée : J1 Déparasitage (Levamisole Volaille, rémanence 7), J5 Anti-coccidien 1/4 (Amprolium, rémanence 5), J6 Complément Calcium (CalciBoost), J12 Vaccin Gumboro Rappel (rémanence 0) [seeder].
-- AgriERP ne contient AUCUNE règle de pintade (seul un produit « Pintade », SKU AVI-002) [guide bloc 1].
+- LogiAgriERP ne contient AUCUNE règle de pintade (seul un produit « Pintade », SKU AVI-002) [guide bloc 1].
 
 **À DÉFINIR AVEC LE CLIENT** :
 - **Q-PIN-1 Stades.** Durée exacte du stade du jeune pintadeau (« 0 → 4 mois » indicatif) ? Seuil de maturité en âge et en poids (comme les 120 j et 2,8 kg du Goliath) ?
@@ -331,36 +331,36 @@ Tableau de configuration (source : `logialvia_app/lib/elevage/domain/entities/co
 - Étapes : « Naissance (Couveuse) », « Goliathau (0 → 4 mois) », « Mature (≥ 4 mois, ≥ 2,8 kg) — Éligible à la Vente » ; constantes `poidsMaturiteGrammes = 2800`, `ageMaturiteJours = 120` (aucune règle d'alerte codée à ce jour : les seuils ne sont que des données ; vérifié par recherche dans `logialvia_app/lib/elevage`).
 - Incubation 21 jours ; mirages J+7, J+14 (RM-COU) ; deux espèces seulement dans le couvoir (Goliath, Pintade).
 - Ration : 30/60/110 g/j, générique (« à valider avec la Gérante ») ; prophylaxie semée : J1 Déparasitage (Levamisole, rémanence 7), J5 Anti-coccidien 1/4 (Amprolium, rémanence 5), J15 Vaccin Newcastle Rappel (HB1) [seeder].
-- AgriERP : « Poulet goliath (sujet vif) » est rangé en Jeune par défaut d'après le nom du produit ; catégorie commercialisée de logialvia = Goliathau (milieu) : même place [guide bloc 1].
+- LogiAgriERP : « Poulet goliath (sujet vif) » est rangé en Jeune par défaut d'après le nom du produit ; catégorie commercialisée de logialvia = Goliathau (milieu) : même place [guide bloc 1].
 
 **À DÉFINIR AVEC LE CLIENT** :
 - **Q-GOL-1** Confirmer que la vente se déduit de Goliathau et jamais de Mature (note de `calcul_fiche_journaliere.dart`). Que devient un Goliathau vendu après 4 mois ?
 - **Q-GOL-2** Barème de ration propre au Goliath (par stade) ?
 - **Q-GOL-3** Alerte de maturité (4 mois et 2,8 kg) : souhaitée ? Où se saisit le poids pesé (champ « Poids général ») ? Passage Goliathau → Mature : manuel ou automatique à l'âge ?
-- **Q-ELV-8** Registre nominatif des reproducteurs (fonction BS3 d'AgriERP) utile à ALLMANY ?
+- **Q-ELV-8** Registre nominatif des reproducteurs (fonction BS3 d'LogiAgriERP) utile à ALLMANY ?
 
 ---
 
 ## 8. Récapitulatif des décisions et questions du client sur l'élevage (rappel des numéros)
 
-Q-ELV-1 glossaire lapins (Lapereau/Chair/Reproducteur de logialvia contre Reproducteur/Sous-mères/Jeune d'AgriERP) · Q-ELV-2 ration lapins reproducteur 110 (code) / 120 (base semée et AgriERP) · Q-ELV-3 poulets : Poussin/Poulette/Adulte confirmé ? chair ou reproducteurs ? « Jeune » ou « Poulet » · Q-ELV-4 où vont les achats d'une volaille (Poussin selon BR-ELV-002 ; Jeune ou Poulette chez AgriERP) · Q-ELV-5 départ obligatoire, à la création de la bande ou à l'ouverture de la fiche · Q-ELV-6 cascade qui s'arrête ou franchit les jours sautés · Q-ELV-7 produit vendable porteur d'une catégorie d'effectif, refus sinon · Q-ELV-8 registre nominatif · Q-ELV-9 stock d'œufs négatif · Q-REP-1 suivi de reproduction (saillies, mises bas, échecs) voulu pour les lapins ? · Q-ALR-1 **TRANCHÉ (DV-04)** : alerte 7 j, critique 3 j, paramétrables · Q-ALR-2 seuil de mortalité anormale · Q-ALR-3 horizon des rappels de soins N (3 j) et fenêtre au lancement + à chaque connexion · Q-VTE-1 délai de paiement par défaut · Q-VTE-2 règles d'avoir (retournable, montant maximal) · Q-VTE-3 vente sous délai d'attente : refuser ou signaler · Q-STK-1 PMP ou FIFO / dernier prix · Q-STK-2 la provende fabriquée devient-elle un article de stock (unité, seuil, valorisation ?) · Q-STK-3 recettes types de provende · Q-ROL-1 **TRANCHÉ (DV-07)** : 4 rôles · Q-PIS-5 et Q-PIS-6 **TRANCHÉES (DV-01, DV-02)** · Q-PIN-4 **TRANCHÉE (DV-03)** · Q-DV-1 à Q-DV-8 nouvelles (`16_` §4) · Q-CPT-1 exercice = année civile ; numéros de comptes (531/512/…) validés par l'expert-comptable ; N+1 « provisoire » voulu ? · Q-CPT-2 affectation du résultat · Q-CPT-3 **TRANCHÉ (DV-05)** : contre-passation seule, jamais de suppression ni de corbeille · Q-CPT-4 immobilisations : méthode d'amortissement (linéaire seule ?), durées, prorata au mois ou au jour, mois entiers ou à virgule (`CalculAmortissement.moisEntre` d'AgriERP donne des mois à virgule : 31/01 → 28/02 = 0,903) · Q-CPT-5 axe analytique par filière et clé de répartition des charges communes · Q-TVA-1 assujettissement et facture simple dans la déclaration · Q-TVA-2 taux autres que 0 % et 18 % ? · Q-MEC-1 mode e-MECeF ou boîtier.
+Q-ELV-1 glossaire lapins (Lapereau/Chair/Reproducteur de logialvia contre Reproducteur/Sous-mères/Jeune d'LogiAgriERP) · Q-ELV-2 ration lapins reproducteur 110 (code) / 120 (base semée et LogiAgriERP) · Q-ELV-3 poulets : Poussin/Poulette/Adulte confirmé ? chair ou reproducteurs ? « Jeune » ou « Poulet » · Q-ELV-4 où vont les achats d'une volaille (Poussin selon BR-ELV-002 ; Jeune ou Poulette chez LogiAgriERP) · Q-ELV-5 départ obligatoire, à la création de la bande ou à l'ouverture de la fiche · Q-ELV-6 cascade qui s'arrête ou franchit les jours sautés · Q-ELV-7 produit vendable porteur d'une catégorie d'effectif, refus sinon · Q-ELV-8 registre nominatif · Q-ELV-9 stock d'œufs négatif · Q-REP-1 suivi de reproduction (saillies, mises bas, échecs) voulu pour les lapins ? · Q-ALR-1 **TRANCHÉ (DV-04)** : alerte 7 j, critique 3 j, paramétrables · Q-ALR-2 seuil de mortalité anormale · Q-ALR-3 horizon des rappels de soins N (3 j) et fenêtre au lancement + à chaque connexion · Q-VTE-1 délai de paiement par défaut · Q-VTE-2 règles d'avoir (retournable, montant maximal) · Q-VTE-3 vente sous délai d'attente : refuser ou signaler · Q-STK-1 PMP ou FIFO / dernier prix · Q-STK-2 la provende fabriquée devient-elle un article de stock (unité, seuil, valorisation ?) · Q-STK-3 recettes types de provende · Q-ROL-1 **TRANCHÉ (DV-07)** : 4 rôles · Q-PIS-5 et Q-PIS-6 **TRANCHÉES (DV-01, DV-02)** · Q-PIN-4 **TRANCHÉE (DV-03)** · Q-DV-1 à Q-DV-8 nouvelles (`16_` §4) · Q-CPT-1 exercice = année civile ; numéros de comptes (531/512/…) validés par l'expert-comptable ; N+1 « provisoire » voulu ? · Q-CPT-2 affectation du résultat · Q-CPT-3 **TRANCHÉ (DV-05)** : contre-passation seule, jamais de suppression ni de corbeille · Q-CPT-4 immobilisations : méthode d'amortissement (linéaire seule ?), durées, prorata au mois ou au jour, mois entiers ou à virgule (`CalculAmortissement.moisEntre` d'LogiAgriERP donne des mois à virgule : 31/01 → 28/02 = 0,903) · Q-CPT-5 axe analytique par filière et clé de répartition des charges communes · Q-TVA-1 assujettissement et facture simple dans la déclaration · Q-TVA-2 taux autres que 0 % et 18 % ? · Q-MEC-1 mode e-MECeF ou boîtier.
 
 ## 9. Contradictions entre sources (à ne pas résoudre en silence)
 
 | Réf. | Contradiction | Décision proposée |
 |---|---|---|
-| C-1 | B6 BR-ELV-006 : la cascade s'arrête « au premier jour non saisi » ; AgriERP franchit les jours sautés. | Q-ELV-6 ; en attendant, comportement de logialvia. |
-| C-2 | B6 BR-ELV-002 : achats → catégorie la plus jeune ; AgriERP VOL-1 : achats → Jeune ; VOL-2 : achat → Poulette. | Garder la règle de logialvia ; Q-ELV-4. |
+| C-1 | B6 BR-ELV-006 : la cascade s'arrête « au premier jour non saisi » ; LogiAgriERP franchit les jours sautés. | Q-ELV-6 ; en attendant, comportement de logialvia. |
+| C-2 | B6 BR-ELV-002 : achats → catégorie la plus jeune ; LogiAgriERP VOL-1 : achats → Jeune ; VOL-2 : achat → Poulette. | Garder la règle de logialvia ; Q-ELV-4. |
 | C-3 | Poissons-Chats : ration 30/60/110 (`configuration_espece.dart`, g/j par sujet) contre **8/25/45** (`parametres_elevage_seeder.dart`). | **TRANCHÉ (DV-01)** : les deux séries sont écartées ; ration en % de la biomasse (RM-ELV-09b). |
 | C-4 | Pintades : le barème semé nomme « Alevins » le stade « Poussins » du code. | **TRANCHÉ (DV-03)** : « Alevins » interdit ; le stade s'appelle « Poussins » (DV-09) ; corriger le seeder côté LogiALVIA (hors de ce dépôt) et y mettre le libellé exact du glossaire « Poussins » (DV-09 ; Q-DV-8 fermée). |
-| C-5 | Lapins : reproducteur 110 g/j (code) contre 120 g/j (base semée, confirmé « Référence Cuniculture » ; AgriERP 120). | Q-ELV-2. |
+| C-5 | Lapins : reproducteur 110 g/j (code) contre 120 g/j (base semée, confirmé « Référence Cuniculture » ; LogiAgriERP 120). | Q-ELV-2. |
 | C-6 | Incubation Pintade : 27 j (prototype, INDEX_MAITRE) contre 28 j (F3 v21, code `cycle_incubation.dart`). | **TRANCHÉ (DV-03)** : 28 j par défaut, paramétrable, fenêtre 26–28 j ; corriger `INDEX_MAITRE`. |
-| C-7 | Autonomie de provende : H2 « sous 7 jours » contre AgriERP « sous 3 jours ». | **TRANCHÉ (DV-04)** : les deux, comme seuils d'alerte (7 j) et critique (3 j), paramétrables. |
-| C-8 | `05 §2` : répartition initiale 35/35/30 (donnée de démonstration) contre départ obligatoire AgriERP. | Q-ELV-5 ; ne jamais appeler la répartition en production. |
+| C-7 | Autonomie de provende : H2 « sous 7 jours » contre LogiAgriERP « sous 3 jours ». | **TRANCHÉ (DV-04)** : les deux, comme seuils d'alerte (7 j) et critique (3 j), paramétrables. |
+| C-8 | `05 §2` : répartition initiale 35/35/30 (donnée de démonstration) contre départ obligatoire LogiAgriERP. | Q-ELV-5 ; ne jamais appeler la répartition en production. |
 | C-9 | Rôles : 4 (B1/B2/B3) contre 3 (I1). | **TRANCHÉ (DV-07)** : 4 rôles. |
-| C-10 | F6 §10.15 / `supprimerPiece` : suppression d'une pièce ; AgriERP : contre-passation jamais suppression. | **TRANCHÉ (DV-05)** : contre-passation seule ; les écritures n'entrent jamais en corbeille (RM-CPT-09). |
-| C-11 | Alerte de stock d'AgriERP : critique à stock ≤ 0 ; logialvia : critique à stock ≤ seuil. | Garder logialvia (RM-STK-02). |
-| C-12 | `docs/prd/rh-crud-poste.md` : le comptable a `view-rh` ; le seeder `RolesAndPermissionsSeeder.php` ne le lui donne pas. | Le rôle comptable existe (DV-07) : périmètre tranché par défaut recommandé (DV-20, Q-DV-7), `view-rh` dépend de Q-PAI-1 ; relever dans AgriERP. |
+| C-10 | F6 §10.15 / `supprimerPiece` : suppression d'une pièce ; LogiAgriERP : contre-passation jamais suppression. | **TRANCHÉ (DV-05)** : contre-passation seule ; les écritures n'entrent jamais en corbeille (RM-CPT-09). |
+| C-11 | Alerte de stock d'LogiAgriERP : critique à stock ≤ 0 ; logialvia : critique à stock ≤ seuil. | Garder logialvia (RM-STK-02). |
+| C-12 | `docs/prd/rh-crud-poste.md` : le comptable a `view-rh` ; le seeder `RolesAndPermissionsSeeder.php` ne le lui donne pas. | Le rôle comptable existe (DV-07) : périmètre tranché par défaut recommandé (DV-20, Q-DV-7), `view-rh` dépend de Q-PAI-1 ; relever dans LogiAgriERP. |
 
 ## 10. Critères d'acceptation du document
 

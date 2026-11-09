@@ -83,7 +83,7 @@ class CorbeilleArchiveParTest extends TestCase
         parent::setUp();
         $this->preparerDecorDepenses();
 
-        $this->marie = User::create(['name' => 'Marie Gestionnaire', 'username' => 'marie', 'email' => 'marie@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $this->marie = User::create(['name' => 'Marie Gestionnaire', 'username' => 'marie', 'email' => 'marie@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $this->marie->assignRole('admin');
 
         $this->espece = LivestockSpecies::create(['code' => 'cuniculture', 'label' => 'Lapins', 'is_enabled' => true]);
@@ -436,7 +436,7 @@ class CorbeilleArchiveParTest extends TestCase
 
     private function posteur(): User
     {
-        $u = User::create(['name' => 'Posteur Aimé', 'username' => 'aime', 'email' => 'aime@fermeolouwachegoun.com', 'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+        $u = User::create(['name' => 'Posteur Aimé', 'username' => 'aime', 'email' => 'aime@fermeolouwachegoun.com', 'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $u->assignRole('admin');
 
         return $u;

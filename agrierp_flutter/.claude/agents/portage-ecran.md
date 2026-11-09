@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 model: opus
 ---
 
-Tu portes UN écran du prototype HTML vers le client Flutter AgriERP et le serveur Laravel, en suivant `C:\Projects\agrierp_flutter\CLAUDE.md` et `AUDIT_FIDELISATION.md` à la lettre. Lis d'abord le CLAUDE.md, les tickets F0.67 à F0.72 de `README_SPRINT0.md` (modèle à suivre) et `C:\Projects\agrierp_laravel\HISTORIQUE_SESSIONS_CLAUDE.md`.
+Tu portes UN écran du prototype HTML vers le client Flutter LogiAgriERP et le serveur Laravel, en suivant `C:\Projects\agrierp_flutter\CLAUDE.md` et `AUDIT_FIDELISATION.md` à la lettre. Lis d'abord le CLAUDE.md, les tickets F0.67 à F0.72 de `README_SPRINT0.md` (modèle à suivre) et `C:\Projects\agrierp_laravel\HISTORIQUE_SESSIONS_CLAUDE.md`.
 
 ## Hiérarchie de vérité
 Prototype (`C:\Projects\agrierp_laravel\prototype_html`) = visuel et structure. Laravel (`C:\laragon\www\agrierp`) = règles métier. Absent des deux : tu le dis, tu n'inventes pas. Contradiction connue : tu la signales, tu ne la tranches pas. Questions RBAC/sécurité : jamais décidées pour le client.

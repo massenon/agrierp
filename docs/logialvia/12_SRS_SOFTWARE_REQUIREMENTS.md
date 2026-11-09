@@ -15,7 +15,7 @@
 > **Rôle.** Architecte logiciel senior (Laravel 12/Livewire 3, Flutter/Drift, synchronisation offline-first).
 > **Contexte.** B3 décrivait une application monoposte sans réseau. Le client a décidé (07/11/2026) de créer le web : le système devient « serveur Laravel + clients Flutter Windows + navigateurs ». Le schéma est partagé (UUID), le serveur est l'unique écrivain des règles sensibles (comptabilité, numéros de pièces, stock rejoué), le poste écrit des FAITS ou des DEMANDES.
 > **Tâches.** (1) Mets à jour le contexte système (section 2) ; (2) vérifie chaque `SR-` contre sa source ; (3) complète la matrice de la section 5 en classant toute table de `logialvia_app/lib/*/data/tables/` : synchronisable / serveur seule / locale, + règle de conflit ; (4) précise les contrats d'interface (section 4) : routes, statuts HTTP, corps ; (5) ajoute les exigences de sécurité, hors ligne, PWA, MeCeF, import ; (6) liste les hypothèses et dépendances ; (7) marque À DÉFINIR ce que les sources ne tranchent pas.
-> **Contraintes.** Mêmes conventions qu'AgriERP (français partout ; UUID ; `app_database.g.dart` jamais à la main ; 1 point de passage par règle ; `authorize()` en première ligne de chaque méthode mutante ; `@can`/masquage = cosmétique). Aucun SQL concaténé. Aucun secret en dur ni versionné. Heure du pays.
+> **Contraintes.** Mêmes conventions qu'LogiAgriERP (français partout ; UUID ; `app_database.g.dart` jamais à la main ; 1 point de passage par règle ; `authorize()` en première ligne de chaque méthode mutante ; `@can`/masquage = cosmétique). Aucun SQL concaténé. Aucun secret en dur ni versionné. Heure du pays.
 > **Critères d'acceptation.** (a) chaque `SR-` : id, énoncé « DOIT », source, test de vérification ; (b) la matrice §5 couvre 100 % des 37 tables de logialvia (37 classes `extends Table`, voir §5) ; (c) chaque interface §4 a route, méthode, authentification, erreurs ; (d) les hypothèses §7 sont datées ; (e) aucune exigence ne contredit `15_REGLES_METIER.md`.
 > **Interdits.** Concevoir un second protocole de synchronisation (PWA incluse) ; hasher un mot de passe en SHA-256+sel côté poste après la bascule ; servir le jeton e-MECeF au poste ; laisser le poste écrire `fiscal_years` ou un numéro de pièce.
 
@@ -55,7 +55,7 @@ Source : B3 §2 (poste seul) révisé par guide §0 et 14.2. Le poste n'est plus
 
 ## 4. Interfaces externes et API de synchronisation
 
-Contrat repris d'AgriERP (`agrierp_laravel/routes/api.php` ; `agrierp_laravel/CLAUDE.md` « Offline sync »). Détail : `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` et `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md`.
+Contrat repris d'LogiAgriERP (`agrierp_laravel/routes/api.php` ; `agrierp_laravel/CLAUDE.md` « Offline sync »). Détail : `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md` et `docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md`.
 
 | ID | Interface | Contrat | Source |
 |---|---|---|---|
@@ -97,7 +97,7 @@ Matrice de classement des **37 tables Drift** de logialvia (relevées par `grep 
 | `AuditLogs`, `SecurityLogs`, `Corbeille`, `MessagesEditeur` | serveur seule (copie en lecture selon droit) | serveur |
 | `PreferencesPoste` | locale, non synchronisée | — |
 
-Absences à noter : il n'existe PAS de table « sujets » dans logialvia (seule `Bandes`) ; les sujets nominatifs (registre des reproducteurs) sont une fonction d'AgriERP (BS3) à décider (Q-ELV-8). Liste complète et dictionnaire : `30_DATABASE_ENGINEERING.md` et `logialvia/docs/D1_Modele_Donnees_ERD_Dictionnaire.md`.
+Absences à noter : il n'existe PAS de table « sujets » dans logialvia (seule `Bandes`) ; les sujets nominatifs (registre des reproducteurs) sont une fonction d'LogiAgriERP (BS3) à décider (Q-ELV-8). Liste complète et dictionnaire : `30_DATABASE_ENGINEERING.md` et `logialvia/docs/D1_Modele_Donnees_ERD_Dictionnaire.md`.
 
 ## 6. Exigences de sécurité, hors ligne, PWA, import
 
@@ -128,7 +128,7 @@ Absences à noter : il n'existe PAS de table « sujets » dans logialvia (seule 
 - Windows 10/11 64 bits avec VC++ Redistributable (`sqlite3_flutter_libs`) [B3 §6, B5 NFRS-PORT-01].
 - Imprimante ou export PDF de repli [B3 §6].
 - Flutter figé (`.fvmrc`) ; PHP 8.3 ; Composer ; Node pour `npm run build` (manifeste Vite requis par la suite de tests) [`CLAUDE.md` racine].
-- Boîtier MeCeF (Eltrade CC300) : À VENIR, non construit à AgriERP ; ne PAS promettre.
+- Boîtier MeCeF (Eltrade CC300) : À VENIR, non construit à LogiAgriERP ; ne PAS promettre.
 
 ## 8. Questions ouvertes
 

@@ -157,7 +157,7 @@ try {
   A.on('response', (r) => { if (r.url().includes('/api/sync/pull')) pulls++; });
   await charger(A, `${base}/poste/`);
   await A.mouse.click(960, 486); await pause(600); await A.keyboard.type('admin', { delay: 40 });
-  await A.mouse.click(940, 568); await pause(600); await A.keyboard.type('AgriERP@2026', { delay: 40 });
+  await A.mouse.click(940, 568); await pause(600); await A.keyboard.type('LogiAgriERP@2026', { delay: 40 });
   const t1 = Date.now();
   await A.mouse.click(960, 664);
   await attendreTexte(A, /Définir votre code PIN/, 30000);

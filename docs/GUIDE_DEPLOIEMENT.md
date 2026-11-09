@@ -1,4 +1,4 @@
-# Guide — cloner, tester et déployer AgriERP (serveur, poste, cPanel, tâches planifiées)
+# Guide — cloner, tester et déployer LogiAgriERP (serveur, poste, cPanel, tâches planifiées)
 
 **Date :** 19/10/2026 · **Pour :** l'éditeur et l'équipe technique de la ferme.
 Ce guide complète [`INSTALLATION_LOCALE.md`](INSTALLATION_LOCALE.md) (poste Windows de développement, pas à pas),
@@ -50,7 +50,7 @@ php artisan storage:link           # justificatifs et photos
 php artisan serve --port=8002      # http://127.0.0.1:8002
 ```
 
-Comptes de démonstration (mot de passe `AgriERP@2026`) : `admin`, `compta`, `caisse`, `elevage`.
+Comptes de démonstration (mot de passe `LogiAgriERP@2026`) : `admin`, `compta`, `caisse`, `elevage`.
 Jeu de démonstration complet (ventes, fiches, stocks…) : `php artisan db:seed --class=DemoDataSeeder`.
 
 ### Tester le serveur
@@ -108,7 +108,7 @@ build_windows.bat --env dev               # développement (http://127.0.0.1:800
 build_windows.bat --sans-installateur     # dossier Release seulement
 ```
 
-Résultat : `agrierp_flutter\installer\Output\AgriERP-Setup-<version>.exe`. Le script refuse une version `-demo`
+Résultat : `agrierp_flutter\installer\Output\LogiAgriERP-Setup-<version>.exe`. Le script refuse une version `-demo`
 en production, une version mal formée, l'absence d'Inno Setup ou du runtime VC++.
 
 ## 4. Envoyer le serveur sur cPanel
@@ -150,7 +150,7 @@ Dans **cPanel → Domaines**, faire pointer `agrierp.fermeolouwachegoun.com` sur
 ### 4.4 Fichier `.env` de production
 
 ```dotenv
-APP_NAME=AgriERP
+APP_NAME=LogiAgriERP
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://agrierp.fermeolouwachegoun.com

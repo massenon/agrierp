@@ -32,7 +32,7 @@ Constat favorable, mesuré : **aucun `<script>` inline** dans `resources/views/l
 ## 4. Hors périmètre
 - Le poste Flutter (déjà sans rechargement).
 - Les liens qui DOIVENT recharger : `a[download]`, exports PDF/Excel, `target="_blank"`, connexion / déconnexion, pages publiques, tout lien vers un fichier (`/storage/…`).
-- Un vrai mode hors ligne du navigateur : la PWA reste volontairement étroite (`CLAUDE.md`, « This PWA does not make AgriERP work offline »).
+- Un vrai mode hors ligne du navigateur : la PWA reste volontairement étroite (`CLAUDE.md`, « This PWA does not make LogiAgriERP work offline »).
 - Inertia / Vue / React : aucun gain ici, une réécriture des 97 composants.
 
 ## 5. Exigences et critères d'acceptation

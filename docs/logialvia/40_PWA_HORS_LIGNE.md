@@ -6,29 +6,29 @@
 > - **Ordre.** Après (1) le socle web Laravel + Livewire de LogiALVIA (`02_ARCHITECTURE_WEB_ET_STACK.md`), (2) l'appairage et la synchronisation du poste fonctionnels contre le vrai serveur (`43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`, étapes S0 à S5), (3) la décision écrite du client sur les questions de la section 8. Avant : lire cette page seule pour décider, jamais pour coder.
 > - **Entrées requises.** Réponses aux questions de la section 8 ; `/api/sync/pull` et `/api/sync/push` de LogiALVIA verts (essai multipostes passé) ; liste des tables de caisse et de fiches journalières déjà synchronisables (UUID, `sync_status`) ; le guide `GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md` (blocs 15, 16 et 20, dont ce fichier est la version « prompt »).
 > - **Sorties.** Une PWA installable ; une file d'envoi IndexedDB ; un service worker étroit ; un client JavaScript de caisse et de fiche ; des tests (mode avion simulé, Playwright) ; une extension de `PwaEtPolicesLocalesTest` ; un paragraphe « PWA » mis à jour dans le `CLAUDE.md` du web de LogiALVIA.
-> - **Pièges de lecture.** Ce fichier **ne contredit pas** le guide (bloc 20) : il le détaille. Tout ce qui suit la section 1 est **À CONCEVOIR** : rien n'en est construit ni éprouvé, ni dans AgriERP ni dans LogiALVIA.
+> - **Pièges de lecture.** Ce fichier **ne contredit pas** le guide (bloc 20) : il le détaille. Tout ce qui suit la section 1 est **À CONCEVOIR** : rien n'en est construit ni éprouvé, ni dans LogiAgriERP ni dans LogiALVIA.
 > - **Voir aussi.** `01_MASTER_PROMPT.md`, `02_ARCHITECTURE_WEB_ET_STACK.md`, `03_DEVELOPMENT_STANDARDS.md`, `04_UI_UX_DESIGN_SYSTEM.md`, `31_TESTING_QA.md`, `43_APPAIRAGE_SYNCHRO_MODALE_ALERTES.md`.
 
 ---
 
-## 1. La vérité sur AgriERP (à rappeler au client, factuellement)
+## 1. La vérité sur LogiAgriERP (à rappeler au client, factuellement)
 
 Le client croyait que LogiAgriERP « fait une PWA qui travaille hors connexion puis se synchronise ». **C'est faux.** Vérifié dans le dépôt le 07/11/2026 :
 
 | Constat | Preuve (chemin réel) |
 |---|---|
-| Le PWA d'AgriERP est **installable**, rien de plus | `agrierp_laravel/public/manifest.webmanifest` (`display: standalone`, `start_url: /dashboard`, 4 icônes, 3 raccourcis) ; `agrierp_laravel/public/offline.html` ; `agrierp_laravel/resources/views/components/pwa-install.blade.php` |
+| Le PWA d'LogiAgriERP est **installable**, rien de plus | `agrierp_laravel/public/manifest.webmanifest` (`display: standalone`, `start_url: /dashboard`, 4 icônes, 3 raccourcis) ; `agrierp_laravel/public/offline.html` ; `agrierp_laravel/resources/views/components/pwa-install.blade.php` |
 | Le service worker est **volontairement étroit**, 3 règles de sûreté écrites en tête du fichier | `agrierp_laravel/public/sw.js` (`VERSION = 'agrierp-v5'`) : (1) seules les requêtes `GET` sont interceptées ; (2) aucune page HTML authentifiée n'est stockée (les navigations passent par le réseau et ne retombent sur `offline.html` qu'en cas d'échec réel) ; (3) seuls les fichiers statiques (`/build/`, `/assets/fonts/`, `/assets/icons/`, `/assets/images/`) sont mis en cache ; exclus : `/livewire/`, `/api/`, `/login`, `/logout`, `/reset-password`, `/broadcasting/`, `/storage/` |
-| La position est **écrite** | `agrierp_laravel/CLAUDE.md`, section « PWA » : « This PWA does not make AgriERP work offline, and that is not a gap : disconnected work is the dedicated client's job, via `/api/sync/*`. A browser cache pretending to take sales offline would create two sources of truth. » |
+| La position est **écrite** | `agrierp_laravel/CLAUDE.md`, section « PWA » : « This PWA does not make LogiAgriERP work offline, and that is not a gap : disconnected work is the dedicated client's job, via `/api/sync/*`. A browser cache pretending to take sales offline would create two sources of truth. » |
 | Aucune brique hors ligne dans le navigateur | aucune occurrence de `indexedDB`, `SyncManager`, `registration.sync` dans `agrierp_laravel/resources` ni `agrierp_laravel/public` ; seul `navigator.serviceWorker.register('/sw.js')` dans les deux layouts |
 | Garde-fou | `agrierp_laravel/tests/Feature/PwaEtPolicesLocalesTest.php` (11 tests : manifeste, icônes, fichiers précachés existants, `sw.js` ignore tout sauf `GET` et exclut `/livewire/`, fenêtre d'installation en bas à gauche, polices locales). ⚠️ La règle « aucun HTML authentifié » est dans le code de `sw.js` mais n'est pas assertée mot pour mot par ce test : à corriger dans LogiALVIA. |
-| Le travail hors ligne d'AgriERP = le **poste Windows** | `agrierp_flutter/` (Drift/SQLite, moteur `agrierp_flutter/lib/core/sync/sync_engine.dart`) ; `agrierp_flutter/pubspec.yaml` ne déclare aucune cible web |
+| Le travail hors ligne d'LogiAgriERP = le **poste Windows** | `agrierp_flutter/` (Drift/SQLite, moteur `agrierp_flutter/lib/core/sync/sync_engine.dart`) ; `agrierp_flutter/pubspec.yaml` ne déclare aucune cible web |
 
-**Phrase à dire au client :** « AgriERP vous permet d'installer le site comme une application et affiche une page d'attente si le réseau tombe ; il ne permet PAS de vendre sans réseau dans le navigateur. Pour vendre sans réseau, il a un logiciel Windows séparé. Pour LogiALVIA, vous voulez mieux : voici ce que ça coûte et comment le faire sans créer deux vérités. »
+**Phrase à dire au client :** « LogiAgriERP vous permet d'installer le site comme une application et affiche une page d'attente si le réseau tombe ; il ne permet PAS de vendre sans réseau dans le navigateur. Pour vendre sans réseau, il a un logiciel Windows séparé. Pour LogiALVIA, vous voulez mieux : voici ce que ça coûte et comment le faire sans créer deux vérités. »
 
 ### 1.1 Le refus d'origine, et comment le lever
 
-AgriERP a refusé le hors ligne navigateur pour cinq raisons (guide bloc 20). Pour chacune, la parade de LogiALVIA :
+LogiAgriERP a refusé le hors ligne navigateur pour cinq raisons (guide bloc 20). Pour chacune, la parade de LogiALVIA :
 
 | Raison du refus | Comment la lever sans recréer deux sources de vérité |
 |---|---|
@@ -57,7 +57,7 @@ AgriERP a refusé le hors ligne navigateur pour cinq raisons (guide bloc 20). Po
 
 ### Recommandation
 
-1. **Par défaut : garder le poste Windows comme client hors ligne** (c'est ce qu'AgriERP fait et prouve), et faire de la PWA un client **« consultation + saisie simple EN LIGNE »**, avec le service worker étroit d'AgriERP (statique seulement, page d'attente).
+1. **Par défaut : garder le poste Windows comme client hors ligne** (c'est ce qu'LogiAgriERP fait et prouve), et faire de la PWA un client **« consultation + saisie simple EN LIGNE »**, avec le service worker étroit d'LogiAgriERP (statique seulement, page d'attente).
 2. **Si le client veut vraiment le hors ligne dans le navigateur** (tablette ou téléphone en boutique, ordinateur sans installation) : **voie B, périmètre minimal** (section 3), après les réponses de la section 8. C'est la voie la plus chère mais la seule qui n'impose pas de recompiler tout LogiALVIA.
 3. **Voie C : seulement après un essai de compilation web de `logialvia_app/`** (une demi-journée, jetable) et un essai Drift WASM sur les navigateurs du client. Sans cet essai : non.
 4. **Jamais les deux B et C.** Et si le besoin est « quelques ventes quand le réseau tombe » : la caisse du poste Windows suffit.
@@ -85,8 +85,8 @@ RÔLE
 Tu es l'ingénieur front-end/PWA et l'ingénieur de synchronisation de LogiALVIA (web Laravel 12 + Livewire 3, mêmes conventions que LogiAgriERP). Tu construis un client hors ligne dans le navigateur qui parle le MÊME protocole de synchronisation que le poste Windows, sans créer de seconde source de vérité. Tout en français (prose, libellés, commentaires, noms de tests, messages de commit). Ne commite et ne pousse que sur demande expresse.
 
 CONTEXTE (rien à inventer)
-- Lis d'abord : le CLAUDE.md de LogiALVIA (web), docs/DOCTRINE_PORTAGE.md (équivalent), docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md d'AgriERP (/home/user/agrierp/docs/), et le guide /home/user/agrierp/docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md blocs 15, 16 et 20.
-- Référence AgriERP (lecture seule) : /home/user/agrierp/agrierp_laravel/public/sw.js, public/manifest.webmanifest, public/offline.html, resources/views/components/pwa-install.blade.php, tests/Feature/PwaEtPolicesLocalesTest.php ; protocole : app/Http/Controllers/Api/SyncController.php (pull, push), routes/api.php ; moteur du poste : /home/user/agrierp/agrierp_flutter/lib/core/sync/sync_engine.dart et synchronisation_automatique.dart ; verrou : agrierp_flutter/lib/core/auth/verrou_local.dart ; essai multipostes : agrierp_laravel/tests/Feature/SyncEssaiMultipostesTest.php.
+- Lis d'abord : le CLAUDE.md de LogiALVIA (web), docs/DOCTRINE_PORTAGE.md (équivalent), docs/BLUEPRINT_SYNCHRONISATION_MULTIPOSTES.md d'LogiAgriERP (/home/user/agrierp/docs/), et le guide /home/user/agrierp/docs/logialvia/GUIDE_PORTAGE_VERS_AUTRE_LOGICIEL.md blocs 15, 16 et 20.
+- Référence LogiAgriERP (lecture seule) : /home/user/agrierp/agrierp_laravel/public/sw.js, public/manifest.webmanifest, public/offline.html, resources/views/components/pwa-install.blade.php, tests/Feature/PwaEtPolicesLocalesTest.php ; protocole : app/Http/Controllers/Api/SyncController.php (pull, push), routes/api.php ; moteur du poste : /home/user/agrierp/agrierp_flutter/lib/core/sync/sync_engine.dart et synchronisation_automatique.dart ; verrou : agrierp_flutter/lib/core/auth/verrou_local.dart ; essai multipostes : agrierp_laravel/tests/Feature/SyncEssaiMultipostesTest.php.
 - Décisions déjà prises par le client (à recopier en tête de ton CLAUDE.md « PWA », avec leurs dates) : appareils visés = <À REMPLIR, section 8>, durée maximale hors ligne = <À REMPLIR>, volumes = <À REMPLIR>.
 - Si une de ces réponses manque : ARRÊTE-TOI et pose la question. Ne choisis pas.
 
@@ -94,7 +94,7 @@ TÂCHES (dans l'ordre ; une tâche = un commit ; chaque tâche finit vert avant 
 
 T1 — Décision écrite. Crée docs/PWA_DECISION.md dans le web : voie retenue (B), périmètre minimal (ventes de caisse, fiches journalières, lecture de référentiels réduits), interdits hors ligne, limite de durée, appareils. Aucune ligne de code avant.
 
-T2 — Service worker (public/sw.js), reprise du service worker d'AgriERP et SEULEMENT élargi comme suit :
+T2 — Service worker (public/sw.js), reprise du service worker d'LogiAgriERP et SEULEMENT élargi comme suit :
  a) Garde les trois règles de sûreté en tête de fichier, mot pour mot : (1) seules les requêtes GET sont interceptées (`if (request.method !== 'GET') return;`) ; (2) aucune page HTML authentifiée n'est JAMAIS stockée : les navigations passent par le réseau et ne retombent sur /offline.html qu'en échec réel ; (3) seuls des fichiers statiques sont mis en cache.
  b) Stratégies de cache PRÉCISES, une par famille d'URL :
     - /build/* (fichiers empreints) et /assets/fonts|icons|images/* : cache d'abord, mise à jour au changement de VERSION ;
@@ -147,7 +147,7 @@ T9 — Protocole de synchronisation (le MÊME que le poste ; interdiction d'en i
 
 T10 — Interface hors ligne : coque statique + client JavaScript de caisse et de fiche réduites (pas Livewire). Chaque écran copie la structure et les libellés de la vue Blade correspondante (la vue Blade est le maître) ; un test lit la vue Blade et compare les libellés (modèle : agrierp_flutter/test/email_smtp_blade_test.dart).
 
-T11 — Manifeste et installabilité : reprendre public/manifest.webmanifest d'AgriERP (display standalone, start_url, scope, theme_color, icônes 192/512 `any` + `maskable`, raccourcis « Enregistrer une vente » et « Fiches d'élevage ») ; type MIME `application/manifest+json` servi (AddType dans public/.htaccess : sans cela le navigateur l'ignore EN SILENCE) ; `sw.js` en `no-cache` ; icônes dérivées du logo/favicon OFFICIEL de LogiALVIA ; invitation d'installation en BAS À GAUCHE (le bas droit est pris par les toasts, z-index 200).
+T11 — Manifeste et installabilité : reprendre public/manifest.webmanifest d'LogiAgriERP (display standalone, start_url, scope, theme_color, icônes 192/512 `any` + `maskable`, raccourcis « Enregistrer une vente » et « Fiches d'élevage ») ; type MIME `application/manifest+json` servi (AddType dans public/.htaccess : sans cela le navigateur l'ignore EN SILENCE) ; `sw.js` en `no-cache` ; icônes dérivées du logo/favicon OFFICIEL de LogiALVIA ; invitation d'installation en BAS À GAUCHE (le bas droit est pris par les toasts, z-index 200).
 
 T12 — Tests (section 6) puis documentation : section « PWA » du CLAUDE.md web, paragraphe « Limites connues » (sections 5.6 et 7), mise à jour du manuel.
 
@@ -156,7 +156,7 @@ CONTRAINTES (à ne jamais assouplir)
 2. Aucune règle métier réécrite : le navigateur écrit des FAITS ; le serveur décide, numérote, écrit. Les seuls calculs côté navigateur (total de ligne, remise, total de vente) vivent dans UN module (`resources/js/hors-ligne/calculs-caisse.js`) prouvé égal au PHP par un test de parité EXÉCUTÉ (voir 5.4).
 3. Aucun jeton, mot de passe, PIN ni clé en clair dans localStorage, sessionStorage, cache, journal, URL ou message d'erreur.
 4. Un seul protocole : /api/sync/pull|push. Aucune route serveur nouvelle pour la PWA sans décision écrite du client.
-5. Aucune dépendance externe chargée à l'exécution (polices et scripts locaux, comme AgriERP) ; versions de bibliothèques figées.
+5. Aucune dépendance externe chargée à l'exécution (polices et scripts locaux, comme LogiAgriERP) ; versions de bibliothèques figées.
 6. Les montants sont des entiers FCFA ; les quantités décimales sont des chaînes ou des entiers en millièmes, jamais des flottants binaires cumulés.
 7. Hors ligne n'est jamais présenté comme une erreur rouge.
 
@@ -183,7 +183,7 @@ A10. Parité : `tests/Js/calculs-caisse.test.mjs` (même grille de cas que le PH
 A11. `PwaEtPolicesLocalesTest` étendu, jamais affaibli ; suite Feature verte ; tout est en français.
 A12. Safari/iOS (si visé) : essai manuel documenté — pas de Background Sync, repli par `online` + premier plan vérifiés ; limites de stockage notées.
 
-PIÈGES DÉJÀ PAYÉS (par AgriERP, à connaître)
+PIÈGES DÉJÀ PAYÉS (par LogiAgriERP, à connaître)
 - manifeste servi en `text/plain` par Apache → application non installable sans aucune erreur visible (`AddType` dans .htaccess).
 - service worker changé sans changer VERSION → les postes gardent l'ancien fichier sur disque.
 - cache HTML d'un tableau de bord réapparu après déconnexion sur un poste partagé.
@@ -210,7 +210,7 @@ Le cache d'un navigateur n'est pas cloisonné par utilisateur et ne sait pas exp
 `online` n'est qu'un indice (il peut mentir) : la preuve est un appel réel au serveur. Séquence : `online` → attente 2 s → tirage → envoi → mise à jour de l'état. Échec réseau → réessais 30 s / 2 min / 5 min / 15 min / 1 h.
 
 ### 5.4 Parité du calcul d'affichage
-Même méthode que le poste : le test lit le PHP de référence, exécute le JavaScript sur la même grille (`tests/Js/*.test.mjs` existe déjà côté AgriERP : `agrierp_laravel/tests/Js/verrou-logique.test.mjs`, lancé par `node`), et exige l'égalité. Une divergence = test rouge, jamais « ça arrondit pareil à peu près ».
+Même méthode que le poste : le test lit le PHP de référence, exécute le JavaScript sur la même grille (`tests/Js/*.test.mjs` existe déjà côté LogiAgriERP : `agrierp_laravel/tests/Js/verrou-logique.test.mjs`, lancé par `node`), et exige l'égalité. Une divergence = test rouge, jamais « ça arrondit pareil à peu près ».
 
 ### 5.5 Durée hors ligne
 Le jeton expire à 90 jours (`agrierp_laravel/config/sanctum.php`, `SANCTUM_EXPIRATION`) ; les référentiels vieillissent (prix) ; annoncer à l'écran « Dernier tirage : il y a N jours » et, au-delà d'un seuil décidé avec le client, **refuser la vente hors ligne** plutôt que vendre à un prix périmé (décision client).
@@ -221,7 +221,7 @@ Le jeton expire à 90 jours (`agrierp_laravel/config/sanctum.php`, `SANCTUM_EXPI
 | Chrome / Edge (Windows, macOS, Linux, Android) | invite `beforeinstallprompt` ; manifeste + service worker + HTTPS exigés | Background Sync disponible (Chromium) mais pas garanti ; stockage purgeable |
 | Android | « Ajouter à l'écran d'accueil » / installation | idem ; économiseurs de batterie qui retardent la synchronisation |
 | Firefox | pas d'installation de PWA sur ordinateur ; usage en onglet | pas de Background Sync |
-| Safari / iOS / iPadOS | pas de `beforeinstallprompt` : afficher les instructions manuelles Partager ➔ Sur l'écran d'accueil (comme `pwa-install.blade.php` d'AgriERP) | **pas de Background Sync** ; stockage d'un site peu utilisé potentiellement purgé par le système ; comportements propres aux PWA installées à vérifier sur un vrai appareil avant tout engagement |
+| Safari / iOS / iPadOS | pas de `beforeinstallprompt` : afficher les instructions manuelles Partager ➔ Sur l'écran d'accueil (comme `pwa-install.blade.php` d'LogiAgriERP) | **pas de Background Sync** ; stockage d'un site peu utilisé potentiellement purgé par le système ; comportements propres aux PWA installées à vérifier sur un vrai appareil avant tout engagement |
 HTTPS est obligatoire en production (hors `localhost`). Ces points sont des limites générales de plateforme, à reconfirmer à la date du chantier ; aucun essai iPhone n'a été fait dans ce dépôt.
 
 ---
@@ -229,7 +229,7 @@ HTTPS est obligatoire en production (hors `localhost`). Ces points sont des limi
 ## 6. Tests
 
 ### 6.1 Outils
-- **Playwright** et Chromium sont présents sur la machine de rédaction : Playwright en module Node global (`/opt/node22/lib/node_modules/playwright`), Chromium sous `/opt/pw-browsers` (`chromium-1194`, `chromium_headless_shell-1194`). Le dépôt d'AgriERP a aussi **Laravel Dusk** (`agrierp_laravel/tests/Browser/*`, `DuskTestCase.php`, chromedriver global). Dusk est bien pour les parcours Livewire ; **pour le mode avion, Playwright est plus simple** (`context.setOffline(true)`, `page.route` pour perdre une réponse, `context.serviceWorkers()`, inspection d'IndexedDB et des caches par `page.evaluate`). Choix recommandé : Playwright pour la PWA, Dusk pour le reste, un seul des deux par scénario.
+- **Playwright** et Chromium sont présents sur la machine de rédaction : Playwright en module Node global (`/opt/node22/lib/node_modules/playwright`), Chromium sous `/opt/pw-browsers` (`chromium-1194`, `chromium_headless_shell-1194`). Le dépôt d'LogiAgriERP a aussi **Laravel Dusk** (`agrierp_laravel/tests/Browser/*`, `DuskTestCase.php`, chromedriver global). Dusk est bien pour les parcours Livewire ; **pour le mode avion, Playwright est plus simple** (`context.setOffline(true)`, `page.route` pour perdre une réponse, `context.serviceWorkers()`, inspection d'IndexedDB et des caches par `page.evaluate`). Choix recommandé : Playwright pour la PWA, Dusk pour le reste, un seul des deux par scénario.
 - Serveur de test : `php artisan serve` sur base `migrate:fresh --seed` ; `npm run build` et `php artisan storage:link` obligatoires (sinon des tests échouent pour des raisons d'environnement).
 
 ### 6.2 Scénarios obligatoires (mode avion simulé)

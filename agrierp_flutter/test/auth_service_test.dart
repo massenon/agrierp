@@ -138,7 +138,7 @@ void main() {
 
     final utilisateur = await auth.connecter(
       identifiant: 'compta',
-      motDePasse: 'AgriERP@2026',
+      motDePasse: 'LogiAgriERP@2026',
     );
 
     expect(serveur.corpsRecu!['identifiant'], 'compta');
@@ -153,7 +153,7 @@ void main() {
 
     await auth.connecter(
       identifiant: 'compta',
-      motDePasse: 'AgriERP@2026-reconnaissable',
+      motDePasse: 'LogiAgriERP@2026-reconnaissable',
     );
 
     for (final valeur in coffre.values) {

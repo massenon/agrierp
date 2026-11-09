@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Tokens de design AgriERP — transposition FIDÈLE de
+/// Tokens de design LogiAgriERP — transposition FIDÈLE de
 /// `prototype_html/assets/js/tailwind-config.js`, source unique de vérité
 /// partagée par les 97 écrans du prototype.
 ///

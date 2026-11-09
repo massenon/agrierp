@@ -39,13 +39,13 @@ int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
 }
 
-// AgriERP : taille minimale de la fenetre, en pixels LOGIQUES (a 96 ppp). Elle
+// LogiAgriERP : taille minimale de la fenetre, en pixels LOGIQUES (a 96 ppp). Elle
 // reste sous le plus petit ecran courant meme a 150 % de mise a l'echelle ; elle
 // est de toute facon plafonnee a la zone de travail (voir FillMinMaxInfo).
 constexpr int kMinLogicalWidth = 640;
 constexpr int kMinLogicalHeight = 480;
 
-// AgriERP : l'icone de l'application (le logo de la ferme, ressource
+// LogiAgriERP : l'icone de l'application (le logo de la ferme, ressource
 // IDI_APP_ICON de Runner.rc) est donnee a la fenetre en GRANDE taille (Alt+Tab,
 // barre des taches) et en PETITE taille (coin de la fenetre, barre des taches
 // en mode compact). Sans cela, Windows redimensionne l'unique icone de la classe
@@ -173,7 +173,7 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  // AgriERP s'affiche SANS CADRE SYSTEME.
+  // LogiAgriERP s'affiche SANS CADRE SYSTEME.
   //
   // `WS_POPUP` retire la barre de titre et ses trois boutons. L'ecran occupe
   // ainsi toute la surface, comme la maquette qui est une page pleine.
@@ -245,7 +245,7 @@ Win32Window::MessageHandler(HWND hwnd,
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
-      // AgriERP : une fenetre agrandie reste sur la zone de travail du
+      // LogiAgriERP : une fenetre agrandie reste sur la zone de travail du
       // moniteur qui la porte desormais (autre resolution, autre echelle, autre
       // barre des taches). Le rectangle suggere ci-dessus l'a d'abord amenee
       // sur ce moniteur ; on la cale ensuite sur SA zone de travail.
@@ -256,7 +256,7 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
     }
     case WM_SIZE: {
-      // AgriERP : sortie de reduction dans la barre des taches. Si la zone de
+      // LogiAgriERP : sortie de reduction dans la barre des taches. Si la zone de
       // travail a change pendant que la fenetre etait reduite, elle se recale.
       if (maximized_ && wparam == SIZE_RESTORED) {
         FitToWorkArea();

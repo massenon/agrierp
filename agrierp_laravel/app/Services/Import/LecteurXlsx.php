@@ -80,7 +80,7 @@ class LecteurXlsx
         $version = $meta ? LectureValeurs::texte($meta->getCell('B2')->getValue()) : '';
 
         if ($modele === '') {
-            throw new ImportRefuse("Ce fichier n'est pas un modèle AgriERP : téléchargez le modèle « {$module->libelle()} » (version {$module->version()}) à l'étape 2.");
+            throw new ImportRefuse("Ce fichier n'est pas un modèle LogiAgriERP : téléchargez le modèle « {$module->libelle()} » (version {$module->version()}) à l'étape 2.");
         }
 
         if ($modele !== $module->cle()) {

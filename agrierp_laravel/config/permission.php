@@ -23,7 +23,7 @@ return [
     ],
 
     'column_names' => [
-        // AgriERP : users.id est UUID (voir docblock migration users) —
+        // LogiAgriERP : users.id est UUID (voir docblock migration users) —
         // model_morph_key doit correspondre à la colonne générée par
         // uuidMorphs('model') dans la migration permission_tables.
         'role_pivot_key' => 'role_id',

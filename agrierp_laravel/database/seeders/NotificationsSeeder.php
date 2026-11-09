@@ -34,11 +34,11 @@ class NotificationsSeeder extends Seeder
         }
 
         Notification::firstOrCreate(
-            ['user_id' => $admin->id, 'title' => 'Bienvenue sur AgriERP'],
+            ['user_id' => $admin->id, 'title' => 'Bienvenue sur LogiAgriERP'],
             [
                 'type' => 'system',
                 'severity' => 'info',
-                'message' => 'Votre espace AgriERP est prêt. Les alertes automatiques (stock, élevage, finance) apparaîtront ici au fil de l\'utilisation réelle des modules.',
+                'message' => 'Votre espace LogiAgriERP est prêt. Les alertes automatiques (stock, élevage, finance) apparaîtront ici au fil de l\'utilisation réelle des modules.',
                 'icon' => 'celebration',
                 'is_read' => false,
             ]

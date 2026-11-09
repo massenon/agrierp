@@ -56,7 +56,7 @@ class PwaHorsLigneTest extends TestCase
     private function compte(string $role, string $nom = null): User
     {
         $u = User::create(['name' => ucfirst($role), 'username' => $nom ?? $role, 'email' => ($nom ?? $role).'@fermeolouwachegoun.com',
-            'password' => bcrypt('AgriERP@2026'), 'is_active' => true]);
+            'password' => bcrypt('LogiAgriERP@2026'), 'is_active' => true]);
         $u->assignRole($role);
 
         return $u;
@@ -65,7 +65,7 @@ class PwaHorsLigneTest extends TestCase
     /** Appairage du navigateur : exactement l'appel que fait `appairage.js`. */
     private function appairer(string $appareil = self::APPAREIL, string $identifiant = 'caissier'): string
     {
-        $r = $this->postJson('/api/auth/login', ['identifiant' => $identifiant, 'password' => 'AgriERP@2026', 'device_name' => $appareil]);
+        $r = $this->postJson('/api/auth/login', ['identifiant' => $identifiant, 'password' => 'LogiAgriERP@2026', 'device_name' => $appareil]);
         $r->assertOk()->assertJsonStructure(['token', 'user' => ['id', 'name', 'username', 'role'], 'must_change_password']);
 
         return $r->json('token');
