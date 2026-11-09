@@ -2465,25 +2465,24 @@ class SyncEngine {
           c.id,
       };
 
-      for (final l in lignes) {
-        if (protegees.contains(l['id'])) continue;
-
-        await _db
-            .into(_db.customers)
-            .insertOnConflictUpdate(
-              CustomersCompanion.insert(
-                id: l['id'] as String,
-                name: (l['name'] ?? '') as String,
-                phone: Value(l['phone'] as String?),
-                email: Value(l['email'] as String?),
-                city: Value(l['city'] as String?),
-                // MECEF-3 — IFU du client (13 chiffres, facultatif) : préremplit la facture normalisée.
-                ifu: Value(l['ifu'] as String?),
-                creditLimit: Value(_reel(l['credit_limit']) ?? 0),
-                isActive: Value(_bool(l['is_active'])),
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch` ; un client `pending` / `conflict` reste intouchable.
+      await _db.batch((b) {
+        for (final l in lignes) {
+          if (protegees.contains(l['id'])) continue;
+          final client = CustomersCompanion.insert(
+            id: l['id'] as String,
+            name: (l['name'] ?? '') as String,
+            phone: Value(l['phone'] as String?),
+            email: Value(l['email'] as String?),
+            city: Value(l['city'] as String?),
+            // MECEF-3 — IFU du client (13 chiffres, facultatif) : préremplit la facture normalisée.
+            ifu: Value(l['ifu'] as String?),
+            creditLimit: Value(_reel(l['credit_limit']) ?? 0),
+            isActive: Value(_bool(l['is_active'])),
+          );
+          b.insert(_db.customers, client, onConflict: DoUpdate((_) => client));
+        }
+      });
     });
 
     return lignes.length;
@@ -2556,27 +2555,26 @@ class SyncEngine {
           a.id,
       };
 
-      for (final l in lignes) {
-        if (protegees.contains(l['id'])) continue;
-
-        await _db
-            .into(_db.customerAdvances)
-            .insertOnConflictUpdate(
-              CustomerAdvancesCompanion.insert(
-                id: l['id'] as String,
-                customerId: (l['customer_id'] ?? '') as String,
-                amount: _reel(l['amount']) ?? 0,
-                amountUsed: Value(_reel(l['amount_used']) ?? 0),
-                advanceDate: Value(_date(l['advance_date'])),
-                isActive: Value(_bool(l['is_active'])),
-                treasuryAccountId: Value(l['treasury_account_id'] as String?),
-                paymentMode: Value(l['payment_mode'] as String?),
-                motif: Value(l['motif'] as String?),
-                deviceId: Value(l['device_id'] as String?),
-                syncStatus: const Value(SyncStatus.synced),
-              ),
-            );
-      }
+      // PWA-2c — UNE rafale `batch` ; une avance `pending` / `conflict` reste intouchable.
+      await _db.batch((b) {
+        for (final l in lignes) {
+          if (protegees.contains(l['id'])) continue;
+          final avance = CustomerAdvancesCompanion.insert(
+            id: l['id'] as String,
+            customerId: (l['customer_id'] ?? '') as String,
+            amount: _reel(l['amount']) ?? 0,
+            amountUsed: Value(_reel(l['amount_used']) ?? 0),
+            advanceDate: Value(_date(l['advance_date'])),
+            isActive: Value(_bool(l['is_active'])),
+            treasuryAccountId: Value(l['treasury_account_id'] as String?),
+            paymentMode: Value(l['payment_mode'] as String?),
+            motif: Value(l['motif'] as String?),
+            deviceId: Value(l['device_id'] as String?),
+            syncStatus: const Value(SyncStatus.synced),
+          );
+          b.insert(_db.customerAdvances, avance, onConflict: DoUpdate((_) => avance));
+        }
+      });
 
       final servies = [for (final l in lignes) l['id'] as String];
       await (_db.delete(_db.customerAdvances)..where(
@@ -2618,12 +2616,11 @@ class SyncEngine {
         _db.suppliers,
       )..where((t) => t.syncStatus.equalsValue(SyncStatus.synced))).go();
 
-      for (final l in lignes) {
-        if (protegees.contains(l['id'])) continue;
-
-        await _db
-            .into(_db.suppliers)
-            .insert(
+      // PWA-2c — UNE rafale `batch` (les fiches acquittées viennent d'être effacées ; une fiche protégée n'est pas réécrite).
+      await _db.batch((b) {
+        b.insertAll(_db.suppliers, [
+          for (final l in lignes)
+            if (!protegees.contains(l['id']))
               SuppliersCompanion.insert(
                 id: l['id'] as String,
                 name: (l['name'] ?? '') as String,
@@ -2632,8 +2629,8 @@ class SyncEngine {
                 email: Value(l['email'] as String?),
                 address: Value(l['address'] as String?),
               ),
-            );
-      }
+        ]);
+      });
     });
 
     return lignes.length;
@@ -3105,11 +3102,11 @@ class SyncEngine {
 
     final l = brut.map((c, v) => MapEntry(c.toString(), v));
     await _tirerFichiersEntreprise(l);
+    // PWA-2c — les réglages MeCeF servis sont écrits en UNE rafale `batch` (jusqu'à six instructions avant).
+    final reglages = <AppSettingsCompanion>[];
     // Ticket VC-5 — le serveur dit si le module MeCeF est activé (clé absente d'un serveur antérieur : le poste garde son défaut).
     if (l['mecef_actif'] is bool) {
-      await _db.into(_db.appSettings).insertOnConflictUpdate(
-        AppSettingsCompanion.insert(key: 'mecef.actif', value: l['mecef_actif'] == true ? '1' : '0'),
-      );
+      reglages.add(AppSettingsCompanion.insert(key: 'mecef.actif', value: l['mecef_actif'] == true ? '1' : '0'));
     }
     // MECEF-1 — le mode (`desactive` · `emecef` · `boitier`), l'adresse de l'API, l'opérateur et UN BOOLÉEN « jeton configuré » :
     // jamais le jeton lui-même (le serveur ne le sert pas). Clés absentes (serveur antérieur) : rien n'est touché.
@@ -3120,15 +3117,18 @@ class SyncEngine {
       ('mecef_operateur_nom', 'mecef.operateur_nom'),
     ]) {
       if (l.containsKey(cleServeur)) {
-        await _db.into(_db.appSettings).insertOnConflictUpdate(
-          AppSettingsCompanion.insert(key: cleLocale, value: (l[cleServeur] ?? '').toString()),
-        );
+        reglages.add(AppSettingsCompanion.insert(key: cleLocale, value: (l[cleServeur] ?? '').toString()));
       }
     }
     if (l['mecef_jeton_configure'] is bool) {
-      await _db.into(_db.appSettings).insertOnConflictUpdate(
-        AppSettingsCompanion.insert(key: 'mecef.jeton_configure', value: l['mecef_jeton_configure'] == true ? '1' : '0'),
-      );
+      reglages.add(AppSettingsCompanion.insert(key: 'mecef.jeton_configure', value: l['mecef_jeton_configure'] == true ? '1' : '0'));
+    }
+    if (reglages.isNotEmpty) {
+      await _db.batch((b) {
+        for (final r in reglages) {
+          b.insert(_db.appSettings, r, onConflict: DoUpdate((_) => r));
+        }
+      });
     }
 
     final delaiServi = l.containsKey('rappel_soins_jours');
@@ -3675,6 +3675,8 @@ class SyncEngine {
       };
 
       final servis = <String>{};
+      // PWA-2c — les écritures sont COLLECTÉES puis jouées en UNE rafale `batch` (même ordre) : une instruction par ligne avant.
+      final ops = <void Function(Batch)>[];
 
       for (final l in lignes) {
         final id = l['id'];
@@ -3705,14 +3707,11 @@ class SyncEngine {
 
         // Archivé côté serveur : il quitte la liste du poste (rien n'y est supprimé là-bas).
         if (l.containsKey('is_active') && !_bool(l['is_active'])) {
-          await (_db.delete(_db.mails)..where((t) => t.id.equals(id))).go();
+          ops.add((b) => b.deleteWhere(_db.mails, (t) => t.id.equals(id)));
           continue;
         }
 
-        await _db
-            .into(_db.mails)
-            .insertOnConflictUpdate(
-              MailsCompanion.insert(
+        final ligne = MailsCompanion.insert(
                 id: id,
                 reference: Value(l['reference'] as String?),
                 type: type as String,
@@ -3722,11 +3721,17 @@ class SyncEngine {
                 isActive: const Value(true),
                 syncStatus: const Value(SyncStatus.synced),
                 knownByServer: const Value(true),
-              ),
-            );
+              );
+        ops.add((b) => b.insert(_db.mails, ligne, onConflict: DoUpdate((_) => ligne)));
       }
 
       // Une ligne synchronisée que le serveur n'a PAS servie n'est plus un courrier actif.
+      await _db.batch((b) {
+        for (final o in ops) {
+          o(b);
+        }
+      });
+
       await (_db.delete(_db.mails)..where(
             (t) => Expression.and([
               t.syncStatus.equalsValue(SyncStatus.synced),
@@ -3772,6 +3777,8 @@ class SyncEngine {
       };
 
       final servis = <String>{};
+      // PWA-2c — les écritures sont COLLECTÉES puis jouées en UNE rafale `batch` (même ordre) : une instruction par ligne avant.
+      final ops = <void Function(Batch)>[];
 
       for (final l in lignes) {
         final id = l['id'];
@@ -3818,16 +3825,11 @@ class SyncEngine {
 
         // Retiré côté serveur : il quitte la liste du poste (rien n'y est supprimé là-bas).
         if (l.containsKey('is_active') && !_bool(l['is_active'])) {
-          await (_db.delete(
-            _db.administrativeDocuments,
-          )..where((t) => t.id.equals(id))).go();
+          ops.add((b) => b.deleteWhere(_db.administrativeDocuments, (t) => t.id.equals(id)));
           continue;
         }
 
-        await _db
-            .into(_db.administrativeDocuments)
-            .insertOnConflictUpdate(
-              AdministrativeDocumentsCompanion.insert(
+        final ligne = AdministrativeDocumentsCompanion.insert(
                 id: id,
                 title: titre,
                 type: Value(type),
@@ -3837,11 +3839,17 @@ class SyncEngine {
                 isActive: const Value(true),
                 syncStatus: const Value(SyncStatus.synced),
                 knownByServer: const Value(true),
-              ),
-            );
+              );
+        ops.add((b) => b.insert(_db.administrativeDocuments, ligne, onConflict: DoUpdate((_) => ligne)));
       }
 
       // Une ligne synchronisée que le serveur n'a PAS servie n'est plus un document actif.
+      await _db.batch((b) {
+        for (final o in ops) {
+          o(b);
+        }
+      });
+
       await (_db.delete(_db.administrativeDocuments)..where(
             (t) => Expression.and([
               t.syncStatus.equalsValue(SyncStatus.synced),
@@ -3885,6 +3893,8 @@ class SyncEngine {
       };
 
       final servis = <String>{};
+      // PWA-2c — les écritures sont COLLECTÉES puis jouées en UNE rafale `batch` (même ordre) : une instruction par ligne avant.
+      final ops = <void Function(Batch)>[];
 
       for (final l in lignes) {
         final id = l['id'];
@@ -3924,16 +3934,11 @@ class SyncEngine {
 
         // Retiré côté serveur : il quitte la liste du poste (rien n'y est supprimé là-bas).
         if (l.containsKey('is_active') && !_bool(l['is_active'])) {
-          await (_db.delete(
-            _db.archivedDocuments,
-          )..where((t) => t.id.equals(id))).go();
+          ops.add((b) => b.deleteWhere(_db.archivedDocuments, (t) => t.id.equals(id)));
           continue;
         }
 
-        await _db
-            .into(_db.archivedDocuments)
-            .insertOnConflictUpdate(
-              ArchivedDocumentsCompanion.insert(
+        final ligne = ArchivedDocumentsCompanion.insert(
                 id: id,
                 title: titre,
                 category: Value(categorie),
@@ -3942,11 +3947,17 @@ class SyncEngine {
                 isActive: const Value(true),
                 syncStatus: const Value(SyncStatus.synced),
                 knownByServer: const Value(true),
-              ),
-            );
+              );
+        ops.add((b) => b.insert(_db.archivedDocuments, ligne, onConflict: DoUpdate((_) => ligne)));
       }
 
       // Une ligne synchronisée que le serveur n'a PAS servie n'est plus un document actif.
+      await _db.batch((b) {
+        for (final o in ops) {
+          o(b);
+        }
+      });
+
       await (_db.delete(_db.archivedDocuments)..where(
             (t) => Expression.and([
               t.syncStatus.equalsValue(SyncStatus.synced),
