@@ -9,6 +9,8 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 
 > Convention : ✅ fait · 🔧 à faire · ❓ décision client requise avant de coder. Un ticket = une session, terminé seulement quand les tests sont verts des deux côtés et que le ticket est consigné dans `README_SPRINT0.md`.
 
+**Passage de nettoyage du 10/11/2026.** Sur 25 lignes portant 🔧 ou ❓, 7 passent en ✅ (preuve citée sur chaque ligne) : A6 (`.fvmrc`), 3.F1 et 3.F2 (F0.96 / F0.97), 3.F6 (A2 à A4), B2 (synchronisation automatique, H13), B4 (absorbé par H2) et le doublon périmé de MP1-Q1. Restent **ouvertes dans le code** (aucune preuve de livraison trouvée) : 3.F5 (cascade Escargots / Reproducteurs en parité exécutée PHP ↔ Dart : aucun test dédié aux Escargots), 3.F7 (la mise-bas n'écrit pas `ne`), B3 (historique, filtre par table et export du journal : seule la relance d'un conflit existe), B5 (sauvegarde automatique quotidienne et avant migration, rotation 7 jours : seule la sauvegarde manuelle de 30 jours existe), B6 (continu), Sprint C (clôture de caisse, définition web à valider), D3 (aucun workflow GitHub Actions dans le dépôt), EX9 (archive figée de l'exercice, non construite), MP2 (champs voisins d'une date), DEV2 (l'onglet « Devis » du tableau de bord du poste ne lit pas `quotes`). **Dépendent du client** : essais réels sur Windows (D2, D5), certificat de signature (D4), mise en service simultanée avec l'exploitant (3.F4), décisions sans réponse (3.F3 : D5, D15, D2/D8/D9/D12 ; E3 : charte des en-têtes ; VW-Q1 à VW-Q4).
+
 ---
 
 ## Point de départ
@@ -67,7 +69,7 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 
 - `sync_engine.dart` ne compilait pas avec Dart 3.13 (promotion de nullité d'une variable capturée), alors que `pubspec.yaml` autorise ce SDK.
 - **Corrigé** par une copie finale locale, sans changement de règle.
-- 🔧 Figer la version de Flutter du poste de compilation (`.fvmrc` ou mention dans `build_windows.bat`) pour éviter la prochaine dérive.
+- ✅ Figer la version de Flutter du poste de compilation (`.fvmrc` ou mention dans `build_windows.bat`) pour éviter la prochaine dérive. (livré, vérifié le 10/11/2026 : `agrierp_flutter/.fvmrc` versionné (Flutter 3.47.7), contrôle de version dans `build_windows.bat` lignes 129-144, section « Version de Flutter figée » de `agrierp_flutter/CLAUDE.md`, commit 5243603.)
 
 ### A7 ✅ Chemins Windows absolus dans les tests du poste
 
@@ -158,12 +160,12 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 
 | # | Ticket | Statut |
 |---|---|---|
-| 3.F1 | **F0.96** — fiche Lapins du poste : saisie ventilée (morts et dons par catégorie, passage sevré → jeune), miroir du ticket 15.41 | 🔧 Bloquant : tant qu'il n'est pas livré, une fiche du poste avec morts ou dons sur une bande « à départ » est **refusée** (D7). |
-| 3.F2 | **F0.97** — fiche Porcs du poste : même chose, miroir du ticket 15.42 | 🔧 Bloquant (même motif) |
+| 3.F1 | **F0.96** — fiche Lapins du poste : saisie ventilée (morts et dons par catégorie, passage sevré → jeune), miroir du ticket 15.41 | ✅ Était bloquant : tant qu'il n'était pas livré, une fiche du poste avec morts ou dons sur une bande « à départ » était **refusée** (D7). (livré, vérifié le 10/11/2026 : section « Tickets F0.96 / F0.97 » de `agrierp_laravel/README_SPRINT0.md`, A12 de ce plan, tests `ventilation_categories_test.dart` et `fiche_lapins_glossaire_test.dart`.) |
+| 3.F2 | **F0.97** — fiche Porcs du poste : même chose, miroir du ticket 15.42 | ✅ Était bloquant (même motif). (livré, vérifié le 10/11/2026 : mêmes preuves que 3.F1, `fiche_porcs_test.dart` et `fiches_ventilation_sync_test.dart` présents, A12 de ce plan.) |
 | 3.F3 | D6 tranchée le 17/10/2026 (bandes déjà saisies : corrigées par la chaîne, départ déduit du stade). Restent D5 (qui déverrouille un départ erroné), D15 (« Porc Marchand » / « Jeune porc »), confirmation de D2/D8/D9/D12 | ❓ |
-| 3.F4 | Mise en service **simultanée** du serveur (15.39–15.42) et du poste (F0.95–F0.97) | 🔧 À planifier avec l'exploitant |
+| 3.F4 | Mise en service **simultanée** du serveur (15.39–15.42) et du poste (F0.95–F0.97) | 🔧 À planifier avec l'exploitant (10/11/2026 : dépend du client ; le code des deux côtés est livré, F0.96 / F0.97 ; la date de mise en service reste à fixer) |
 | 3.F5 | Tests de cascade pour Escargots et Reproducteurs en parité exécutée PHP ↔ Dart (`test/php_laravel.dart`) | 🔧 |
-| 3.F6 | A2, A3, A4 ci-dessus (transferts, dons reçus, transformation) | ❓ puis 🔧 |
+| 3.F6 | A2, A3, A4 ci-dessus (transferts, dons reçus, transformation) | ✅ (livré, vérifié le 10/11/2026 : A2, A3 et A4 portent ✅ dans ce plan ; tests du poste `transferts_bandes_test.dart`, `transformation_poste_test.dart`, `transformation_parite_php_test.dart` ; ticket EL-1 dans `agrierp_flutter/CLAUDE.md` ; dons par catégorie web et poste, A13.) |
 | 3.F7 | Suivi de reproduction : la mise-bas (`saveMiseBas`) n'alimente aucune fiche. Les nés vivants restent à saisir à la main dans la fiche du jour. Décider si la mise-bas écrit `ne` dans la fiche de la bande. | ❓ |
 
 ---
@@ -173,9 +175,9 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 | # | Ticket | Statut |
 |---|---|---|
 | B1 | Écran **Synchronisation** (`lib/features/sync/synchronisation_screen.dart`) | ✅ existe : en attente, conflits avec motif, dernier état, bouton « Synchroniser ». |
-| B2 | Synchronisation **déclenchée automatiquement** : au retour du réseau, à intervalle (15 min, configurable dans Paramètres du poste) et à la fermeture de l'application. Jamais bloquante ; hors ligne = état normal, pas une erreur rouge. | 🔧 |
+| B2 | Synchronisation **déclenchée automatiquement** : au retour du réseau, à intervalle (15 min, configurable dans Paramètres du poste) et à la fermeture de l'application. Jamais bloquante ; hors ligne = état normal, pas une erreur rouge. | ✅ (livré, vérifié le 10/11/2026 : ticket H13 de ce plan, `lib/core/sync/synchronisation_automatique.dart` (retour du réseau, intervalle réglable dans Paramètres, fermeture, réessais) ; `synchronisation_automatique_test.dart` ; intervalle par défaut 5 min depuis S-T3, et non 15.) |
 | B3 | Écran Synchronisation : historique des dernières tentatives (date, poussés / tirés / refusés), filtre des conflits par table, relance d'un conflit après correction, export du journal pour le support. | 🔧 |
-| B4 | Indicateur permanent dans `BarreSuperieure` : nombre d'enregistrements en attente et âge de la dernière synchronisation réussie. | 🔧 absorbé par **H2** |
+| B4 | Indicateur permanent dans `BarreSuperieure` : nombre d'enregistrements en attente et âge de la dernière synchronisation réussie. | ✅ absorbé par **H2** (livré, vérifié le 10/11/2026 : ligne H2 de ce plan, ✅ 19/10/2026 ; `synchronisation_barre_test.dart` présent) |
 | B5 | Sauvegarde locale de la base Drift (copie datée dans `Documents\LogiAgriERP\sauvegardes`, rotation 7 jours) avant toute migration de schéma et chaque jour. | 🔧 |
 | B6 | Couches DDD : migrer progressivement les repositories qui renvoient des lignes Drift vers des entités de domaine (Doctrine §1.3), écran par écran et jamais en lot. | 🔧 continu |
 
@@ -201,10 +203,10 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 | # | Ticket | Statut |
 |---|---|---|
 | D1 | `agrierp_flutter/build_windows.bat` : enchaîne dépendances, génération Drift, analyse, tests, `flutter build windows --release`, copie du runtime VC++, puis installateur Inno Setup (`installer/agrierp.iss`) → `installer\Output\LogiAgriERP-Setup-<version>.exe` | ✅ écrit le 17/10/2026, **pas encore exécuté sur une machine Windows** |
-| D2 | Première exécution réelle sur le poste de compilation ; vérifier l'installation sur un Windows 10 vierge, sans redistribuable VC++ | 🔧 |
+| D2 | Première exécution réelle sur le poste de compilation ; vérifier l'installation sur un Windows 10 vierge, sans redistribuable VC++ | 🔧 (10/11/2026 : dépend du client, il faut une machine Windows ; aucune trace d'exécution réelle trouvée) |
 | D3 | CI GitHub Actions `windows-latest` : analyse, tests, build, installateur publié en artefact à chaque tag `v*` | 🔧 |
-| D4 | Signature du code de l'exécutable (certificat éditeur), pour éviter l'alerte SmartScreen | ❓ achat du certificat |
-| D5 | Mise à jour du poste : l'installateur réutilise le même `AppId` ; la base locale (profil utilisateur) n'est jamais touchée par une mise à jour ou une désinstallation | ✅ prévu dans `agrierp.iss`, 🔧 à vérifier en réel |
+| D4 | Signature du code de l'exécutable (certificat éditeur), pour éviter l'alerte SmartScreen | ❓ achat du certificat (10/11/2026 : dépend du client ; aucune étape de signature dans `installer/agrierp.iss` ni `build_windows.bat`) |
+| D5 | Mise à jour du poste : l'installateur réutilise le même `AppId` ; la base locale (profil utilisateur) n'est jamais touchée par une mise à jour ou une désinstallation | ✅ prévu dans `agrierp.iss`, 🔧 à vérifier en réel (10/11/2026 : dépend du client, essai sur Windows ; `AppId` fixe présent ligne 46 de `agrierp.iss`. ⚠️ Depuis DES-1 (27/10/2026) la **désinstallation** supprime la base locale après confirmation : seule la mise à jour la conserve) |
 
 **Cloner et compiler** (sur le poste Windows de compilation) :
 
@@ -386,7 +388,7 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 | EX7 + EX8 | Fusion et branchement : le sélecteur d'EX7 pilote les colonnes N / N-1 (web : écran Bilan, onglets et PDF des États financiers ; poste : `etats_comparatifs.dart`) ; bandeau des fiches = celui d'EX7 | ✅ 20/10/2026 (README_SPRINT0, « EX7 + EX8 — fusion et branchement ») |
 
 ### Lot 3 — avec la clôture de 2026
-| EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 |
+| EX9 | Archive figée de l'exercice à la clôture, hors purge des 30 jours, conservée 10 ans (Q6, à confirmer par FAGUEZ) ; Réinitialisation interdite après une vraie clôture (Q8) ; journal d'audit (EF13, EF14) | 🔧 (10/11/2026 : décisions Q6 et Q8 retenues le 20/10/2026 (voir ci-dessus), mais aucune archive figée ni garde de réinitialisation trouvée dans le code : non livré) |
 
 ---
 
@@ -514,7 +516,7 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 | MP2 | Mêmes contrôles pour les libellés et champs VOISINS d'une date dans les modales (texte, liste, nombre : `h-11 px-md text-sm`, libellés `text-[10px] uppercase`), `labelText` flottant de Transferts, « Compte : » du Grand Livre ; construire les champs Date que le poste n'a pas (Historique des ventes, Liste d'Achats, Bilan…) relève de tickets de fonctionnalité | 🔧 proposé |
 | MP1-Q1 | ✅ *tranché 21/10/2026* : `flex-wrap` ajouté à la barre « Bande / Date / Mois » du Blade de la fiche Reproducteurs (retouche web) ; l'écart disparaît, garde-fou `champs_date_mise_en_page_test.dart` et `docs/AUDIT_FIDELITE_ECRANS.md` § 9 mis à jour | ✅ 21/10/2026 |
 
-| MP1-Q1 | ❓ Fiche Reproducteurs : le Blade ne replie pas sa barre « Bande / Date / Mois » (`flex items-center gap-xs` sans `flex-wrap`). Le poste la replie. Ajouter `flex-wrap` au Blade (retouche web) ou garder l'écart ? | ❓ client |
+| MP1-Q1 | ❓ Fiche Reproducteurs : le Blade ne replie pas sa barre « Bande / Date / Mois » (`flex items-center gap-xs` sans `flex-wrap`). Le poste la replie. Ajouter `flex-wrap` au Blade (retouche web) ou garder l'écart ? | ✅ client (livré, vérifié le 10/11/2026 : doublon périmé de la ligne MP1-Q1 ci-dessus, tranchée le 21/10/2026 ; `flex-wrap` présent dans `fiche-reproducteurs.blade.php` ligne 34, garde-fou `champs_date_mise_en_page_test.dart` ligne 444) |
 
 ## Sprint MAIL — Domaine des adresses e-mail (décision du client du 21/10/2026)
 
