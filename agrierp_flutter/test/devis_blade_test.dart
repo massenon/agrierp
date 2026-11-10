@@ -307,7 +307,7 @@ void main() {
         (m.group(1)!, m.group(2)!),
     ];
     expect(actions.map((a) => a.$1), [
-      'Marquer comme envoyé', 'Marquer comme accepté', 'Marquer comme refusé', 'Convertir en Facture', 'Modifier', 'Archiver',
+      'Marquer comme envoyé', 'Marquer comme accepté', 'Marquer comme refusé', 'Convertir en Facture', 'Imprimer le devis', 'Modifier', 'Archiver',
     ]);
     for (final (titre, icone) in actions) {
       expect(
