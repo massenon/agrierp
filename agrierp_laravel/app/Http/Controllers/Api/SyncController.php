@@ -278,9 +278,9 @@ class SyncController extends Controller
         'attestation_counts' => ['view-rh'],
         'sales' => null,
         'sale_lines' => null,
-        // Ticket DEV — DEVIS : aux comptes qui ouvrent « Ventes & Devis » (`view-ventes`, la permission de la route du
-        // hub), comme le web leur montre l'onglet « Devis Prestations ». Archivés compris (`is_active`).
-        'quotes' => ['view-ventes'],
+        // Ticket DEV — DEVIS : aux comptes qui ouvrent « Ventes & Devis » (`view-ventes`) OU à l'animalier
+        // (`view-elevage`) — le tableau de bord du web les liste aux quatre rôles sans garde (DEV2). Archivés compris.
+        'quotes' => ['view-ventes', 'view-elevage'],
         // Ticket AV1 — « Retours et Avoirs » (hub Ventes & Devis, `view-ventes`, comme `customer_advances`).
         'credit_notes' => ['view-ventes'],
         'stock_movements' => ['view-elevage', 'view-stocks', 'view-rapports'],

@@ -368,15 +368,28 @@ class DevisPosteTest extends TestCase
         $this->assertSame([self::DEVIS_2], collect($corps->json('quotes'))->pluck('id')->all());
     }
 
-    public function test_un_compte_qui_ne_lit_pas_les_ventes_ne_recoit_pas_les_devis(): void
+    // Ticket DEV2b — l'animalier reçoit aussi les devis (`view-elevage` suffit, comme le web le lui montre au tableau de bord).
+    public function test_l_animalier_recoit_les_devis_au_tirage(): void
     {
         $this->pousser($this->devis())->assertOk();
         $this->jetonDe('animalier');
 
         $corps = $this->tirer();
 
-        $this->assertNotContains('quotes', $corps->json('tables_servies'));
-        $this->assertArrayNotHasKey('quotes', $corps->json());
+        $this->assertContains('quotes', $corps->json('tables_servies'));
+        $this->assertArrayHasKey('quotes', $corps->json());
+        $this->assertSame([self::DEVIS], collect($corps->json('quotes'))->pluck('id')->all());
+    }
+
+    // Le caissier a `view-ventes` : il reçoit les devis comme avant.
+    public function test_le_caissier_recoit_aussi_les_devis(): void
+    {
+        $this->pousser($this->devis())->assertOk();
+        $this->jetonDe('caissier');
+
+        $corps = $this->tirer();
+
+        $this->assertContains('quotes', $corps->json('tables_servies'));
     }
 
     public function test_le_tirage_sans_page_d_un_poste_ancien_sert_aussi_les_devis(): void
