@@ -212,6 +212,11 @@ void main() {
     EcranPoste.dashboardElevage: {
       'view-achats': {'purchase_orders'},
     },
+    // Ticket DEV2 — l'onglet « Devis » du tableau de bord lit `quotes`, servie sous `view-ventes` seulement (protection du tirage) :
+    // l'animalier a un onglet vide au poste alors que le web (`Dashboard\Index`, aucune garde) lui liste les cinq derniers (écart assumé).
+    EcranPoste.tableauDeBord: {
+      'view-ventes': {'quotes'},
+    },
     // Tickets IMPORT-2 à IMPORT-4 — l'écran importe aussi les employés (`manage-rh`), les comptes (`manage-comptabilite`) et les
     // rations (`manage-elevage`) : il n'ouvre ces modules, et ne lit leurs tables, que sous le même droit que le serveur. Le relevé
     // statique suit les dépôts propriétaires de bout en bout (personnel, comptabilité, paramètres d'élevage), d'où des tables que
