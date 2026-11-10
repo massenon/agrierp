@@ -344,7 +344,7 @@ return [
             'puces' => [
                 "Quatre onglets : « Enregistrer Vente » (la caisse), « Devis Prestations », « Historique des Ventes » et « Retours et Avoirs ».",
                 "À la caisse, ajoutez les produits au panier, choisissez le client puis « Valider la Vente » ; le client peut être créé sur place.",
-                "Un devis passe de brouillon à envoyé, puis accepté ou refusé, et peut être converti en facture.",
+                "Un devis passe de brouillon à envoyé, puis accepté ou refusé, et peut être converti en facture ; « Imprimer le devis » en fait le document à remettre au client (bon pour accord).",
                 "Dans l'historique, on consulte une vente ou on l'annule ; un retour crée un avoir.",
             ],
         ],

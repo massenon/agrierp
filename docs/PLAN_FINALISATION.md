@@ -85,7 +85,7 @@ Ce plan ordonne ce qui reste à faire pour livrer un poste Windows **100 % auton
 - **Décision du client (09/11/2026) :** « OUI, FAIT, ENLEVER, ON N'A PLUS LA MAQUETTE HTML » : la vue Blade est la seule référence (Doctrine, article 0). Les tests qui ne comparaient qu'à la maquette sont supprimés, ceux qui comparaient aussi au web ne gardent que le web ; `dossierPrototype` et `AGRIERP_PROTOTYPE` sont retirés des tests ; les outils Python qui la lisent sont marqués obsolètes ; les fixtures `*_maquette.g.dart` restent un instantané figé, non régénérable.
 
 
-### Décisions proposées au client (09/11/2026) — recommandations, à valider
+### Décisions proposées au client (09/11/2026) — recommandations, **VALIDÉES le 09/11/2026 (« OUI à tout »)** : statut ci-dessous par ligne
 
 Le client a demandé les propositions ; chacune est une RECOMMANDATION (rien n'est tranché à sa place) et se valide par « OUI ».
 
@@ -97,7 +97,7 @@ Le client a demandé les propositions ; chacune est une RECOMMANDATION (rien n'e
 | CAISSE-1 | Appareil personnel ou d'entreprise : le code PIN suffit-il ? | **Appareil d'entreprise recommandé, PIN suffisant** (4 à 6 chiffres, chiffrement AES-GCM dérivé du PIN, limiteur d'essais). **Appareil personnel toléré** avec un PIN de 6 chiffres et l'effacement des données hors ligne à la déconnexion. | Le PIN protège déjà la clé de chiffrement ; l'appareil personnel est le risque de perte ou de prêt. |
 | CAISSE-2 | Reçu provisoire à imprimer ? | **Oui** : « Reçu provisoire » sans numéro de facture légal, avec l'identifiant court du poste (8 premiers caractères de l'UUID de la vente) et la mention « facture n° attribué à la synchronisation ». | Le client repart avec une preuve ; le numéro légal reste attribué par le serveur. |
 | CAISSE-3 | Essai sur les vrais appareils | **Un essai d'une journée sur trois appareils** (Android Chrome, iPhone Safari, un PC) : coupure du réseau, cinq ventes, retour du réseau, comparaison avec le serveur (ventes, stock, caisse). Résultats consignés dans `docs/logialvia/46_…`. | Safari et les appareils réels sont les deux zones jamais vérifiées. |
-| COMPTA-1 | Droit d'export des ventes (`export-ventes`) pour le comptable | **Oui** : l'accorder au comptable (il lit déjà ventes, clients, créances et avances ; l'export est une lecture). Seeder, migration de données, matrice du poste et test de matrice. | Cohérent avec CONF-4 / CONF-5 ; le poste imprime déjà ces états en local. |
+| COMPTA-1 | Droit d'export des ventes (`export-ventes`) pour le comptable | ✅ **LIVRÉ (09/11/2026, DV-34)** — **Oui** : l'accorder au comptable (il lit déjà ventes, clients, créances et avances ; l'export est une lecture). Seeder, migration de données, matrice du poste et test de matrice. | Cohérent avec CONF-4 / CONF-5 ; le poste imprime déjà ces états en local. |
 
 ### A9 ✅ Empreinte du plan comptable SYSCOHADA
 
@@ -564,8 +564,8 @@ Toutes les propositions du PRD sont retenues : **Q1** N+1 s'ouvre seul le 01/01 
 |---|---|---|
 | DEV2 | Tableau de bord : l'onglet « Devis » des « Transactions récentes » est encore vide au poste (« Aucun devis récent. ») alors que `quotes` descend désormais ; le lire comme `Dashboard\Index` | 🔧 proposé |
 | DEV-Q1 | ✅ (09/11/2026) Construit : la conversion « devis accepté → facture / vente » existe au web puis au poste (`ConversionDevisFactureTest`, `ConversionDevisWebTest`). *Question d'origine :* Conversion « devis accepté → facture / vente » : absente du web (toast d'attente « module Facturation, Sprint 7 »). Recommandé : la construire d'abord au web (statut `facture`, `converted_sale_id`), puis la porter. Un devis facturé crée-t-il une vente à crédit (créance) ou une vente payée ? | ✅ livré |
-| DEV-Q2 | ❓ Lignes de devis structurées (produits du catalogue, remise par ligne). Recommandé : non tant que le web n'en a pas (description libre) | ❓ client — proposition ci-dessous |
-| DEV-Q3 | ❓ Impression d'un devis « document client » (en-tête de la ferme, mentions légales) en plus de l'état « Exporter ». Recommandé : oui, web d'abord | ❓ client — proposition ci-dessous |
+| DEV-Q2 | ✅ Lignes de devis structurées : **NON, acté le 09/11/2026 (DV-36)** — description libre comme le web ; à rouvrir si les prestations deviennent fréquentes | ✅ validé 09/11/2026 |
+| DEV-Q3 | ✅ **Livré (09/11/2026, DV-35)** : « Imprimer le devis » au web (`Devis::imprimerDevis`, `exports.devis-document`, droit `export-ventes`) puis au poste (`DevisRepository.documentDevis`, mêmes libellés et même ordre, numéro « — » tant que non reçu) ; validité = date + `validity_days` du devis (le web a cette durée : rien d'inventé) ; coordonnées du client (téléphone, ville, IFU) reprises ; `aide_ecrans` régénéré | ✅ validé 09/11/2026 |
 ## Sprint VL — Verrou local du poste (décision du client du 21/10/2026)
 
 ### VL-1 ✅ (21/10/2026) Code PIN, écran de verrouillage à chaque lancement, sans réseau

@@ -229,6 +229,17 @@ class _DevisOngletState extends State<DevisOnglet> {
           );
   }
 
+  /// « Imprimer le devis » — `imprimerDevis($id)` : le devis « document client » d'UNE ligne, hors ligne, par le même générateur PDF.
+  Future<void> _imprimerDevis(LigneDevis l) async {
+    final editeur = widget.imprimer;
+    if (editeur == null) return;
+    final maintenant = HeureBenin.maintenant();
+    final message = await editeur(DevisRepository.documentDevis(l, maintenant), maintenant);
+    if (message != null && mounted) {
+      ToastAgri.afficher(context, message, type: TypeToast.erreur);
+    }
+  }
+
   /// « Exporter » — `exportDevisPdf()` : les devis tels qu'ils sont filtrés à l'écran.
   Future<void> _exporter(DonneesDevis d) async {
     final editeur = widget.imprimer;
@@ -666,6 +677,15 @@ class _DevisOngletState extends State<DevisOnglet> {
             icone: SymbolesAgri.visibility,
             couleur: AgriColors.brandEmerald,
             surAppui: () => widget.surVoirFacturation?.call(),
+          ),
+        // DEV-Q3 : `@can('export-ventes')` « Imprimer le devis » (`imprimerDevis`), avant « Modifier » comme au web.
+        if (widget.peutExporter && widget.imprimer != null)
+          action(
+            cle: 'devis-imprimer-${d.id}',
+            infobulle: 'Imprimer le devis',
+            icone: SymbolesAgri.print,
+            couleur: AgriColors.brandForest,
+            surAppui: () => _imprimerDevis(l),
           ),
         if (widget.peutGerer) ...[
           action(

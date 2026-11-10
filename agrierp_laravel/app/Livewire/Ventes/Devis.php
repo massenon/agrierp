@@ -135,6 +135,28 @@ class Devis extends Component
         return response()->streamDownload(fn () => print($pdf->output()), 'devis-'.now()->format('Y-m-d').'.pdf');
     }
 
+    /**
+     * DEV-Q3 (DV-35) — le DEVIS « document client » (A4) : en-tête de la ferme, numéro `DEV-AAAA-NNN`, dates, validité, client, désignation, montants en FCFA
+     * entiers, « Bon pour accord » (date et signature du client). Même droit que « Exporter » (`export-ventes`). Un devis ARCHIVÉ ne s'imprime pas (il n'est plus
+     * dans la liste) ; un brouillon s'imprime (on l'envoie au client avant de le marquer « envoyé »).
+     */
+    public function imprimerDevis(string $id)
+    {
+        $this->authorize('export-ventes');
+
+        $quote = Quote::with('customer')->where('is_active', true)->findOrFail($id);
+
+        $pdf = app(\App\Services\PdfExportService::class)->render(
+            'exports.devis-document',
+            ['quote' => $quote],
+            'Devis',
+            'N° '.$quote->quote_number.' — émis le '.$quote->quote_date->format('d/m/Y'),
+            'portrait',
+        );
+
+        return response()->streamDownload(fn () => print($pdf->output()), 'devis-'.$quote->quote_number.'.pdf');
+    }
+
     public function newQuote(): void
     {
         $this->reset(['editingQuoteId', 'customerId', 'articlesDescription', 'amount', 'note']);

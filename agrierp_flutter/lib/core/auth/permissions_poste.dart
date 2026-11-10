@@ -437,6 +437,8 @@ class PermissionsPoste {
       'view-stocks',
       'view-facturation',
       'correct-invoices',
+      // Ticket COMPTA-1 (DV-34) : le comptable EXPORTE (PDF de clients, créances, avances, ventes, devis) ; jamais `manage-ventes`.
+      'export-ventes',
     },
     // Ticket CONF-5 (DV-06) : le caissier CONSULTE et RÉIMPRIME ses factures (`view-facturation`, LECTURE seule) ; jamais
     // `manage-facturation`, `correct-invoices` ni la retransmission.

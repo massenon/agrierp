@@ -228,7 +228,7 @@ void main() {
     });
 
     test('droits : lecture + correction, aucun droit d\'écriture de la caisse, des achats, des stocks ni de l\'élevage', () {
-      for (final d in ['view-ventes', 'view-achats', 'view-stocks', 'view-facturation', 'correct-invoices', 'manage-comptabilite']) {
+      for (final d in ['view-ventes', 'view-achats', 'view-stocks', 'view-facturation', 'correct-invoices', 'manage-comptabilite', 'export-ventes']) {
         expect(PermissionsPoste.peut('comptable', d), isTrue, reason: d);
       }
       for (final d in [
@@ -239,7 +239,6 @@ void main() {
         'manage-users',
         'manage-parametres',
         'manage-facturation',
-        'export-ventes',
       ]) {
         expect(PermissionsPoste.peut('comptable', d), isFalse, reason: d);
       }
