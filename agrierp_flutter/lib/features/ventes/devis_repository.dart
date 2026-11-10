@@ -30,13 +30,18 @@ class DevisRefuse implements Exception {
 /// Une ligne du tableau « Devis & Proforma » : le devis, le nom de son client, et — pour une saisie refusée du poste —
 /// le motif du serveur, mot pour mot.
 class LigneDevis {
-  const LigneDevis({required this.devis, this.client, this.motifRefus});
+  const LigneDevis({required this.devis, this.client, this.motifRefus, this.telephone, this.ville, this.ifuClient});
 
   final Quote devis;
 
   /// `$quote->customer?->name` du Blade ; `null` : client inconnu de ce poste (colonne vide, comme au web).
   final String? client;
   final String? motifRefus;
+
+  /// DEV-Q3 — coordonnées du client pour le DOCUMENT du devis (`$quote->customer->phone / city / ifu`) ; `null` : non renseignées.
+  final String? telephone;
+  final String? ville;
+  final String? ifuClient;
 
   /// `getValidUntilAttribute()` du web : date du devis + validité en jours.
   DateTime get valideJusqua => HeureBenin.plusJours(devis.quoteDate, devis.validityDays);
@@ -198,6 +203,7 @@ class DevisRepository {
     final clients = await this.clients();
     final tous = await _db.select(_db.customers).get();
     final nomDe = {for (final c in tous) c.id: c.name};
+    final clientDe = {for (final c in tous) c.id: c};
 
     // Un devis refusé : le motif de sa saisie (`quotes`) ou, plus récent, celui de sa DEMANDE de conversion
     // (`quote_conversions`, ticket DEV3) — ce dernier prime, la saisie ayant été acceptée avant lui.
@@ -236,6 +242,9 @@ class DevisRepository {
           LigneDevis(
             devis: d,
             client: nomDe[d.customerId],
+            telephone: clientDe[d.customerId]?.phone,
+            ville: clientDe[d.customerId]?.city,
+            ifuClient: clientDe[d.customerId]?.ifu,
             motifRefus: d.syncStatus == SyncStatus.conflict ? refus[d.id] : null,
           ),
       ],
@@ -652,6 +661,55 @@ class DevisRepository {
           ? null
           : '$enAttente devis saisi(s) sur ce poste, pas encore reçu(s) par la ferme (en attente de synchronisation) : '
                 "« — » en N° Devis, le serveur l'attribue à la synchronisation.",
+    );
+  }
+
+  /// DEV-Q3 (DV-35) — le DEVIS « document client » (A4) du web (`exports.devis-document`, `Devis::imprimerDevis`) : MÊMES libellés et MÊME ordre des faits
+  /// (devis et numéro, client, date d'émission, validité, désignation, montants HT / TVA / TTC en FCFA ENTIERS, observations, « Bon pour accord »). Le numéro
+  /// `DEV-AAAA-NNN` est attribué par le serveur : « — » tant que ce poste ne l'a pas reçu, JAMAIS inventé. La validité est celle du devis (date + `validity_days`).
+  /// Entiers : HT = `round(amount)`, TTC = `round(round(amount × (1 + taux/100), 2))`, TVA = TTC − HT (comme `Quote::amount_ttc`).
+  static DocumentOfficiel documentDevis(LigneDevis l, DateTime maintenant) {
+    final d = l.devis;
+    String deux(int n) => n.toString().padLeft(2, '0');
+    String jour(DateTime x) => '${deux(x.day)}/${deux(x.month)}/${x.year}';
+    String fcfa(int v) => '${PmpService.francs(v.toDouble())} FCFA';
+    final numero = d.quoteNumber ?? '—';
+    final ht = d.amount.round();
+    final ttc = (((d.amount * (1 + d.tvaRate / 100)) * 100).round() / 100).round();
+    final tva = ttc - ht;
+    final taux = d.tvaRate == d.tvaRate.roundToDouble()
+        ? d.tvaRate.round().toString()
+        : d.tvaRate.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll('.', ',');
+    final contact = [
+      if ((l.telephone ?? '').isNotEmpty) l.telephone!,
+      if ((l.ville ?? '').isNotEmpty) l.ville!,
+    ].map((x) => ' — $x').join();
+
+    return DocumentOfficiel(
+      titre: 'Devis',
+      sousTitre: 'N° $numero — émis le ${jour(d.quoteDate)}',
+      fichier: 'devis-${d.quoteNumber ?? 'en-attente'}.pdf',
+      entetes: const ['Désignation', 'Montant HT'],
+      lignes: [
+        BandeDocument('Devis $numero'),
+        BandeDocument('Client : ${l.client ?? '—'}$contact'),
+        if ((l.ifuClient ?? '').isNotEmpty) BandeDocument('IFU du client : ${l.ifuClient}'),
+        BandeDocument("Date d'émission : ${jour(d.quoteDate)}"),
+        BandeDocument("Valable jusqu'au : ${jour(l.valideJusqua)} (durée de validité : ${d.validityDays} jours)"),
+        DonneesDocument([d.articlesDescription, PmpService.francs(ht.toDouble())]),
+        TotalDocument(['Montant HT : ${fcfa(ht)}', ''], premiere: true),
+        TotalDocument(['TVA ($taux %) : ${fcfa(tva)}', '']),
+        TotalDocument(['Total TTC : ${fcfa(ttc)}', '']),
+      ],
+      mentions: [
+        if ((d.note ?? '').isNotEmpty) 'Observations : ${d.note}',
+        'Bon pour accord',
+        'Date : ____ / ____ / ________',
+        'Signature du client :',
+      ],
+      noteDePied: d.quoteNumber == null
+          ? "Devis saisi sur ce poste, pas encore reçu par la ferme : « — » en numéro, le serveur l'attribue à la synchronisation."
+          : null,
     );
   }
 }

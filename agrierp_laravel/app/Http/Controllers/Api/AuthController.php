@@ -96,6 +96,8 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->roles->first()?->name,
                 'role_label' => $user->role_label,
+                // CAISSE-1 : les droits que la PWA suit à l'écran (caisse = manage-ventes, fiches = view-elevage, écriture = manage-elevage). Le serveur reste le juge.
+                'droits' => array_values(array_filter(['manage-ventes', 'view-elevage', 'manage-elevage'], fn ($d) => $user->can($d))),
             ],
             // MDP-1 : mot de passe temporaire posé par un administrateur — le poste affiche le changement
             // obligatoire AVANT l'accueil ; tout le reste de l'API est refusé (403) tant qu'il est vrai.

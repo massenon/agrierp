@@ -14,14 +14,14 @@ use Livewire\Component;
  * `pwa-<uuid>`, gardé chiffré dans le navigateur — voir `docs`/CLAUDE.md « PWA »). Aucune route serveur nouvelle pour la
  * synchronisation : c'est le protocole des postes (`/api/sync/pull|push`).
  *
- * Réservé aux comptes qui encaissent (`manage-ventes`) : le périmètre hors ligne de ce premier lot est la caisse.
+ * Réservé aux comptes qui encaissent (`manage-ventes`) OU tiennent les fiches d'élevage (`manage-elevage`) : Gate unique `utiliser-mode-hors-ligne` (CAISSE-1, volet animalier). L'écran de la PWA suit ensuite les droits du compte.
  */
 #[Layout('layouts.app')]
 class ModeHorsLigne extends Component
 {
     public function mount(): void
     {
-        abort_unless(Gate::allows('manage-ventes'), 403);
+        abort_unless(Gate::allows('utiliser-mode-hors-ligne'), 403);
     }
 
     public function render()

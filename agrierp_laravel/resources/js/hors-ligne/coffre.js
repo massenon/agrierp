@@ -31,6 +31,21 @@ export function pinValide(pin) {
 
 export const MOTIF_PIN = 'Le PIN doit comporter 4 à 6 chiffres.';
 
+/** CAISSE-1 (DV-32) — type d'appareil choisi à l'activation : « entreprise » (défaut recommandé) ou « personnel ». */
+export const TYPES_APPAREIL = ['entreprise', 'personnel'];
+export const TYPE_APPAREIL_PAR_DEFAUT = 'entreprise';
+export const MOTIF_PIN_PERSONNEL = 'Sur un appareil personnel, le PIN doit comporter exactement 6 chiffres.';
+export const MOTIF_TYPE_APPAREIL = "Choisissez le type d'appareil : appareil de l'entreprise ou appareil personnel.";
+
+/** Entreprise : 4 à 6 chiffres. Personnel : 6 chiffres EXACTEMENT. */
+export function pinValidePour(pin, type = TYPE_APPAREIL_PAR_DEFAUT) {
+    if (type === 'personnel') return typeof pin === 'string' && /^\d{6}$/.test(pin);
+    return pinValide(pin);
+}
+
+/** Le message français d'un PIN refusé pour ce type d'appareil. */
+export const motifPinPour = (type) => (type === 'personnel' ? MOTIF_PIN_PERSONNEL : MOTIF_PIN);
+
 const encodeur = new TextEncoder();
 const decodeur = new TextDecoder();
 

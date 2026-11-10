@@ -57,6 +57,8 @@ class RolesAndPermissionsSeeder extends Seeder
             // `manage-parametres` ni `manage-facturation` (conversion de devis en facture).
             'view-ventes', 'view-achats', 'view-stocks',
             'view-facturation', 'correct-invoices',
+            // COMPTA-1 (DV-34) — le comptable EXPORTE (PDF de clients, créances, avances, ventes, devis) : `export-ventes`, jamais `manage-ventes`.
+            'export-ventes',
         ]);
 
         Role::findByName('caissier')->givePermissionTo([

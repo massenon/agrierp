@@ -1,5 +1,5 @@
 import { ouvrirBase, totalEnAttente, listeEnAttente } from './base-locale.js';
-import { lireMarqueur, purgerLocal, MARQUEUR_ACTIVE } from './appairage.js';
+import { lireMarqueur, purgerLocal, decisionDeconnexion, MARQUEUR_ACTIVE } from './appairage.js';
 
 /**
  * PWA-1 — DÉCONNEXION WEB = PURGE DE L'APPAREIL (comme au poste), sans jamais perdre une vente en silence.
@@ -26,7 +26,11 @@ document.addEventListener('submit', async (ev) => {
         base = await ouvrirBase();
         const c = await base.compterTout();
         const n = totalEnAttente(c);
-        if (n > 0) {
+        // CAISSE-1 (DV-32) : sur un appareil PERSONNEL, la déconnexion efface TOUT après confirmation (le nombre d'éléments perdus est dit) ; sur un appareil de l'entreprise, elle est refusée tant que des éléments attendent.
+        const decision = decisionDeconnexion((await base.meta('appareil'))?.type_appareil, n);
+        if (decision === 'confirmer') {
+            if (!window.confirm(`Appareil personnel : ${listeEnAttente(c)} ne sont pas encore envoyé(e)s et seront PERDU(E)S. Toutes les données hors ligne de cet appareil seront effacées. Se déconnecter quand même ?`)) { base.fermer(); return; }
+        } else if (decision === 'refuser') {
             base.fermer();
             window.dispatchEvent(new CustomEvent('toast', { detail: {
                 message: `${listeEnAttente(c)} de la caisse hors ligne ne sont pas encore envoyé(e)s : ouvrez la caisse hors ligne pour les envoyer (ou les abandonner) avant de vous déconnecter.`,

@@ -48,6 +48,9 @@ const BOUTON = ESC ? '#btn-vue-escargots' : (POND ? '#btn-vue-pondeuses' : REPRO
 const CHAMP_MORT = ESC ? '#saisie-mortNaissain' : (POND ? '#saisie-mortRepro' : REPRO ? '#saisie-mortPoulet' : '#saisie-mortChair');
 const DEPART = POND ? '#saisie-departRepro' : '#saisie-departJeune'; // la proposition place tout l'effectif dans le stade de la bande (Pondeuse : emplacement `repro`)
 const COL_FINAL = ESC ? 10 : (VOL ? 5 : 11); // l'effectif final : après 3 colonnes d'effectif (escargots) ou 4
+// FICHE_COMPTE=elevage : le MÊME parcours avec l'animalier de démonstration (CAISSE-1) — il active seul le mode hors ligne, ne voit AUCUN bouton de caisse.
+const COMPTE = process.env.FICHE_COMPTE ?? 'admin';
+const ANIMALIER = COMPTE === 'elevage';
 const resultats = [];
 const ok = (nom) => { resultats.push(nom); console.log(`  ✔ ${nom}`); };
 
@@ -91,7 +94,7 @@ try {
 
     await page.goto(`${base}/login`);
     await page.waitForLoadState('networkidle');
-    await page.fill('#identifiant', 'admin');
+    await page.fill('#identifiant', COMPTE);
     await page.fill('#password', 'LogiAgriERP@2026');
     await Promise.all([page.waitForURL('**/dashboard', { timeout: 30000 }), page.click('[dusk=login-submit]')]);
     await page.goto(`${base}/mode-hors-ligne`);
@@ -103,13 +106,21 @@ try {
     await page.fill('#hl-pin2', '4821');
     await page.click('#hl-activer');
     await page.waitForSelector('text=Appareil appairé', { timeout: 30000 });
-    ok('connexion web et appairage du compte « admin »');
+    ok(`connexion web et appairage du compte « ${COMPTE} »`);
 
     await page.goto(`${base}/caisse-hors-ligne.html`);
     await page.waitForSelector('#champ-pin');
     await page.fill('#champ-pin', '4821');
     await page.click('#form-pin button');
-    await page.waitForSelector('#contenu:not([hidden])');
+    await page.waitForSelector(ANIMALIER ? '#contenu-fiche:not([hidden])' : '#contenu:not([hidden])');
+    if (ANIMALIER) {
+        assert.equal(await page.isVisible('#contenu'), false, 'aucun écran de caisse pour un animalier');
+        assert.equal(await page.isVisible('#produits'), false);
+        assert.equal(await page.isVisible('#grille-produits, #panier, #btn-valider'), false);
+        assert.equal((await page.textContent('#titre-texte')).trim(), 'Fiches hors ligne');
+        for (const id of ['#btn-vue-fiche', '#btn-vue-porcs', '#btn-vue-escargots', '#btn-vue-reproducteurs', '#btn-vue-pondeuses']) assert.doesNotMatch(await page.textContent(id), /^Caisse$/);
+        ok('animalier : l\'écran ne montre que les fiches, aucun bouton ni panneau de caisse');
+    }
     await page.waitForFunction(() => /Synchronisé/.test(document.querySelector('#etat-synchro').textContent), null, { timeout: 30000 });
     await page.waitForSelector(`${BOUTON}:not([hidden])`);
     ok('tirage initial : la fiche lapins est offerte');
@@ -275,6 +286,7 @@ try {
     ok('exercice clos : refus du serveur affiché avec sa phrase, rien d\'écrit, reprise manuelle ou abandon proposés');
 } catch (e) {
     echec = e;
+    if (process.env.E2E_DEBUG) console.log('ÉTAT', await navigateur?.contexts()[0]?.pages()[0]?.evaluate(() => ({ avis: document.querySelector('#avis')?.textContent, etat: document.querySelector('#etat-synchro')?.textContent, titre: document.querySelector('#titre-texte')?.textContent, fiche: document.querySelector('#contenu-fiche')?.hidden, contenu: document.querySelector('#contenu')?.hidden, btn: document.querySelector('#btn-vue-fiche')?.hidden })));
 } finally {
     await navigateur?.close();
     arreter();

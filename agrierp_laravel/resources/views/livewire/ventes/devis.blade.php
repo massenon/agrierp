@@ -94,6 +94,9 @@
                                 @if($quote->status === 'facture' && $quote->sale && auth()->user()?->can('view-facturation'))
                                     <a wire:navigate href="{{ route('facturation.index', ['search' => $quote->sale->id]) }}" class="text-brand-emerald hover:text-brand-forest p-1 inline-block" title="Voir la facture"><span class="material-symbols-outlined text-[18px]">visibility</span></a>
                                 @endif
+                                @can('export-ventes')
+                                    <button type="button" wire:click="imprimerDevis('{{ $quote->id }}')" wire:loading.attr="disabled" wire:target="imprimerDevis" class="text-brand-forest hover:text-brand-emerald p-1" title="Imprimer le devis"><span class="material-symbols-outlined text-[18px]">print</span></button>
+                                @endcan
                                 <button type="button" wire:click="editQuote('{{ $quote->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-devis-{{ $quote->id }}' })" class="text-outline hover:text-error-deep p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                             </td>

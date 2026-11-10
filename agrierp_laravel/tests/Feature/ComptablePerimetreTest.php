@@ -106,14 +106,14 @@ class ComptablePerimetreTest extends TestCase
     public function test_le_seeder_donne_au_comptable_le_perimetre_de_dv20_et_ne_touche_pas_aux_autres_roles(): void
     {
         $this->assertSame(
-            ['close-fiscal-year', 'correct-invoices', 'export-rapports', 'manage-comptabilite', 'view-achats', 'view-comptabilite',
+            ['close-fiscal-year', 'correct-invoices', 'export-rapports', 'export-ventes', 'manage-comptabilite', 'view-achats', 'view-comptabilite',
                 'view-facturation', 'view-rapports', 'view-stocks', 'view-ventes'],
             $this->droits('comptable'),
         );
 
         // Aucun droit d'écriture hors comptabilité : ni caisse, ni achats, ni stocks, ni élevage, ni utilisateurs, ni réglages.
         foreach (['manage-ventes', 'manage-achats', 'manage-stocks', 'manage-elevage', 'manage-users', 'manage-parametres',
-            'manage-facturation', 'manage-rh', 'manage-administration', 'manage-modules', 'export-ventes', 'view-parametres'] as $interdit) {
+            'manage-facturation', 'manage-rh', 'manage-administration', 'manage-modules', 'view-parametres'] as $interdit) {
             $this->assertFalse($this->comptable->can($interdit), "le comptable ne doit pas avoir {$interdit}");
         }
 

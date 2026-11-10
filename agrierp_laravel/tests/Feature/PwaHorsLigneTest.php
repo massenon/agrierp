@@ -95,11 +95,12 @@ class PwaHorsLigneTest extends TestCase
 
     // ═══ Page d'activation ═══
 
-    public function test_la_page_d_activation_exige_la_connexion_et_le_droit_d_encaisser(): void
+    public function test_la_page_d_activation_exige_la_connexion_et_le_droit_d_encaisser_ou_de_tenir_les_fiches(): void
     {
         $this->get('/mode-hors-ligne')->assertRedirect('/login');
 
-        $this->actingAs($this->compte('animalier'))->get('/mode-hors-ligne')->assertForbidden();
+        // CAISSE-1 (volet animalier) : le comptable (view-ventes seulement) reste refusé ; l'animalier est admis (voir ModeHorsLigneAnimalierTest).
+        $this->actingAs($this->compte('comptable'))->get('/mode-hors-ligne')->assertForbidden();
 
         $page = $this->actingAs($this->compte('caissier'))->get('/mode-hors-ligne');
         $page->assertOk()->assertSee('Mode hors ligne')->assertSee('Activer le mode hors ligne')->assertSee('modeHorsLigne(', false);
@@ -116,10 +117,10 @@ class PwaHorsLigneTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/public\s+(string|\?string)\s+\$(password|mot|pin)/i', $composant);
     }
 
-    public function test_l_entree_de_menu_n_est_proposee_qu_a_qui_encaisse(): void
+    public function test_l_entree_de_menu_n_est_proposee_qu_a_qui_encaisse_ou_tient_les_fiches(): void
     {
         $this->actingAs($this->compte('caissier'))->get('/dashboard')->assertSee('href="/mode-hors-ligne"', false);
-        $this->actingAs($this->compte('animalier'))->get('/dashboard')->assertDontSee('href="/mode-hors-ligne"', false);
+        $this->actingAs($this->compte('comptable'))->get('/dashboard')->assertDontSee('href="/mode-hors-ligne"', false);
     }
 
     // ═══ Appairage : un poste de plus ═══

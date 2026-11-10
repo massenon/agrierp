@@ -13,7 +13,7 @@
  * (`AuthController::login` supprime les jetons de même nom).
  */
 
-import { creerCoffre, ouvrirCoffre, chiffrer, dechiffrer, ErreurPin, ECHECS_MAXIMUM, pinValide, MOTIF_PIN } from './coffre.js';
+import { creerCoffre, ouvrirCoffre, chiffrer, dechiffrer, ErreurPin, ECHECS_MAXIMUM, pinValide, MOTIF_PIN, TYPES_APPAREIL, TYPE_APPAREIL_PAR_DEFAUT, MOTIF_TYPE_APPAREIL, pinValidePour, motifPinPour } from './coffre.js';
 import { ouvrirBase, supprimerBase } from './base-locale.js';
 
 export const MARQUEUR_ACTIVE = 'agrierp_hors_ligne_active';       // localStorage : un drapeau, AUCUN secret
@@ -55,8 +55,9 @@ export async function demanderPersistance(env = globalThis) {
  *
  * @returns {{deviceName:string, utilisateur:object, persistant:boolean}}
  */
-export async function activer({ identifiant, motDePasse, pin, fetchFn = (...a) => globalThis.fetch(...a), idb = globalThis.indexedDB, cryptoApi = globalThis.crypto, iterations, urlBase = '' }) {
-    if (!pinValide(pin)) throw new ErreurAppairage(MOTIF_PIN, 'pin');
+export async function activer({ identifiant, motDePasse, pin, typeAppareil = TYPE_APPAREIL_PAR_DEFAUT, fetchFn = (...a) => globalThis.fetch(...a), idb = globalThis.indexedDB, cryptoApi = globalThis.crypto, iterations, urlBase = '' }) {
+    if (!TYPES_APPAREIL.includes(typeAppareil)) throw new ErreurAppairage(MOTIF_TYPE_APPAREIL, 'type');
+    if (!pinValidePour(pin, typeAppareil)) throw new ErreurAppairage(motifPinPour(typeAppareil), 'pin');
     if (!motDePasse) throw new ErreurAppairage('Saisissez votre mot de passe.', 'mot-de-passe');
 
     const base = await ouvrirBase({ idb });
@@ -88,15 +89,18 @@ export async function activer({ identifiant, motDePasse, pin, fetchFn = (...a) =
         if (enAttente.pending + enAttente.conflict > 0 && existant) {
             throw new ErreurAppairage(`Cet appareil garde ${enAttente.pending + enAttente.conflict} vente(s) non envoyée(s) chiffrée(s) par l'ancien PIN : ouvrez la caisse hors ligne, déverrouillez avec l'ancien PIN et envoyez-les d'abord.`, 'file-existante');
         }
-        const utilisateur = { id: json.user?.id, name: json.user?.name, username: json.user?.username, role: json.user?.role };
+        const utilisateur = { id: json.user?.id, name: json.user?.name, username: json.user?.username, role: json.user?.role, ...(Array.isArray(json.user?.droits) ? { droits: json.user.droits } : {}) };
         const persistant = await demanderPersistance();
         // ⚠️ Tout ce qui est ASYNCHRONE hors IndexedDB (WebCrypto) se fait AVANT la transaction : une transaction IndexedDB se
         // referme dès qu'elle n'a plus de requête en cours, et l'écriture suivante échouerait (ou serait perdue).
         const jetonChiffre = await chiffrer(cle, json.token, cryptoApi);
+        // Le type choisi est mémorisé CHIFFRÉ avec l'appairage (relu au déverrouillage, qui en détecte l'altération) ; la copie en clair ne sert qu'à la déconnexion du web, qui n'a pas la clé.
+        const typeChiffre = await chiffrer(cle, typeAppareil, cryptoApi);
         await base.transaction(['meta'], 'readwrite', async (tx) => {
             const p = (req) => new Promise((ok, ko) => { req.onsuccess = () => ok(); req.onerror = () => ko(req.error); });
             const m = tx.objectStore('meta');
-            await p(m.put({ cle: 'appareil', valeur: { device_name: deviceName, utilisateur, active_le: new Date().toISOString(), persistant } }));
+            await p(m.put({ cle: 'appareil', valeur: { device_name: deviceName, utilisateur, active_le: new Date().toISOString(), persistant, type_appareil: typeAppareil } }));
+            await p(m.put({ cle: 'type_appareil', valeur: typeChiffre }));
             await p(m.put({ cle: 'coffre', valeur: parametres }));
             await p(m.put({ cle: 'jeton', valeur: jetonChiffre }));
             await p(m.put({ cle: 'echecs_pin', valeur: 0 }));
@@ -119,6 +123,7 @@ export async function etatAppareil(base) {
         utilisateur: appareil?.utilisateur ?? null,
         activeLe: appareil?.active_le ?? null,
         persistant: appareil?.persistant ?? false,
+        typeAppareil: TYPES_APPAREIL.includes(appareil?.type_appareil) ? appareil.type_appareil : TYPE_APPAREIL_PAR_DEFAUT,
         suspendu: Boolean(await base.meta('suspendu')),
         echecsPin: (await base.meta('echecs_pin')) ?? 0,
     };
@@ -137,7 +142,7 @@ export async function deverrouiller(base, pin, { cryptoApi = globalThis.crypto, 
         const cle = await ouvrirCoffre(pin, parametres, cryptoApi);
         const jeton = await dechiffrer(cle, await base.meta('jeton'), cryptoApi);
         await base.poserMeta('echecs_pin', 0);
-        return { cle, jeton };
+        return { cle, jeton, typeAppareil: await typeDeLAppareil(base, cle, cryptoApi) };
     } catch (e) {
         if (!(e instanceof ErreurPin)) throw e;
         const echecs = ((await base.meta('echecs_pin')) ?? 0) + 1;
@@ -151,6 +156,30 @@ export async function deverrouiller(base, pin, { cryptoApi = globalThis.crypto, 
             ? `PIN incorrect. Attention : ${restant} essai(s) avant l'EFFACEMENT des données de cet appareil (les ventes non envoyées seraient perdues).`
             : `PIN incorrect (${echecs}/${ECHECS_MAXIMUM}).`);
     }
+}
+
+/**
+ * Le type d'appareil lu CHIFFRÉ (déverrouillé). Absent (appareil activé avant CAISSE-1) : « entreprise ». Copie en clair différente de la copie chiffrée,
+ * ou chiffrée illisible : « personnel » (le plus strict), jamais le plus permissif.
+ */
+export async function typeDeLAppareil(base, cle, cryptoApi = globalThis.crypto) {
+    const brut = await base.meta('type_appareil');
+    if (!brut) return (await base.meta('appareil'))?.type_appareil === 'personnel' ? 'personnel' : TYPE_APPAREIL_PAR_DEFAUT;
+    let chiffre = null;
+    try { chiffre = await dechiffrer(cle, brut, cryptoApi); } catch { return 'personnel'; }
+    const clair = (await base.meta('appareil'))?.type_appareil;
+    if (!TYPES_APPAREIL.includes(chiffre) || clair !== chiffre) return 'personnel';
+    return chiffre;
+}
+
+/**
+ * CAISSE-1 (DV-32) — ce que fait la déconnexion DU WEB d'après le type d'appareil et le nombre d'éléments non envoyés :
+ * rien en attente = `purger` ; appareil de l'entreprise avec des éléments en attente = `refuser` (jusqu'à leur envoi ou leur abandon dans la caisse) ;
+ * appareil PERSONNEL avec des éléments en attente = `confirmer` (le nombre perdu est dit, puis TOUT est effacé).
+ */
+export function decisionDeconnexion(typeAppareil, enAttente) {
+    if (!(enAttente > 0)) return 'purger';
+    return typeAppareil === 'personnel' ? 'confirmer' : 'refuser';
 }
 
 /** Purge locale : base IndexedDB, caches du service worker, marqueurs. Ne touche pas au serveur. */

@@ -3,7 +3,7 @@
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
             <span class="material-symbols-outlined text-brand-emerald text-[26px]">cloud_off</span>Mode hors ligne
         </h2>
-        <p class="text-xs text-outline mt-xs">Vendre à la caisse même quand la liaison de la ferme tombe : les ventes sont gardées sur cet appareil, puis envoyées toutes seules au retour du réseau.</p>
+        <p class="text-xs text-outline mt-xs">Travailler même quand la liaison de la ferme tombe : la caisse (avec le droit des ventes) et les fiches d'élevage (avec le droit d'élevage) sont gardées sur cet appareil, puis envoyées toutes seules au retour du réseau. L'écran suit les droits de votre compte.</p>
     </div>
 
     {{-- Le formulaire est piloté par Alpine/JavaScript, jamais par Livewire : le mot de passe ne passe jamais par Livewire. --}}
@@ -25,13 +25,19 @@
             <template x-if="prerequis.ok && !chargement && !actif">
                 <form x-on:submit.prevent="activer()" class="space-y-md" autocomplete="off">
                     <p class="text-xs text-outline">Cet appareil n'est pas encore activé. Confirmez votre mot de passe (il n'est pas conservé), puis choisissez un PIN : il protège les données locales et rouvre la caisse hors ligne.</p>
+                    {{-- CAISSE-1 (DV-32) : le type d'appareil, choisi UNE fois à l'activation (pour le changer, il faut réactiver). --}}
+                    <fieldset class="space-y-xs">
+                        <legend class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Type d'appareil</legend>
+                        <label class="flex items-start gap-xs text-xs cursor-pointer"><input id="hl-type-entreprise" type="radio" name="hl-type" value="entreprise" x-model="typeAppareil" class="mt-[2px]"><span><strong>Appareil de l'entreprise</strong> (recommandé) : PIN de 4 à 6 chiffres ; les données restent sur l'appareil jusqu'à leur envoi au serveur.</span></label>
+                        <label class="flex items-start gap-xs text-xs cursor-pointer"><input id="hl-type-personnel" type="radio" name="hl-type" value="personnel" x-model="typeAppareil" class="mt-[2px]"><span><strong>Appareil personnel</strong> : PIN de 6 chiffres obligatoire ; TOUTES les données hors ligne de l'appareil sont effacées à la déconnexion.</span></label>
+                    </fieldset>
                     <div>
                         <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs" for="hl-mdp">Mot de passe</label>
                         <input id="hl-mdp" type="password" x-model="motDePasse" autocomplete="current-password" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs">
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
                         <div>
-                            <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs" for="hl-pin">PIN (4 à 6 chiffres)</label>
+                            <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs" for="hl-pin" x-text="libellePin">PIN (4 à 6 chiffres)</label>
                             <input id="hl-pin" type="password" inputmode="numeric" maxlength="6" x-model="pin" autocomplete="off" class="w-full h-10 px-md border border-outline-variant rounded-lg text-xs">
                         </div>
                         <div>
@@ -50,6 +56,7 @@
                 <div class="space-y-md">
                     <div class="bg-surface-zebra rounded-lg p-md text-xs space-y-xs">
                         <p><span class="font-bold text-brand-forest">Appareil appairé :</span> <span class="font-mono" x-text="nomAppareil"></span></p>
+                        <p><span class="font-bold text-brand-forest">Type d'appareil :</span> <span id="hl-type-actif" x-text="typeActif === 'personnel' ? 'appareil personnel (tout est effacé à la déconnexion)' : 'appareil de l\'entreprise'"></span></p>
                         <p><span class="font-bold text-brand-forest">Activé le :</span> <span x-text="activeLe"></span></p>
                         <p><span class="font-bold text-brand-forest">Stockage durable :</span> <span x-text="persistant ? 'accordé par le navigateur' : 'non garanti par le navigateur : synchronisez souvent'"></span></p>
                         <p x-show="enAttente > 0" class="text-warn font-bold"><span x-text="enAttente"></span> vente(s) de cet appareil ne sont pas encore envoyées.</p>
@@ -67,7 +74,8 @@
         <div class="bg-white border border-outline-variant rounded-lg p-lg text-xs text-outline space-y-sm">
             <p class="text-sm font-bold text-brand-forest uppercase">Ce que couvre ce mode</p>
             <ul class="list-disc pl-md space-y-xs">
-                <li>Ventes de caisse : produits du catalogue (sujets vivants avec leur bande source et le contrôle de rémanence vétérinaire), panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
+                <li>Ventes de caisse (réservées aux comptes qui ont le droit des ventes) : produits du catalogue (sujets vivants avec leur bande source et le contrôle de rémanence vétérinaire), panier, livraison facturée, facture simple ou normalisée, paiement (dont « Déduire de l'avance »).</li>
+                <li>Reçu provisoire : après une vente hors ligne, le bouton « Imprimer le reçu provisoire » produit un reçu SANS numéro de facture légal (identifiant court de la vente, client, lignes, mode de règlement, mention « Facture n° attribué à la synchronisation. ») ; le numéro est attribué par le serveur à la synchronisation.</li>
                 <li>Création d'un client avec le bouton « + » (nom, téléphone, IFU facultatif) ; il est envoyé au serveur à la synchronisation, qui peut le rapprocher d'une fiche déjà connue.</li>
                 <li>Consultation du catalogue et des clients copiés sur l'appareil.</li>
             </ul>
