@@ -912,8 +912,8 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
 
   /// Les cinq onglets du web, dans son ordre, avec leurs messages vides exacts.
   ///
-  /// Depuis le ticket DEV, `quotes` descend au poste (table mixte) ; l'onglet Devis garde sa place et le message
-  /// vide du web quand la ferme n'a aucun devis.
+  /// Depuis le ticket DEV, `quotes` descend au poste (table mixte) ; depuis DEV2 l'onglet Devis liste les cinq derniers
+  /// devis comme le web et garde le message vide du web quand la ferme n'a aucun devis.
   static const _ongletsTx = <(String, String)>[
     ('Vente', 'Aucune vente récente.'),
     ('Achat', 'Aucun achat récent.'),
@@ -936,6 +936,7 @@ class _TableauDeBordScreenState extends State<TableauDeBordScreen> {
     final lignes = switch (_ongletTx) {
       'Vente' => d.ventesRecentes,
       'Achat' => d.achatsRecents,
+      'Devis' => d.devisRecents,
       'Dépenses' => d.depensesRecentes,
       'Factures' => d.facturesRecentes,
       _ => const <LigneTransaction>[],

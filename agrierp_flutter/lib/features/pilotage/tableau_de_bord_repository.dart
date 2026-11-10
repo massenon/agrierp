@@ -153,6 +153,7 @@ class DonneesTableauDeBord {
     required this.serie,
     required this.ventesRecentes,
     required this.achatsRecents,
+    required this.devisRecents,
     required this.depensesRecentes,
     required this.facturesRecentes,
     required this.activitesDuJour,
@@ -192,6 +193,9 @@ class DonneesTableauDeBord {
   final List<PointMensuel> serie;
   final List<LigneTransaction> ventesRecentes;
   final List<LigneTransaction> achatsRecents;
+
+  /// Ticket DEV2 — onglet « Devis » : `Quote::with('customer')->latest('created_at')->limit(5)`.
+  final List<LigneTransaction> devisRecents;
   final List<LigneTransaction> depensesRecentes;
   final List<LigneTransaction> facturesRecentes;
   final List<LigneActivite> activitesDuJour;
@@ -316,6 +320,8 @@ class TableauDeBordRepository {
     final effectif = bandesActives.fold<int>(0, (t, b) => t + b.currentQuantity);
 
     final nomsClients = {for (final c in clients) c.id: c.name};
+    // Ticket DEV2 — `quotes` descend (table mixte) : même règle U8 que les ventes (le refusé par le serveur n'existe pas au web).
+    final devis = (await database.select(database.quotes).get()).where((q) => compteAuWeb(q.syncStatus)).toList();
 
     final exercices = await (database.select(database.fiscalYears)..where((e) => e.status.equals('ouvert'))).get();
     final exerciceOuvert = exercices.isEmpty ? null : exercices.map((e) => e.year).reduce((a, b) => a > b ? a : b);
@@ -370,6 +376,7 @@ class TableauDeBordRepository {
       serie: _serie(ventesValides, achats, maintenant),
       ventesRecentes: _ventes(ventes, nomsClients),
       achatsRecents: _achats(achats),
+      devisRecents: _devis(devis, nomsClients),
       depensesRecentes: _depenses(depenses),
       // Facturation = `Sale` dont `mecef_status = 'transmise'` (pas de modèle `Invoice`).
       facturesRecentes: _ventes(
@@ -735,6 +742,28 @@ class TableauDeBordRepository {
             ton: a.paymentMode == 'comptant' ? TonMontant.foret : TonMontant.jaune,
           ),
         )
+        .toList();
+  }
+
+  /// Ticket DEV2 — `Quote::with('customer')->latest('created_at')->limit(5)` : TOUS les devis, archivés compris (le web ne
+  /// filtre ni `is_active` ni le statut ni l'exercice) ; libellé `ID8 · client` (nom vide sans client), montant `text-info-blue`.
+  /// ⚠️ ÉCART ASSUMÉ : `created_at` n'est pas servi au poste ; le tri suit `quote_date` (jour de création d'un devis
+  /// saisi, sauf devis antidaté), départagé par `updated_at`, puis par `id`.
+  List<LigneTransaction> _devis(List<Quote> devis, Map<String, String> nomsClients) {
+    final tries = [...devis]
+      ..sort((a, b) {
+        final j = b.quoteDate.compareTo(a.quoteDate);
+        if (j != 0) return j;
+        final u = b.updatedAt.compareTo(a.updatedAt);
+        return u != 0 ? u : b.id.compareTo(a.id);
+      });
+    return tries
+        .take(5)
+        .map((q) => LigneTransaction(
+              libelle: '${_id8(q.id)} · ${nomsClients[q.customerId] ?? ''}',
+              montant: q.amount,
+              ton: TonMontant.bleu,
+            ))
         .toList();
   }
 
