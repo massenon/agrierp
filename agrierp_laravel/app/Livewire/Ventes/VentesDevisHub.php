@@ -33,7 +33,7 @@ class VentesDevisHub extends Component
     {
         $peutEncaisser = \Illuminate\Support\Facades\Gate::allows('manage-ventes');
 
-        if (! $peutEncaisser && $this->tab === 'vente') {
+        if (! $peutEncaisser && in_array($this->tab, ['vente', 'cloture'])) {
             $this->tab = 'historique';
         }
 

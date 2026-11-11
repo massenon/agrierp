@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/features/ventes/avoirs_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
+import 'package:agrierp/features/ventes/cloture_caisse_repository.dart';
 import 'package:agrierp/features/ventes/devis_repository.dart';
 import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
 import 'package:agrierp/features/ventes/ventes_devis_repository.dart';
@@ -45,6 +46,8 @@ void main() {
           depot: depot,
           caisse: caisse,
           devis: DevisRepository(database: db, deviceId: 'poste-test'),
+          clotureCaisse: ClotureCaisseRepository(db),
+          deviceId: 'poste-test',
           avoirs: AvoirsRepository(database: db, identifiantPoste: 'poste-test'),
           historique: HistoriqueVentesRepository(database: db),
         ),
@@ -58,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('⚠️ les quatre onglets du hub sont là, dans son ordre', (
+  testWidgets('⚠️ les cinq onglets du hub sont là, dans son ordre', (
     tester,
   ) async {
     await afficher(tester);
@@ -68,6 +71,7 @@ void main() {
       'Devis Prestations',
       'Historique des Ventes',
       'Retours et Avoirs',
+      'Clôture Caisse',
     ]) {
       expect(find.text(onglet), findsWidgets, reason: onglet);
     }

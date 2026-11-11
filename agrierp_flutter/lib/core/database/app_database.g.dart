@@ -22489,6 +22489,895 @@ class PeriodicClosuresCompanion extends UpdateCompanion<PeriodicClosure> {
   }
 }
 
+class $CashClosuresTable extends CashClosures
+    with TableInfo<$CashClosuresTable, CashClosure> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CashClosuresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fiscalYearIdMeta = const VerificationMeta(
+    'fiscalYearId',
+  );
+  @override
+  late final GeneratedColumn<String> fiscalYearId = GeneratedColumn<String>(
+    'fiscal_year_id',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 36,
+      maxTextLength: 36,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _closureDateMeta = const VerificationMeta(
+    'closureDate',
+  );
+  @override
+  late final GeneratedColumn<String> closureDate = GeneratedColumn<String>(
+    'closure_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ventesEspecesMeta = const VerificationMeta(
+    'ventesEspeces',
+  );
+  @override
+  late final GeneratedColumn<double> ventesEspeces = GeneratedColumn<double>(
+    'ventes_especes',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _ventesMobileMoneyMeta = const VerificationMeta(
+    'ventesMobileMoney',
+  );
+  @override
+  late final GeneratedColumn<double> ventesMobileMoney =
+      GeneratedColumn<double>(
+        'ventes_mobile_money',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
+  static const VerificationMeta _ventesVirementMeta = const VerificationMeta(
+    'ventesVirement',
+  );
+  @override
+  late final GeneratedColumn<double> ventesVirement = GeneratedColumn<double>(
+    'ventes_virement',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _fondDeCaisseMeta = const VerificationMeta(
+    'fondDeCaisse',
+  );
+  @override
+  late final GeneratedColumn<double> fondDeCaisse = GeneratedColumn<double>(
+    'fond_de_caisse',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _montantCompteMeta = const VerificationMeta(
+    'montantCompte',
+  );
+  @override
+  late final GeneratedColumn<double> montantCompte = GeneratedColumn<double>(
+    'montant_compte',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _ecartMeta = const VerificationMeta('ecart');
+  @override
+  late final GeneratedColumn<double> ecart = GeneratedColumn<double>(
+    'ecart',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _statutMeta = const VerificationMeta('statut');
+  @override
+  late final GeneratedColumn<String> statut = GeneratedColumn<String>(
+    'statut',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('en_cours'),
+  );
+  static const VerificationMeta _accountingEntryIdMeta = const VerificationMeta(
+    'accountingEntryId',
+  );
+  @override
+  late final GeneratedColumn<String> accountingEntryId =
+      GeneratedColumn<String>(
+        'accounting_entry_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<int> createdBy = GeneratedColumn<int>(
+    'created_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    fiscalYearId,
+    closureDate,
+    deviceId,
+    ventesEspeces,
+    ventesMobileMoney,
+    ventesVirement,
+    fondDeCaisse,
+    montantCompte,
+    ecart,
+    statut,
+    accountingEntryId,
+    createdBy,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cash_closures';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CashClosure> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('fiscal_year_id')) {
+      context.handle(
+        _fiscalYearIdMeta,
+        fiscalYearId.isAcceptableOrUnknown(
+          data['fiscal_year_id']!,
+          _fiscalYearIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fiscalYearIdMeta);
+    }
+    if (data.containsKey('closure_date')) {
+      context.handle(
+        _closureDateMeta,
+        closureDate.isAcceptableOrUnknown(
+          data['closure_date']!,
+          _closureDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_closureDateMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('ventes_especes')) {
+      context.handle(
+        _ventesEspecesMeta,
+        ventesEspeces.isAcceptableOrUnknown(
+          data['ventes_especes']!,
+          _ventesEspecesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ventes_mobile_money')) {
+      context.handle(
+        _ventesMobileMoneyMeta,
+        ventesMobileMoney.isAcceptableOrUnknown(
+          data['ventes_mobile_money']!,
+          _ventesMobileMoneyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ventes_virement')) {
+      context.handle(
+        _ventesVirementMeta,
+        ventesVirement.isAcceptableOrUnknown(
+          data['ventes_virement']!,
+          _ventesVirementMeta,
+        ),
+      );
+    }
+    if (data.containsKey('fond_de_caisse')) {
+      context.handle(
+        _fondDeCaisseMeta,
+        fondDeCaisse.isAcceptableOrUnknown(
+          data['fond_de_caisse']!,
+          _fondDeCaisseMeta,
+        ),
+      );
+    }
+    if (data.containsKey('montant_compte')) {
+      context.handle(
+        _montantCompteMeta,
+        montantCompte.isAcceptableOrUnknown(
+          data['montant_compte']!,
+          _montantCompteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ecart')) {
+      context.handle(
+        _ecartMeta,
+        ecart.isAcceptableOrUnknown(data['ecart']!, _ecartMeta),
+      );
+    }
+    if (data.containsKey('statut')) {
+      context.handle(
+        _statutMeta,
+        statut.isAcceptableOrUnknown(data['statut']!, _statutMeta),
+      );
+    }
+    if (data.containsKey('accounting_entry_id')) {
+      context.handle(
+        _accountingEntryIdMeta,
+        accountingEntryId.isAcceptableOrUnknown(
+          data['accounting_entry_id']!,
+          _accountingEntryIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CashClosure map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CashClosure(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fiscalYearId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fiscal_year_id'],
+      )!,
+      closureDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}closure_date'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      ),
+      ventesEspeces: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ventes_especes'],
+      )!,
+      ventesMobileMoney: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ventes_mobile_money'],
+      )!,
+      ventesVirement: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ventes_virement'],
+      )!,
+      fondDeCaisse: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}fond_de_caisse'],
+      )!,
+      montantCompte: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}montant_compte'],
+      )!,
+      ecart: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ecart'],
+      )!,
+      statut: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}statut'],
+      )!,
+      accountingEntryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accounting_entry_id'],
+      ),
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $CashClosuresTable createAlias(String alias) {
+    return $CashClosuresTable(attachedDatabase, alias);
+  }
+}
+
+class CashClosure extends DataClass implements Insertable<CashClosure> {
+  final String id;
+  final String fiscalYearId;
+  final String closureDate;
+  final String? deviceId;
+  final double ventesEspeces;
+  final double ventesMobileMoney;
+  final double ventesVirement;
+  final double fondDeCaisse;
+  final double montantCompte;
+  final double ecart;
+  final String statut;
+  final String? accountingEntryId;
+  final int? createdBy;
+  final String? createdAt;
+  final String? updatedAt;
+  const CashClosure({
+    required this.id,
+    required this.fiscalYearId,
+    required this.closureDate,
+    this.deviceId,
+    required this.ventesEspeces,
+    required this.ventesMobileMoney,
+    required this.ventesVirement,
+    required this.fondDeCaisse,
+    required this.montantCompte,
+    required this.ecart,
+    required this.statut,
+    this.accountingEntryId,
+    this.createdBy,
+    this.createdAt,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['fiscal_year_id'] = Variable<String>(fiscalYearId);
+    map['closure_date'] = Variable<String>(closureDate);
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['ventes_especes'] = Variable<double>(ventesEspeces);
+    map['ventes_mobile_money'] = Variable<double>(ventesMobileMoney);
+    map['ventes_virement'] = Variable<double>(ventesVirement);
+    map['fond_de_caisse'] = Variable<double>(fondDeCaisse);
+    map['montant_compte'] = Variable<double>(montantCompte);
+    map['ecart'] = Variable<double>(ecart);
+    map['statut'] = Variable<String>(statut);
+    if (!nullToAbsent || accountingEntryId != null) {
+      map['accounting_entry_id'] = Variable<String>(accountingEntryId);
+    }
+    if (!nullToAbsent || createdBy != null) {
+      map['created_by'] = Variable<int>(createdBy);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<String>(createdAt);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<String>(updatedAt);
+    }
+    return map;
+  }
+
+  CashClosuresCompanion toCompanion(bool nullToAbsent) {
+    return CashClosuresCompanion(
+      id: Value(id),
+      fiscalYearId: Value(fiscalYearId),
+      closureDate: Value(closureDate),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      ventesEspeces: Value(ventesEspeces),
+      ventesMobileMoney: Value(ventesMobileMoney),
+      ventesVirement: Value(ventesVirement),
+      fondDeCaisse: Value(fondDeCaisse),
+      montantCompte: Value(montantCompte),
+      ecart: Value(ecart),
+      statut: Value(statut),
+      accountingEntryId: accountingEntryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountingEntryId),
+      createdBy: createdBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdBy),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory CashClosure.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CashClosure(
+      id: serializer.fromJson<String>(json['id']),
+      fiscalYearId: serializer.fromJson<String>(json['fiscalYearId']),
+      closureDate: serializer.fromJson<String>(json['closureDate']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      ventesEspeces: serializer.fromJson<double>(json['ventesEspeces']),
+      ventesMobileMoney: serializer.fromJson<double>(json['ventesMobileMoney']),
+      ventesVirement: serializer.fromJson<double>(json['ventesVirement']),
+      fondDeCaisse: serializer.fromJson<double>(json['fondDeCaisse']),
+      montantCompte: serializer.fromJson<double>(json['montantCompte']),
+      ecart: serializer.fromJson<double>(json['ecart']),
+      statut: serializer.fromJson<String>(json['statut']),
+      accountingEntryId: serializer.fromJson<String?>(
+        json['accountingEntryId'],
+      ),
+      createdBy: serializer.fromJson<int?>(json['createdBy']),
+      createdAt: serializer.fromJson<String?>(json['createdAt']),
+      updatedAt: serializer.fromJson<String?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fiscalYearId': serializer.toJson<String>(fiscalYearId),
+      'closureDate': serializer.toJson<String>(closureDate),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'ventesEspeces': serializer.toJson<double>(ventesEspeces),
+      'ventesMobileMoney': serializer.toJson<double>(ventesMobileMoney),
+      'ventesVirement': serializer.toJson<double>(ventesVirement),
+      'fondDeCaisse': serializer.toJson<double>(fondDeCaisse),
+      'montantCompte': serializer.toJson<double>(montantCompte),
+      'ecart': serializer.toJson<double>(ecart),
+      'statut': serializer.toJson<String>(statut),
+      'accountingEntryId': serializer.toJson<String?>(accountingEntryId),
+      'createdBy': serializer.toJson<int?>(createdBy),
+      'createdAt': serializer.toJson<String?>(createdAt),
+      'updatedAt': serializer.toJson<String?>(updatedAt),
+    };
+  }
+
+  CashClosure copyWith({
+    String? id,
+    String? fiscalYearId,
+    String? closureDate,
+    Value<String?> deviceId = const Value.absent(),
+    double? ventesEspeces,
+    double? ventesMobileMoney,
+    double? ventesVirement,
+    double? fondDeCaisse,
+    double? montantCompte,
+    double? ecart,
+    String? statut,
+    Value<String?> accountingEntryId = const Value.absent(),
+    Value<int?> createdBy = const Value.absent(),
+    Value<String?> createdAt = const Value.absent(),
+    Value<String?> updatedAt = const Value.absent(),
+  }) => CashClosure(
+    id: id ?? this.id,
+    fiscalYearId: fiscalYearId ?? this.fiscalYearId,
+    closureDate: closureDate ?? this.closureDate,
+    deviceId: deviceId.present ? deviceId.value : this.deviceId,
+    ventesEspeces: ventesEspeces ?? this.ventesEspeces,
+    ventesMobileMoney: ventesMobileMoney ?? this.ventesMobileMoney,
+    ventesVirement: ventesVirement ?? this.ventesVirement,
+    fondDeCaisse: fondDeCaisse ?? this.fondDeCaisse,
+    montantCompte: montantCompte ?? this.montantCompte,
+    ecart: ecart ?? this.ecart,
+    statut: statut ?? this.statut,
+    accountingEntryId: accountingEntryId.present
+        ? accountingEntryId.value
+        : this.accountingEntryId,
+    createdBy: createdBy.present ? createdBy.value : this.createdBy,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  CashClosure copyWithCompanion(CashClosuresCompanion data) {
+    return CashClosure(
+      id: data.id.present ? data.id.value : this.id,
+      fiscalYearId: data.fiscalYearId.present
+          ? data.fiscalYearId.value
+          : this.fiscalYearId,
+      closureDate: data.closureDate.present
+          ? data.closureDate.value
+          : this.closureDate,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      ventesEspeces: data.ventesEspeces.present
+          ? data.ventesEspeces.value
+          : this.ventesEspeces,
+      ventesMobileMoney: data.ventesMobileMoney.present
+          ? data.ventesMobileMoney.value
+          : this.ventesMobileMoney,
+      ventesVirement: data.ventesVirement.present
+          ? data.ventesVirement.value
+          : this.ventesVirement,
+      fondDeCaisse: data.fondDeCaisse.present
+          ? data.fondDeCaisse.value
+          : this.fondDeCaisse,
+      montantCompte: data.montantCompte.present
+          ? data.montantCompte.value
+          : this.montantCompte,
+      ecart: data.ecart.present ? data.ecart.value : this.ecart,
+      statut: data.statut.present ? data.statut.value : this.statut,
+      accountingEntryId: data.accountingEntryId.present
+          ? data.accountingEntryId.value
+          : this.accountingEntryId,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CashClosure(')
+          ..write('id: $id, ')
+          ..write('fiscalYearId: $fiscalYearId, ')
+          ..write('closureDate: $closureDate, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('ventesEspeces: $ventesEspeces, ')
+          ..write('ventesMobileMoney: $ventesMobileMoney, ')
+          ..write('ventesVirement: $ventesVirement, ')
+          ..write('fondDeCaisse: $fondDeCaisse, ')
+          ..write('montantCompte: $montantCompte, ')
+          ..write('ecart: $ecart, ')
+          ..write('statut: $statut, ')
+          ..write('accountingEntryId: $accountingEntryId, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    fiscalYearId,
+    closureDate,
+    deviceId,
+    ventesEspeces,
+    ventesMobileMoney,
+    ventesVirement,
+    fondDeCaisse,
+    montantCompte,
+    ecart,
+    statut,
+    accountingEntryId,
+    createdBy,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CashClosure &&
+          other.id == this.id &&
+          other.fiscalYearId == this.fiscalYearId &&
+          other.closureDate == this.closureDate &&
+          other.deviceId == this.deviceId &&
+          other.ventesEspeces == this.ventesEspeces &&
+          other.ventesMobileMoney == this.ventesMobileMoney &&
+          other.ventesVirement == this.ventesVirement &&
+          other.fondDeCaisse == this.fondDeCaisse &&
+          other.montantCompte == this.montantCompte &&
+          other.ecart == this.ecart &&
+          other.statut == this.statut &&
+          other.accountingEntryId == this.accountingEntryId &&
+          other.createdBy == this.createdBy &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CashClosuresCompanion extends UpdateCompanion<CashClosure> {
+  final Value<String> id;
+  final Value<String> fiscalYearId;
+  final Value<String> closureDate;
+  final Value<String?> deviceId;
+  final Value<double> ventesEspeces;
+  final Value<double> ventesMobileMoney;
+  final Value<double> ventesVirement;
+  final Value<double> fondDeCaisse;
+  final Value<double> montantCompte;
+  final Value<double> ecart;
+  final Value<String> statut;
+  final Value<String?> accountingEntryId;
+  final Value<int?> createdBy;
+  final Value<String?> createdAt;
+  final Value<String?> updatedAt;
+  final Value<int> rowid;
+  const CashClosuresCompanion({
+    this.id = const Value.absent(),
+    this.fiscalYearId = const Value.absent(),
+    this.closureDate = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.ventesEspeces = const Value.absent(),
+    this.ventesMobileMoney = const Value.absent(),
+    this.ventesVirement = const Value.absent(),
+    this.fondDeCaisse = const Value.absent(),
+    this.montantCompte = const Value.absent(),
+    this.ecart = const Value.absent(),
+    this.statut = const Value.absent(),
+    this.accountingEntryId = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CashClosuresCompanion.insert({
+    required String id,
+    required String fiscalYearId,
+    required String closureDate,
+    this.deviceId = const Value.absent(),
+    this.ventesEspeces = const Value.absent(),
+    this.ventesMobileMoney = const Value.absent(),
+    this.ventesVirement = const Value.absent(),
+    this.fondDeCaisse = const Value.absent(),
+    this.montantCompte = const Value.absent(),
+    this.ecart = const Value.absent(),
+    this.statut = const Value.absent(),
+    this.accountingEntryId = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fiscalYearId = Value(fiscalYearId),
+       closureDate = Value(closureDate);
+  static Insertable<CashClosure> custom({
+    Expression<String>? id,
+    Expression<String>? fiscalYearId,
+    Expression<String>? closureDate,
+    Expression<String>? deviceId,
+    Expression<double>? ventesEspeces,
+    Expression<double>? ventesMobileMoney,
+    Expression<double>? ventesVirement,
+    Expression<double>? fondDeCaisse,
+    Expression<double>? montantCompte,
+    Expression<double>? ecart,
+    Expression<String>? statut,
+    Expression<String>? accountingEntryId,
+    Expression<int>? createdBy,
+    Expression<String>? createdAt,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+      if (closureDate != null) 'closure_date': closureDate,
+      if (deviceId != null) 'device_id': deviceId,
+      if (ventesEspeces != null) 'ventes_especes': ventesEspeces,
+      if (ventesMobileMoney != null) 'ventes_mobile_money': ventesMobileMoney,
+      if (ventesVirement != null) 'ventes_virement': ventesVirement,
+      if (fondDeCaisse != null) 'fond_de_caisse': fondDeCaisse,
+      if (montantCompte != null) 'montant_compte': montantCompte,
+      if (ecart != null) 'ecart': ecart,
+      if (statut != null) 'statut': statut,
+      if (accountingEntryId != null) 'accounting_entry_id': accountingEntryId,
+      if (createdBy != null) 'created_by': createdBy,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CashClosuresCompanion copyWith({
+    Value<String>? id,
+    Value<String>? fiscalYearId,
+    Value<String>? closureDate,
+    Value<String?>? deviceId,
+    Value<double>? ventesEspeces,
+    Value<double>? ventesMobileMoney,
+    Value<double>? ventesVirement,
+    Value<double>? fondDeCaisse,
+    Value<double>? montantCompte,
+    Value<double>? ecart,
+    Value<String>? statut,
+    Value<String?>? accountingEntryId,
+    Value<int?>? createdBy,
+    Value<String?>? createdAt,
+    Value<String?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CashClosuresCompanion(
+      id: id ?? this.id,
+      fiscalYearId: fiscalYearId ?? this.fiscalYearId,
+      closureDate: closureDate ?? this.closureDate,
+      deviceId: deviceId ?? this.deviceId,
+      ventesEspeces: ventesEspeces ?? this.ventesEspeces,
+      ventesMobileMoney: ventesMobileMoney ?? this.ventesMobileMoney,
+      ventesVirement: ventesVirement ?? this.ventesVirement,
+      fondDeCaisse: fondDeCaisse ?? this.fondDeCaisse,
+      montantCompte: montantCompte ?? this.montantCompte,
+      ecart: ecart ?? this.ecart,
+      statut: statut ?? this.statut,
+      accountingEntryId: accountingEntryId ?? this.accountingEntryId,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fiscalYearId.present) {
+      map['fiscal_year_id'] = Variable<String>(fiscalYearId.value);
+    }
+    if (closureDate.present) {
+      map['closure_date'] = Variable<String>(closureDate.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (ventesEspeces.present) {
+      map['ventes_especes'] = Variable<double>(ventesEspeces.value);
+    }
+    if (ventesMobileMoney.present) {
+      map['ventes_mobile_money'] = Variable<double>(ventesMobileMoney.value);
+    }
+    if (ventesVirement.present) {
+      map['ventes_virement'] = Variable<double>(ventesVirement.value);
+    }
+    if (fondDeCaisse.present) {
+      map['fond_de_caisse'] = Variable<double>(fondDeCaisse.value);
+    }
+    if (montantCompte.present) {
+      map['montant_compte'] = Variable<double>(montantCompte.value);
+    }
+    if (ecart.present) {
+      map['ecart'] = Variable<double>(ecart.value);
+    }
+    if (statut.present) {
+      map['statut'] = Variable<String>(statut.value);
+    }
+    if (accountingEntryId.present) {
+      map['accounting_entry_id'] = Variable<String>(accountingEntryId.value);
+    }
+    if (createdBy.present) {
+      map['created_by'] = Variable<int>(createdBy.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CashClosuresCompanion(')
+          ..write('id: $id, ')
+          ..write('fiscalYearId: $fiscalYearId, ')
+          ..write('closureDate: $closureDate, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('ventesEspeces: $ventesEspeces, ')
+          ..write('ventesMobileMoney: $ventesMobileMoney, ')
+          ..write('ventesVirement: $ventesVirement, ')
+          ..write('fondDeCaisse: $fondDeCaisse, ')
+          ..write('montantCompte: $montantCompte, ')
+          ..write('ecart: $ecart, ')
+          ..write('statut: $statut, ')
+          ..write('accountingEntryId: $accountingEntryId, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AccountingEntriesTable extends AccountingEntries
     with TableInfo<$AccountingEntriesTable, AccountingEntry> {
   @override
@@ -53334,6 +54223,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PeriodicClosuresTable periodicClosures = $PeriodicClosuresTable(
     this,
   );
+  late final $CashClosuresTable cashClosures = $CashClosuresTable(this);
   late final $AccountingEntriesTable accountingEntries =
       $AccountingEntriesTable(this);
   late final $AccountingEntryLinesTable accountingEntryLines =
@@ -53455,6 +54345,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     fiscalYears,
     fiscalClosureRequests,
     periodicClosures,
+    cashClosures,
     accountingEntries,
     accountingEntryLines,
     companySettings,
@@ -64665,6 +65556,412 @@ typedef $$PeriodicClosuresTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $PeriodicClosuresTable, PeriodicClosure>,
       ),
       PeriodicClosure,
+      PrefetchHooks Function()
+    >;
+typedef $$CashClosuresTableCreateCompanionBuilder =
+    CashClosuresCompanion Function({
+      required String id,
+      required String fiscalYearId,
+      required String closureDate,
+      Value<String?> deviceId,
+      Value<double> ventesEspeces,
+      Value<double> ventesMobileMoney,
+      Value<double> ventesVirement,
+      Value<double> fondDeCaisse,
+      Value<double> montantCompte,
+      Value<double> ecart,
+      Value<String> statut,
+      Value<String?> accountingEntryId,
+      Value<int?> createdBy,
+      Value<String?> createdAt,
+      Value<String?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CashClosuresTableUpdateCompanionBuilder =
+    CashClosuresCompanion Function({
+      Value<String> id,
+      Value<String> fiscalYearId,
+      Value<String> closureDate,
+      Value<String?> deviceId,
+      Value<double> ventesEspeces,
+      Value<double> ventesMobileMoney,
+      Value<double> ventesVirement,
+      Value<double> fondDeCaisse,
+      Value<double> montantCompte,
+      Value<double> ecart,
+      Value<String> statut,
+      Value<String?> accountingEntryId,
+      Value<int?> createdBy,
+      Value<String?> createdAt,
+      Value<String?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CashClosuresTableFilterComposer
+    extends Composer<_$AppDatabase, $CashClosuresTable> {
+  $$CashClosuresTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fiscalYearId => $composableBuilder(
+    column: $table.fiscalYearId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get closureDate => $composableBuilder(
+    column: $table.closureDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get ventesEspeces => $composableBuilder(
+    column: $table.ventesEspeces,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get ventesMobileMoney => $composableBuilder(
+    column: $table.ventesMobileMoney,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get ventesVirement => $composableBuilder(
+    column: $table.ventesVirement,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get fondDeCaisse => $composableBuilder(
+    column: $table.fondDeCaisse,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get montantCompte => $composableBuilder(
+    column: $table.montantCompte,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get ecart => $composableBuilder(
+    column: $table.ecart,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get statut => $composableBuilder(
+    column: $table.statut,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accountingEntryId => $composableBuilder(
+    column: $table.accountingEntryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CashClosuresTableOrderingComposer
+    extends Composer<_$AppDatabase, $CashClosuresTable> {
+  $$CashClosuresTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fiscalYearId => $composableBuilder(
+    column: $table.fiscalYearId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get closureDate => $composableBuilder(
+    column: $table.closureDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get ventesEspeces => $composableBuilder(
+    column: $table.ventesEspeces,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get ventesMobileMoney => $composableBuilder(
+    column: $table.ventesMobileMoney,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get ventesVirement => $composableBuilder(
+    column: $table.ventesVirement,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get fondDeCaisse => $composableBuilder(
+    column: $table.fondDeCaisse,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get montantCompte => $composableBuilder(
+    column: $table.montantCompte,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get ecart => $composableBuilder(
+    column: $table.ecart,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get statut => $composableBuilder(
+    column: $table.statut,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accountingEntryId => $composableBuilder(
+    column: $table.accountingEntryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CashClosuresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CashClosuresTable> {
+  $$CashClosuresTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get fiscalYearId => $composableBuilder(
+    column: $table.fiscalYearId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get closureDate => $composableBuilder(
+    column: $table.closureDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<double> get ventesEspeces => $composableBuilder(
+    column: $table.ventesEspeces,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get ventesMobileMoney => $composableBuilder(
+    column: $table.ventesMobileMoney,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get ventesVirement => $composableBuilder(
+    column: $table.ventesVirement,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get fondDeCaisse => $composableBuilder(
+    column: $table.fondDeCaisse,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get montantCompte => $composableBuilder(
+    column: $table.montantCompte,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get ecart =>
+      $composableBuilder(column: $table.ecart, builder: (column) => column);
+
+  GeneratedColumn<String> get statut =>
+      $composableBuilder(column: $table.statut, builder: (column) => column);
+
+  GeneratedColumn<String> get accountingEntryId => $composableBuilder(
+    column: $table.accountingEntryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CashClosuresTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CashClosuresTable,
+          CashClosure,
+          $$CashClosuresTableFilterComposer,
+          $$CashClosuresTableOrderingComposer,
+          $$CashClosuresTableAnnotationComposer,
+          $$CashClosuresTableCreateCompanionBuilder,
+          $$CashClosuresTableUpdateCompanionBuilder,
+          (
+            CashClosure,
+            BaseReferences<_$AppDatabase, $CashClosuresTable, CashClosure>,
+          ),
+          CashClosure,
+          PrefetchHooks Function()
+        > {
+  $$CashClosuresTableTableManager(_$AppDatabase db, $CashClosuresTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CashClosuresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CashClosuresTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CashClosuresTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> fiscalYearId = const Value.absent(),
+                Value<String> closureDate = const Value.absent(),
+                Value<String?> deviceId = const Value.absent(),
+                Value<double> ventesEspeces = const Value.absent(),
+                Value<double> ventesMobileMoney = const Value.absent(),
+                Value<double> ventesVirement = const Value.absent(),
+                Value<double> fondDeCaisse = const Value.absent(),
+                Value<double> montantCompte = const Value.absent(),
+                Value<double> ecart = const Value.absent(),
+                Value<String> statut = const Value.absent(),
+                Value<String?> accountingEntryId = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
+                Value<String?> createdAt = const Value.absent(),
+                Value<String?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CashClosuresCompanion(
+                id: id,
+                fiscalYearId: fiscalYearId,
+                closureDate: closureDate,
+                deviceId: deviceId,
+                ventesEspeces: ventesEspeces,
+                ventesMobileMoney: ventesMobileMoney,
+                ventesVirement: ventesVirement,
+                fondDeCaisse: fondDeCaisse,
+                montantCompte: montantCompte,
+                ecart: ecart,
+                statut: statut,
+                accountingEntryId: accountingEntryId,
+                createdBy: createdBy,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String fiscalYearId,
+                required String closureDate,
+                Value<String?> deviceId = const Value.absent(),
+                Value<double> ventesEspeces = const Value.absent(),
+                Value<double> ventesMobileMoney = const Value.absent(),
+                Value<double> ventesVirement = const Value.absent(),
+                Value<double> fondDeCaisse = const Value.absent(),
+                Value<double> montantCompte = const Value.absent(),
+                Value<double> ecart = const Value.absent(),
+                Value<String> statut = const Value.absent(),
+                Value<String?> accountingEntryId = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
+                Value<String?> createdAt = const Value.absent(),
+                Value<String?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CashClosuresCompanion.insert(
+                id: id,
+                fiscalYearId: fiscalYearId,
+                closureDate: closureDate,
+                deviceId: deviceId,
+                ventesEspeces: ventesEspeces,
+                ventesMobileMoney: ventesMobileMoney,
+                ventesVirement: ventesVirement,
+                fondDeCaisse: fondDeCaisse,
+                montantCompte: montantCompte,
+                ecart: ecart,
+                statut: statut,
+                accountingEntryId: accountingEntryId,
+                createdBy: createdBy,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CashClosuresTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CashClosuresTable,
+      CashClosure,
+      $$CashClosuresTableFilterComposer,
+      $$CashClosuresTableOrderingComposer,
+      $$CashClosuresTableAnnotationComposer,
+      $$CashClosuresTableCreateCompanionBuilder,
+      $$CashClosuresTableUpdateCompanionBuilder,
+      (
+        CashClosure,
+        BaseReferences<_$AppDatabase, $CashClosuresTable, CashClosure>,
+      ),
+      CashClosure,
       PrefetchHooks Function()
     >;
 typedef $$AccountingEntriesTableCreateCompanionBuilder =
@@ -79326,6 +80623,8 @@ class $AppDatabaseManager {
       $$FiscalClosureRequestsTableTableManager(_db, _db.fiscalClosureRequests);
   $$PeriodicClosuresTableTableManager get periodicClosures =>
       $$PeriodicClosuresTableTableManager(_db, _db.periodicClosures);
+  $$CashClosuresTableTableManager get cashClosures =>
+      $$CashClosuresTableTableManager(_db, _db.cashClosures);
   $$AccountingEntriesTableTableManager get accountingEntries =>
       $$AccountingEntriesTableTableManager(_db, _db.accountingEntries);
   $$AccountingEntryLinesTableTableManager get accountingEntryLines =>

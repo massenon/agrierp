@@ -33,6 +33,7 @@ import 'package:agrierp/features/rapports/rapports_repository.dart';
 import 'package:agrierp/features/rh/personnel_repository.dart';
 import 'package:agrierp/features/stocks/stocks_repository.dart';
 import 'package:agrierp/features/ventes/caisse_repository.dart';
+import 'package:agrierp/features/ventes/cloture_caisse_repository.dart';
 import 'package:agrierp/features/ventes/devis_repository.dart';
 import 'package:agrierp/features/ventes/facturation_repository.dart';
 import 'package:agrierp/features/ventes/avoirs_repository.dart';
@@ -100,6 +101,7 @@ SocleAccueil coqueDeTest(
     ventesDevis: VentesDevisRepository(database: db),
     devis: DevisRepository(database: db, deviceId: poste),
     avoirs: AvoirsRepository(database: db, identifiantPoste: poste),
+    clotureCaisse: ClotureCaisseRepository(db),
     historiqueVentes: HistoriqueVentesRepository(database: db),
     stocks: StocksRepository(database: db, deviceId: poste),
     clients: ClientsCreancesRepository(database: db, deviceId: 'poste-test'),

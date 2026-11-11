@@ -1005,6 +1005,8 @@ class SyncEngine {
     recus += await _absorberExercices(corps['fiscal_years']);
     // Ticket CP-4 — clôtures de mois (remplacées à chaque tirage ; clé servie à `view-comptabilite`).
     recus += await _absorberClotures(corps['periodic_closures']);
+    // Sprint C — clôtures de caisse journalières (upsert par id : incrémental depuis `since`).
+    recus += await _absorberCloturesCaisse(corps['cash_closures']);
     recus += await _absorberJournal(
       corps['accounting_entries'],
       corps['accounting_entry_ids'],
@@ -2814,6 +2816,43 @@ class SyncEngine {
       });
     });
 
+    return lignes.length;
+  }
+
+  /// Sprint C — clôtures de caisse journalières : upsert incrémental (le serveur sert uniquement
+  /// les lignes modifiées depuis `since`). La clé `[closure_date, device_id]` est unique côté serveur ;
+  /// le poste stocke l'id UUID comme clé primaire.
+  Future<int> _absorberCloturesCaisse(Object? brut) async {
+    if (brut == null) return 0;
+    final lignes = _lignes(brut);
+    if (lignes.isEmpty) return 0;
+    await _transactionDePage(() async {
+      await _db.batch((b) {
+        for (final l in lignes) {
+          b.insert(
+            _db.cashClosures,
+            CashClosuresCompanion.insert(
+              id: l['id'] as String,
+              fiscalYearId: l['fiscal_year_id'] as String,
+              closureDate: (l['closure_date'] ?? '') as String,
+              deviceId: Value(l['device_id'] as String?),
+              ventesEspeces: Value((l['ventes_especes'] as num? ?? 0).toDouble()),
+              ventesMobileMoney: Value((l['ventes_mobile_money'] as num? ?? 0).toDouble()),
+              ventesVirement: Value((l['ventes_virement'] as num? ?? 0).toDouble()),
+              fondDeCaisse: Value((l['fond_de_caisse'] as num? ?? 0).toDouble()),
+              montantCompte: Value((l['montant_compte'] as num? ?? 0).toDouble()),
+              ecart: Value((l['ecart'] as num? ?? 0).toDouble()),
+              statut: Value((l['statut'] ?? 'en_cours') as String),
+              accountingEntryId: Value(l['accounting_entry_id'] as String?),
+              createdBy: Value(l['created_by'] as int?),
+              createdAt: Value(l['created_at'] as String?),
+              updatedAt: Value(l['updated_at'] as String?),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
+    });
     return lignes.length;
   }
 

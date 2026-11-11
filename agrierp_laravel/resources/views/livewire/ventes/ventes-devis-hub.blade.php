@@ -6,7 +6,8 @@
             ['key' => 'devis', 'label' => 'Devis Prestations', 'icon' => 'description'],
             ['key' => 'historique', 'label' => 'Historique des Ventes', 'icon' => 'history'],
             ['key' => 'retours', 'label' => 'Retours et Avoirs', 'icon' => 'assignment_return'],
-        ])->reject(fn ($t) => $t['key'] === 'vente' && ! $peutEncaisser)->values()->all()"
+            ['key' => 'cloture', 'label' => 'Clôture Caisse', 'icon' => 'point_of_sale'],
+        ])->reject(fn ($t) => in_array($t['key'], ['vente', 'cloture']) && ! $peutEncaisser)->values()->all()"
         :active="$tab">
 
         @if($tab === 'vente' && $peutEncaisser)
@@ -23,6 +24,10 @@
 
         @if($tab === 'retours')
             <livewire:ventes.retours-avoirs />
+        @endif
+
+        @if($tab === 'cloture' && $peutEncaisser)
+            <livewire:ventes.cloture-caisse />
         @endif
     </x-tab-page>
 </div>

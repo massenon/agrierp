@@ -10,6 +10,8 @@ import 'devis_onglet.dart';
 import 'devis_repository.dart';
 import 'historique_ventes_onglet.dart';
 import 'historique_ventes_repository.dart';
+import 'cloture_caisse_repository.dart';
+import 'cloture_caisse_screen.dart';
 import 'retours_avoirs_onglet.dart';
 import 'ventes_devis_repository.dart';
 import '../../core/theme/symboles_agri.dart';
@@ -34,6 +36,8 @@ class VentesDevisScreen extends StatefulWidget {
     required this.avoirs,
     required this.historique,
     required this.devis,
+    required this.clotureCaisse,
+    required this.deviceId,
     this.imprimer,
     this.peutGerer = true,
     this.peutCorriger = true,
@@ -52,6 +56,12 @@ class VentesDevisScreen extends StatefulWidget {
 
   /// Onglet « Historique des Ventes » (ticket AV2) : l'historique de la ferme, l'annulation et le ticket PDF.
   final HistoriqueVentesRepository historique;
+
+  /// Sprint C — onglet « Clôture Caisse » (table `cash_closures`, tirée depuis le serveur).
+  final ClotureCaisseRepository clotureCaisse;
+
+  /// Identifiant du poste courant (transmis à [ClotureCaisseScreen]).
+  final String deviceId;
 
   /// Ticket DEV — l'onglet « Devis Prestations » (table `quotes`, saisie ET tirée) ; mêmes droits `manage-ventes` /
   /// `export-ventes` que les autres onglets.
@@ -87,26 +97,32 @@ class VentesDevisScreen extends StatefulWidget {
 }
 
 class _VentesDevisScreenState extends State<VentesDevisScreen> {
-  /// Les quatre onglets du hub, dans son ordre.
+  /// Les cinq onglets du hub, dans son ordre.
   static const onglets = <(String, IconData)>[
     ('Enregistrer Vente', SymbolesAgri.point_of_sale),
     ('Devis Prestations', SymbolesAgri.description),
     ('Historique des Ventes', SymbolesAgri.receipt_long),
     ('Retours et Avoirs', SymbolesAgri.assignment_return),
+    ('Clôture Caisse', SymbolesAgri.point_of_sale),
   ];
 
   /// Ticket CONF-4 — « Enregistrer Vente » (la caisse) n'est offerte qu'à `manage-ventes` : le comptable, qui LIT les ventes,
   /// ouvre le hub sur « Devis Prestations » (comme le web, qui ne monte pas la caisse sans ce droit).
   static const _caisse = 'Enregistrer Vente';
+  static const _cloture = 'Clôture Caisse';
 
-  List<(String, IconData)> get _visibles => widget.peutGerer ? onglets : [for (final o in onglets) if (o.$1 != _caisse) o];
+  List<(String, IconData)> get _visibles => widget.peutGerer
+      ? onglets
+      : [for (final o in onglets) if (o.$1 != _caisse && o.$1 != _cloture) o];
 
   late String _onglet = _visibles.first.$1;
 
   @override
   Widget build(BuildContext context) {
-    // Jamais la caisse sans le droit, même si l'onglet courant l'était (rôle changé, état restauré).
-    if (!widget.peutGerer && _onglet == _caisse) _onglet = _visibles.first.$1;
+    // Jamais la caisse ni la clôture sans le droit (rôle changé, état restauré).
+    if (!widget.peutGerer && (_onglet == _caisse || _onglet == _cloture)) {
+      _onglet = _visibles.first.$1;
+    }
     return Scaffold(
       backgroundColor: AgriColors.surfaceBg,
       body: Column(
@@ -137,6 +153,11 @@ class _VentesDevisScreenState extends State<VentesDevisScreen> {
               // Ticket AV1 — les retours et avoirs : la demande part, le serveur fait les effets.
               // CONF-4 : l'avoir s'ouvre à `manage-ventes` OU `correct-invoices` (Gate `avoir-client`), pas à la seule caisse.
               'Retours et Avoirs' => RetoursAvoirsOnglet(depot: widget.avoirs, peutGerer: widget.peutCorriger),
+              // Sprint C — Clôture de Caisse (`manage-ventes` uniquement, même garde que la caisse).
+              'Clôture Caisse' => ClotureCaisseScreen(
+                depot: widget.clotureCaisse,
+                deviceId: widget.deviceId,
+              ),
               _ => CaisseScreen(depot: widget.caisse),
             },
           ),

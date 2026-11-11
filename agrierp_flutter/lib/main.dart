@@ -126,6 +126,7 @@ import 'features/stocks/gestion_stocks_screen.dart';
 import 'features/stocks/stocks_repository.dart';
 import 'features/ventes/caisse_screen.dart';
 import 'features/ventes/avoirs_repository.dart';
+import 'features/ventes/cloture_caisse_repository.dart';
 import 'features/ventes/historique_ventes_repository.dart';
 import 'features/ventes/devis_repository.dart';
 import 'features/ventes/ventes_devis_repository.dart';
@@ -352,6 +353,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
     database: _db,
     deviceId: widget.identifiantPoste,
   );
+
+  late final ClotureCaisseRepository _clotureCaisse = ClotureCaisseRepository(_db);
 
   late final ParametresElevageRepository _parametresElevage =
       ParametresElevageRepository(database: _db);
@@ -603,6 +606,7 @@ class _AgriErpAppState extends State<AgriErpApp> {
           ventesDevis: _ventesDevis,
           devis: _devis,
           avoirs: _avoirs,
+          clotureCaisse: _clotureCaisse,
           corbeille: _corbeille,
           historiqueVentes: _historiqueVentes,
           stocks: _stocks,
@@ -672,6 +676,7 @@ class SocleAccueil extends StatefulWidget {
     required this.ventesDevis,
     required this.devis,
     required this.avoirs,
+    required this.clotureCaisse,
     this.corbeille,
     required this.historiqueVentes,
     required this.stocks,
@@ -771,6 +776,7 @@ class SocleAccueil extends StatefulWidget {
   final VentesDevisRepository ventesDevis;
   final DevisRepository devis;
   final AvoirsRepository avoirs;
+  final ClotureCaisseRepository clotureCaisse;
 
   /// Ticket ARC3 — onglet « Corbeille » de Paramètres ; `null` (tests du châssis) : l'onglet le dit.
   final CorbeilleRepository? corbeille;
@@ -1460,6 +1466,8 @@ class _SocleAccueilState extends State<SocleAccueil> {
           depot: widget.ventesDevis,
           caisse: widget.caisse,
           devis: widget.devis,
+          clotureCaisse: widget.clotureCaisse,
+          deviceId: widget.identifiantPoste,
           imprimer: EditeursRapports.imprimer,
           avoirs: widget.avoirs,
           historique: widget.historiqueVentes,

@@ -1024,6 +1024,35 @@ class PeriodicClosures extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Sprint C — Clôture de caisse journalière.
+///
+/// Reçue du serveur en lecture seule : le poste peut ENVOYER une clôture
+/// (push `cash_closures`), mais ne la modifie jamais localement — la validation
+/// définitive appartient au serveur (`ValiderClotureCaisseAction`).
+class CashClosures extends Table {
+  TextColumn get id => text().withLength(min: 36, max: 36)();
+  TextColumn get fiscalYearId => text().withLength(min: 36, max: 36)();
+  TextColumn get closureDate => text()(); // AAAA-MM-JJ
+  TextColumn get deviceId => text().nullable()();
+  RealColumn get ventesEspeces => real().withDefault(const Constant(0))();
+  RealColumn get ventesMobileMoney => real().withDefault(const Constant(0))();
+  RealColumn get ventesVirement => real().withDefault(const Constant(0))();
+  RealColumn get fondDeCaisse => real().withDefault(const Constant(0))();
+  RealColumn get montantCompte => real().withDefault(const Constant(0))();
+  RealColumn get ecart => real().withDefault(const Constant(0))();
+  TextColumn get statut => text().withDefault(const Constant('en_cours'))();
+  TextColumn get accountingEntryId => text().nullable()();
+  IntColumn get createdBy => integer().nullable()();
+  TextColumn get createdAt => text().nullable()();
+  TextColumn get updatedAt => text().nullable()();
+
+  /// Clé de synchronisation : seules les clôtures validées ou hors ligne en cours
+  /// sont utiles sur le poste. L'unicité serveur `[closure_date, device_id]` est
+  /// respectée : le push refusé passe en `SyncConflict`.
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Écriture comptable — l'en-tête d'une pièce du journal.
 ///
 /// ⚠️⚠️ **LES ÉTATS LISENT LE JOURNAL, JAMAIS DES TABLES MÉTIER DISJOINTES.**
@@ -2415,6 +2444,7 @@ class SyncHistory extends Table {
     FiscalYears,
     FiscalClosureRequests,
     PeriodicClosures,
+    CashClosures,
     AccountingEntries,
     AccountingEntryLines,
     CompanySettings,
@@ -2478,7 +2508,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 87;
+  int get schemaVersion => 88;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3170,6 +3200,10 @@ class AppDatabase extends _$AppDatabase {
       }
       // v86 — ticket RELEVES-1 : relevés de terrain (mixte : saisis au poste ET tirés du serveur).
       // v87 — ticket B3 : historique des tentatives de synchronisation.
+      // v88 — Sprint C : clôtures de caisse journalières.
+      if (from < 88) {
+        if (!await _tableExiste(m, cashClosures)) await m.createTable(cashClosures);
+      }
       if (from < 87) {
         if (!await _tableExiste(m, syncHistory)) await m.createTable(syncHistory);
       }
@@ -3797,6 +3831,7 @@ class AppDatabase extends _$AppDatabase {
     'manual_entry_requests', // CP-2
     'depreciation_requests', // CP-3
     'fiscal_closure_requests', 'periodic_closures', // CP-4
+    'cash_closures', // Sprint C
     'settings_requests', // PA-*
     'bank_statement_lines', 'bank_statement_imports', // CP-5
     'corbeille_elements', 'corbeille_demandes', // ARC3

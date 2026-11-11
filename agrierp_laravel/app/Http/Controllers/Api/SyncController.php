@@ -1249,6 +1249,29 @@ class SyncController extends Controller
                     'closed_at' => $e->closed_at?->format('Y-m-d H:i:s'),
                 ]),
 
+            // Sprint C — clôtures de caisse journalières : toutes les clôtures depuis le curseur.
+            'cash_closures' => fn () => \App\Models\CashClosure::query()
+                ->when($since, fn ($q) => $q->where('updated_at', '>', $since))
+                ->orderByDesc('closure_date')
+                ->get()
+                ->map(fn (\App\Models\CashClosure $c) => [
+                    'id'                  => $c->id,
+                    'fiscal_year_id'      => $c->fiscal_year_id,
+                    'closure_date'        => $c->closure_date?->format('Y-m-d'),
+                    'device_id'           => $c->device_id,
+                    'ventes_especes'      => (float) $c->ventes_especes,
+                    'ventes_mobile_money' => (float) $c->ventes_mobile_money,
+                    'ventes_virement'     => (float) $c->ventes_virement,
+                    'fond_de_caisse'      => (float) $c->fond_de_caisse,
+                    'montant_compte'      => (float) $c->montant_compte,
+                    'ecart'               => (float) $c->ecart,
+                    'statut'              => $c->statut,
+                    'accounting_entry_id' => $c->accounting_entry_id,
+                    'created_by'          => $c->created_by,
+                    'created_at'          => $c->created_at?->toIso8601String(),
+                    'updated_at'          => $c->updated_at?->toIso8601String(),
+                ]),
+
             // Ticket CP-4 — l'historique des clôtures de mois (une ligne par mois, déclôtures comprises).
             'periodic_closures' => fn () => \App\Models\PeriodicClosure::query()
                 ->orderByDesc('period')
@@ -2693,6 +2716,15 @@ class SyncController extends Controller
             $result['fiscal_closure_requests'] = $this->pushFiscalClosureRequests(
                 $this->envoiTraduit($request, 'fiscal_closure_requests'),
                 $request->user(),
+            );
+        }
+
+        // Sprint C — Clôture de caisse : APRÈS les ventes du même envoi, pour que le calcul de l'écart inclut la vente à l'instant.
+        if ($request->has('cash_closures')) {
+            $result['cash_closures'] = $this->pushCashClosures(
+                $request->input('cash_closures'),
+                $request->user(),
+                $request->input('device_id'),
             );
         }
 
@@ -7327,6 +7359,48 @@ class SyncController extends Controller
             } catch (\Throwable $e) {
                 // Ticket U5 : un motif technique du framework (anglais) devient une phrase française.
                 $rejected[] = ['id' => $adj['client_ref'] ?? null, 'client_ref' => $adj['client_ref'] ?? null, 'reason' => MessagesErreurFr::pourUtilisateur($e)];
+            }
+        }
+
+        return ['accepted' => $accepted, 'rejected' => $rejected];
+    }
+
+    // ─── Sprint C : Clôture de caisse ────────────────────────────────────────
+
+    /**
+     * Clôtures de caisse envoyées depuis le poste.
+     * Rejoue `ValiderClotureCaisseAction` : un seul point de passage, comme pour les ventes.
+     */
+    private function pushCashClosures(array $clotures, $utilisateur, ?string $deviceId): array
+    {
+        $accepted = [];
+        $rejected = [];
+
+        foreach ($clotures as $cl) {
+            try {
+                if (! isset($cl['closure_date'], $cl['fond_de_caisse'], $cl['montant_compte'])) {
+                    $rejected[] = ['id' => $cl['id'] ?? null, 'reason' => 'Champs obligatoires manquants (closure_date, fond_de_caisse, montant_compte).'];
+                    continue;
+                }
+
+                $cloture = app(\App\Actions\CloturesCaisse\ValiderClotureCaisseAction::class)->execute(
+                    closureDate:   $cl['closure_date'],
+                    fondDeCaisse:  (float) $cl['fond_de_caisse'],
+                    montantCompte: (float) $cl['montant_compte'],
+                    userId:        $utilisateur->id,
+                    deviceId:      $deviceId,
+                );
+
+                // On peut aussi honorer l'UUID client pour la cohérence des références.
+                if (isset($cl['id'])) {
+                    $cloture->forceFill(['id' => $cl['id']])->save();
+                }
+
+                $accepted[] = $cloture->id;
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $rejected[] = ['id' => $cl['id'] ?? null, 'reason' => \App\Support\MessagesErreurFr::pourValidation($e)];
+            } catch (\Throwable $e) {
+                $rejected[] = ['id' => $cl['id'] ?? null, 'reason' => \App\Support\MessagesErreurFr::pourUtilisateur($e)];
             }
         }
 
