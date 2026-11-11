@@ -1,0 +1,143 @@
+# CI Flutter Web — build web + garde « aucune URL externe »
+#
+# Ticket PWA-2-fin (11/11/2026) : build de la Progressive Web App du poste web
+# et vérification qu'aucun fichier compilé ne charge une ressource depuis un CDN
+# ou un domaine externe — règle de sécurité du poste web : tout doit être servi
+# localement.
+#
+# Déclenchement : mêmes branches que flutter-ci.yml, mais sur les chemins web.
+# Exécution : ubuntu-latest (le build web ne nécessite pas windows-latest).
+
+name: Flutter Web CI
+
+on:
+  push:
+    branches: [ main, 'claude/**' ]
+    paths:
+      - 'agrierp_flutter/**'
+      - '.github/workflows/flutter-web-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'agrierp_flutter/**'
+      - '.github/workflows/flutter-web-ci.yml'
+
+defaults:
+  run:
+    working-directory: agrierp_flutter
+
+jobs:
+  build-web:
+    name: Compiler (web) · Garde URL externe
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Lire la version Flutter cible (.fvmrc)
+        id: fvm
+        run: |
+          version=$(python3 -c "import json,sys; print(json.load(open('.fvmrc'))['flutter'])")
+          echo "FLUTTER_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Installer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Installer les dépendances
+        run: flutter pub get
+
+      - name: Générer le code Drift
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyser
+        run: flutter analyze
+
+      # ──────────────────────────────────────────────────────────────────────
+      # Build web — JavaScript standard (compatible Dart 3.x, sans --wasm).
+      #
+      # Option WebAssembly (commentée) :
+      #   La version Flutter figée dans .fvmrc est 3.47.7 (Dart 3.13.5).
+      #   Dart 3.3+ supporte --wasm, mais le support web WASM de Flutter
+      #   nécessite une chaîne toolchain (wasm-opt, binaryen) et un serveur
+      #   qui sert les en-têtes COOP/COEP requis par SharedArrayBuffer.
+      #   À activer sur le serveur de production une fois ces prérequis
+      #   vérifiés sur Windows réel avec un Dart WASM stable :
+      #
+      #   flutter build web --release --wasm \
+      #     --dart-define=AGRIERP_ENV=production
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Compiler (web release, JavaScript)
+        run: |
+          flutter build web --release \
+            --dart-define=AGRIERP_ENV=production
+
+      # ──────────────────────────────────────────────────────────────────────
+      # Garde « aucune URL externe » :
+      #   Parcourt TOUS les fichiers générés dans build/web/ et vérifie
+      #   qu'aucun ne contient une URL https?:// pointant hors du domaine
+      #   local (localhost, 127.0.0.1, domaine de la ferme).
+      #
+      #   Domaines autorisés (hors-local) :
+      #     agrierp.fermeolouwachegoun.com — le serveur de la ferme
+      #   Toute autre URL https?:// est considérée comme une ressource CDN
+      #   externe non autorisée et fait échouer le build.
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Vérifier l'absence d'URL externe dans le build web
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Domaines autorisés (en plus de localhost / 127.0.0.1)
+          DOMAINES_AUTORISES="agrierp\.fermeolouwachegoun\.com"
+
+          # Cherche toutes les URL https?:// dans les fichiers texte du build
+          FICHIERS_SUSPECTS=$(
+            grep --include="*.js" \
+                 --include="*.html" \
+                 --include="*.json" \
+                 --include="*.css" \
+                 -rl 'https\?://' build/web/ 2>/dev/null || true
+          )
+
+          if [ -z "$FICHIERS_SUSPECTS" ]; then
+            echo "✓ Aucun fichier avec URL https?:// trouvé."
+            exit 0
+          fi
+
+          VIOLATIONS=""
+          while IFS= read -r fichier; do
+            # Extrait les URLs, filtre les domaines autorisés
+            URLS_EXTERNES=$(
+              grep -oP 'https?://[^\s"\x27>]+' "$fichier" 2>/dev/null \
+              | grep -v 'localhost' \
+              | grep -v '127\.0\.0\.1' \
+              | grep -Ev "$DOMAINES_AUTORISES" \
+              || true
+            )
+            if [ -n "$URLS_EXTERNES" ]; then
+              VIOLATIONS="$VIOLATIONS\n--- $fichier ---\n$URLS_EXTERNES"
+            fi
+          done <<< "$FICHIERS_SUSPECTS"
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "ÉCHEC — URL(s) externe(s) détectée(s) dans le build web :"
+            echo -e "$VIOLATIONS"
+            echo ""
+            echo "Le poste web doit fonctionner sans réseau externe."
+            echo "Toute ressource CDN doit être embarquée localement."
+            exit 1
+          fi
+
+          echo "✓ Aucune URL externe détectée dans le build web."
+
+      - name: Publier les artefacts du build web
+        uses: actions/upload-artifact@v4
+        with:
+          name: agrierp-web-${{ github.sha }}
+          path: agrierp_flutter/build/web/
+          retention-days: 14

@@ -39,8 +39,10 @@ dependencies:
   # GET /api/sync/pull, POST /api/sync/push (jeton Sanctum nommé par appareil).
   dio: ^5.7.0
   connectivity_plus: ^6.1.0
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^10.0.0
   # Verrou local (ticket VL-1) : HMAC-SHA256 de la dérivation PBKDF2 du code PIN (déjà tirée par les autres paquets).
+  # PWA-2-fin (11/11/2026) : ^10.0.0 — support web via localStorage chiffré (AES-GCM, clé dans la session IndexedDB).
+  # Ancienne version : ^9.2.2 (web supporté depuis ^9.0, ^10 est la version actuelle stable).
   crypto: ^3.0.3
 
   # ─── Présentation ────────────────────────────────────────────────────────
