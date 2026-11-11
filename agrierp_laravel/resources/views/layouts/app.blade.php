@@ -38,6 +38,8 @@
             });
         }
     </script>
+    {{-- PWA-PERF : préchargement de la feuille de style principale (réduit le temps de blocage du rendu). --}}
+    <link rel="preload" as="style" href="{{ Vite::asset('resources/css/app.css') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-surface-bg text-on-surface antialiased">

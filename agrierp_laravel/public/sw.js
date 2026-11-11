@@ -44,7 +44,8 @@
 // nouveau numéro, un poste déjà venu lirait l'ancienne fonte en cache et afficherait ces noms en toutes lettres.
 // v6 (PWA-1) — caisse hors ligne : nouvelle enveloppe statique précachée, nouveau cache `…-hors-ligne`.
 // v7 (CONF-3) — la page de caisse gagne le bandeau et la confirmation « prix périmés » (3 j / 7 j).
-const VERSION = 'agrierp-v20';
+// v21 (PWA-PERF) — cache-first pur pour /build/assets/ (fichiers Vite avec empreinte de contenu : immuables).
+const VERSION = 'agrierp-v21';
 const CACHE_STATIQUE = `${VERSION}-statique`;
 
 /** Le strict minimum pour afficher une page d'attente présentable ET ouvrir la caisse hors ligne. */
@@ -85,6 +86,13 @@ const estStatique = (url) =>
     url.pathname.startsWith('/assets/fonts/') ||
     url.pathname.startsWith('/assets/icons/') ||
     url.pathname.startsWith('/assets/images/');
+
+/**
+ * PWA-PERF : les fichiers Vite sous /build/assets/ portent une empreinte SHA de leur contenu dans leur nom
+ * (ex. app-uKPt2jnj.css). Ils sont IMMUABLES : une URL donnée désigne toujours le même contenu.
+ * On les sert cache-first sans jamais relancer le réseau quand ils sont déjà stockés.
+ */
+const estImmuable = (url) => url.pathname.startsWith('/build/assets/');
 
 const estHorsLigne = (url) => url.pathname.startsWith(PREFIXE_HORS_LIGNE);
 
@@ -177,7 +185,24 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // --- Fichiers statiques : cache d'abord, rafraîchi en arrière-plan ---
+    // --- Fichiers Vite immuables (/build/assets/) : cache-first pur, aucune requête réseau si déjà stockés ---
+    if (estImmuable(url)) {                                     // règle 3 — optimisation PWA-PERF
+        event.respondWith(
+            caches.match(request).then((enCache) => {
+                if (enCache) return enCache;                    // immuable : on ne redemande jamais
+                return fetch(request).then((reponse) => {
+                    if (peutEtreStocke(request, url, reponse)) {
+                        const copie = reponse.clone();
+                        caches.open(CACHE_STATIQUE).then((c) => c.put(request, copie));
+                    }
+                    return reponse;
+                });
+            })
+        );
+        return;
+    }
+
+    // --- Autres fichiers statiques (fontes, icônes, images) : stale-while-revalidate ---
     if (estStatique(url)) {                                     // règle 3
         event.respondWith(
             caches.match(request).then((enCache) => {

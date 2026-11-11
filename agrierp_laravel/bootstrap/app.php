@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SessionVerrouillee::class,
             // MDP-1 : après le verrou (un compte verrouillé voit d'abord l'écran de verrouillage).
             \App\Http\Middleware\ChangementMotDePasseObligatoire::class,
+            // PWA-PERF : compression gzip/brotli des réponses HTML/JS/CSS/JSON (si le serveur web ne le fait pas déjà).
+            \App\Http\Middleware\CompresserReponse::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, splitVendorChunkPlugin } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
 export default defineConfig({
@@ -7,5 +7,16 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: true,
         }),
+        splitVendorChunkPlugin(),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('alpinejs')) return 'alpinejs';
+                    if (id.includes('@alpinejs')) return 'alpinejs';
+                },
+            },
+        },
+    },
 });
