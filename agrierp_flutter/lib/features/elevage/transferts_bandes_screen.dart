@@ -6,6 +6,7 @@ import '../../core/database/sync_columns.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/champs_date_agri.dart';
+import '../../core/widgets/champs_formulaire_agri.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/lecture_seule.dart';
 import '../../core/widgets/modale_agri.dart';
@@ -510,43 +511,61 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
                 style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
               ),
             ),
-          DropdownButtonFormField<String>(
-            key: const Key('transfert-source'),
-            initialValue: _source,
-            decoration: InputDecoration(
-              labelText: _constitution ? "Bande d'Origine *" : 'Bande Source *',
+          BlocChampFormulaire(
+            libelle: _constitution ? "Bande d'Origine *" : 'Bande Source *',
+            enfant: Container(
+              height: AgriChamps.hauteurFormulaire,
+              padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
+              decoration: cadreChampFormulaire(),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const Key('transfert-source'),
+                  isExpanded: true,
+                  value: _sources.any((b) => b.id == _source) ? _source : null,
+                  icon: const Icon(Icons.expand_more, size: 20, color: AgriColors.outline),
+                  style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+                  hint: Text('-- Sélectionner --', style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.outline)),
+                  items: [
+                    for (final b in _sources)
+                      DropdownMenuItem(value: b.id, child: Text('${b.code} (${b.currentQuantity})', overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _source = v;
+                    if (!_constitution) { _cible = null; _categorie = null; }
+                  }),
+                ),
+              ),
             ),
-            items: [
-              for (final b in _sources)
-                DropdownMenuItem(value: b.id, child: Text('${b.code} (${b.currentQuantity})')),
-            ],
-            onChanged: (v) => setState(() {
-              _source = v;
-              if (!_constitution) {
-                _cible = null;
-                _categorie = null;
-              }
-            }),
           ),
-          const SizedBox(height: AgriSpacing.sm),
           if (_constitution)
-            TextFormField(
-              initialValue: _rattachee!.code,
-              enabled: false,
-              decoration: const InputDecoration(labelText: 'Bande Rattachée'),
+            BlocChampFormulaire(
+              libelle: 'Bande Rattachée',
+              enfant: ChampLectureFormulaire(valeur: _rattachee!.code),
             )
           else
-            DropdownButtonFormField<String>(
-              key: const Key('transfert-cible'),
-              initialValue: _cible,
-              decoration: const InputDecoration(labelText: 'Bande Cible *'),
-              items: [
-                for (final b in _cibles)
-                  DropdownMenuItem(value: b.id, child: Text('${b.code} (${b.currentQuantity})')),
-              ],
-              onChanged: (v) => setState(() => _cible = v),
+            BlocChampFormulaire(
+              libelle: 'Bande Cible *',
+              enfant: Container(
+                height: AgriChamps.hauteurFormulaire,
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
+                decoration: cadreChampFormulaire(),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    key: const Key('transfert-cible'),
+                    isExpanded: true,
+                    value: _cibles.any((b) => b.id == _cible) ? _cible : null,
+                    icon: const Icon(Icons.expand_more, size: 20, color: AgriColors.outline),
+                    style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+                    hint: Text('-- Sélectionner --', style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.outline)),
+                    items: [
+                      for (final b in _cibles)
+                        DropdownMenuItem(value: b.id, child: Text('${b.code} (${b.currentQuantity})', overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() => _cible = v),
+                  ),
+                ),
+              ),
             ),
-          const SizedBox(height: AgriSpacing.sm),
           ChampDateFormulaire(
             cle: const Key('transfert-date'),
             etiquette: 'Date du Transfert *',
@@ -564,37 +583,47 @@ class _FormulaireTransfertState extends State<_FormulaireTransfert> {
             },
           ),
           const SizedBox(height: AgriSpacing.sm),
-          TextField(
-            key: const Key('transfert-quantite'),
-            controller: _quantite,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Nombre de Sujets *'),
+          BlocChampFormulaire(
+            libelle: 'Nombre de Sujets *',
+            enfant: ChampTexteFormulaire(
+              controleur: _quantite,
+              nombre: true,
+            ),
           ),
           if (libelles.isNotEmpty) ...[
-            const SizedBox(height: AgriSpacing.sm),
-            DropdownButtonFormField<String>(
-              key: const Key('transfert-categorie'),
-              initialValue: _categorie,
-              decoration: const InputDecoration(labelText: 'Catégorie des Sujets *'),
-              items: [
-                for (final e in libelles.entries)
-                  DropdownMenuItem(value: e.key, child: Text(e.value)),
-              ],
-              onChanged: (v) => setState(() => _categorie = v),
+            BlocChampFormulaire(
+              libelle: 'Catégorie des Sujets *',
+              enfant: Container(
+                height: AgriChamps.hauteurFormulaire,
+                padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
+                decoration: cadreChampFormulaire(),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    key: const Key('transfert-categorie'),
+                    isExpanded: true,
+                    value: libelles.containsKey(_categorie) ? _categorie : null,
+                    icon: const Icon(Icons.expand_more, size: 20, color: AgriColors.outline),
+                    style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+                    hint: Text('-- Sélectionner --', style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.outline)),
+                    items: [
+                      for (final e in libelles.entries)
+                        DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() => _categorie = v),
+                  ),
+                ),
+              ),
             ),
             const Text(
               "Les sujets gardent leur catégorie dans la bande cible : un changement de bande n'est pas un changement de stade.",
               style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
             ),
           ],
-          const SizedBox(height: AgriSpacing.sm),
-          TextField(
-            key: const Key('transfert-motif'),
-            controller: _motif,
-            maxLength: 255,
-            decoration: const InputDecoration(
-              labelText: 'Motif',
-              hintText: 'Ex. : sevrage de la portée de la lapine L-12',
+          BlocChampFormulaire(
+            libelle: 'Motif',
+            enfant: ChampTexteFormulaire(
+              controleur: _motif,
+              indice: 'Ex. : sevrage de la portée de la lapine L-12',
             ),
           ),
         ],

@@ -8,6 +8,7 @@ import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
 import '../../core/widgets/carte_kpi.dart';
 import '../../core/widgets/champs_date_agri.dart';
+import '../../core/widgets/champs_formulaire_agri.dart';
 import '../../core/widgets/pagination_agri.dart';
 import '../rapports/rapports_exports_screen.dart' show Editeur;
 import '../../core/export/document_officiel.dart';
@@ -986,31 +987,32 @@ class _ComptabiliteScreenState extends State<ComptabiliteScreen> {
                   color: AgriColors.brandForest,
                 ),
               ),
+              // Ticket MP2 — h-11 px-md text-sm, cadre agri (remplace DropdownButtonFormField + InputDecoration).
               SizedBox(
                 width: 380,
-                child: DropdownButtonFormField<String>(
+                child: Container(
                   key: const Key('compte-grand-livre'),
-                  initialValue: _compteGrandLivre,
-                  isDense: true,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
+                  height: AgriChamps.hauteurFormulaire,
+                  padding: const EdgeInsets.symmetric(horizontal: AgriSpacing.md),
+                  decoration: cadreChampFormulaire(),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _compteGrandLivre,
+                      // État vide de la page web : « Aucun compte au plan comptable ».
+                      hint: const Text('Aucun compte au plan comptable', overflow: TextOverflow.ellipsis),
+                      icon: const Icon(Icons.expand_more, size: 20, color: AgriColors.outline),
+                      style: const TextStyle(fontSize: AgriTypography.sm, color: AgriColors.onSurface),
+                      items: [
+                        for (final c in d.comptes)
+                          DropdownMenuItem(
+                            value: c.id,
+                            child: Text('${c.code} — ${c.label}', overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (v) => setState(() => _compteGrandLivre = v),
+                    ),
                   ),
-                  // État vide de la page web : « Aucun compte au plan comptable ».
-                  hint: const Text('Aucun compte au plan comptable'),
-                  style: const TextStyle(
-                    fontSize: AgriTypography.sm,
-                    color: AgriColors.onSurface,
-                  ),
-                  items: [
-                    for (final c in d.comptes)
-                      DropdownMenuItem(
-                        value: c.id,
-                        child: Text('${c.code} — ${c.label}'),
-                      ),
-                  ],
-                  onChanged: (v) => setState(() => _compteGrandLivre = v),
                 ),
               ),
               // `flex items-center gap-xs bg-surface-zebra rounded-lg px-sm py-1` : champs sans bordure (`p-1`) et « au ».
