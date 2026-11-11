@@ -264,8 +264,14 @@ class PwaEtPolicesLocalesTest extends TestCase
     {
         $sw = $this->lire('public/sw.js');
 
-        $this->assertSame(['/offline.html', '/caisse-hors-ligne.html'], $this->listeDuWorker('HTML_STATIQUES'),
-            'Une page HTML de plus en cache serait une page de plus qui survit à la déconnexion.');
+        // PWA-4 (11/11/2026) : trois pages de consultation hors ligne ajoutées à HTML_STATIQUES.
+        // Toutes sont purement statiques (sans session, sans données de la ferme) : règle 2 respectée.
+        $this->assertSame(
+            ['/offline.html', '/caisse-hors-ligne.html', '/offline-stock.html', '/offline-creances.html', '/offline-ventes.html'],
+            $this->listeDuWorker('HTML_STATIQUES'),
+            'Toute page HTML en cache doit être STATIQUE (sans donnée utilisateur ni session). ' .
+            'Ajouter une page authentifiée ici casserait la règle 2 de sw.js.'
+        );
 
         // La garde unique refuse tout HTML hors de cette liste, tout JSON, toute requête authentifiée.
         $this->assertMatchesRegularExpression("/text\\/html'\\) && !HTML_STATIQUES\\.includes\\(url\\.pathname\\)\\) return false;/", $sw);

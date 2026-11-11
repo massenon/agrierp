@@ -96,6 +96,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CompteActif::class, \App
     Route::post('/parametres/reinitialisation', [ReinitialisationDonneesController::class, 'reinitialiser'])
         ->middleware('throttle:5,1,reinitialisation-execution');
 
+    // PWA-4 — Snapshot hors ligne : stock, créances, ventes récentes (11/11/2026).
+    // Appelé par le JavaScript du navigateur juste après la connexion et périodiquement,
+    // stocké en IndexedDB (jamais par le service worker : règle 3 de sw.js, pas de JSON).
+    Route::get('/offline/snapshot', [\App\Http\Controllers\Api\OfflineSnapshotController::class, 'index'])
+        ->middleware('throttle:60,1');
+
     // Tickets PA-1, PA-5, PA-6, PA-8 — gestes d'administration EN LIGNE depuis le poste (mêmes services et droits que le web).
     Route::prefix('/parametres')->middleware('throttle:30,1,administration-en-ligne')->group(function () {
         Route::post('/sessions/vider', [\App\Http\Controllers\Api\AdministrationEnLigneController::class, 'viderSessions']);

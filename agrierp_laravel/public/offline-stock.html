@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock — Mode hors ligne — LogiAgriERP</title>
+    <meta name="robots" content="noindex,nofollow">
+    <link rel="icon" type="image/webp" href="/assets/images/logo_favicon.webp">
+    <!--
+        PWA-4 — Page statique hors ligne : GESTION DES STOCKS
+        Aucune donnée de la ferme ici. Tout vient d'IndexedDB (`offline_snapshot`),
+        chargé par JavaScript au montage de la page.
+        Règle 2 de sw.js : cette page est STATIQUE, sans session, sans données.
+    -->
+    <style>
+        :root {
+            --vert: #052e16;
+            --vert-clair: #166534;
+            --rouge: #dc2626;
+            --orange: #d97706;
+            --gris: #f9fafb;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--gris); color: #111827; font-family: system-ui, sans-serif; }
+        header {
+            background: var(--vert); color: white;
+            padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+        }
+        header img { width: 32px; height: 32px; }
+        header h1 { font-size: 1.1rem; font-weight: 600; }
+        .banniere {
+            background: #fef3c7; border-left: 4px solid var(--orange);
+            padding: .75rem 1.5rem; font-size: .875rem; color: #92400e;
+        }
+        .contenu { padding: 1.5rem; max-width: 960px; margin: 0 auto; }
+        h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--vert); }
+        .tableau-wrapper { overflow-x: auto; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        thead { background: var(--vert); color: white; }
+        th { padding: .75rem 1rem; text-align: left; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+        td { padding: .75rem 1rem; border-bottom: 1px solid #e5e7eb; font-size: .875rem; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: #f0fdf4; }
+        .badge-alerte { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: .75rem; font-weight: 600; background: #fee2e2; color: var(--rouge); }
+        .badge-ok { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: .75rem; font-weight: 600; background: #dcfce7; color: var(--vert-clair, #166534); }
+        .message { text-align: center; padding: 3rem; color: #6b7280; font-style: italic; }
+        .compteur { color: #6b7280; font-size: .875rem; margin-bottom: .75rem; }
+        .btn-retour {
+            display: inline-flex; align-items: center; gap: .4rem; margin-top: 1.5rem;
+            padding: .5rem 1rem; background: var(--vert); color: white;
+            border-radius: 6px; text-decoration: none; font-size: .875rem;
+        }
+        #zone-donnees { display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="/assets/images/logo_favicon.webp" alt="Logo AgriERP">
+        <h1>LogiAgriERP — Stock</h1>
+    </header>
+    <div class="banniere" id="banniere">Mode hors ligne — <span id="date-cache">chargement…</span></div>
+    <div class="contenu">
+        <h2>Gestion des Stocks</h2>
+        <div id="zone-chargement" class="message">Chargement des données hors ligne…</div>
+        <div id="zone-vide" class="message" style="display:none">Aucune donnée hors ligne disponible. Reconnectez-vous pour actualiser le cache.</div>
+        <div id="zone-donnees">
+            <p class="compteur" id="compteur"></p>
+            <div class="tableau-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Unité</th>
+                            <th>Quantité disponible</th>
+                            <th>Seuil d'alerte</th>
+                            <th>État</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corps-tableau"></tbody>
+                </table>
+            </div>
+        </div>
+        <a href="/gestion-stocks" class="btn-retour">↩ Retour en ligne</a>
+    </div>
+    <script>
+        (function () {
+            'use strict';
+
+            function fmt(n) {
+                return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            }
+
+            function afficher(snap) {
+                document.getElementById('zone-chargement').style.display = 'none';
+                if (!snap || !snap.cached_at) {
+                    document.getElementById('zone-vide').style.display = 'block';
+                    document.getElementById('date-cache').textContent = 'aucune donnée en cache';
+                    return;
+                }
+                document.getElementById('date-cache').textContent = 'données du ' + new Date(snap.cached_at).toLocaleString('fr-FR');
+                var stock = snap.stock || [];
+                document.getElementById('compteur').textContent = stock.length + ' produit(s)';
+                var corps = document.getElementById('corps-tableau');
+                if (!stock.length) {
+                    corps.innerHTML = '<tr><td colspan="5" class="message">Aucun produit actif.</td></tr>';
+                } else {
+                    corps.innerHTML = stock.map(function (p) {
+                        var enAlerte = Number(p.stock_qty) <= Number(p.alert_threshold);
+                        var badge = enAlerte
+                            ? '<span class="badge-alerte">⚠ Alerte stock</span>'
+                            : '<span class="badge-ok">✓ OK</span>';
+                        return '<tr>'
+                            + '<td>' + (p.name || '—') + '</td>'
+                            + '<td>' + (p.unit || '—') + '</td>'
+                            + '<td>' + fmt(p.stock_qty) + '</td>'
+                            + '<td>' + fmt(p.alert_threshold) + '</td>'
+                            + '<td>' + badge + '</td>'
+                            + '</tr>';
+                    }).join('');
+                }
+                document.getElementById('zone-donnees').style.display = 'block';
+            }
+
+            function lireSnapshot(callback) {
+                try {
+                    var req = indexedDB.open('agrierp_offline_snapshot', 1);
+                    req.onupgradeneeded = function (e) {
+                        e.target.result.createObjectStore('snapshot', { keyPath: 'cle' });
+                    };
+                    req.onsuccess = function (e) {
+                        var db = e.target.result;
+                        var tx = db.transaction('snapshot', 'readonly');
+                        var get = tx.objectStore('snapshot').get('offline_snapshot');
+                        get.onsuccess = function () { callback(get.result ? get.result.data : null); };
+                        get.onerror = function () { callback(null); };
+                    };
+                    req.onerror = function () { callback(null); };
+                } catch (err) {
+                    callback(null);
+                }
+            }
+
+            lireSnapshot(afficher);
+        })();
+    </script>
+</body>
+</html>

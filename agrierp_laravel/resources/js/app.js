@@ -3,6 +3,7 @@ import './verrou';
 import './aide';
 import './hors-ligne/activation-page';
 import './hors-ligne/deconnexion-web';
+import './offline-snapshot'; // PWA-4 : snapshot hors ligne (stock, créances, ventes)
 
 /**
  * LogiAgriERP — resources/js/app.js

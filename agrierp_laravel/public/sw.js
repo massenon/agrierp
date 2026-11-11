@@ -45,13 +45,19 @@
 // v6 (PWA-1) — caisse hors ligne : nouvelle enveloppe statique précachée, nouveau cache `…-hors-ligne`.
 // v7 (CONF-3) — la page de caisse gagne le bandeau et la confirmation « prix périmés » (3 j / 7 j).
 // v21 (PWA-PERF) — cache-first pur pour /build/assets/ (fichiers Vite avec empreinte de contenu : immuables).
-const VERSION = 'agrierp-v21';
+// v22 (PWA-4) — trois pages statiques hors ligne (stock, créances, ventes récentes) précachées et servies
+//               quand le navigateur ouvre /gestion-stocks, /creances-clients ou /ventes-devis hors ligne.
+const VERSION = 'agrierp-v22';
 const CACHE_STATIQUE = `${VERSION}-statique`;
 
 /** Le strict minimum pour afficher une page d'attente présentable ET ouvrir la caisse hors ligne. */
 const SOCLE = [
     '/offline.html',
     '/caisse-hors-ligne.html',
+    // PWA-4 — pages de consultation hors ligne (statiques, sans aucune donnée utilisateur).
+    '/offline-stock.html',
+    '/offline-creances.html',
+    '/offline-ventes.html',
     '/assets/hors-ligne/caisse.js',
     '/assets/hors-ligne/caisse-style.css',
     '/manifest.webmanifest',
@@ -75,8 +81,17 @@ const EXCLUS = [
     '/storage/',   // justificatifs et photos : toujours frais, jamais en cache
 ];
 
-/** Les SEULES pages HTML que ce worker a le droit de stocker : statiques, sans aucune donnée utilisateur. */
-const HTML_STATIQUES = ['/offline.html', '/caisse-hors-ligne.html'];
+/**
+ * Les SEULES pages HTML que ce worker a le droit de stocker : statiques, sans aucune donnée utilisateur.
+ * PWA-4 : les trois pages de consultation hors ligne sont elles aussi purement statiques.
+ */
+const HTML_STATIQUES = [
+    '/offline.html',
+    '/caisse-hors-ligne.html',
+    '/offline-stock.html',
+    '/offline-creances.html',
+    '/offline-ventes.html',
+];
 
 /** Coque de la caisse hors ligne : fichiers à nom stable (sans empreinte), servis RÉSEAU D'ABORD puis cache. */
 const PREFIXE_HORS_LIGNE = '/assets/hors-ligne/';
@@ -145,6 +160,44 @@ self.addEventListener('fetch', (event) => {
 
     // --- Navigations : réseau d'abord, page d'attente en dernier recours ---
     if (request.mode === 'navigate') {                          // règle 2
+
+        // PWA-4 — pages statiques hors ligne (stock, créances, ventes) : servies depuis le cache.
+        if (HTML_STATIQUES.includes(url.pathname) && url.pathname !== '/offline.html') {
+            event.respondWith(
+                caches.match(url.pathname).then((enCache) => {
+                    if (enCache) return enCache;
+                    return fetch(request).then((reponse) => {
+                        if (peutEtreStocke(request, url, reponse)) {
+                            const copie = reponse.clone();
+                            caches.open(CACHE_STATIQUE).then((c) => c.put(url.pathname, copie));
+                        }
+                        return reponse;
+                    }).catch(() => caches.match('/offline.html').then((r) => r || Response.error()));
+                })
+            );
+            return;
+        }
+
+        // PWA-4 — redirection hors ligne : si on ne peut pas joindre le serveur sur ces trois pages,
+        // on sert la page statique correspondante plutôt que offline.html générique.
+        const HORS_LIGNE_MAP = {
+            '/gestion-stocks':    '/offline-stock.html',
+            '/creances-clients':  '/offline-creances.html',
+            '/ventes-devis':      '/offline-ventes.html',
+            '/historique-ventes': '/offline-ventes.html',
+        };
+        const pageHorsLigne = HORS_LIGNE_MAP[url.pathname];
+        if (pageHorsLigne) {
+            event.respondWith(
+                fetch(request).catch(() =>
+                    caches.match(pageHorsLigne)
+                        .then((r) => r || caches.match('/offline.html'))
+                        .then((r) => r || Response.error())
+                )
+            );
+            return;
+        }
+
         // Exception NOMMÉE : l'enveloppe statique de la caisse hors ligne se sert du cache (elle ne contient aucune donnée).
         if (url.pathname === '/caisse-hors-ligne.html') {
             event.respondWith(
