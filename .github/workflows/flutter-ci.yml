@@ -1,0 +1,63 @@
+# CI Flutter — analyse, tests, build Windows release
+#
+# Ticket D3 (11/11/2026) : chaîne de tests automatiques sur windows-latest.
+# Déclenchement : push ou PR sur main et sur les branches de travail Claude.
+# Pas d'installateur ici (Inno Setup) : uniquement le dossier Release,
+# suffisant pour vérifier que le build compile. L'installateur est produit
+# par le workflow flutter-release.yml à chaque tag v*.
+
+name: Flutter CI
+
+on:
+  push:
+    branches: [ main, 'claude/**' ]
+    paths:
+      - 'agrierp_flutter/**'
+      - '.github/workflows/flutter-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'agrierp_flutter/**'
+      - '.github/workflows/flutter-ci.yml'
+
+defaults:
+  run:
+    working-directory: agrierp_flutter
+
+jobs:
+  analyse-tests-build:
+    name: Analyser · Tester · Compiler
+    runs-on: windows-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Lire la version Flutter cible (.fvmrc)
+        id: fvm
+        shell: pwsh
+        run: |
+          $version = (Get-Content .fvmrc | ConvertFrom-Json).flutter
+          "FLUTTER_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Installer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Installer les dépendances
+        run: flutter pub get
+
+      - name: Générer le code Drift
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyser
+        run: flutter analyze
+
+      - name: Tester
+        run: flutter test --concurrency=2
+
+      - name: Compiler (Windows release, sans installateur)
+        run: flutter build windows --release --dart-define=AGRIERP_ENV=production

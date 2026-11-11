@@ -1,0 +1,93 @@
+# Release Flutter — installateur Windows publié en artefact
+#
+# Ticket D3 (11/11/2026) : à chaque tag v* (ex. v1.2.3 ou v1.2.3-demo),
+# ce workflow compile le poste Windows, génère l'installateur Inno Setup
+# et le publie comme artefact GitHub Actions.
+#
+# Prérequis : Inno Setup 6 est installé par ce workflow via Chocolatey ;
+# aucune configuration manuelle du runner n'est nécessaire.
+
+name: Flutter Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+defaults:
+  run:
+    working-directory: agrierp_flutter
+
+jobs:
+  release-windows:
+    name: Installer Windows — ${{ github.ref_name }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Lire la version Flutter cible (.fvmrc)
+        id: fvm
+        shell: pwsh
+        run: |
+          $version = (Get-Content .fvmrc | ConvertFrom-Json).flutter
+          "FLUTTER_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Installer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Installer Inno Setup 6 (via Chocolatey)
+        shell: pwsh
+        run: choco install innosetup --version=6.3.3 -y --no-progress
+
+      - name: Installer les dépendances
+        run: flutter pub get
+
+      - name: Générer le code Drift
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyser
+        run: flutter analyze
+
+      - name: Tester
+        run: flutter test --concurrency=2
+
+      # Extrait x.y.z du tag : v1.2.3 → 1.2.3 ; v1.2.3-demo → 1.2.3-demo
+      - name: Calculer le numéro de version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"          # ex. v1.2.3
+          $version = $tag -replace '^v', ''        # ex. 1.2.3
+          # Partie numérique seule pour VersionInfoVersion
+          $versionNum = ($version -split '-')[0]   # ex. 1.2.3
+          "VERSION=$version"       | Out-File -FilePath $env:GITHUB_ENV -Append
+          "VERSION_NUM=$versionNum" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "NOM_INSTALLATEUR=LogiAgriERP-Setup-$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Compiler (Windows release)
+        run: flutter build windows --release --dart-define=AGRIERP_ENV=production
+
+      - name: Générer l'installateur Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc /Q `
+            /DAppVersion="${{ env.VERSION }}" `
+            /DAppVersionNum="${{ env.VERSION_NUM }}" `
+            /DAppEnv="production" `
+            /DNomInstallateur="${{ env.NOM_INSTALLATEUR }}" `
+            installer\agrierp.iss
+
+      - name: Publier l'installateur en artefact GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NOM_INSTALLATEUR }}
+          path: agrierp_flutter/installer/Output/${{ env.NOM_INSTALLATEUR }}.exe
+          if-no-files-found: error
+          retention-days: 90

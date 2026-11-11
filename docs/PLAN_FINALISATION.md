@@ -204,7 +204,7 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 |---|---|---|
 | D1 | `agrierp_flutter/build_windows.bat` : enchaîne dépendances, génération Drift, analyse, tests, `flutter build windows --release`, copie du runtime VC++, puis installateur Inno Setup (`installer/agrierp.iss`) → `installer\Output\LogiAgriERP-Setup-<version>.exe` | ✅ écrit le 17/10/2026, **pas encore exécuté sur une machine Windows** |
 | D2 | Première exécution réelle sur le poste de compilation ; vérifier l'installation sur un Windows 10 vierge, sans redistribuable VC++ | 🔧 (10/11/2026 : dépend du client, il faut une machine Windows ; aucune trace d'exécution réelle trouvée) |
-| D3 | CI GitHub Actions `windows-latest` : analyse, tests, build, installateur publié en artefact à chaque tag `v*` | 🔧 |
+| D3 | CI GitHub Actions `windows-latest` : analyse, tests, build, installateur publié en artefact à chaque tag `v*` | ✅ (11/11/2026, `.github/workflows/flutter-ci.yml` + `flutter-release.yml`) |
 | D4 | Signature du code de l'exécutable (certificat éditeur), pour éviter l'alerte SmartScreen | ❓ achat du certificat (10/11/2026 : dépend du client ; aucune étape de signature dans `installer/agrierp.iss` ni `build_windows.bat`) |
 | D5 | Mise à jour du poste : l'installateur réutilise le même `AppId` ; la base locale (profil utilisateur) n'est jamais touchée par une mise à jour ou une désinstallation | ✅ prévu dans `agrierp.iss`, 🔧 à vérifier en réel (10/11/2026 : dépend du client, essai sur Windows ; `AppId` fixe présent ligne 46 de `agrierp.iss`. ⚠️ Depuis DES-1 (27/10/2026) la **désinstallation** supprime la base locale après confirmation : seule la mise à jour la conserve) |
 
