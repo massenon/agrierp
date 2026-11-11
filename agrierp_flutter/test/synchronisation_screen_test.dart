@@ -182,6 +182,9 @@ void main() {
 
     await afficher(tester);
 
+    // Ticket B3 — le bloc historique précède le bloc conflits ; il peut avoir
+    // poussé le bouton hors du viewport. On s'assure qu'il est visible avant de taper.
+    await tester.ensureVisible(find.byKey(Key('relancer-$id')));
     await tester.tap(find.byKey(Key('relancer-$id')));
     await tester.pumpAndSettle();
 
@@ -202,6 +205,12 @@ void main() {
     await tester.tap(find.byKey(const Key('bouton-synchroniser')));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Hors ligne'), findsOneWidget);
+    // Ticket B3 — le SnackBar « Hors ligne — rien n'a été envoyé. » et l'étiquette
+    // de statut d'une ligne d'historique portent toutes deux le mot « Hors ligne » ;
+    // on cible le message de statut exact pour éviter l'ambiguïté.
+    expect(
+      find.text('Hors ligne — rien n\'a été envoyé.'),
+      findsOneWidget,
+    );
   });
 }

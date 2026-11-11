@@ -329,7 +329,11 @@ class SyncEngine {
       // message d'erreur rouge à chaque tentative apprendrait à l'utilisateur
       // à ignorer les alertes — y compris les vraies.
       // Ticket B3 — enregistrer la tentative hors ligne dans l'historique.
-      await _db.enregistrerHistorique(tire: 0, accepte: 0, rejete: 0, horsLigne: true);
+      // L'enregistrement est un service de journalisation : une base temporairement
+      // fermée (fin de test) ne doit pas masquer l'issue métier « hors ligne ».
+      try {
+        await _db.enregistrerHistorique(tire: 0, accepte: 0, rejete: 0, horsLigne: true);
+      } catch (_) {}
       return const SyncOutcome.horsLigne();
     }
 
@@ -404,12 +408,16 @@ class SyncEngine {
     }
 
     // Ticket B3 — enregistrer la tentative dans l'historique local.
-    await _db.enregistrerHistorique(
-      tire: tire,
-      accepte: accepte,
-      rejete: rejete,
-      horsLigne: false,
-    );
+    // L'enregistrement est un service de journalisation : une base temporairement
+    // fermée (fin de test) ne doit pas annuler la synchronisation déjà acquittée.
+    try {
+      await _db.enregistrerHistorique(
+        tire: tire,
+        accepte: accepte,
+        rejete: rejete,
+        horsLigne: false,
+      );
+    } catch (_) {}
 
     return SyncOutcome(
       tire: tire,
