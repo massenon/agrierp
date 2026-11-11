@@ -98,8 +98,8 @@
             </form>
         </div>
 
-        <div class="border-t border-outline-variant/40 pt-4 flex items-center justify-center text-[10px] text-outline">
-            <span>© {{ now()->year }} LogiAgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — Accompagnement : Cabinet FAGUEZ SARL — Édité par Dr&nbsp;MASSENON&nbsp;Rhodes</span>
+        <div class="border-t border-outline-variant/40 pt-4 flex items-center justify-center text-xs text-gray-400 text-center mt-6">
+            <span>© {{ now()->year }} LogiAgriERP — (PAEB)/Cabinet FAGUEZ SARL — Conçu par Dr&nbsp;MASSENON&nbsp;Rhodes</span>
         </div>
     </main>
 

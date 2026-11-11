@@ -752,9 +752,10 @@ class _PiedDePage extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(top: AgriSpacing.md),
       child: Text(
-        "© 2026 LogiAgriERP — Projet d'Appui à l'Entrepreneuriat au Bénin (PAEB) — FAGUEZ SARL",
+        '© 2026 LogiAgriERP — (PAEB)/Cabinet FAGUEZ SARL — Conçu par Dr MASSENON Rhodes',
+        key: Key('pied-de-page-connexion'),
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 10, color: AgriColors.outline),
+        style: TextStyle(fontSize: 10, color: Colors.grey),
       ),
     );
   }
