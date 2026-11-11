@@ -141,6 +141,8 @@ void main() {
     // Ticket CP-4 — demandes de clôture (envoyées, jamais tirées : l'exercice et les mois clos redescendent dans `fiscal_years` et `periodic_closures`).
     'fiscal_closure_requests',
     'sync_conflicts',
+    // Ticket B3 — journal local des tentatives de synchronisation (métadonnée, jamais envoyée ni tirée).
+    'sync_history',
     'app_settings',
     'sync_state',
   };

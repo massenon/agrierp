@@ -96,6 +96,8 @@ Map<int, List<TableInfo>> _tablesCreees(AppDatabase d) => {
   80: [d.fiscalClosureRequests, d.periodicClosures],
   // v86 — ticket RELEVES-1 : relevés de terrain (mixte : saisis au poste ET tirés du serveur).
   86: [d.fieldSurveyEntries],
+  // v87 — ticket B3 : historique des tentatives de synchronisation (local uniquement).
+  87: [d.syncHistory],
 };
 
 /// Version à laquelle chaque colonne a été ajoutée à une table existante (palier
@@ -539,7 +541,7 @@ void main() {
   test('⚠️ la chaîne 52 → 53 (quotes, DEV) → 54 (credit_notes, AV) → 56 (dépenses, DEP4) → 57 (conversion devis, DEV3) → 59 (à crédit, DEP7) est complète ; 55 et 58 inutilisés ici', () {
     final d = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(d.close);
-    expect(d.schemaVersion, 86, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1, 82 = VOL-1, 83 = VOL-2, 84 = MECEF-1, 85 = MECEF-3 (IFU du client, choix de facture, AIB, livraison incluse), 86 = RELEVES-1 (relevés de terrain)');
+    expect(d.schemaVersion, 87, reason: 'le 55 (unicité) n\'a pas pris de palier Drift : 54 → 56 sans trou ; 57 à 59 sont réservés ; 61 (ventes) et 62 (rappels) sont réservés à d\'autres branches ; 64 = justificatifs locaux, 65 = ATT-1, 66 = ATT-2, 67 = RH-1 à RH-4, 68 = UT-1, 69 = VC-1, 70 = VC-2, 78 = AUT-3, 79 = EL-1, 80 = CP-4, 81 = MDP-1, 82 = VOL-1, 83 = VOL-2, 84 = MECEF-1, 85 = MECEF-3 (IFU du client, choix de facture, AIB, livraison incluse), 86 = RELEVES-1 (relevés de terrain), 87 = B3 (historique des tentatives de synchronisation)');
     expect(_colonnesAjoutees(d)[63], [(d.corbeilleElements, d.corbeilleElements.archivePar)]);
     expect(_tablesCreees(d)[58], [d.corbeilleElements, d.corbeilleDemandes]);
     expect(_tablesCreees(d)[56], [d.expenseLines, d.costCenters]);

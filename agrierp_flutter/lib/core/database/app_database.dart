@@ -3801,7 +3801,7 @@ class AppDatabase extends _$AppDatabase {
     'internship_absences', 'payslip_requests',
     'accounting_entries', 'accounting_entry_lines',
     'mails', 'administrative_documents', 'archived_documents', 'notifications',
-    'sync_conflicts', 'sync_history',
+    'sync_conflicts',
   ];
 
   /// Référentiels et réglages CONSERVÉS (préservés au serveur ; les comptes restent pour que la
@@ -3815,6 +3815,8 @@ class AppDatabase extends _$AppDatabase {
     'income_tax_brackets',
     'roles_applicatifs', 'permissions_applicatives', 'utilisateurs', 'audit_logs',
     'app_settings', 'sync_state',
+    // Ticket B3 — journal local des tentatives de synchronisation (métadonnée, conservée après une réinitialisation).
+    'sync_history',
   ];
 
   /// Efface les données d'activité, remet à zéro les soldes qui en dérivent (stock, trésorerie,
