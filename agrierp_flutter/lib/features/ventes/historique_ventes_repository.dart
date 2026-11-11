@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/pdf_recu.dart';
+import '../../domain/entities/article_resume.dart';
 import '../../domain/entities/client_resume.dart';
 import '../../domain/entities/vente_historique.dart';
 import 'avoirs_repository.dart';
@@ -75,6 +76,18 @@ class LigneVente {
   String get mode => ModePaiement.libelle(vente.paymentMode);
 }
 
+/// Convertit un article Drift [Product] en entité de domaine [ArticleResume].
+///
+/// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
+/// ne franchissent plus la frontière vers les écrans.
+ArticleResume _versArticleResume(Product p) => ArticleResume(
+  id: p.id,
+  nom: p.name,
+  // `priceMin` est le prix de référence : égal à `priceMax` en mode `fixe`, plancher en mode `fourchette`.
+  prixUnitaire: p.priceMin ?? 0,
+  unite: p.unit,
+);
+
 /// Convertit un client Drift [Customer] en entité de domaine [ClientResume].
 ///
 /// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
@@ -134,7 +147,7 @@ class InstantaneHistorique {
   final List<VenteHistorique> ventes;
   final Map<String, List<SaleLine>> lignesParVente;
   final Map<String, ClientResume> clients;
-  final Map<String, Product> produits;
+  final Map<String, ArticleResume> produits;
   final Map<String, Receivable> creancesParVente;
   final double encoursCreances;
 
@@ -243,7 +256,7 @@ class InstantaneHistorique {
       ligne: _ligne(v),
       articles: [
         for (final l in lignesParVente[id] ?? const <SaleLine>[])
-          ArticleVente(nom: produits[l.productId]?.name ?? '—', quantite: l.qty, montant: l.manualTotalAmount),
+          ArticleVente(nom: produits[l.productId]?.nom ?? '—', quantite: l.qty, montant: l.manualTotalAmount),
       ],
     );
   }
@@ -373,7 +386,7 @@ class HistoriqueVentesRepository {
       ventes: ventes.map(_versVenteHistorique).toList(),
       lignesParVente: parVente,
       clients: {for (final c in await database.select(database.customers).get()) c.id: _versClientResume(c)},
-      produits: {for (final p in await database.select(database.products).get()) p.id: p},
+      produits: {for (final p in await database.select(database.products).get()) p.id: _versArticleResume(p)},
       creancesParVente: {
         for (final c in creances)
           if (c.saleId != null) c.saleId!: c,

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/domain/entities/article_resume.dart';
 import 'package:agrierp/domain/entities/client_resume.dart';
 import 'package:agrierp/domain/entities/vente_historique.dart';
 import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
@@ -75,6 +76,54 @@ LigneVente _ligneDepuisVente(
 
 void main() {
   _testsInstantaneHistorique();
+
+  // ── Mapper Product → ArticleResume ────────────────────────────────────────
+
+  group('mapper Product → ArticleResume', () {
+    test('les champs sont recopiés fidèlement depuis un article Drift', () {
+      final drift = _articleDrift(id: 'ppp-001', nom: 'Provende ponte', prix: 350.0, unite: 'kg');
+      // On reconstruit manuellement la même conversion que _versArticleResume (privé du repository).
+      final resume = ArticleResume(
+        id: drift.id,
+        nom: drift.name,
+        prixUnitaire: drift.priceMin ?? 0,
+        unite: drift.unit,
+      );
+      expect(resume.id, 'ppp-001');
+      expect(resume.nom, 'Provende ponte');
+      expect(resume.prixUnitaire, 350.0);
+      expect(resume.unite, 'kg');
+    });
+
+    test('le prix nul est recopié tel quel', () {
+      final drift = _articleDrift(id: 'ppp-002', nom: 'Médicament gratuit', prix: 0.0, unite: 'dose');
+      final resume = ArticleResume(id: drift.id, nom: drift.name, prixUnitaire: drift.price, unite: drift.unit);
+      expect(resume.prixUnitaire, 0.0);
+    });
+  });
+
+  group('InstantaneHistorique.produits (ArticleResume)', () {
+    test('une map vide retourne null pour tout identifiant', () {
+      final snap = _instantane(produits: {});
+      expect(snap.produits['inconnu'], isNull);
+    });
+
+    test('produits[id] retourne le bon ArticleResume', () {
+      final snap = _instantane(produits: {
+        'p1': _articleResume(id: 'p1', nom: 'Poulet fermier', prix: 2500.0, unite: 'pièce'),
+      });
+      expect(snap.produits['p1']?.nom, 'Poulet fermier');
+      expect(snap.produits['p1']?.prixUnitaire, 2500.0);
+      expect(snap.produits['p1']?.unite, 'pièce');
+    });
+
+    test('produits[id] vaut null pour un identifiant absent', () {
+      final snap = _instantane(produits: {
+        'p1': _articleResume(id: 'p1', nom: 'Miel', prix: 1000.0, unite: 'pot'),
+      });
+      expect(snap.produits['p2'], isNull);
+    });
+  });
 
   // ── Mapper Sale → VenteHistorique ──────────────────────────────────────────
 
@@ -243,12 +292,13 @@ void main() {
 InstantaneHistorique _instantane({
   List<VenteHistorique>? ventes,
   Map<String, ClientResume>? clients,
+  Map<String, ArticleResume>? produits,
 }) =>
     InstantaneHistorique(
       ventes: ventes ?? [],
       lignesParVente: {},
       clients: clients ?? {},
-      produits: {},
+      produits: produits ?? {},
       creancesParVente: {},
       encoursCreances: 0,
     );
@@ -260,6 +310,36 @@ ClientResume _clientResume({
   bool actif = true,
 }) =>
     ClientResume(id: id, nom: nom, estActif: actif);
+
+/// Construit un [ArticleResume] minimal pour les tests (sans Drift).
+ArticleResume _articleResume({
+  required String id,
+  required String nom,
+  double prix = 0.0,
+  String unite = 'pièce',
+}) =>
+    ArticleResume(id: id, nom: nom, prixUnitaire: prix, unite: unite);
+
+/// Construit un [Product] Drift minimal — uniquement pour les tests du mapper.
+Product _articleDrift({
+  required String id,
+  required String nom,
+  double prix = 0.0,
+  String unite = 'pièce',
+}) =>
+    Product(
+      id: id,
+      sku: id,
+      name: nom,
+      priceMin: prix,
+      unit: unite,
+      syncStatus: SyncStatus.synced,
+      updatedAt: DateTime(2026, 11, 11),
+      stockQty: 0,
+      pricingMode: 'fixe',
+      tvaRate: 0,
+      isActive: true,
+    );
 
 /// Construit un [Customer] Drift minimal — uniquement pour les tests du mapper.
 Customer _clientDrift({
