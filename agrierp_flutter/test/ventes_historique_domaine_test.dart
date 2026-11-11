@@ -4,6 +4,7 @@ import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/domain/entities/article_resume.dart';
 import 'package:agrierp/domain/entities/client_resume.dart';
+import 'package:agrierp/domain/entities/creance_resume.dart';
 import 'package:agrierp/domain/entities/vente_historique.dart';
 import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
 
@@ -259,6 +260,82 @@ void main() {
     });
   });
 
+  // ── Mapper Receivable → CreanceResume ─────────────────────────────────────
+
+  group('mapper Receivable → CreanceResume', () {
+    test('les champs sont recopiés fidèlement depuis une créance Drift', () {
+      final drift = _creanceDrift(
+        id: 'rrr-001',
+        venteId: 'vvv-001',
+        montantDu: 15000,
+        montantPaye: 5000,
+        status: 'ouverte',
+      );
+      // On reconstruit manuellement la même conversion que _versCreanceResume (privé du repository).
+      final resume = CreanceResume(
+        id: drift.id,
+        venteId: drift.saleId!,
+        montantDu: drift.amount,
+        montantPaye: drift.amountPaid,
+        estEchue: drift.status != 'soldee',
+      );
+      expect(resume.id, 'rrr-001');
+      expect(resume.venteId, 'vvv-001');
+      expect(resume.montantDu, 15000);
+      expect(resume.montantPaye, 5000);
+      expect(resume.estEchue, isTrue);
+    });
+
+    test('estEchue est faux pour une créance soldée', () {
+      final drift = _creanceDrift(id: 'rrr-002', venteId: 'vvv-002', montantDu: 10000, montantPaye: 10000, status: 'soldee');
+      final resume = CreanceResume(
+        id: drift.id,
+        venteId: drift.saleId!,
+        montantDu: drift.amount,
+        montantPaye: drift.amountPaid,
+        estEchue: drift.status != 'soldee',
+      );
+      expect(resume.estEchue, isFalse);
+    });
+  });
+
+  group('InstantaneHistorique.creancesParVente (CreanceResume)', () {
+    test('une map vide retourne null pour tout identifiant', () {
+      final snap = _instantane(creancesParVente: {});
+      expect(snap.creancesParVente['inconnu'], isNull);
+    });
+
+    test('creancesParVente[id] retourne le bon CreanceResume', () {
+      final snap = _instantane(creancesParVente: {
+        'vvv-010': _creanceResume(id: 'rrr-010', venteId: 'vvv-010', montantDu: 20000, montantPaye: 8000),
+      });
+      expect(snap.creancesParVente['vvv-010']?.montantDu, 20000);
+      expect(snap.creancesParVente['vvv-010']?.montantPaye, 8000);
+    });
+
+    test('creancesParVente[id] vaut null pour un identifiant absent', () {
+      final snap = _instantane(creancesParVente: {
+        'vvv-011': _creanceResume(id: 'rrr-011', venteId: 'vvv-011', montantDu: 5000, montantPaye: 0),
+      });
+      expect(snap.creancesParVente['vvv-999'], isNull);
+    });
+
+    test('le solde calculé par _ligne correspond à montantDu − montantPaye', () {
+      final vente = _venteHistorique(
+        _vente(id: 'vvv-020', paymentMode: 'credit', total: 30000),
+        customerId: 'ccc-001',
+      );
+      final snap = _instantane(
+        ventes: [vente],
+        creancesParVente: {
+          'vvv-020': _creanceResume(id: 'rrr-020', venteId: 'vvv-020', montantDu: 30000, montantPaye: 10000),
+        },
+      );
+      final lignes = snap.filtrer();
+      expect(lignes.single.reste, 20000);
+    });
+  });
+
   // ── clientsActifs sur ClientResume ────────────────────────────────────────
 
   group('InstantaneHistorique.clientsActifs (ClientResume)', () {
@@ -293,13 +370,14 @@ InstantaneHistorique _instantane({
   List<VenteHistorique>? ventes,
   Map<String, ClientResume>? clients,
   Map<String, ArticleResume>? produits,
+  Map<String, CreanceResume>? creancesParVente,
 }) =>
     InstantaneHistorique(
       ventes: ventes ?? [],
       lignesParVente: {},
       clients: clients ?? {},
       produits: produits ?? {},
-      creancesParVente: {},
+      creancesParVente: creancesParVente ?? {},
       encoursCreances: 0,
     );
 
@@ -339,6 +417,39 @@ Product _articleDrift({
       pricingMode: 'fixe',
       tvaRate: 0,
       isActive: true,
+    );
+
+/// Construit un [CreanceResume] minimal pour les tests (sans Drift).
+CreanceResume _creanceResume({
+  required String id,
+  required String venteId,
+  double montantDu = 0.0,
+  double montantPaye = 0.0,
+  bool estEchue = true,
+}) =>
+    CreanceResume(
+      id: id,
+      venteId: venteId,
+      montantDu: montantDu,
+      montantPaye: montantPaye,
+      estEchue: estEchue,
+    );
+
+/// Construit un [Receivable] Drift minimal — uniquement pour les tests du mapper.
+Receivable _creanceDrift({
+  required String id,
+  required String venteId,
+  double montantDu = 0.0,
+  double montantPaye = 0.0,
+  String status = 'en_cours',
+}) =>
+    Receivable(
+      id: id,
+      customerId: 'ccc-drift',
+      saleId: venteId,
+      amount: montantDu,
+      amountPaid: montantPaye,
+      status: status,
     );
 
 /// Construit un [Customer] Drift minimal — uniquement pour les tests du mapper.

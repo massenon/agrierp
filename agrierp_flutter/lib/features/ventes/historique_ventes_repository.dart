@@ -8,6 +8,7 @@ import '../../core/database/sync_columns.dart';
 import '../../core/export/pdf_recu.dart';
 import '../../domain/entities/article_resume.dart';
 import '../../domain/entities/client_resume.dart';
+import '../../domain/entities/creance_resume.dart';
 import '../../domain/entities/vente_historique.dart';
 import 'avoirs_repository.dart';
 import 'caisse_repository.dart';
@@ -98,6 +99,18 @@ ClientResume _versClientResume(Customer c) => ClientResume(
   estActif: c.isActive,
 );
 
+/// Convertit une créance Drift [Receivable] en entité de domaine [CreanceResume].
+///
+/// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
+/// ne franchissent plus la frontière vers les écrans.
+CreanceResume _versCreanceResume(Receivable r) => CreanceResume(
+  id: r.id,
+  venteId: r.saleId!,
+  montantDu: r.amount,
+  montantPaye: r.amountPaid,
+  estEchue: r.status != 'soldee',
+);
+
 /// Convertit une ligne Drift [Sale] en entité de domaine [VenteHistorique].
 ///
 /// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
@@ -148,7 +161,7 @@ class InstantaneHistorique {
   final Map<String, List<SaleLine>> lignesParVente;
   final Map<String, ClientResume> clients;
   final Map<String, ArticleResume> produits;
-  final Map<String, Receivable> creancesParVente;
+  final Map<String, CreanceResume> creancesParVente;
   final double encoursCreances;
 
   /// `Customer::where('is_active', true)->orderBy('name')` : les clients du filtre « Client : Tous ».
@@ -169,7 +182,7 @@ class InstantaneHistorique {
     } else if (!v.estEnvoyee) {
       reste = v.paymentMode == 'credit' && v.customerId != null ? v.total : 0;
     } else {
-      final solde = c == null ? 0.0 : c.amount - c.amountPaid;
+      final solde = c == null ? 0.0 : c.montantDu - c.montantPaye;
       reste = solde < 0 ? 0 : solde;
     }
     return LigneVente(
@@ -389,7 +402,7 @@ class HistoriqueVentesRepository {
       produits: {for (final p in await database.select(database.products).get()) p.id: _versArticleResume(p)},
       creancesParVente: {
         for (final c in creances)
-          if (c.saleId != null) c.saleId!: c,
+          if (c.saleId != null) c.saleId!: _versCreanceResume(c),
       },
       encoursCreances: ouvertes.fold<double>(0, (t, c) => t + c.amount) - ouvertes.fold<double>(0, (t, c) => t + c.amountPaid),
     );
