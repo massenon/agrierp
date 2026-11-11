@@ -6,6 +6,8 @@ import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/sync/gestes_importants.dart';
 import '../../core/temps/heure_benin.dart';
+import '../../domain/entities/bande_origine.dart';
+import '../../domain/entities/produit_candidat.dart';
 import '../stocks/pmp_service.dart';
 import 'effectif_par_categorie.dart';
 import 'jour_categories.dart';
@@ -361,9 +363,9 @@ class BandesRepository {
   }
 
   /// `getProduitsCandidatsProperty()` : produits actifs de l'espèce, hors intrants (`ALI-%`, `MED-%`), par nom.
-  Future<List<Product>> produitsCandidats(String speciesId) async {
+  Future<List<ProduitCandidat>> produitsCandidats(String speciesId) async {
     if (speciesId.isEmpty) return const [];
-    return [
+    final liste = [
       for (final p in await _db.select(_db.products).get())
         if (p.isActive &&
             p.speciesId == speciesId &&
@@ -371,16 +373,24 @@ class BandesRepository {
             !cleCommeLeServeur(p.sku).startsWith('med-'))
           p,
     ]..sort((a, b) => cleCommeLeServeur(a.name).compareTo(cleCommeLeServeur(b.name)));
+    return [for (final p in liste) _versProduitCandidat(p)];
   }
 
   /// `getBandesOriginePossiblesProperty()` : bandes non archivées de l'espèce choisie, par code.
-  Future<List<LivestockLot>> bandesOrigine(String speciesId) async {
+  Future<List<BandeOrigine>> bandesOrigine(String speciesId) async {
     if (speciesId.isEmpty) return const [];
-    return (_db.select(_db.livestockLots)
+    final lots = await (_db.select(_db.livestockLots)
           ..where((t) => t.speciesId.equals(speciesId) & t.isActive.equals(true))
           ..orderBy([(t) => OrderingTerm(expression: t.code)]))
         .get();
+    return [for (final l in lots) _versBandeOrigine(l)];
   }
+
+  static ProduitCandidat _versProduitCandidat(Product p) =>
+      ProduitCandidat(id: p.id, sku: p.sku, nom: p.name);
+
+  static BandeOrigine _versBandeOrigine(LivestockLot l) =>
+      BandeOrigine(id: l.id, code: l.code, quantiteActuelle: l.currentQuantity.toDouble());
 
   /// Le tiroir de détail (`view($id)`).
   Future<DetailBande?> detail(String id) async {

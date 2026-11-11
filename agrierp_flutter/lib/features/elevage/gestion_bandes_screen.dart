@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../core/comptabilite/exercice_de_saisie.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
+import '../../domain/entities/bande_origine.dart';
+import '../../domain/entities/produit_candidat.dart';
 import '../../core/export/document_officiel.dart';
 import '../../core/temps/heure_benin.dart';
 import '../../core/theme/agri_tokens.dart';
@@ -852,8 +854,8 @@ class _ModaleNouvelleBande extends StatefulWidget {
 
 class _ModaleNouvelleBandeState extends State<_ModaleNouvelleBande> {
   List<EspeceElevage> _especes = const [];
-  List<Product> _produits = const [];
-  List<LivestockLot> _origines = const [];
+  List<ProduitCandidat> _produits = const [];
+  List<BandeOrigine> _origines = const [];
   String _espece = '';
   String? _codeEspece;
   String _stade = 'reproduction';
@@ -1026,7 +1028,7 @@ class _ModaleNouvelleBandeState extends State<_ModaleNouvelleBande> {
               child: ChampListeModale(
                 valeur: _produit,
                 vide: '-- Aucun (pas de mouvement de stock) --',
-                options: [for (final p in _produits) (p.id, '${p.sku} — ${p.name}')],
+                options: [for (final p in _produits) (p.id, '${p.sku} — ${p.nom}')],
                 surChangement: (v) => setState(() => _produit = v),
               ),
             ),
@@ -1044,7 +1046,7 @@ class _ModaleNouvelleBandeState extends State<_ModaleNouvelleBande> {
                 valeur: _origine,
                 vide: "-- Aucune (achat, animaux extérieurs) --",
                 enErreur: _erreurs.containsKey('lot_origine_id'),
-                options: [for (final o in _origines) (o.id, '${o.code} (${PmpService.francs(o.currentQuantity.toDouble())})')],
+                options: [for (final o in _origines) (o.id, '${o.code} (${PmpService.francs(o.quantiteActuelle)})')],
                 surChangement: (v) => setState(() => _origine = v),
               ),
             ),
