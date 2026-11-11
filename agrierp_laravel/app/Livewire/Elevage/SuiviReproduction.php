@@ -2,11 +2,15 @@
 
 namespace App\Livewire\Elevage;
 
+use App\Actions\RecordSaleOnFicheElevageAction;
+use App\Actions\SyncLotProductionStockAction;
 use App\Models\Animal;
 use App\Models\AuditLog;
 use App\Models\LivestockDailyEntry;
 use App\Models\LivestockLot;
 use App\Models\LivestockReproductionEvent;
+use App\Support\OrdreDesVerrous;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -283,15 +287,61 @@ class SuiviReproduction extends Component
             'nesMorts' => ['required', 'integer', 'min:0'],
         ]);
 
-        LivestockReproductionEvent::findOrFail($this->miseBasEventId)->update([
-            'mise_bas_date_actual' => now()->format('Y-m-d'),
-            'nes_vivants' => $this->nesVivants,
-            'nes_morts' => $this->nesMorts,
-        ]);
+        $event = LivestockReproductionEvent::findOrFail($this->miseBasEventId);
+        $date = now()->format('Y-m-d');
+
+        // Ticket 3.F7 (décision client A, 11/11/2026) — les nés vivants alimentent automatiquement
+        // la fiche journalière de la bande le jour de la mise-bas : l'effectif monte sans double-saisie.
+        DB::transaction(function () use ($event, $date) {
+            $event->update([
+                'mise_bas_date_actual' => $date,
+                'nes_vivants' => $this->nesVivants,
+                'nes_morts' => $this->nesMorts,
+            ]);
+
+            if ($this->nesVivants > 0) {
+                OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$event->lot_id]));
+
+                $ficheAvant = LivestockDailyEntry::where('lot_id', $event->lot_id)
+                    ->whereDate('entry_date', $date)
+                    ->first();
+
+                $etatAvant = $ficheAvant
+                    ? ['ne' => (int) $ficheAvant->ne, 'mort' => (int) $ficheAvant->mort, 'don' => (int) ($ficheAvant->don ?? 0)]
+                    : [];
+
+                $neNouveau = ((int) ($ficheAvant->ne ?? 0)) + $this->nesVivants;
+
+                // Effectif précédent : fiche de la veille, sinon initial_quantity de la bande.
+                $veille = LivestockDailyEntry::where('lot_id', $event->lot_id)
+                    ->where('entry_date', '<', $date)
+                    ->orderByDesc('entry_date')
+                    ->value('effectif_final') ?? $event->lot->initial_quantity ?? 0;
+
+                $effectifFinal = LivestockDailyEntry::computeEffectifFinal(
+                    (int) $veille,
+                    (int) ($ficheAvant->achat ?? 0),
+                    $neNouveau,
+                    (int) ($ficheAvant->mort ?? 0),
+                    (int) ($ficheAvant->vente ?? 0),
+                    (int) ($ficheAvant->don ?? 0),
+                    (int) ($ficheAvant->transfert_entree ?? 0),
+                    (int) ($ficheAvant->transfert_sortie ?? 0),
+                );
+
+                $entree = LivestockDailyEntry::updateOrCreate(
+                    ['lot_id' => $event->lot_id, 'entry_date' => $date],
+                    ['ne' => $neNouveau, 'effectif_final' => $effectifFinal],
+                );
+
+                app(SyncLotProductionStockAction::class)->execute($entree, $etatAvant);
+                app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($event->lot_id, $date);
+            }
+        });
 
         AuditLog::record('reproduction_event.misebas_recorded', 'elevage');
         $this->dispatch('close-modal', name: 'modal-misebas');
-        $this->dispatch('toast', message: 'Mise bas enregistrée avec succès.', type: 'success');
+        $this->dispatch('toast', message: "Mise bas enregistrée — fiche du {$date} mise à jour ({$this->nesVivants} nés vivants).", type: 'success');
     }
 
     public function closeCycle(string $id): void

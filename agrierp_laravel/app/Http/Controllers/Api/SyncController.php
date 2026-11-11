@@ -3867,6 +3867,40 @@ class SyncController extends Controller
                 if ($existant !== null) {
                     if ($maj !== []) {
                         $existant->update($maj);
+                        // Ticket 3.F7 (décision client A, 11/11/2026) — parité push ↔ web : les nés vivants d'une
+                        // mise bas reçue du poste alimentent la fiche journalière de la bande, comme `saveMiseBas`.
+                        $nesVivants = isset($maj['nes_vivants']) ? (int) $maj['nes_vivants'] : null;
+                        $dateMiseBas = $maj['mise_bas_date_actual'] ?? null;
+                        if ($nesVivants !== null && $nesVivants > 0 && $dateMiseBas !== null) {
+                            OrdreDesVerrous::stock(OrdreDesVerrous::produitsDesFiches([$existant->lot_id]));
+                            $ficheAvant = LivestockDailyEntry::where('lot_id', $existant->lot_id)
+                                ->whereDate('entry_date', $dateMiseBas)
+                                ->first();
+                            $etatAvant = $ficheAvant
+                                ? ['ne' => (int) $ficheAvant->ne, 'mort' => (int) $ficheAvant->mort, 'don' => (int) ($ficheAvant->don ?? 0)]
+                                : [];
+                            $neNouveau = ((int) ($ficheAvant->ne ?? 0)) + $nesVivants;
+                            $veille = LivestockDailyEntry::where('lot_id', $existant->lot_id)
+                                ->where('entry_date', '<', $dateMiseBas)
+                                ->orderByDesc('entry_date')
+                                ->value('effectif_final') ?? $existant->lot->initial_quantity ?? 0;
+                            $effectifFinal = LivestockDailyEntry::computeEffectifFinal(
+                                (int) $veille,
+                                (int) ($ficheAvant->achat ?? 0),
+                                $neNouveau,
+                                (int) ($ficheAvant->mort ?? 0),
+                                (int) ($ficheAvant->vente ?? 0),
+                                (int) ($ficheAvant->don ?? 0),
+                                (int) ($ficheAvant->transfert_entree ?? 0),
+                                (int) ($ficheAvant->transfert_sortie ?? 0),
+                            );
+                            $entree = LivestockDailyEntry::updateOrCreate(
+                                ['lot_id' => $existant->lot_id, 'entry_date' => $dateMiseBas],
+                                ['ne' => $neNouveau, 'effectif_final' => $effectifFinal],
+                            );
+                            app(SyncLotProductionStockAction::class)->execute($entree, $etatAvant);
+                            app(RecordSaleOnFicheElevageAction::class)->recalculerEnCascade($existant->lot_id, $dateMiseBas);
+                        }
                         AuditLog::record('reproduction_event.updated_from_device', 'elevage');
                     }
                     $accepted[] = $validated['id'];
