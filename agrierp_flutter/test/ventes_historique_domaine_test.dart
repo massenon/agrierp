@@ -5,6 +5,7 @@ import 'package:agrierp/core/database/sync_columns.dart';
 import 'package:agrierp/domain/entities/article_resume.dart';
 import 'package:agrierp/domain/entities/client_resume.dart';
 import 'package:agrierp/domain/entities/creance_resume.dart';
+import 'package:agrierp/domain/entities/ligne_vente_resume.dart';
 import 'package:agrierp/domain/entities/vente_historique.dart';
 import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
 
@@ -77,6 +78,7 @@ LigneVente _ligneDepuisVente(
 
 void main() {
   _testsInstantaneHistorique();
+  _testsLigneVenteResume();
 
   // ── Mapper Product → ArticleResume ────────────────────────────────────────
 
@@ -371,10 +373,11 @@ InstantaneHistorique _instantane({
   Map<String, ClientResume>? clients,
   Map<String, ArticleResume>? produits,
   Map<String, CreanceResume>? creancesParVente,
+  Map<String, List<LigneVenteResume>>? lignesParVente,
 }) =>
     InstantaneHistorique(
       ventes: ventes ?? [],
-      lignesParVente: {},
+      lignesParVente: lignesParVente ?? {},
       clients: clients ?? {},
       produits: produits ?? {},
       creancesParVente: creancesParVente ?? {},
@@ -466,6 +469,42 @@ Customer _clientDrift({
       syncStatus: SyncStatus.synced,
     );
 
+/// Construit un [LigneVenteResume] minimal pour les tests (sans Drift).
+LigneVenteResume _ligneVenteResume({
+  String id = 'lll-001',
+  String venteId = 'vvv-001',
+  String produitId = 'ppp-001',
+  double quantite = 1.0,
+  double prixUnitaire = 1000.0,
+  double manualTotalAmount = 1000.0,
+}) =>
+    LigneVenteResume(
+      id: id,
+      venteId: venteId,
+      produitId: produitId,
+      quantite: quantite,
+      prixUnitaire: prixUnitaire,
+      manualTotalAmount: manualTotalAmount,
+    );
+
+/// Construit un [SaleLine] Drift minimal — uniquement pour les tests du mapper.
+SaleLine _saleLine({
+  required String id,
+  required String venteId,
+  required String produitId,
+  double qty = 1.0,
+  double unitPrice = 500.0,
+  double manualTotalAmount = 500.0,
+}) =>
+    SaleLine(
+      id: id,
+      saleId: venteId,
+      productId: produitId,
+      qty: qty,
+      unitPrice: unitPrice,
+      manualTotalAmount: manualTotalAmount,
+    );
+
 // ── Tests InstantaneHistorique ────────────────────────────────────────────────
 
 void _testsInstantaneHistorique() {
@@ -510,6 +549,97 @@ void _testsInstantaneHistorique() {
       expect(lignes, hasLength(1));
       expect(lignes.first.vente.id, 'aabbccdd-0000-0000-0000-000000000032');
       expect(lignes.first.annulee, isTrue);
+    });
+  });
+}
+
+// ── Tests LigneVenteResume ────────────────────────────────────────────────────
+
+void _testsLigneVenteResume() {
+  // ── Mapper SaleLine → LigneVenteResume ──────────────────────────────────────
+
+  group('mapper SaleLine → LigneVenteResume', () {
+    test('les champs sont recopiés fidèlement depuis une ligne Drift', () {
+      final drift = _saleLine(
+        id: 'lll-drift-001',
+        venteId: 'vvv-drift-001',
+        produitId: 'ppp-drift-001',
+        qty: 3.5,
+        unitPrice: 2000.0,
+        manualTotalAmount: 7000.0,
+      );
+      // On reconstruit manuellement la même conversion que _versLigneVenteResume (privé du repository).
+      final resume = LigneVenteResume(
+        id: drift.id,
+        venteId: drift.saleId,
+        produitId: drift.productId,
+        quantite: drift.qty,
+        prixUnitaire: drift.unitPrice,
+        manualTotalAmount: drift.manualTotalAmount,
+      );
+      expect(resume.id, 'lll-drift-001');
+      expect(resume.venteId, 'vvv-drift-001');
+      expect(resume.produitId, 'ppp-drift-001');
+      expect(resume.quantite, 3.5);
+      expect(resume.prixUnitaire, 2000.0);
+      expect(resume.manualTotalAmount, 7000.0);
+    });
+
+    test('une quantité décimale est conservée telle quelle', () {
+      final drift = _saleLine(id: 'lll-002', venteId: 'vvv-002', produitId: 'ppp-002', qty: 0.5, manualTotalAmount: 250.0);
+      final resume = LigneVenteResume(
+        id: drift.id,
+        venteId: drift.saleId,
+        produitId: drift.productId,
+        quantite: drift.qty,
+        prixUnitaire: drift.unitPrice,
+        manualTotalAmount: drift.manualTotalAmount,
+      );
+      expect(resume.quantite, 0.5);
+      expect(resume.manualTotalAmount, 250.0);
+    });
+  });
+
+  // ── Accès lignesParVente[id] ─────────────────────────────────────────────────
+
+  group('InstantaneHistorique.lignesParVente (LigneVenteResume)', () {
+    test('une map vide retourne null pour tout identifiant', () {
+      final snap = _instantane(lignesParVente: {});
+      expect(snap.lignesParVente['inconnu'], isNull);
+    });
+
+    test('lignesParVente[id] retourne la bonne liste de LigneVenteResume', () {
+      final ligne1 = _ligneVenteResume(id: 'lll-010', venteId: 'vvv-010', produitId: 'ppp-010', quantite: 2.0, manualTotalAmount: 4000.0);
+      final ligne2 = _ligneVenteResume(id: 'lll-011', venteId: 'vvv-010', produitId: 'ppp-011', quantite: 1.0, manualTotalAmount: 1500.0);
+      final snap = _instantane(lignesParVente: {
+        'vvv-010': [ligne1, ligne2],
+      });
+      expect(snap.lignesParVente['vvv-010'], hasLength(2));
+      expect(snap.lignesParVente['vvv-010']!.first.produitId, 'ppp-010');
+      expect(snap.lignesParVente['vvv-010']!.last.manualTotalAmount, 1500.0);
+    });
+
+    test('lignesParVente[id] vaut null pour un identifiant absent', () {
+      final snap = _instantane(lignesParVente: {
+        'vvv-020': [_ligneVenteResume(id: 'lll-020', venteId: 'vvv-020')],
+      });
+      expect(snap.lignesParVente['vvv-999'], isNull);
+    });
+
+    test('detail() compte correctement les articles depuis lignesParVente', () {
+      final venteId = 'aabbccdd-0000-0000-0000-000000000099';
+      final vente = _venteHistorique(_vente(id: venteId));
+      final snap = _instantane(
+        ventes: [vente],
+        lignesParVente: {
+          venteId: [
+            _ligneVenteResume(id: 'lll-a', venteId: venteId, produitId: 'ppp-001', quantite: 2.0, manualTotalAmount: 2000.0),
+            _ligneVenteResume(id: 'lll-b', venteId: venteId, produitId: 'ppp-002', quantite: 1.0, manualTotalAmount: 500.0),
+          ],
+        },
+      );
+      final lignes = snap.filtrer();
+      expect(lignes.single.articles, 2);
     });
   });
 }

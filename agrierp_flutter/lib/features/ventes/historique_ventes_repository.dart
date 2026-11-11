@@ -9,6 +9,7 @@ import '../../core/export/pdf_recu.dart';
 import '../../domain/entities/article_resume.dart';
 import '../../domain/entities/client_resume.dart';
 import '../../domain/entities/creance_resume.dart';
+import '../../domain/entities/ligne_vente_resume.dart';
 import '../../domain/entities/vente_historique.dart';
 import 'avoirs_repository.dart';
 import 'caisse_repository.dart';
@@ -99,6 +100,19 @@ ClientResume _versClientResume(Customer c) => ClientResume(
   estActif: c.isActive,
 );
 
+/// Convertit une ligne Drift [SaleLine] en entité de domaine [LigneVenteResume].
+///
+/// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
+/// ne franchissent plus la frontière vers les écrans.
+LigneVenteResume _versLigneVenteResume(SaleLine l) => LigneVenteResume(
+  id: l.id,
+  venteId: l.saleId,
+  produitId: l.productId,
+  quantite: l.qty,
+  prixUnitaire: l.unitPrice,
+  manualTotalAmount: l.manualTotalAmount,
+);
+
 /// Convertit une créance Drift [Receivable] en entité de domaine [CreanceResume].
 ///
 /// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
@@ -158,7 +172,7 @@ class InstantaneHistorique {
   });
 
   final List<VenteHistorique> ventes;
-  final Map<String, List<SaleLine>> lignesParVente;
+  final Map<String, List<LigneVenteResume>> lignesParVente;
   final Map<String, ClientResume> clients;
   final Map<String, ArticleResume> produits;
   final Map<String, CreanceResume> creancesParVente;
@@ -268,7 +282,7 @@ class InstantaneHistorique {
     return DetailVente(
       ligne: _ligne(v),
       articles: [
-        for (final l in lignesParVente[id] ?? const <SaleLine>[])
+        for (final l in lignesParVente[id] ?? const <LigneVenteResume>[])
           ArticleVente(nom: produits[l.productId]?.nom ?? '—', quantite: l.qty, montant: l.manualTotalAmount),
       ],
     );
@@ -387,9 +401,9 @@ class HistoriqueVentesRepository {
     final lignes = await database.select(database.saleLines).get();
     final creances = await database.select(database.receivables).get();
 
-    final parVente = <String, List<SaleLine>>{};
+    final parVente = <String, List<LigneVenteResume>>{};
     for (final l in lignes) {
-      parVente.putIfAbsent(l.saleId, () => []).add(l);
+      parVente.putIfAbsent(l.saleId, () => []).add(_versLigneVenteResume(l));
     }
 
     // `HistoriqueVentes` lit `Receivable::where('status', '!=', 'soldee')`, toutes périodes.
