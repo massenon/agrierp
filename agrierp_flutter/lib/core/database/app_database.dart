@@ -2360,6 +2360,19 @@ class SyncState extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ticket B3 — historique des tentatives de synchronisation (local, non synchronisé).
+///
+/// Chaque appel à [SyncEngine.synchroniser] y ajoute une ligne.
+/// La table est plafonnée à 30 lignes : les plus anciennes sont supprimées.
+class SyncHistory extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  DateTimeColumn get date => dateTime()();
+  IntColumn get tire => integer()();
+  IntColumn get accepte => integer()();
+  IntColumn get rejete => integer()();
+  BoolColumn get horsLigne => boolean()();
+}
+
 @DriftDatabase(
   tables: [
     ProductCategories,
@@ -2435,6 +2448,7 @@ class SyncState extends Table {
     StockAdjustments,
     StockMovements,
     SyncConflicts,
+    SyncHistory,
     TreasuryAccounts,
     ExpenseCategories,
     Expenses,
@@ -2463,7 +2477,7 @@ class AppDatabase extends _$AppDatabase {
   /// alors que tout fonctionne sur une installation neuve, ce qui rend la
   /// panne invisible en développement.
   @override
-  int get schemaVersion => 86;
+  int get schemaVersion => 87;
 
   /// Ajoute [colonne] à [table] SEULEMENT si la colonne n'y est pas déjà.
   ///
@@ -3146,6 +3160,10 @@ class AppDatabase extends _$AppDatabase {
         if (!await _tableExiste(m, depreciationRequests)) await m.createTable(depreciationRequests);
       }
       // v86 — ticket RELEVES-1 : relevés de terrain (mixte : saisis au poste ET tirés du serveur).
+      // v87 — ticket B3 : historique des tentatives de synchronisation.
+      if (from < 87) {
+        if (!await _tableExiste(m, syncHistory)) await m.createTable(syncHistory);
+      }
       if (from < 86) {
         if (!await _tableExiste(m, fieldSurveyEntries)) await m.createTable(fieldSurveyEntries);
       }
@@ -3605,6 +3623,43 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  // ── Ticket B3 : historique des tentatives ─────────────────────────────────
+
+  /// Enregistre une tentative de synchronisation et supprime les lignes au-delà de 30.
+  Future<void> enregistrerHistorique({
+    required int tire,
+    required int accepte,
+    required int rejete,
+    required bool horsLigne,
+  }) async {
+    await into(syncHistory).insert(
+      SyncHistoryCompanion.insert(
+        date: DateTime.now(),
+        tire: tire,
+        accepte: accepte,
+        rejete: rejete,
+        horsLigne: horsLigne,
+      ),
+    );
+    // Plafond à 30 lignes : supprimer les plus anciennes.
+    const limite = 30;
+    final toutes = await (select(syncHistory)
+          ..orderBy([(t) => OrderingTerm(expression: t.id, mode: OrderingMode.asc)]))
+        .get();
+    if (toutes.length > limite) {
+      final ids = toutes.take(toutes.length - limite).map((r) => r.id).toList();
+      await (delete(syncHistory)..where((t) => t.id.isIn(ids))).go();
+    }
+  }
+
+  /// Dernières tentatives de synchronisation, les plus récentes d'abord.
+  Future<List<SyncHistoryData>> dernierHistorique({int limite = 10}) {
+    return (select(syncHistory)
+          ..orderBy([(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
+          ..limit(limite))
+        .get();
+  }
+
   /// Ticket H2 — TABLES QUE LE POSTE ENVOIE au serveur (`SyncEngine._pousser`), nom SQL.
   ///
   /// 🔴 Le compteur « en attente » était une liste tenue à la main, ajoutée table par table (F0.35, F0.45,
@@ -3746,7 +3801,7 @@ class AppDatabase extends _$AppDatabase {
     'internship_absences', 'payslip_requests',
     'accounting_entries', 'accounting_entry_lines',
     'mails', 'administrative_documents', 'archived_documents', 'notifications',
-    'sync_conflicts',
+    'sync_conflicts', 'sync_history',
   ];
 
   /// Référentiels et réglages CONSERVÉS (préservés au serveur ; les comptes restent pour que la

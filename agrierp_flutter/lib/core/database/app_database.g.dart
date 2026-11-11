@@ -47661,6 +47661,402 @@ class SyncConflictsCompanion extends UpdateCompanion<SyncConflict> {
   }
 }
 
+class $SyncHistoryTable extends SyncHistory
+    with TableInfo<$SyncHistoryTable, SyncHistoryData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncHistoryTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tireMeta = const VerificationMeta('tire');
+  @override
+  late final GeneratedColumn<int> tire = GeneratedColumn<int>(
+    'tire',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _accepteMeta = const VerificationMeta(
+    'accepte',
+  );
+  @override
+  late final GeneratedColumn<int> accepte = GeneratedColumn<int>(
+    'accepte',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rejeteMeta = const VerificationMeta('rejete');
+  @override
+  late final GeneratedColumn<int> rejete = GeneratedColumn<int>(
+    'rejete',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _horsLigneMeta = const VerificationMeta(
+    'horsLigne',
+  );
+  @override
+  late final GeneratedColumn<bool> horsLigne = GeneratedColumn<bool>(
+    'hors_ligne',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("hors_ligne" IN (0, 1))',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    date,
+    tire,
+    accepte,
+    rejete,
+    horsLigne,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_history';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncHistoryData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('tire')) {
+      context.handle(
+        _tireMeta,
+        tire.isAcceptableOrUnknown(data['tire']!, _tireMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tireMeta);
+    }
+    if (data.containsKey('accepte')) {
+      context.handle(
+        _accepteMeta,
+        accepte.isAcceptableOrUnknown(data['accepte']!, _accepteMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_accepteMeta);
+    }
+    if (data.containsKey('rejete')) {
+      context.handle(
+        _rejeteMeta,
+        rejete.isAcceptableOrUnknown(data['rejete']!, _rejeteMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rejeteMeta);
+    }
+    if (data.containsKey('hors_ligne')) {
+      context.handle(
+        _horsLigneMeta,
+        horsLigne.isAcceptableOrUnknown(data['hors_ligne']!, _horsLigneMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_horsLigneMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SyncHistoryData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncHistoryData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      tire: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tire'],
+      )!,
+      accepte: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}accepte'],
+      )!,
+      rejete: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rejete'],
+      )!,
+      horsLigne: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}hors_ligne'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncHistoryTable createAlias(String alias) {
+    return $SyncHistoryTable(attachedDatabase, alias);
+  }
+}
+
+class SyncHistoryData extends DataClass implements Insertable<SyncHistoryData> {
+  final int id;
+  final DateTime date;
+  final int tire;
+  final int accepte;
+  final int rejete;
+  final bool horsLigne;
+  const SyncHistoryData({
+    required this.id,
+    required this.date,
+    required this.tire,
+    required this.accepte,
+    required this.rejete,
+    required this.horsLigne,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['date'] = Variable<DateTime>(date);
+    map['tire'] = Variable<int>(tire);
+    map['accepte'] = Variable<int>(accepte);
+    map['rejete'] = Variable<int>(rejete);
+    map['hors_ligne'] = Variable<bool>(horsLigne);
+    return map;
+  }
+
+  SyncHistoryCompanion toCompanion(bool nullToAbsent) {
+    return SyncHistoryCompanion(
+      id: Value(id),
+      date: Value(date),
+      tire: Value(tire),
+      accepte: Value(accepte),
+      rejete: Value(rejete),
+      horsLigne: Value(horsLigne),
+    );
+  }
+
+  factory SyncHistoryData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncHistoryData(
+      id: serializer.fromJson<int>(json['id']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      tire: serializer.fromJson<int>(json['tire']),
+      accepte: serializer.fromJson<int>(json['accepte']),
+      rejete: serializer.fromJson<int>(json['rejete']),
+      horsLigne: serializer.fromJson<bool>(json['horsLigne']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'date': serializer.toJson<DateTime>(date),
+      'tire': serializer.toJson<int>(tire),
+      'accepte': serializer.toJson<int>(accepte),
+      'rejete': serializer.toJson<int>(rejete),
+      'horsLigne': serializer.toJson<bool>(horsLigne),
+    };
+  }
+
+  SyncHistoryData copyWith({
+    int? id,
+    DateTime? date,
+    int? tire,
+    int? accepte,
+    int? rejete,
+    bool? horsLigne,
+  }) => SyncHistoryData(
+    id: id ?? this.id,
+    date: date ?? this.date,
+    tire: tire ?? this.tire,
+    accepte: accepte ?? this.accepte,
+    rejete: rejete ?? this.rejete,
+    horsLigne: horsLigne ?? this.horsLigne,
+  );
+  SyncHistoryData copyWithCompanion(SyncHistoryCompanion data) {
+    return SyncHistoryData(
+      id: data.id.present ? data.id.value : this.id,
+      date: data.date.present ? data.date.value : this.date,
+      tire: data.tire.present ? data.tire.value : this.tire,
+      accepte: data.accepte.present ? data.accepte.value : this.accepte,
+      rejete: data.rejete.present ? data.rejete.value : this.rejete,
+      horsLigne: data.horsLigne.present ? data.horsLigne.value : this.horsLigne,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncHistoryData(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('tire: $tire, ')
+          ..write('accepte: $accepte, ')
+          ..write('rejete: $rejete, ')
+          ..write('horsLigne: $horsLigne')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, date, tire, accepte, rejete, horsLigne);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncHistoryData &&
+          other.id == this.id &&
+          other.date == this.date &&
+          other.tire == this.tire &&
+          other.accepte == this.accepte &&
+          other.rejete == this.rejete &&
+          other.horsLigne == this.horsLigne);
+}
+
+class SyncHistoryCompanion extends UpdateCompanion<SyncHistoryData> {
+  final Value<int> id;
+  final Value<DateTime> date;
+  final Value<int> tire;
+  final Value<int> accepte;
+  final Value<int> rejete;
+  final Value<bool> horsLigne;
+  const SyncHistoryCompanion({
+    this.id = const Value.absent(),
+    this.date = const Value.absent(),
+    this.tire = const Value.absent(),
+    this.accepte = const Value.absent(),
+    this.rejete = const Value.absent(),
+    this.horsLigne = const Value.absent(),
+  });
+  SyncHistoryCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime date,
+    required int tire,
+    required int accepte,
+    required int rejete,
+    required bool horsLigne,
+  }) : date = Value(date),
+       tire = Value(tire),
+       accepte = Value(accepte),
+       rejete = Value(rejete),
+       horsLigne = Value(horsLigne);
+  static Insertable<SyncHistoryData> custom({
+    Expression<int>? id,
+    Expression<DateTime>? date,
+    Expression<int>? tire,
+    Expression<int>? accepte,
+    Expression<int>? rejete,
+    Expression<bool>? horsLigne,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (date != null) 'date': date,
+      if (tire != null) 'tire': tire,
+      if (accepte != null) 'accepte': accepte,
+      if (rejete != null) 'rejete': rejete,
+      if (horsLigne != null) 'hors_ligne': horsLigne,
+    });
+  }
+
+  SyncHistoryCompanion copyWith({
+    Value<int>? id,
+    Value<DateTime>? date,
+    Value<int>? tire,
+    Value<int>? accepte,
+    Value<int>? rejete,
+    Value<bool>? horsLigne,
+  }) {
+    return SyncHistoryCompanion(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      tire: tire ?? this.tire,
+      accepte: accepte ?? this.accepte,
+      rejete: rejete ?? this.rejete,
+      horsLigne: horsLigne ?? this.horsLigne,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (tire.present) {
+      map['tire'] = Variable<int>(tire.value);
+    }
+    if (accepte.present) {
+      map['accepte'] = Variable<int>(accepte.value);
+    }
+    if (rejete.present) {
+      map['rejete'] = Variable<int>(rejete.value);
+    }
+    if (horsLigne.present) {
+      map['hors_ligne'] = Variable<bool>(horsLigne.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncHistoryCompanion(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('tire: $tire, ')
+          ..write('accepte: $accepte, ')
+          ..write('rejete: $rejete, ')
+          ..write('horsLigne: $horsLigne')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TreasuryAccountsTable extends TreasuryAccounts
     with TableInfo<$TreasuryAccountsTable, TreasuryAccount> {
   @override
@@ -53002,6 +53398,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
   late final $SyncConflictsTable syncConflicts = $SyncConflictsTable(this);
+  late final $SyncHistoryTable syncHistory = $SyncHistoryTable(this);
   late final $TreasuryAccountsTable treasuryAccounts = $TreasuryAccountsTable(
     this,
   );
@@ -53092,6 +53489,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     stockAdjustments,
     stockMovements,
     syncConflicts,
+    syncHistory,
     treasuryAccounts,
     expenseCategories,
     expenses,
@@ -76112,6 +76510,219 @@ typedef $$SyncConflictsTableProcessedTableManager =
       SyncConflict,
       PrefetchHooks Function()
     >;
+typedef $$SyncHistoryTableCreateCompanionBuilder =
+    SyncHistoryCompanion Function({
+      Value<int> id,
+      required DateTime date,
+      required int tire,
+      required int accepte,
+      required int rejete,
+      required bool horsLigne,
+    });
+typedef $$SyncHistoryTableUpdateCompanionBuilder =
+    SyncHistoryCompanion Function({
+      Value<int> id,
+      Value<DateTime> date,
+      Value<int> tire,
+      Value<int> accepte,
+      Value<int> rejete,
+      Value<bool> horsLigne,
+    });
+
+class $$SyncHistoryTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncHistoryTable> {
+  $$SyncHistoryTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tire => $composableBuilder(
+    column: $table.tire,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get accepte => $composableBuilder(
+    column: $table.accepte,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rejete => $composableBuilder(
+    column: $table.rejete,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get horsLigne => $composableBuilder(
+    column: $table.horsLigne,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncHistoryTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncHistoryTable> {
+  $$SyncHistoryTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get tire => $composableBuilder(
+    column: $table.tire,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get accepte => $composableBuilder(
+    column: $table.accepte,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rejete => $composableBuilder(
+    column: $table.rejete,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get horsLigne => $composableBuilder(
+    column: $table.horsLigne,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncHistoryTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncHistoryTable> {
+  $$SyncHistoryTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get tire =>
+      $composableBuilder(column: $table.tire, builder: (column) => column);
+
+  GeneratedColumn<int> get accepte =>
+      $composableBuilder(column: $table.accepte, builder: (column) => column);
+
+  GeneratedColumn<int> get rejete =>
+      $composableBuilder(column: $table.rejete, builder: (column) => column);
+
+  GeneratedColumn<bool> get horsLigne =>
+      $composableBuilder(column: $table.horsLigne, builder: (column) => column);
+}
+
+class $$SyncHistoryTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncHistoryTable,
+          SyncHistoryData,
+          $$SyncHistoryTableFilterComposer,
+          $$SyncHistoryTableOrderingComposer,
+          $$SyncHistoryTableAnnotationComposer,
+          $$SyncHistoryTableCreateCompanionBuilder,
+          $$SyncHistoryTableUpdateCompanionBuilder,
+          (
+            SyncHistoryData,
+            BaseReferences<_$AppDatabase, $SyncHistoryTable, SyncHistoryData>,
+          ),
+          SyncHistoryData,
+          PrefetchHooks Function()
+        > {
+  $$SyncHistoryTableTableManager(_$AppDatabase db, $SyncHistoryTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncHistoryTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncHistoryTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncHistoryTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<int> tire = const Value.absent(),
+                Value<int> accepte = const Value.absent(),
+                Value<int> rejete = const Value.absent(),
+                Value<bool> horsLigne = const Value.absent(),
+              }) => SyncHistoryCompanion(
+                id: id,
+                date: date,
+                tire: tire,
+                accepte: accepte,
+                rejete: rejete,
+                horsLigne: horsLigne,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required DateTime date,
+                required int tire,
+                required int accepte,
+                required int rejete,
+                required bool horsLigne,
+              }) => SyncHistoryCompanion.insert(
+                id: id,
+                date: date,
+                tire: tire,
+                accepte: accepte,
+                rejete: rejete,
+                horsLigne: horsLigne,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncHistoryTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncHistoryTable,
+      SyncHistoryData,
+      $$SyncHistoryTableFilterComposer,
+      $$SyncHistoryTableOrderingComposer,
+      $$SyncHistoryTableAnnotationComposer,
+      $$SyncHistoryTableCreateCompanionBuilder,
+      $$SyncHistoryTableUpdateCompanionBuilder,
+      (
+        SyncHistoryData,
+        BaseReferences<_$AppDatabase, $SyncHistoryTable, SyncHistoryData>,
+      ),
+      SyncHistoryData,
+      PrefetchHooks Function()
+    >;
 typedef $$TreasuryAccountsTableCreateCompanionBuilder =
     TreasuryAccountsCompanion Function({
       required String id,
@@ -78790,6 +79401,8 @@ class $AppDatabaseManager {
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
   $$SyncConflictsTableTableManager get syncConflicts =>
       $$SyncConflictsTableTableManager(_db, _db.syncConflicts);
+  $$SyncHistoryTableTableManager get syncHistory =>
+      $$SyncHistoryTableTableManager(_db, _db.syncHistory);
   $$TreasuryAccountsTableTableManager get treasuryAccounts =>
       $$TreasuryAccountsTableTableManager(_db, _db.treasuryAccounts);
   $$ExpenseCategoriesTableTableManager get expenseCategories =>

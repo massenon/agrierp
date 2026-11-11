@@ -328,6 +328,8 @@ class SyncEngine {
       // NORMAL de cette ferme : le réseau est intermittent à Ikpinlè. Un
       // message d'erreur rouge à chaque tentative apprendrait à l'utilisateur
       // à ignorer les alertes — y compris les vraies.
+      // Ticket B3 — enregistrer la tentative hors ligne dans l'historique.
+      await _db.enregistrerHistorique(tire: 0, accepte: 0, rejete: 0, horsLigne: true);
       return const SyncOutcome.horsLigne();
     }
 
@@ -400,6 +402,14 @@ class SyncEngine {
     } on Object catch (e) {
       debugPrint('Émissions d\'attestation non déclarées (détail technique) : $e');
     }
+
+    // Ticket B3 — enregistrer la tentative dans l'historique local.
+    await _db.enregistrerHistorique(
+      tire: tire,
+      accepte: accepte,
+      rejete: rejete,
+      horsLigne: false,
+    );
 
     return SyncOutcome(
       tire: tire,

@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/erreurs/message_erreur.dart';
@@ -48,6 +51,11 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
   SyncStateData? _etat;
   bool _enCours = false;
 
+  // Ticket B3 — historique et filtre.
+  List<SyncHistoryData> _historique = const [];
+  String? _filtreTable;
+  bool _exportEnCours = false;
+
   late final ControleCoherenceRepository _depotCoherence =
       widget.coherence ??
       ControleCoherenceRepository(
@@ -70,12 +78,14 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     final attente = await widget.database.pendingCount();
     final conflits = await widget.engine.conflits();
     final etat = await widget.database.etatDeSynchronisation();
+    final historique = await widget.database.dernierHistorique();
 
     if (mounted) {
       setState(() {
         _enAttente = attente;
         _conflits = conflits;
         _etat = etat;
+        _historique = historique;
       });
     }
   }
@@ -134,6 +144,73 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     }
   }
 
+  // ── Ticket B3 : export du journal ─────────────────────────────────────────
+
+  Future<void> _exporterJournal() async {
+    if (_exportEnCours) return;
+    setState(() => _exportEnCours = true);
+    try {
+      final lignes = <String>[
+        'Journal de synchronisation — LogiAgriERP',
+        'Exporté le ${_horodatage(DateTime.now())}',
+        '',
+        '=== HISTORIQUE DES TENTATIVES (${_historique.length}) ===',
+        '',
+      ];
+
+      for (final h in _historique) {
+        final statut = h.horsLigne ? 'HORS LIGNE' : 'EN LIGNE';
+        lignes.add(
+          '${_horodatage(h.date)}  [$statut]  '
+          'Reçus : ${h.tire}  Envoyés : ${h.accepte}  Refusés : ${h.rejete}',
+        );
+      }
+
+      lignes
+        ..add('')
+        ..add('=== REFUS DU SERVEUR EN COURS (${_conflits.length}) ===')
+        ..add('');
+
+      if (_conflits.isEmpty) {
+        lignes.add('Aucun refus en attente.');
+      } else {
+        for (final c in _conflits) {
+          lignes
+            ..add('Table    : ${_libelleTable(c.sourceTable)} (${c.sourceTable})')
+            ..add('ID       : ${c.recordId}')
+            ..add('Détecté  : ${_horodatage(c.detectedAt)}')
+            ..add('Motif    : ${c.reason}')
+            ..add('');
+        }
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final ts = DateTime.now();
+      final nom =
+          'sync_journal_${ts.year}${ts.month.toString().padLeft(2, '0')}${ts.day.toString().padLeft(2, '0')}.txt';
+      final fichier = File('${dir.path}/$nom');
+      await fichier.writeAsString(lignes.join('\n'), flush: true);
+
+      if (mounted) {
+        ToastAgri.afficher(
+          context,
+          'Journal exporté : ${fichier.path}',
+          type: TypeToast.succes,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastAgri.afficher(
+          context,
+          'Impossible d\'exporter le journal — ${messageErreur(e)}',
+          type: TypeToast.erreur,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportEnCours = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -162,6 +239,8 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
             ),
             const SizedBox(height: AgriSpacing.lg),
             _etatDuPoste(),
+            const SizedBox(height: AgriSpacing.lg),
+            _blocHistorique(),
             const SizedBox(height: AgriSpacing.lg),
             _blocConflits(),
             const SizedBox(height: AgriSpacing.lg),
@@ -283,7 +362,150 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
     );
   }
 
+  // ── Ticket B3 : historique des tentatives ──────────────────────────────────
+
+  Widget _blocHistorique() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AgriSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(SymbolesAgri.history, color: AgriColors.brandForest, size: 20),
+                const SizedBox(width: AgriSpacing.sm),
+                const Expanded(
+                  child: Text(
+                    'Dernières tentatives',
+                    style: TextStyle(
+                      fontSize: AgriTypography.sm,
+                      fontWeight: FontWeight.bold,
+                      color: AgriColors.brandForest,
+                    ),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('bouton-exporter-journal'),
+                  onPressed: _exportEnCours ? null : _exporterJournal,
+                  icon: _exportEnCours
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(SymbolesAgri.download, size: 16),
+                  label: const Text(
+                    'Exporter le journal',
+                    style: TextStyle(fontSize: AgriTypography.xs),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AgriSpacing.xs),
+            const Text(
+              'Les 10 dernières tentatives enregistrées sur ce poste.',
+              style: TextStyle(fontSize: 11, color: AgriColors.outline),
+            ),
+            const Divider(),
+            if (_historique.isEmpty)
+              const Text(
+                key: Key('historique-vide'),
+                'Aucune tentative enregistrée.',
+                style: TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+              )
+            else
+              _enteteHistorique(),
+            for (final h in _historique) _ligneHistorique(h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _enteteHistorique() {
+    const style = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.bold,
+      color: AgriColors.outline,
+    );
+    return const Padding(
+      padding: EdgeInsets.only(bottom: AgriSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(flex: 4, child: Text('Date', style: style)),
+          Expanded(flex: 2, child: Text('Reçus', style: style, textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text('Envoyés', style: style, textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text('Refusés', style: style, textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text('Statut', style: style, textAlign: TextAlign.end)),
+        ],
+      ),
+    );
+  }
+
+  Widget _ligneHistorique(SyncHistoryData h) {
+    final couleur = h.horsLigne
+        ? AgriColors.outline
+        : (h.rejete > 0 ? AgriColors.errorDeep : AgriColors.brandEmerald);
+    final style = TextStyle(fontSize: 11, color: couleur);
+
+    return Padding(
+      key: Key('historique-${h.id}'),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(flex: 4, child: Text(_horodatage(h.date), style: style)),
+          Expanded(
+            flex: 2,
+            child: Text(
+              h.horsLigne ? '—' : '${h.tire}',
+              style: style,
+              textAlign: TextAlign.end,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              h.horsLigne ? '—' : '${h.accepte}',
+              style: style,
+              textAlign: TextAlign.end,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              h.horsLigne ? '—' : '${h.rejete}',
+              style: style,
+              textAlign: TextAlign.end,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              h.horsLigne ? 'Hors ligne' : (h.rejete > 0 ? 'Refus' : 'OK'),
+              style: style.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Bloc conflits avec filtre par table ────────────────────────────────────
+
   Widget _blocConflits() {
+    // Tables présentes dans les conflits, triées alphabétiquement par libellé.
+    final tables = _conflits
+        .map((c) => c.sourceTable)
+        .toSet()
+        .toList()
+      ..sort((a, b) => _libelleTable(a).compareTo(_libelleTable(b)));
+
+    final conflitsFiltres = _filtreTable == null
+        ? _conflits
+        : _conflits.where((c) => c.sourceTable == _filtreTable).toList();
+
     if (_conflits.isEmpty) {
       return const Card(
         child: Padding(
@@ -339,9 +561,58 @@ class _SynchronisationScreenState extends State<SynchronisationScreen> {
               'chaque tentative.',
               style: TextStyle(fontSize: 11, color: AgriColors.outline),
             ),
+            // Ticket B3 — filtre par table (visible seulement si plusieurs tables).
+            if (tables.length > 1) ...[
+              const SizedBox(height: AgriSpacing.sm),
+              _filtreParTable(tables),
+            ],
             const Divider(),
-            for (final c in _conflits) _ligneConflit(c),
+            if (conflitsFiltres.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AgriSpacing.xs),
+                child: Text(
+                  'Aucun refus pour « ${_libelleTable(_filtreTable!)} ».',
+                  style: const TextStyle(fontSize: AgriTypography.xs, color: AgriColors.outline),
+                ),
+              )
+            else
+              for (final c in conflitsFiltres) _ligneConflit(c),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filtreParTable(List<String> tables) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _chipFiltre(null, 'Toutes (${_conflits.length})'),
+          for (final t in tables)
+            _chipFiltre(
+              t,
+              '${_libelleTable(t)} (${_conflits.where((c) => c.sourceTable == t).length})',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipFiltre(String? table, String libelle) {
+    final selectionne = _filtreTable == table;
+    return Padding(
+      padding: const EdgeInsets.only(right: AgriSpacing.xs),
+      child: FilterChip(
+        key: Key('filtre-${table ?? 'toutes'}'),
+        label: Text(libelle, style: const TextStyle(fontSize: 11)),
+        selected: selectionne,
+        onSelected: (_) => setState(() => _filtreTable = table),
+        selectedColor: AgriColors.brandForest.withValues(alpha: 0.15),
+        checkmarkColor: AgriColors.brandForest,
+        labelStyle: TextStyle(
+          color: selectionne ? AgriColors.brandForest : AgriColors.onSurface,
+          fontWeight: selectionne ? FontWeight.bold : FontWeight.normal,
         ),
       ),
     );
