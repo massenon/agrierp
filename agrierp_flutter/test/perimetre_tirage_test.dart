@@ -212,10 +212,11 @@ void main() {
     EcranPoste.dashboardElevage: {
       'view-achats': {'purchase_orders'},
     },
-    // Ticket DEV2 — l'onglet « Devis » du tableau de bord lit `quotes`, servie sous `view-ventes` seulement (protection du tirage) :
-    // l'animalier a un onglet vide au poste alors que le web (`Dashboard\Index`, aucune garde) lui liste les cinq derniers (écart assumé).
+    // Ticket DEV2 — l'onglet « Devis » du tableau de bord lit `quotes`, servie sous `view-ventes` OU `view-elevage`
+    // (DEV2b : l'animalier reçoit les devis comme le web le lui montre).
     EcranPoste.tableauDeBord: {
       'view-ventes': {'quotes'},
+      'view-elevage': {'quotes'},
     },
     // Tickets IMPORT-2 à IMPORT-4 — l'écran importe aussi les employés (`manage-rh`), les comptes (`manage-comptabilite`) et les
     // rations (`manage-elevage`) : il n'ouvre ces modules, et ne lit leurs tables, que sous le même droit que le serveur. Le relevé
@@ -487,6 +488,10 @@ void main() {
       // La fiche Pondeuses (Tableau 3) lit le grand livre des stocks : servi à l'animalier, pas au caissier.
       expect(animalier, contains('stock_movements'));
       expect(caissier, isNot(contains('stock_movements')));
+      // Ticket DEV2b — l'onglet « Devis » du tableau de bord est servi à l'animalier (`view-elevage`) comme au web.
+      // Le caissier a `view-ventes` : il reçoit les devis aussi (via la règle existante).
+      expect(animalier, contains('quotes'));
+      expect(caissier, contains('quotes'));
       // Le journal comptable ne descend qu'au comptable (et à l'administrateur) ; le personnel, à aucun des trois.
       expect(
         comptable,
