@@ -8,6 +8,7 @@ use App\Models\AccountingEntryLine;
 use App\Models\AuditLog;
 use App\Models\ChartOfAccount;
 use App\Models\FiscalYear;
+use App\Models\FiscalYearArchive;
 use App\Models\PeriodicClosure;
 use Illuminate\Support\Facades\DB;
 
@@ -318,6 +319,10 @@ class ClotureExerciceService
         ]);
 
         AuditLog::record('fiscal_year.closed', 'comptabilite');
+
+        // Ticket EX9 (Q6) — archive figée des états financiers à la date de clôture.
+        FiscalYearArchive::creerDepuisExercice($year);
+        AuditLog::record('fiscal_year.archive_created', 'comptabilite');
     }
 
     /** Réouverture exceptionnelle (ticket 15.53) — la logique vit dans `ReopenFiscalYearAction`. @throws \DomainException */

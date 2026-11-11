@@ -272,6 +272,9 @@ class AuditLog extends Model
         'fiscal_year.step1_confirmed' => "Travaux d'inventaire confirmés",
         'fiscal_year.gestion_accounts_closed' => 'Comptes de gestion soldés',
         'fiscal_year.closed' => 'Exercice clôturé',
+        // Ticket EX9 — archive figée (Q6) et garde de réinitialisation (Q8).
+        'fiscal_year.archive_created' => 'Archive figée de l\'exercice créée',
+        'reinitialisation.refusee_exercice_clos' => 'Réinitialisation refusée : exercice clôturé',
         // Ticket EX3 — ouverture de l'exercice N+1 (bouton de décembre, tâche du 1er janvier,
         // première saisie de l'année quand la tâche n'a pas tourné). `reopened` (15.53) n'avait pas de libellé.
         'fiscal_year.opened' => 'Exercice ouvert',

@@ -58,6 +58,13 @@ class ReinitialisationDonneesService
     /** Refus quand la bascule est fausse (verrou 1). */
     public const REFUS_MODE_DEMO = 'Réinitialisation refusée : le mode démonstration n\'est pas activé.';
 
+    /**
+     * Ticket EX9 (Q8) — refus définitif : un exercice a été clôturé hors mode démo.
+     * Cette protection est PLUS FORTE que le verrou mode démo : même si la bascule est active,
+     * une vraie clôture interdit la réinitialisation à jamais.
+     */
+    public const REFUS_EXERCICE_CLOS = 'Réinitialisation interdite : un exercice a été clôturé. Les données comptables sont définitives.';
+
     /** Message sous le champ quand le mot n'est pas recopié (verrou 2). */
     public static function messageConfirmation(): string
     {

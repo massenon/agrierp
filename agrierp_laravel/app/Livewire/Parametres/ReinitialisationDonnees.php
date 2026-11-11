@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Parametres;
 
+use App\Models\AuditLog;
 use App\Models\CompanySetting;
+use App\Models\FiscalYear;
 use App\Services\ReinitialisationDonneesService;
 use Livewire\Component;
 
@@ -85,6 +87,19 @@ class ReinitialisationDonnees extends Component
     public function reinitialiser(): void
     {
         $this->authorize('manage-parametres');
+
+        // Ticket EX9 (Q8) — garde définitive : un exercice clos signifie des données réelles.
+        // Cette vérification est AVANT le mode démo car elle est absolue et irréversible.
+        if (FiscalYear::where('status', 'cloture')->exists()) {
+            $this->dispatch(
+                'toast',
+                message: ReinitialisationDonneesService::REFUS_EXERCICE_CLOS,
+                type: 'error',
+            );
+            AuditLog::record('reinitialisation.refusee_exercice_clos', 'parametres');
+
+            return;
+        }
 
         // ⚠️ LA BASCULE EST REVÉRIFIÉE ICI. L'onglet masqué ne suffit pas :
         // un appel direct au composant contournerait l'affichage.
