@@ -183,18 +183,14 @@ Décision client du 17/10/2026 : « les sections doivent exister des deux côté
 
 ---
 
-## Sprint C — Clôture de caisse ❓
+## Sprint C — Clôture de caisse ✅ 11/11/2026
 
-> ⚠️ **Fonctionnalité absente du prototype ET de l'application web.** Aucune « clôture de caisse » n'existe aujourd'hui. Par l'article 0 de la doctrine, elle doit être **définie et construite d'abord sur le web**, puis portée. À valider par le client avant tout code.
-
-**Proposition à valider :**
-
-| # | Ticket |
-|---|---|
-| C1 | Web : écran « Clôture de caisse » (caissier). Ventes du jour par mode de paiement, fond de caisse, montant compté et écart. L'écart passe par une Action dédiée qui génère l'écriture SYSCOHADA (perte ou gain de caisse) via `AccountingEntryService::record()`. |
-| C2 | API : table `cash_closures` (UUID), poussée par le poste et **jamais fusionnée** (comme les ventes). |
-| C3 | Poste : écran porté à l'identique. La validation de la clôture **déclenche une synchronisation** (B2). Hors ligne, la clôture reste `pending` et l'écran le dit. Une clôture validée verrouille les ventes du jour sur le poste. |
-| C4 | Tests : écriture d'écart équilibrée au centime ; synchronisation déclenchée ; clôture hors ligne conservée puis envoyée. |
+| # | Ticket | Statut |
+|---|---|---|
+| C1 | Web : écran « Clôture de caisse » (`ValiderClotureCaisseAction`, `ClotureCaisse` Livewire, `cash_closures` table UUID). Ventes du jour par mode de paiement, fond de caisse, montant compté, écart. Écriture SYSCOHADA via `AccountingEntryService` : gain 571/718, perte 658/571. | ✅ |
+| C2 | API : `SyncController::pushCashClosures / pullCashClosures` — jamais fusionnée, comme les ventes. | ✅ |
+| C3 | Poste : `ClotureCaisseRepository` + `ClotureCaisseScreen` fidèle au Blade, `cash_closures` Drift, synchronisation déclenchée après validation, badge hors ligne. | ✅ |
+| C4 | Tests : `ClotureCaisseTest.php` (9 Feature Laravel) + `cloture_caisse_test.dart` (6 tests Flutter). | ✅ |
 
 ---
 
