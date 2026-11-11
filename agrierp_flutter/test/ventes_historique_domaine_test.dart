@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:agrierp/core/database/app_database.dart';
 import 'package:agrierp/core/database/sync_columns.dart';
+import 'package:agrierp/domain/entities/client_resume.dart';
 import 'package:agrierp/domain/entities/vente_historique.dart';
 import 'package:agrierp/features/ventes/historique_ventes_repository.dart';
 
@@ -190,13 +191,58 @@ void main() {
     });
   });
 
+  // ── Mapper Customer → ClientResume ────────────────────────────────────────
+
+  group('mapper Customer → ClientResume', () {
+    test('les champs sont recopiés fidèlement depuis un client Drift actif', () {
+      final drift = _clientDrift(id: 'ccc-001', nom: 'Dossou Arnaud');
+      // On reconstruit manuellement la même conversion que _versClientResume (privé du repository).
+      final resume = ClientResume(id: drift.id, nom: drift.name, estActif: drift.isActive);
+      expect(resume.id, 'ccc-001');
+      expect(resume.nom, 'Dossou Arnaud');
+      expect(resume.estActif, isTrue);
+    });
+
+    test('estActif est faux pour un client inactif', () {
+      final drift = _clientDrift(id: 'ccc-002', nom: 'Hessou Lucie', actif: false);
+      final resume = ClientResume(id: drift.id, nom: drift.name, estActif: drift.isActive);
+      expect(resume.estActif, isFalse);
+    });
+  });
+
+  // ── clientsActifs sur ClientResume ────────────────────────────────────────
+
+  group('InstantaneHistorique.clientsActifs (ClientResume)', () {
+    test('une map vide retourne une liste vide', () {
+      final snap = _instantane(clients: {});
+      expect(snap.clientsActifs, isEmpty);
+    });
+
+    test('un seul client inactif retourne une liste vide', () {
+      final snap = _instantane(clients: {
+        'x': _clientResume(id: 'x', nom: 'Fantôme', actif: false),
+      });
+      expect(snap.clientsActifs, isEmpty);
+    });
+
+    test('le tri est insensible à la casse', () {
+      final snap = _instantane(clients: {
+        'a': _clientResume(id: 'a', nom: 'zinzin Alain'),
+        'b': _clientResume(id: 'b', nom: 'Aklesso Bruno'),
+      });
+      final actifs = snap.clientsActifs;
+      expect(actifs[0].nom, 'Aklesso Bruno');
+      expect(actifs[1].nom, 'zinzin Alain');
+    });
+  });
+
 }
 
 // ── Helpers InstantaneHistorique ──────────────────────────────────────────────
 
 InstantaneHistorique _instantane({
   List<VenteHistorique>? ventes,
-  Map<String, Customer>? clients,
+  Map<String, ClientResume>? clients,
 }) =>
     InstantaneHistorique(
       ventes: ventes ?? [],
@@ -207,6 +253,15 @@ InstantaneHistorique _instantane({
       encoursCreances: 0,
     );
 
+/// Construit un [ClientResume] minimal pour les tests (sans Drift).
+ClientResume _clientResume({
+  required String id,
+  required String nom,
+  bool actif = true,
+}) =>
+    ClientResume(id: id, nom: nom, estActif: actif);
+
+/// Construit un [Customer] Drift minimal — uniquement pour les tests du mapper.
 Customer _clientDrift({
   required String id,
   required String nom,
@@ -238,14 +293,14 @@ void _testsInstantaneHistorique() {
   group('InstantaneHistorique.clientsActifs', () {
     test('retourne uniquement les clients actifs, tries par nom', () {
       final snap = _instantane(clients: {
-        'c1': _clientDrift(id: 'c1', nom: 'Zoumai Brice'),
-        'c2': _clientDrift(id: 'c2', nom: 'Amoussou Regis'),
-        'c3': _clientDrift(id: 'c3', nom: 'Houndji Paul', actif: false),
+        'c1': _clientResume(id: 'c1', nom: 'Zoumai Brice'),
+        'c2': _clientResume(id: 'c2', nom: 'Amoussou Regis'),
+        'c3': _clientResume(id: 'c3', nom: 'Houndji Paul', actif: false),
       });
       final actifs = snap.clientsActifs;
       expect(actifs, hasLength(2));
-      expect(actifs[0].name, 'Amoussou Regis');
-      expect(actifs[1].name, 'Zoumai Brice');
+      expect(actifs[0].nom, 'Amoussou Regis');
+      expect(actifs[1].nom, 'Zoumai Brice');
     });
   });
 

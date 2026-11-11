@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/pdf_recu.dart';
+import '../../domain/entities/client_resume.dart';
 import '../../domain/entities/vente_historique.dart';
 import 'avoirs_repository.dart';
 import 'caisse_repository.dart';
@@ -74,6 +75,16 @@ class LigneVente {
   String get mode => ModePaiement.libelle(vente.paymentMode);
 }
 
+/// Convertit un client Drift [Customer] en entité de domaine [ClientResume].
+///
+/// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
+/// ne franchissent plus la frontière vers les écrans.
+ClientResume _versClientResume(Customer c) => ClientResume(
+  id: c.id,
+  nom: c.name,
+  estActif: c.isActive,
+);
+
 /// Convertit une ligne Drift [Sale] en entité de domaine [VenteHistorique].
 ///
 /// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
@@ -122,16 +133,16 @@ class InstantaneHistorique {
 
   final List<VenteHistorique> ventes;
   final Map<String, List<SaleLine>> lignesParVente;
-  final Map<String, Customer> clients;
+  final Map<String, ClientResume> clients;
   final Map<String, Product> produits;
   final Map<String, Receivable> creancesParVente;
   final double encoursCreances;
 
   /// `Customer::where('is_active', true)->orderBy('name')` : les clients du filtre « Client : Tous ».
-  List<Customer> get clientsActifs => [
+  List<ClientResume> get clientsActifs => [
     for (final c in clients.values)
-      if (c.isActive) c,
-  ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      if (c.estActif) c,
+  ]..sort((a, b) => a.nom.toLowerCase().compareTo(b.nom.toLowerCase()));
 
   static DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -151,7 +162,7 @@ class InstantaneHistorique {
     return LigneVente(
       vente: v,
       client: v.customerId != null
-          ? (clients[v.customerId]?.name ?? v.customerName ?? 'Client Anonyme')
+          ? (clients[v.customerId]?.nom ?? v.customerName ?? 'Client Anonyme')
           : (v.customerName ?? 'Client Anonyme'),
       articles: lignesParVente[v.id]?.length ?? 0,
       reste: reste,
@@ -199,7 +210,7 @@ class InstantaneHistorique {
         // `orWhereHas('customer', …)` : seul un client rattaché peut répondre à la recherche, jamais « Client Anonyme ».
         final rattachee = v.customerId != null || v.customerName != null;
         final nomClient = v.customerId != null
-            ? (clients[v.customerId]?.name ?? v.customerName ?? 'Client Anonyme')
+            ? (clients[v.customerId]?.nom ?? v.customerName ?? 'Client Anonyme')
             : (v.customerName ?? 'Client Anonyme');
         final parClient = rattachee && nomClient.toLowerCase().contains(cherche);
         if (!parId && !parClient) return false;
@@ -361,7 +372,7 @@ class HistoriqueVentesRepository {
     return InstantaneHistorique(
       ventes: ventes.map(_versVenteHistorique).toList(),
       lignesParVente: parVente,
-      clients: {for (final c in await database.select(database.customers).get()) c.id: c},
+      clients: {for (final c in await database.select(database.customers).get()) c.id: _versClientResume(c)},
       produits: {for (final p in await database.select(database.products).get()) p.id: p},
       creancesParVente: {
         for (final c in creances)

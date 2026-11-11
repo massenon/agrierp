@@ -378,7 +378,7 @@ class _HistoriqueVentesOngletState extends State<HistoriqueVentesOnglet> {
           cle: 'filtre-client',
           valeur: _clientId,
           defaut: 'Client : Tous',
-          options: [for (final c in d.clientsActifs) (c.id, c.name)],
+          options: [for (final c in d.clientsActifs) (c.id, c.nom)],
           surChangement: (v) => setState(() {
             _clientId = v;
             _page = 1;

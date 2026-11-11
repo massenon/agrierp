@@ -313,7 +313,7 @@ void main() {
       test('« Client : Tous » ne propose que les clients ACTIFS, par ordre alphabétique', () async {
         final i = await depot.charger();
 
-        expect(i.clientsActifs.map((c) => c.name), ['ADJOVI Koffi', 'GBAGUIDI Solange']);
+        expect(i.clientsActifs.map((c) => c.nom), ['ADJOVI Koffi', 'GBAGUIDI Solange']);
       });
     });
 
