@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/sync_columns.dart';
 import '../../core/export/pdf_recu.dart';
+import '../../domain/entities/vente_historique.dart';
 import 'avoirs_repository.dart';
 import 'caisse_repository.dart';
 import 'facturation_repository.dart' show StatutMecef;
@@ -41,7 +42,7 @@ class LigneVente {
     required this.envoyee,
   });
 
-  final Sale vente;
+  final VenteHistorique vente;
 
   /// `$sale->customer?->name ?? 'Client Anonyme'`.
   final String client;
@@ -72,6 +73,22 @@ class LigneVente {
   /// `$modeLabels[$sale->payment_mode] ?? $sale->payment_mode`.
   String get mode => ModePaiement.libelle(vente.paymentMode);
 }
+
+/// Convertit une ligne Drift [Sale] en entité de domaine [VenteHistorique].
+///
+/// Privé au fichier : seul [InstantaneHistorique._ligne] l'appelle. Les types Drift
+/// ne franchissent plus la frontière vers les écrans.
+VenteHistorique _versVenteHistorique(Sale s) => VenteHistorique(
+  id: s.id,
+  soldAt: s.soldAt,
+  total: s.total,
+  subtotal: s.subtotal,
+  discount: s.discount,
+  paymentMode: s.paymentMode,
+  status: s.status,
+  deviceId: s.deviceId,
+  mecefStatus: s.mecefStatus,
+);
 
 /// Une ligne du détail d'une vente (le tiroir).
 class ArticleVente {
@@ -129,7 +146,7 @@ class InstantaneHistorique {
       reste = solde < 0 ? 0 : solde;
     }
     return LigneVente(
-      vente: v,
+      vente: _versVenteHistorique(v),
       client: AvoirsRepository.nomDuClient(v, clients),
       articles: lignesParVente[v.id]?.length ?? 0,
       reste: reste,
