@@ -18,6 +18,7 @@ import 'core/config/parametres_poste.dart';
 import 'core/config/envoi_email.dart';
 import 'core/config/parametres_smtp.dart';
 import 'core/database/app_database.dart';
+import 'core/database/sauvegarde_automatique.dart';
 import 'core/localisation/localisation_poste.dart';
 import 'core/export/pdf_recu.dart';
 import 'core/sync/gestes_importants.dart';
@@ -466,6 +467,8 @@ class _AgriErpAppState extends State<AgriErpApp> {
   final ValueNotifier<EcranPoste?> _demandeEcran = ValueNotifier<EcranPoste?>(null);
 
   Future<void> _ouvrirRappelsDuJour(BuildContext context) async {
+    // Ticket B5 — sauvegarde quotidienne silencieuse au premier démarrage de session du jour.
+    SauvegardeAutomatique.quotidienne(_db);
     final utilisateur = _auth.utilisateur;
     final rappels = await _rappelsDuJour.aMontrer(idUtilisateur: utilisateur?.id, role: utilisateur?.role);
     if (rappels == null || !context.mounted) return;

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../config/domaine_email.dart';
 import 'identifiant_ligne_depense.dart';
 import 'ouverture_base.dart';
+import 'sauvegarde_automatique.dart';
 import 'sync_columns.dart';
 
 part 'app_database.g.dart';
@@ -2510,6 +2511,14 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    // Ticket B5 — sauvegarde avant migration : VACUUM INTO ne peut pas s'exécuter à l'intérieur
+    // d'une transaction ; `beforeOpen` est le seul point garanti hors transaction.
+    beforeOpen: (details) async {
+      final vAvant = details.versionBefore;
+      if (!details.wasCreated && vAvant != null && details.versionNow > vAvant) {
+        await SauvegardeAutomatique.avantMigration(this, vAvant, details.versionNow);
+      }
+    },
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
       // v2 — rations normatives descendues du serveur (ticket F0.4).
