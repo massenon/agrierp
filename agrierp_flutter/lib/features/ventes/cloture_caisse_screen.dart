@@ -336,6 +336,7 @@ class _ClotureCaisseScreenState extends State<ClotureCaisseScreen> {
                 libelle: 'Fond de Caisse (FCFA)',
                 ctrl: _ctrlFond,
                 aide: 'Montant de départ en caisse ce matin',
+                champKey: const Key('cloture-fond-de-caisse'),
               ),
               const SizedBox(height: 12),
               // Montant compté
@@ -343,6 +344,7 @@ class _ClotureCaisseScreenState extends State<ClotureCaisseScreen> {
                 libelle: 'Montant Compté (FCFA)',
                 ctrl: _ctrlMontant,
                 aide: 'Espèces + mobile money comptées physiquement',
+                champKey: const Key('cloture-montant-compte'),
               ),
               const SizedBox(height: 16),
               // Ligne de récapitulatif
@@ -395,8 +397,10 @@ class _ClotureCaisseScreenState extends State<ClotureCaisseScreen> {
     required String libelle,
     required TextEditingController ctrl,
     required String aide,
+    Key? champKey,
   }) {
     return TextFormField(
+      key: champKey,
       controller: ctrl,
       keyboardType: const TextInputType.numberWithOptions(decimal: false),
       decoration: InputDecoration(
