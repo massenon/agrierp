@@ -34,6 +34,28 @@ Sale _vente({
       deliveryInTotal: false,
     );
 
+/// Construit un [VenteHistorique] minimal depuis un [Sale] (imite [_versVenteHistorique]).
+VenteHistorique _venteHistorique(
+  Sale sale, {
+  bool estEnvoyee = true,
+  String? customerId,
+  String? customerName,
+}) =>
+    VenteHistorique(
+      id: sale.id,
+      soldAt: sale.soldAt,
+      total: sale.total,
+      subtotal: sale.subtotal,
+      discount: sale.discount,
+      paymentMode: sale.paymentMode,
+      status: sale.status,
+      deviceId: sale.deviceId,
+      mecefStatus: sale.mecefStatus,
+      customerId: customerId,
+      customerName: customerName,
+      estEnvoyee: estEnvoyee,
+    );
+
 /// Construit un [LigneVente] en appliquant manuellement la même conversion que
 /// [_versVenteHistorique] (privé du repository). Permet de tester l'entité et
 /// les propriétés calculées sans passer par la base de données.
@@ -43,17 +65,7 @@ LigneVente _ligneDepuisVente(
   bool envoyee = true,
 }) =>
     LigneVente(
-      vente: VenteHistorique(
-        id: sale.id,
-        soldAt: sale.soldAt,
-        total: sale.total,
-        subtotal: sale.subtotal,
-        discount: sale.discount,
-        paymentMode: sale.paymentMode,
-        status: sale.status,
-        deviceId: sale.deviceId,
-        mecefStatus: sale.mecefStatus,
-      ),
+      vente: _venteHistorique(sale, estEnvoyee: envoyee),
       client: 'Client Anonyme',
       articles: 2,
       reste: reste,
@@ -61,6 +73,8 @@ LigneVente _ligneDepuisVente(
     );
 
 void main() {
+  _testsInstantaneHistorique();
+
   // ── Mapper Sale → VenteHistorique ──────────────────────────────────────────
 
   group('mapper Sale → VenteHistorique', () {
@@ -76,17 +90,7 @@ void main() {
         deviceId: 'caisse-2',
       );
 
-      final vente = VenteHistorique(
-        id: sale.id,
-        soldAt: sale.soldAt,
-        total: sale.total,
-        subtotal: sale.subtotal,
-        discount: sale.discount,
-        paymentMode: sale.paymentMode,
-        status: sale.status,
-        deviceId: sale.deviceId,
-        mecefStatus: sale.mecefStatus,
-      );
+      final vente = _venteHistorique(sale);
 
       expect(vente.id, 'aabbccdd-1111-2222-3333-000000000042');
       expect(vente.soldAt, DateTime(2026, 10, 15, 14, 0));
@@ -101,18 +105,18 @@ void main() {
 
     test('le statut MeCeF « transmise » est recopié', () {
       final sale = _vente(mecefStatus: 'transmise');
-      final vente = VenteHistorique(
-        id: sale.id,
-        soldAt: sale.soldAt,
-        total: sale.total,
-        subtotal: sale.subtotal,
-        discount: sale.discount,
-        paymentMode: sale.paymentMode,
-        status: sale.status,
-        deviceId: sale.deviceId,
-        mecefStatus: sale.mecefStatus,
-      );
+      final vente = _venteHistorique(sale);
       expect(vente.mecefStatus, 'transmise');
+    });
+
+    test('estEnvoyee est vrai pour une vente synchronisée', () {
+      final vente = _venteHistorique(_vente(syncStatus: SyncStatus.synced));
+      expect(vente.estEnvoyee, isTrue);
+    });
+
+    test("estEnvoyee est faux pour une vente en attente d'envoi", () {
+      final vente = _venteHistorique(_vente(syncStatus: SyncStatus.pending), estEnvoyee: false);
+      expect(vente.estEnvoyee, isFalse);
     });
   });
 
@@ -183,6 +187,83 @@ void main() {
     test('retourne le libellé français du mode « credit »', () {
       final ligne = _ligneDepuisVente(_vente(paymentMode: 'credit'));
       expect(ligne.mode, 'Crédit client');
+    });
+  });
+
+}
+
+// ── Helpers InstantaneHistorique ──────────────────────────────────────────────
+
+InstantaneHistorique _instantane({
+  List<VenteHistorique>? ventes,
+  Map<String, Customer>? clients,
+}) =>
+    InstantaneHistorique(
+      ventes: ventes ?? [],
+      lignesParVente: {},
+      clients: clients ?? {},
+      produits: {},
+      creancesParVente: {},
+      encoursCreances: 0,
+    );
+
+Customer _clientDrift({
+  required String id,
+  required String nom,
+  bool actif = true,
+}) =>
+    Customer(
+      id: id,
+      name: nom,
+      creditLimit: 0,
+      isActive: actif,
+      syncStatus: SyncStatus.synced,
+    );
+
+// ── Tests InstantaneHistorique ────────────────────────────────────────────────
+
+void _testsInstantaneHistorique() {
+  group('InstantaneHistorique.ventes', () {
+    test('accepte une List<VenteHistorique> et l\'expose correctement', () {
+      final v1 = _venteHistorique(_vente(id: 'aabbccdd-0000-0000-0000-000000000011'));
+      final v2 = _venteHistorique(_vente(id: 'aabbccdd-0000-0000-0000-000000000022'));
+      final snap = _instantane(ventes: [v1, v2]);
+      expect(snap.ventes, hasLength(2));
+      expect(snap.ventes.first, isA<VenteHistorique>());
+      expect(snap.ventes[0].id, 'aabbccdd-0000-0000-0000-000000000011');
+      expect(snap.ventes[1].id, 'aabbccdd-0000-0000-0000-000000000022');
+    });
+  });
+
+  group('InstantaneHistorique.clientsActifs', () {
+    test('retourne uniquement les clients actifs, tries par nom', () {
+      final snap = _instantane(clients: {
+        'c1': _clientDrift(id: 'c1', nom: 'Zoumai Brice'),
+        'c2': _clientDrift(id: 'c2', nom: 'Amoussou Regis'),
+        'c3': _clientDrift(id: 'c3', nom: 'Houndji Paul', actif: false),
+      });
+      final actifs = snap.clientsActifs;
+      expect(actifs, hasLength(2));
+      expect(actifs[0].name, 'Amoussou Regis');
+      expect(actifs[1].name, 'Zoumai Brice');
+    });
+  });
+
+  group('InstantaneHistorique.filtrer', () {
+    test('par statut « annulee » ne retourne que les ventes annulees', () {
+      final venteValidee = _venteHistorique(_vente(
+        id: 'aabbccdd-0000-0000-0000-000000000031',
+        status: 'validee',
+      ));
+      final venteAnnulee = _venteHistorique(_vente(
+        id: 'aabbccdd-0000-0000-0000-000000000032',
+        status: 'annulee',
+      ));
+      final snap = _instantane(ventes: [venteValidee, venteAnnulee]);
+      final lignes = snap.filtrer(statut: 'annulee');
+      expect(lignes, hasLength(1));
+      expect(lignes.first.vente.id, 'aabbccdd-0000-0000-0000-000000000032');
+      expect(lignes.first.annulee, isTrue);
     });
   });
 }

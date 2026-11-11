@@ -2,7 +2,8 @@
 ///
 /// Ne dépend pas de Drift. Contient exactement les champs dont [LigneVente] et
 /// [HistoriqueVentesOnglet] ont besoin : identifiant, horodatage, montants,
-/// mode de paiement, statut métier et statuts techniques (device, MeCeF).
+/// mode de paiement, statut métier, statuts techniques (device, MeCeF), client et
+/// indicateur d'envoi vers le serveur.
 class VenteHistorique {
   const VenteHistorique({
     required this.id,
@@ -14,6 +15,9 @@ class VenteHistorique {
     required this.status,
     this.deviceId,
     this.mecefStatus,
+    this.customerId,
+    this.customerName,
+    this.estEnvoyee = true,
   });
 
   /// UUID de la vente (clé primaire Drift).
@@ -42,4 +46,14 @@ class VenteHistorique {
 
   /// Statut de normalisation fiscale MeCeF : `transmise`, `en_attente`, `erreur`, `expiree` ou `null`.
   final String? mecefStatus;
+
+  /// UUID du client rattaché (`null` = client anonyme ou client servi par [customerName]).
+  final String? customerId;
+
+  /// Nom du client tel que servi avec la vente (source de repli quand [customerId] ne désigne pas un client connu).
+  final String? customerName;
+
+  /// `true` si la vente a été reçue du serveur ou acquittée par lui ; `false` pour une vente saisie ici, pas encore
+  /// envoyée (correspond à `syncStatus == SyncStatus.synced` côté Drift — traduit en domaine pur).
+  final bool estEnvoyee;
 }

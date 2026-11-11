@@ -76,7 +76,7 @@ class LigneVente {
 
 /// Convertit une ligne Drift [Sale] en entité de domaine [VenteHistorique].
 ///
-/// Privé au fichier : seul [InstantaneHistorique._ligne] l'appelle. Les types Drift
+/// Privé au fichier : seul [HistoriqueVentesRepository.charger] l'appelle. Les types Drift
 /// ne franchissent plus la frontière vers les écrans.
 VenteHistorique _versVenteHistorique(Sale s) => VenteHistorique(
   id: s.id,
@@ -88,6 +88,9 @@ VenteHistorique _versVenteHistorique(Sale s) => VenteHistorique(
   status: s.status,
   deviceId: s.deviceId,
   mecefStatus: s.mecefStatus,
+  customerId: s.customerId,
+  customerName: s.customerName,
+  estEnvoyee: s.syncStatus == SyncStatus.synced,
 );
 
 /// Une ligne du détail d'une vente (le tiroir).
@@ -117,7 +120,7 @@ class InstantaneHistorique {
     required this.encoursCreances,
   });
 
-  final List<Sale> ventes;
+  final List<VenteHistorique> ventes;
   final Map<String, List<SaleLine>> lignesParVente;
   final Map<String, Customer> clients;
   final Map<String, Product> produits;
@@ -132,25 +135,27 @@ class InstantaneHistorique {
 
   static DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  LigneVente _ligne(Sale v) {
+  LigneVente _ligne(VenteHistorique v) {
     final c = creancesParVente[v.id];
     // ⚠️ Une vente saisie ici et pas encore reçue n'a pas encore de créance côté ferme : le serveur en ouvre UNE si — et
     // seulement si — le mode est « Crédit client » ET un client est rattaché (`pushSales`). Le poste applique la même règle.
     final double reste;
     if (v.status == 'annulee') {
       reste = 0;
-    } else if (v.syncStatus != SyncStatus.synced) {
+    } else if (!v.estEnvoyee) {
       reste = v.paymentMode == 'credit' && v.customerId != null ? v.total : 0;
     } else {
       final solde = c == null ? 0.0 : c.amount - c.amountPaid;
       reste = solde < 0 ? 0 : solde;
     }
     return LigneVente(
-      vente: _versVenteHistorique(v),
-      client: AvoirsRepository.nomDuClient(v, clients),
+      vente: v,
+      client: v.customerId != null
+          ? (clients[v.customerId]?.name ?? v.customerName ?? 'Client Anonyme')
+          : (v.customerName ?? 'Client Anonyme'),
       articles: lignesParVente[v.id]?.length ?? 0,
       reste: reste,
-      envoyee: v.syncStatus == SyncStatus.synced,
+      envoyee: v.estEnvoyee,
     );
   }
 
@@ -187,13 +192,16 @@ class InstantaneHistorique {
   }) {
     final cherche = recherche.toLowerCase();
 
-    bool correspond(Sale v) {
+    bool correspond(VenteHistorique v) {
       if (!(dansExercice?.call(v.soldAt) ?? true)) return false;
       if (cherche.isNotEmpty) {
         final parId = v.id.toLowerCase().contains(cherche);
         // `orWhereHas('customer', …)` : seul un client rattaché peut répondre à la recherche, jamais « Client Anonyme ».
         final rattachee = v.customerId != null || v.customerName != null;
-        final parClient = rattachee && AvoirsRepository.nomDuClient(v, clients).toLowerCase().contains(cherche);
+        final nomClient = v.customerId != null
+            ? (clients[v.customerId]?.name ?? v.customerName ?? 'Client Anonyme')
+            : (v.customerName ?? 'Client Anonyme');
+        final parClient = rattachee && nomClient.toLowerCase().contains(cherche);
         if (!parId && !parClient) return false;
       }
       final statutOk = switch (statut) {
@@ -351,7 +359,7 @@ class HistoriqueVentesRepository {
     final ouvertes = creances.where((c) => c.status != 'soldee');
 
     return InstantaneHistorique(
-      ventes: ventes,
+      ventes: ventes.map(_versVenteHistorique).toList(),
       lignesParVente: parVente,
       clients: {for (final c in await database.select(database.customers).get()) c.id: c},
       produits: {for (final p in await database.select(database.products).get()) p.id: p},
