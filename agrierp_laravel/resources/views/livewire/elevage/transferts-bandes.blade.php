@@ -2,13 +2,13 @@
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">swap_horiz</span>Transferts entre Bandes
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">swap_horiz</span>{{ __('elevage.titre_transferts_bandes') }}
             </h2>
             <p class="text-xs text-outline mt-xs">Sujets passés d'une bande à une autre le même jour : sortie de la bande source, entrée dans la bande cible, effectifs recalculés.</p>
         </div>
         @can('manage-elevage')
         <button @lectureSeule type="button" wire:click="nouveauTransfert" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-            <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Transfert
+            <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('elevage.bouton_nouveau_transfert') }}
         </button>
         @endcan
     </div>
@@ -86,7 +86,7 @@
                             <td data-label="Motif" class="px-md py-sm text-xs">{{ $transfert->motif ?: '—' }}</td>
                             <td data-label="Statut" class="px-md py-sm text-xs">
                                 @if($transfert->is_active)
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ __('elevage.statut_actif') }}</span>
                                 @else
                                     <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">Annulé</span>
                                 @endif

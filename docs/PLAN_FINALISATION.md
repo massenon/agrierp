@@ -231,7 +231,7 @@ Prérequis : Flutter stable, Visual Studio 2022 (charge « Développement Deskto
 
 | # | Ticket |
 |---|---|
-| F1 | Web : créer `lang/fr/*.php` et migrer les libellés Blade **module par module**, en commençant par Élevage. |
+| F1 | Web : créer `lang/fr/*.php` et migrer les libellés Blade **module par module**, en commençant par Élevage. | ✅ 12/11/2026 — `lang/fr/elevage.php` créé (370+ clés) ; toutes les vues `livewire/elevage/` migrent vers `__('elevage.xxx')` ; 86 tests Élevage ✓ |
 | F2 | Poste : fichiers ARB (`lib/l10n/app_fr.arb`) générés depuis `lang/fr` par un script, pour garantir la parité des clés. |
 | F3 | Adapter `fidelite_libelles_test.dart` pour comparer les **clés** et non plus les littéraux. |
 

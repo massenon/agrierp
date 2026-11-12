@@ -13,12 +13,12 @@
         @if($tab === 'synthese')
             <div class="mt-md space-y-md">
                 <x-kpi-accordion title="Indicateurs de performance">
-                    <x-kpi-card label="Effectif Total Vivant" icon="pets" color="emerald" :value="number_format($this->syntheseKpis['effectif_total'], 0, ',', ' ')" caption="Toutes espèces actives" />
-                    <x-kpi-card label="Autonomie Aliment Min." icon="inventory_2" color="maize" :pending="true" pending-since="Sprint 6 (Stocks) — suivi de stock d'aliment réel" />
-                    <x-kpi-card label="GMQ Moyen" icon="trending_up" color="blue"
+                    <x-kpi-card :label="__('elevage.kpi_effectif_total_vivant')" icon="pets" color="emerald" :value="number_format($this->syntheseKpis['effectif_total'], 0, ',', ' ')" :caption="__('elevage.caption_toutes_especes_actives')" />
+                    <x-kpi-card :label="__('elevage.kpi_autonomie_aliment')" icon="inventory_2" color="maize" :pending="true" pending-since="Sprint 6 (Stocks) — suivi de stock d'aliment réel" />
+                    <x-kpi-card :label="__('elevage.kpi_gmq_moyen')" icon="trending_up" color="blue"
                         :value="$this->syntheseKpis['gmq_moyen'] !== null ? $this->syntheseKpis['gmq_moyen'].' g/j' : '—'"
                         :caption="$this->syntheseKpis['gmq_moyen'] === null ? 'Moins de 2 pesées enregistrées' : 'Consolidé, toutes bandes'" />
-                    <x-kpi-card label="Mortalité Cumulée (7j)" icon="health_and_safety" color="red" :value="number_format($this->syntheseKpis['taux_mortalite_7j'], 1, ',', ' ').' %'" caption="Alerte si > 10%/semaine" />
+                    <x-kpi-card :label="__('elevage.kpi_mortalite_cumulee_7j')" icon="health_and_safety" color="red" :value="number_format($this->syntheseKpis['taux_mortalite_7j'], 1, ',', ' ').' %'" :caption="__('elevage.caption_alerte_mortalite')" />
                 </x-kpi-accordion>
 
                 {{-- Ticket RELEVES-1 — bloc « Relevés de terrain » (lié à l'onglet de Paramètres Élevage) : « — » sans donnée, jamais 0. --}}
@@ -27,11 +27,11 @@
                     $nbRt = fn ($v, $suffixe = '') => $v === null ? '—' : \App\Services\Elevage\ReleveTerrainService::nb($v).$suffixe;
                 @endphp
                 <x-kpi-accordion title="Relevés de terrain">
-                    <x-kpi-card label="Référentiels à valider" icon="check_circle" color="maize" :value="(string) $rt['a_valider']" caption="Propositions en attente de validation" />
-                    <x-kpi-card label="Fertilité moyenne" icon="egg" color="emerald" :value="$nbRt($rt['fertilite_moyenne'], ' %')" :caption="$rt['nb_lots'] === 0 ? 'Aucun lot relevé' : 'Moyenne de '.$rt['nb_lots'].' lot(s) relevé(s)'" />
-                    <x-kpi-card label="Éclosion moyenne" icon="child_care" color="blue" :value="$nbRt($rt['eclosion_moyenne'], ' %')" :caption="$rt['nb_lots'] === 0 ? 'Aucun lot relevé' : 'Éclos ÷ fertiles'" />
-                    <x-kpi-card label="Incubation observée" icon="schedule" color="forest" :value="$nbRt($rt['duree_observee_moyenne'], ' j')" :caption="'Règle : '.$nbRt($rt['duree_regle_moyenne'], ' j')" />
-                    <x-kpi-card label="Délai fournisseur" icon="local_shipping" color="red" :value="$rt['delai']['critique'].' j / '.$rt['delai']['alerte'].' j'" :caption="'Critique / alerte retenus — constaté : '.$nbRt($rt['delai_constate_max'], ' j')" />
+                    <x-kpi-card :label="__('elevage.kpi_referentiels_a_valider')" icon="check_circle" color="maize" :value="(string) $rt['a_valider']" :caption="__('elevage.caption_en_attente_validation')" />
+                    <x-kpi-card :label="__('elevage.kpi_fertilite_moyenne')" icon="egg" color="emerald" :value="$nbRt($rt['fertilite_moyenne'], ' %')" :caption="$rt['nb_lots'] === 0 ? 'Aucun lot relevé' : 'Moyenne de '.$rt['nb_lots'].' lot(s) relevé(s)'" />
+                    <x-kpi-card :label="__('elevage.kpi_eclosion_moyenne')" icon="child_care" color="blue" :value="$nbRt($rt['eclosion_moyenne'], ' %')" :caption="$rt['nb_lots'] === 0 ? 'Aucun lot relevé' : 'Éclos ÷ fertiles'" />
+                    <x-kpi-card :label="__('elevage.kpi_incubation_observee')" icon="schedule" color="forest" :value="$nbRt($rt['duree_observee_moyenne'], ' j')" :caption="'Règle : '.$nbRt($rt['duree_regle_moyenne'], ' j')" />
+                    <x-kpi-card :label="__('elevage.kpi_delai_fournisseur')" icon="local_shipping" color="red" :value="$rt['delai']['critique'].' j / '.$rt['delai']['alerte'].' j'" :caption="'Critique / alerte retenus — constaté : '.$nbRt($rt['delai_constate_max'], ' j')" />
                 </x-kpi-accordion>
                 @can('manage-elevage')
                     <a wire:navigate href="{{ route('elevage.parametres', ['tab' => 'releves']) }}" class="inline-flex items-center gap-xs text-xs font-bold text-brand-emerald hover:underline"><span class="material-symbols-outlined text-[16px]">check_circle</span>Ouvrir les relevés de terrain ({{ $rt['a_valider'] }} à valider) →</a>
@@ -45,9 +45,9 @@
                                 <h3 class="text-sm font-bold text-brand-forest">{{ $row['species']->label }}</h3>
                             </div>
                             <div class="space-y-1 text-xs">
-                                <div class="flex justify-between"><span class="text-outline">Effectif vivant</span><span class="font-bold">{{ $row['effectif'] }}</span></div>
-                                <div class="flex justify-between"><span class="text-outline">Taux mortalité (mois)</span><span class="font-bold {{ $row['taux_mortalite'] > 5 ? 'text-error-deep' : '' }}">{{ number_format($row['taux_mortalite'], 1, ',', ' ') }} %</span></div>
-                                <div class="flex justify-between"><span class="text-outline">Autonomie aliment</span><span class="font-bold text-outline">—</span></div>
+                                <div class="flex justify-between"><span class="text-outline">{{ __('elevage.kpi_effectif_total_vivant') }}</span><span class="font-bold">{{ $row['effectif'] }}</span></div>
+                                <div class="flex justify-between"><span class="text-outline">{{ __('elevage.kpi_taux_mortalite_mois') }}</span><span class="font-bold {{ $row['taux_mortalite'] > 5 ? 'text-error-deep' : '' }}">{{ number_format($row['taux_mortalite'], 1, ',', ' ') }} %</span></div>
+                                <div class="flex justify-between"><span class="text-outline">{{ __('elevage.kpi_autonomie_aliment') }}</span><span class="font-bold text-outline">—</span></div>
                                 {{-- Ticket H11 — ligne propre à la filière (ajout du poste, décision client du 19/10/2026). --}}
                                 @if($row['ligne_poste'])
                                     @include('livewire.elevage.ajouts-poste.dashboard-ligne-filiere', ['ligne' => $row['ligne_poste']])
@@ -59,10 +59,10 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-md">
                     <div class="bg-white border border-outline-variant rounded-lg p-md">
-                        <h3 class="text-sm font-bold text-brand-forest mb-md">GMQ par Bande — Résumé</h3>
-                        <p class="text-[10px] text-outline mb-sm">Le graphique de croissance du prototype est remplacé par un tableau réel (aucune librairie de graphiques disponible côté vue à ce stade) — voir l'onglet « GMQ &amp; Croissance » pour le détail complet.</p>
+                        <h3 class="text-sm font-bold text-brand-forest mb-md">{{ __('elevage.section_gmq_bande_resume') }}</h3>
+                        <p class="text-[10px] text-outline mb-sm">{{ __('elevage.info_graphique_gmq') }}</p>
                         @if($this->gmqTable->where('gmq', '!=', null)->isEmpty())
-                            <p class="text-xs text-outline text-center py-lg">Aucune donnée de croissance suffisante pour le moment (2 pesées minimum par bande).</p>
+                            <p class="text-xs text-outline text-center py-lg">{{ __('elevage.msg_aucune_donnee_croissance') }}</p>
                         @else
                             <div class="space-y-xs">
                                 @foreach($this->gmqTable->whereNotNull('gmq') as $row)
@@ -75,11 +75,11 @@
                         @endif
                     </div>
                     <div class="bg-white border border-outline-variant rounded-lg p-md">
-                        <h3 class="text-sm font-bold text-brand-forest mb-md">Rappels VMS à venir</h3>
+                        <h3 class="text-sm font-bold text-brand-forest mb-md">{{ __('elevage.section_rappels_vms') }}</h3>
                         {{-- Ticket H11 — liste calculée des rappels des 7 prochains jours (ajout du poste), au-dessus du texte et du lien. --}}
                         @include('livewire.elevage.ajouts-poste.dashboard-rappels-vms', ['rappels' => $this->rappelsVms])
-                        <p class="text-xs text-outline text-center py-md">Le calendrier complet (réel) est disponible dans Soins et Vaccins.</p>
-                        <a wire:navigate href="{{ route('elevage.soins-vaccins') }}" class="block text-center mt-md text-xs font-bold text-brand-emerald hover:underline">Voir le calendrier complet →</a>
+                        <p class="text-xs text-outline text-center py-md">{{ __('elevage.info_calendrier_complet') }}</p>
+                        <a wire:navigate href="{{ route('elevage.soins-vaccins') }}" class="block text-center mt-md text-xs font-bold text-brand-emerald hover:underline">{{ __('elevage.lien_voir_calendrier') }}</a>
                     </div>
                 </div>
 
@@ -92,8 +92,8 @@
             <div class="mt-md space-y-md">
                 <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-sm">
                     <div>
-                        <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">monitoring</span>GMQ &amp; Croissance</h2>
-                        <p class="text-xs text-outline mt-xs">GMQ (g/j) = (Poids Final − Poids Initial) ÷ Nombre de Jours entre les deux pesées, calculé par bande à partir des pesées déjà saisies dans les fiches journalières.</p>
+                        <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">monitoring</span>{{ __('elevage.tab_gmq_croissance') }}</h2>
+                        <p class="text-xs text-outline mt-xs">{{ __('elevage.desc_gmq') }}</p>
                     </div>
                     {{-- Ticket H11 — filtre d'espèce du poste. --}}
                     @include('livewire.elevage.ajouts-poste.dashboard-filtre-espece')
@@ -122,10 +122,10 @@
                                         <td data-label="Poids Initial" class="px-md py-sm text-right">{{ $row['poids_initial'] ?? '—' }}</td>
                                         <td data-label="Poids Actuel" class="px-md py-sm text-right">{{ $row['poids_actuel'] ?? '—' }}</td>
                                         <td data-label="Jours" class="px-md py-sm text-right">{{ $row['jours'] ?? '—' }}</td>
-                                        <td data-label="GMQ" class="px-md py-sm text-right font-bold {{ $row['gmq'] !== null && $row['gmq'] < 0 ? 'text-error-deep' : 'text-brand-emerald' }}">{{ $row['gmq'] !== null ? $row['gmq'].' g/j' : 'Pesées insuffisantes' }}</td>
+                                        <td data-label="GMQ" class="px-md py-sm text-right font-bold {{ $row['gmq'] !== null && $row['gmq'] < 0 ? 'text-error-deep' : 'text-brand-emerald' }}">{{ $row['gmq'] !== null ? $row['gmq'].' g/j' : __('elevage.msg_pesees_insuffisantes') }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="6" class="px-md py-lg text-center text-outline">Aucune bande active pour le moment.</td></tr>
+                                    <tr><td colspan="6" class="px-md py-lg text-center text-outline">{{ __('elevage.msg_aucune_bande_active') }}</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -143,12 +143,12 @@
         @if($tab === 'sanitaire')
             <div class="mt-md space-y-md">
                 <div>
-                    <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">coronavirus</span>Analyse Sanitaire — Fréquence des Maladies</h2>
+                    <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">coronavirus</span>{{ __('elevage.titre_analyse_sanitaire') }}</h2>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-md">
-                    <x-kpi-card label="Traitements Administrés (mois)" icon="vaccines" color="emerald" :value="$this->sanitaireKpis['nb_traitements_mois']" />
-                    <x-kpi-card label="Coût Sanitaire Total (mois)" icon="payments" color="red" :value="number_format($this->sanitaireKpis['cout_sanitaire_mois'], 0, ',', ' ').' FCFA'" />
-                    <x-kpi-card label="Traitement le Plus Fréquent" icon="star" color="blue" :value="$this->sanitaireKpis['traitement_frequent'] ?? '—'" />
+                    <x-kpi-card :label="__('elevage.kpi_traitements_mois')" icon="vaccines" color="emerald" :value="$this->sanitaireKpis['nb_traitements_mois']" />
+                    <x-kpi-card :label="__('elevage.kpi_cout_sanitaire_total')" icon="payments" color="red" :value="number_format($this->sanitaireKpis['cout_sanitaire_mois'], 0, ',', ' ').' FCFA'" />
+                    <x-kpi-card :label="__('elevage.kpi_traitement_frequent')" icon="star" color="blue" :value="$this->sanitaireKpis['traitement_frequent'] ?? '—'" />
                 </div>
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="overflow-x-auto">
@@ -180,8 +180,8 @@
         @if($tab === 'prevision')
             <div class="mt-md space-y-md">
                 <div>
-                    <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">query_stats</span>Prévision de Croissance</h2>
-                    <p class="text-xs text-outline mt-xs">Régression linéaire simple sur l'historique des pesées (minimum 3 points requis).</p>
+                    <h2 class="text-lg font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">query_stats</span>{{ __('elevage.titre_prevision_croissance') }}</h2>
+                    <p class="text-xs text-outline mt-xs">{{ __('elevage.desc_prevision') }}</p>
                 </div>
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
                     <div class="overflow-x-auto">
@@ -207,7 +207,7 @@
                                         @endif
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="px-md py-lg text-center text-outline">Aucune bande active pour le moment.</td></tr>
+                                    <tr><td colspan="4" class="px-md py-lg text-center text-outline">{{ __('elevage.msg_aucune_bande_active') }}</td></tr>
                                 @endforelse
                             </tbody>
                         </table>

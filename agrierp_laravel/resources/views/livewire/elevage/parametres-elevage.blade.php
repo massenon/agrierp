@@ -13,11 +13,11 @@
             <div class="space-y-md">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
                     <div>
-                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">restaurant</span>Fiche de Rationnement des Animaux</h2>
-                        <p class="text-xs text-outline mt-xs">Consommation journalière théorique par tête exprimée en <strong>Grammes (g/j)</strong>.</p>
+                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">restaurant</span>{{ __('elevage.titre_rationnement') }}</h2>
+                        <p class="text-xs text-outline mt-xs">{{ __('elevage.desc_rationnement') }}</p>
                     </div>
                     <button type="button" wire:click="newRation" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-                        <span class="material-symbols-outlined text-[18px]">add_circle</span>Ajouter une Ration
+                        <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('elevage.bouton_ajouter_ration') }}
                     </button>
                 </div>
                 <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -52,7 +52,7 @@
 
             <x-modal name="modal-ration" max-width="sm">
                 <div class="flex items-center justify-between mb-md">
-                    <h3 class="font-bold text-lg text-brand-forest">{{ $editingRationId ? 'Modifier la Ration' : 'Saisir une Ration' }}</h3>
+                    <h3 class="font-bold text-lg text-brand-forest">{{ $editingRationId ? __('elevage.params_modal_modifier_ration') : __('elevage.params_modal_saisir_ration') }}</h3>
                     <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-ration' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
                 </div>
                 <form wire:submit="saveRation" class="space-y-md">
@@ -86,11 +86,11 @@
             <div class="space-y-md">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
                     <div>
-                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">event_repeat</span>Calendriers de Prophylaxie &amp; Traitements Récurrents</h2>
-                        <p class="text-xs text-outline mt-xs">Programme médical type par espèce.</p>
+                        <h2 class="text-lg lg:text-xl font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-brand-emerald">event_repeat</span>{{ __('elevage.titre_prophylaxie') }}</h2>
+                        <p class="text-xs text-outline mt-xs">{{ __('elevage.desc_prophylaxie') }}</p>
                     </div>
                     <button type="button" wire:click="newProphy" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-                        <span class="material-symbols-outlined text-[18px]">add_circle</span>Ajouter une Échéance
+                        <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('elevage.bouton_ajouter_echeance') }}
                     </button>
                 </div>
 

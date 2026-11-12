@@ -2,13 +2,13 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md mb-lg">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">pets</span>Registre des Reproducteurs
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">pets</span>{{ __('elevage.titre_registre_reproducteurs') }}
             </h2>
             <p class="text-xs lg:text-sm text-outline mt-xs">Sujets suivis individuellement — identification, race, généalogie. Les bandes d'engraissement restent suivies en quantités.</p>
         </div>
         @can('manage-elevage')
             <button type="button" wire:click="newAnimal" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>Enregistrer un Reproducteur
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('elevage.bouton_enregistrer_reproducteur') }}
             </button>
         @endcan
     </div>
@@ -19,26 +19,26 @@
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
-        <x-kpi-card label="Reproducteurs Enregistrés" icon="inventory_2" color="emerald" :value="$this->kpis['total']" />
-        <x-kpi-card label="Présents" icon="check_circle" color="blue" :value="$this->kpis['presents']" />
-        <x-kpi-card label="Femelles" icon="female" color="maize" :value="$this->kpis['femelles']" />
-        <x-kpi-card label="Mâles" icon="male" color="forest" :value="$this->kpis['males']" />
+        <x-kpi-card :label="__('elevage.kpi_reproducteurs_enregistres')" icon="inventory_2" color="emerald" :value="$this->kpis['total']" />
+        <x-kpi-card :label="__('elevage.kpi_presents')" icon="check_circle" color="blue" :value="$this->kpis['presents']" />
+        <x-kpi-card :label="__('elevage.kpi_femelles')" icon="female" color="maize" :value="$this->kpis['femelles']" />
+        <x-kpi-card :label="__('elevage.kpi_males')" icon="male" color="forest" :value="$this->kpis['males']" />
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
         <div class="p-md flex flex-col md:flex-row items-stretch md:items-center gap-sm border-b border-outline-variant">
             <div class="relative flex-1 md:max-w-xs">
                 <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher un identifiant, une race..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
+                <input wire:model.live.debounce.300ms="search" type="text" placeholder="{{ __('elevage.placeholder_rechercher_reproducteur') }}" class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
             </div>
             <select wire:model.live="speciesFilter" class="text-xs font-bold border border-outline-variant rounded-lg px-md py-2 bg-white outline-none">
-                <option value="">Toutes les espèces</option>
+                <option value="">{{ __('elevage.filtre_toutes_especes') }}</option>
                 @foreach($this->speciesOptions as $espece)
                     <option value="{{ $espece->id }}">{{ $espece->label }}</option>
                 @endforeach
             </select>
             <select wire:model.live="statusFilter" class="text-xs font-bold border border-outline-variant rounded-lg px-md py-2 bg-white outline-none">
-                <option value="">Tous les statuts</option>
+                <option value="">{{ __('elevage.filtre_tous_statuts') }}</option>
                 @foreach(\App\Models\Animal::LIBELLES_STATUT as $valeur => $libelle)
                     <option value="{{ $valeur }}">{{ $libelle }}</option>
                 @endforeach
@@ -72,7 +72,7 @@
                             <td data-label="Cage" class="px-md py-sm text-xs">{{ $animal->cage ?: '—' }}</td>
                             <td data-label="Statut" class="px-md py-sm text-center">
                                 @if($animal->isPresent())
-                                    <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-brand-emerald/10 text-brand-emerald">Actif</span>
+                                    <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-brand-emerald/10 text-brand-emerald">{{ __('elevage.statut_actif') }}</span>
                                 @else
                                     <span class="text-[11px] font-bold px-sm py-0.5 rounded-full bg-surface-zebra text-outline" title="{{ $animal->exit_reason }}">{{ $animal->status_label }}</span>
                                 @endif
@@ -113,7 +113,7 @@
                 @error('identifier') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Espèce *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_espece') }}</label>
                 <select wire:model.live="species_id" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('species_id') ? 'is-invalid' : 'border-outline-variant' }}">
                     <option value="">-- Sélectionner --</option>
                     @foreach($this->speciesFormOptions as $espece)

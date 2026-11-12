@@ -2,31 +2,31 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md mb-lg">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">pets</span>Enregistrer des Sujets
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">pets</span>{{ __('elevage.titre_enregistrer_sujets') }}
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Journal des ENTRÉES (Phase 1 du cycle) : naissances locales et acquisitions externes. Chaque entrée valide alimente ensuite une Bande/Lot pour le suivi continu de l'effectif.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">{{ __('elevage.desc_enregistrer_sujets') }}</p>
         </div>
         @can('manage-elevage')
         <button type="button" wire:click="newEntry" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
-            <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouveau Sujet
+            <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('elevage.bouton_nouveau_sujet') }}
         </button>
         @endcan
     </div>
 
     <x-kpi-accordion title="Indicateurs de performance">
-        <x-kpi-card label="Naissances (mois)" icon="child_care" color="emerald" :value="$this->kpis['naissances_mois']" />
-        <x-kpi-card label="Acquisitions (mois)" icon="shopping_cart" color="emerald" :value="$this->kpis['acquisitions_mois']" />
-        <x-kpi-card label="Effectif Total" icon="pets" color="emerald" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" />
+        <x-kpi-card :label="__('elevage.kpi_naissances_mois')" icon="child_care" color="emerald" :value="$this->kpis['naissances_mois']" />
+        <x-kpi-card :label="__('elevage.kpi_acquisitions_mois')" icon="shopping_cart" color="emerald" :value="$this->kpis['acquisitions_mois']" />
+        <x-kpi-card :label="__('elevage.kpi_effectif_total')" icon="pets" color="emerald" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" />
     </x-kpi-accordion>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
         <div class="p-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-sm border-b border-outline-variant">
             <div class="relative flex-1 md:max-w-xs">
                 <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher un code de bande..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white focus:ring-2 focus:ring-brand-emerald outline-none">
+                <input wire:model.live.debounce.300ms="search" type="text" placeholder="{{ __('elevage.placeholder_rechercher_bande') }}" class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white focus:ring-2 focus:ring-brand-emerald outline-none">
             </div>
             <select wire:model.live="statut" class="border border-outline-variant rounded-lg text-xs px-sm py-2 bg-white w-full md:w-auto">
-                <option value="">Tous les statuts</option>
+                <option value="">{{ __('elevage.filtre_tous_statuts') }}</option>
                 <option value="Naissance">Naissance</option>
                 <option value="Achat">Achat</option>
             </select>
@@ -90,7 +90,7 @@
 
     <x-modal name="modal-create-sujet" max-width="md">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">Nouveau Sujet</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ __('elevage.modal_titre_nouveau_sujet') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-sujet' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="saveEntry" class="space-y-md">

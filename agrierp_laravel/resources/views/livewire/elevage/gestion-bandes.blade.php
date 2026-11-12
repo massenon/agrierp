@@ -2,20 +2,20 @@
     <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-sm border-b border-outline-variant pb-md mb-lg">
         <div class="min-w-0">
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">layers</span>Bandes &amp; Sujets
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">layers</span>{{ __('elevage.titre_bandes_sujets') }}
             </h2>
-            <p class="text-xs text-outline mt-xs">Effectif vivant en temps réel, stade physiologique et statut, par bande.</p>
+            <p class="text-xs text-outline mt-xs">{{ __('elevage.desc_bandes_sujets') }}</p>
         </div>
         <div class="flex flex-wrap xl:flex-nowrap items-center gap-sm xl:shrink-0">
             <a wire:navigate href="{{ route('elevage.enregistrer-sujets') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
-                <span class="material-symbols-outlined text-[18px]">pets</span>Enregistrer des Sujets
+                <span class="material-symbols-outlined text-[18px]">pets</span>{{ __('elevage.bouton_enregistrer_sujets') }}
             </a>
             <a wire:navigate href="{{ route('elevage.reproducteurs') }}" class="flex items-center whitespace-nowrap gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full">
-                <span class="material-symbols-outlined text-[18px]">badge</span>Registre des Reproducteurs
+                <span class="material-symbols-outlined text-[18px]">badge</span>{{ __('elevage.bouton_registre_reproducteurs') }}
             </a>
             @can('manage-elevage')
             <button type="button" wire:click="newLot" class="flex items-center whitespace-nowrap gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Bande
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('elevage.bouton_nouvelle_bande') }}
             </button>
             @endcan
         </div>
@@ -29,33 +29,33 @@
     @endif
 
     <x-kpi-accordion title="Indicateurs de performance">
-        <x-kpi-card label="Bandes Actives" icon="layers" color="emerald" :value="$this->kpis['bandes_actives']" caption="Lots au statut « Actif », toutes espèces" />
-        <x-kpi-card label="En Reproduction" icon="favorite" color="blue" :value="$this->kpis['en_reproduction']" caption="Bandes au stade Reproduction" />
-        <x-kpi-card label="Effectif Total Vivant" icon="pets" color="maize" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" caption="Cumul de toutes les bandes actives" />
-        <x-kpi-card label="Alertes Sanitaires" icon="warning" color="red" :value="$this->kpis['alertes_sanitaires']" caption="Bandes sous rémanence ou soin actif" />
+        <x-kpi-card :label="__('elevage.kpi_bandes_actives')" icon="layers" color="emerald" :value="$this->kpis['bandes_actives']" :caption="__('elevage.caption_bandes_actives')" />
+        <x-kpi-card :label="__('elevage.kpi_en_reproduction')" icon="favorite" color="blue" :value="$this->kpis['en_reproduction']" :caption="__('elevage.caption_bandes_en_reproduction')" />
+        <x-kpi-card :label="__('elevage.kpi_effectif_total_vivant')" icon="pets" color="maize" :value="number_format($this->kpis['effectif_total'], 0, ',', ' ')" :caption="__('elevage.caption_effectif_toutes_bandes')" />
+        <x-kpi-card :label="__('elevage.kpi_alertes_sanitaires')" icon="warning" color="red" :value="$this->kpis['alertes_sanitaires']" :caption="__('elevage.caption_alertes_sanitaires')" />
     </x-kpi-accordion>
 
     <div class="flex justify-end mb-sm">
         <button type="button" wire:click="exportBandesPdf" wire:loading.attr="disabled" wire:target="exportBandesPdf" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">
-            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('elevage.bouton_exporter_pdf') }}
         </button>
     </div>
 
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-md flex flex-wrap items-center gap-sm">
         <div class="relative flex-1 min-w-[180px]">
             <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-            <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher un code de bande..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
+            <input wire:model.live.debounce.300ms="search" type="text" placeholder="{{ __('elevage.placeholder_rechercher_bande') }}" class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
         </div>
         <select wire:model.live="filiere" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Espèce : Toutes</option>
+            <option value="">{{ __('elevage.filtre_espece_toutes') }}</option>
             <option value="cuniculture">Cuniculture</option>
             <option value="aviculture">Aviculture</option>
             <option value="porciculture">Porciculture</option>
             <option value="helico">Héliciculture</option>
         </select>
         <select wire:model.live="affichage" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Bandes en cours</option>
-            <option value="archivees">Bandes archivées</option>
+            <option value="">{{ __('elevage.filtre_bandes_en_cours') }}</option>
+            <option value="archivees">{{ __('elevage.filtre_bandes_archivees') }}</option>
         </select>
     </div>
 
@@ -64,15 +64,15 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Code Bande</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Espèce</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Stade</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Date Création</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Effectif Initial</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Effectif Actuel</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Mortalité</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_code_bande') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_espece') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_stade') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_date_creation') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_effectif_initial') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_effectif_actuel') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_mortalite') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_statut') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('elevage.colonne_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -90,9 +90,9 @@
                             <td data-label="Mortalité" class="px-md py-sm text-xs text-right {{ ($mortaliteRate ?? 0) > 0 ? 'text-error-deep font-bold' : 'text-outline' }}">{{ $mortaliteRate === null ? '—' : $mortaliteRate.'%' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($lot->status === 'actif')
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ __('elevage.statut_actif') }}</span>
                                 @else
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">Clôturé</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">{{ __('elevage.statut_cloture') }}</span>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap" wire:click.stop>
@@ -112,7 +112,7 @@
                         <x-modal-confirm-delete :name="'archive-bande-'.$lot->id" :item-label="$lot->code" :action="'archiveLot(\''.$lot->id.'\')'" />
                         @endif
                     @empty
-                        <tr><td colspan="9" class="px-md py-xl text-center text-outline">{{ $affichage === 'archivees' ? 'Aucune bande archivée.' : 'Aucune bande pour le moment. Cliquez sur « Nouvelle Bande » pour commencer.' }}</td></tr>
+                        <tr><td colspan="9" class="px-md py-xl text-center text-outline">{{ $affichage === 'archivees' ? __('elevage.msg_aucune_bande_archivee') : __('elevage.msg_aucune_bande') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -121,12 +121,12 @@
 
     <x-modal name="modal-create-bande" max-width="sm">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">Nouvelle Bande</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ __('elevage.modal_titre_nouvelle_bande') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-bande' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="saveLot" class="space-y-md">
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Espèce *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_espece') }}</label>
                 <select wire:model.live="species_id" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('species_id') ? 'is-invalid' : 'border-outline-variant' }}">
                     <option value="">-- Sélectionner --</option>
                     @foreach($this->speciesOptions as $sp)
@@ -136,13 +136,13 @@
                 @error('species_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Code Unique de la Bande *</label>
-                <input wire:model="code" type="text" placeholder="ex : LOT-LAP-7" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('code') ? 'is-invalid' : 'border-outline-variant' }}">
-                <p class="text-[10px] text-outline mt-xs">Numérotation continue suggérée automatiquement — modifiable si besoin.</p>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_code_bande') }}</label>
+                <input wire:model="code" type="text" placeholder="{{ __('elevage.placeholder_code_lot') }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('code') ? 'is-invalid' : 'border-outline-variant' }}">
+                <p class="text-[10px] text-outline mt-xs">{{ __('elevage.info_numerotation_suggeree') }}</p>
                 @error('code') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Stade Initial</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_stade_initial') }}</label>
                 <select wire:model="stage" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
                     @foreach($this->stades as $valeurStade => $libelleStade)
                         <option value="{{ $valeurStade }}">{{ $libelleStade }}</option>
@@ -150,21 +150,21 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de Création</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_date_creation') }}</label>
                 <input wire:model="created_date" type="date" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('created_date') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('created_date') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Quantité Initiale (Effectif) *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_quantite_initiale') }}</label>
                 <input wire:model="quantity" type="number" min="1" placeholder="ex : 27" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('quantity') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('quantity') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Coût d'Acquisition (FCFA)</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_cout_acquisition') }}</label>
                 <input wire:model="acquisition_cost" type="number" min="0" placeholder="ex : 135000" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Produit issu de cette bande</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_produit_bande') }}</label>
                 <select wire:model="product_id" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
                     <option value="">-- Aucun (pas de mouvement de stock) --</option>
                     @foreach($this->produitsCandidats as $produit)
@@ -172,10 +172,10 @@
                     @endforeach
                 </select>
                 @error('product_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                <p class="text-[10px] text-outline mt-xs">Les naissances entreront en stock sur ce produit ; mortalité et dons l'en retireront. Sélectionnez d'abord la filière.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('elevage.info_produit_bande') }}</p>
             </div>
             <div>
-                <label for="bande-origine" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bande d'Origine</label>
+                <label for="bande-origine" class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_bande_origine') }}</label>
                 <select id="bande-origine" wire:model="lot_origine_id" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('lot_origine_id') ? 'is-invalid' : 'border-outline-variant' }}">
                     <option value="">-- Aucune (achat, animaux extérieurs) --</option>
                     @foreach($this->bandesOriginePossibles as $origine)
@@ -183,35 +183,35 @@
                     @endforeach
                 </select>
                 @error('lot_origine_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                <p class="text-[10px] text-outline mt-xs">Portée ou sevrés déjà comptés dans une autre bande : ils en sortent le jour de création, pour n'être comptés qu'une fois.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('elevage.info_bande_origine') }}</p>
             </div>
-            <p class="text-[10px] text-outline bg-surface-zebra rounded-lg p-sm">Le suivi individuel par sujet (N° Lapine, etc.) se paramètre depuis Enregistrer Sujets, une fois la bande créée.</p>
+            <p class="text-[10px] text-outline bg-surface-zebra rounded-lg p-sm">{{ __('elevage.info_suivi_individuel') }}</p>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-bande' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Créer la Bande</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-bande' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('elevage.bouton_annuler') }}</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ __('elevage.bouton_creer_bande') }}</button>
             </div>
         </form>
     </x-modal>
 
     <x-modal name="modal-edit-bande" max-width="sm">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">Modifier la Bande</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ __('elevage.modal_titre_modifier_bande') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-edit-bande' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="updateLot" class="space-y-md">
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Code Unique de la Bande</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_code_unique') }}</label>
                 @if($codeEnDoublon)
                 <input wire:model="code" type="text" maxlength="50" data-code-en-doublon class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('code') ? 'is-invalid' : 'border-outline-variant' }}">
-                <p class="text-[10px] text-outline mt-xs">Ce code est partagé avec une autre bande : corrigez-le (il redeviendra non modifiable ensuite).</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('elevage.info_code_doublon') }}</p>
                 @error('code') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 @else
                 <input value="{{ $code }}" type="text" disabled class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline">
-                <p class="text-[10px] text-outline mt-xs">L'identifiant technique unique n'est jamais modifiable après création.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('elevage.info_code_non_modifiable') }}</p>
                 @endif
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Stade *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_stade') }}</label>
                 <select wire:model="stage" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
                     @foreach($this->stades as $valeurStade => $libelleStade)
                         <option value="{{ $valeurStade }}">{{ $libelleStade }}</option>
@@ -219,7 +219,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Effectif Actuel *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_effectif_actuel') }}</label>
                 @if($effectifVerrouille)
                 <input wire:model="quantity" type="number" min="0" disabled data-effectif-verrouille title="{{ \App\Actions\SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES }}" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra text-outline cursor-not-allowed">
                 <p class="text-[10px] text-outline mt-xs">{{ \App\Actions\SaisieBandeAction::INFOBULLE_EFFECTIF_PAR_LES_FICHES }}</p>
@@ -229,15 +229,15 @@
                 @error('quantity') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Statut *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_statut') }}</label>
                 <select wire:model="status" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
                     <option value="actif">Actif</option>
                     <option value="cloture">Clôturé</option>
                 </select>
             </div>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-edit-bande' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer les Modifications</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-edit-bande' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('elevage.bouton_annuler') }}</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ __('elevage.bouton_enregistrer_modif') }}</button>
             </div>
         </form>
     </x-modal>
@@ -251,19 +251,19 @@
             </div>
             <div class="p-lg space-y-md">
                 <div class="grid grid-cols-2 gap-sm text-xs">
-                    <div><span class="text-outline block">Espèce</span><span class="font-bold">{{ $this->viewingLot->species?->label }}</span></div>
-                    <div><span class="text-outline block">Stade</span><span class="font-bold">{{ $this->viewingLot->libelleStade() }}</span></div>
-                    <div><span class="text-outline block">Date Création</span><span class="font-bold">{{ $this->viewingLot->created_date->format('d/m/Y') }}</span></div>
-                    <div><span class="text-outline block">Statut</span><span class="font-bold">{{ $this->viewingLot->status === 'actif' ? 'Actif' : 'Clôturé' }}</span></div>
-                    <div><span class="text-outline block">Effectif Initial</span><span class="font-bold">{{ $this->viewingLot->initial_quantity }}</span></div>
-                    <div><span class="text-outline block">Effectif Actuel</span><span class="font-bold">{{ $this->viewingLot->current_quantity }}</span></div>
+                    <div><span class="text-outline block">{{ __('elevage.drawer_espece') }}</span><span class="font-bold">{{ $this->viewingLot->species?->label }}</span></div>
+                    <div><span class="text-outline block">{{ __('elevage.drawer_stade') }}</span><span class="font-bold">{{ $this->viewingLot->libelleStade() }}</span></div>
+                    <div><span class="text-outline block">{{ __('elevage.drawer_date_creation') }}</span><span class="font-bold">{{ $this->viewingLot->created_date->format('d/m/Y') }}</span></div>
+                    <div><span class="text-outline block">{{ __('elevage.colonne_statut') }}</span><span class="font-bold">{{ $this->viewingLot->status === 'actif' ? 'Actif' : 'Clôturé' }}</span></div>
+                    <div><span class="text-outline block">{{ __('elevage.drawer_effectif_initial') }}</span><span class="font-bold">{{ $this->viewingLot->initial_quantity }}</span></div>
+                    <div><span class="text-outline block">{{ __('elevage.drawer_effectif_actuel') }}</span><span class="font-bold">{{ $this->viewingLot->current_quantity }}</span></div>
                 </div>
                 @php $autonomie = $this->autonomieBande; $sanitaire = $this->suiviSanitaireBande; @endphp
                 <div class="border-t border-outline-variant pt-md space-y-xs">
-                    <p class="text-xs font-bold text-brand-forest uppercase mb-xs">Autonomie Alimentaire</p>
+                    <p class="text-xs font-bold text-brand-forest uppercase mb-xs">{{ __('elevage.section_autonomie_alimentaire') }}</p>
                     <x-autonomie-alimentaire :autonomie="$autonomie['filiere'] ?? null" :filiere="'de la filière '.($this->viewingLot->species?->label ?? '')" />
                     <p class="text-[11px] text-outline">
-                        Provende servie à cette bande :
+                        {{ __('elevage.drawer_provende_bande') }}
                         <strong class="text-brand-forest">{{ ($autonomie['provende_bande_kg'] ?? null) === null ? '—' : number_format($autonomie['provende_bande_kg'], 2, ',', ' ').' Kg/j' }}</strong>
                         @if($autonomie['date_fiche'] ?? null)
                             (fiche du {{ $autonomie['date_fiche']->format('d/m/Y') }})
@@ -271,21 +271,21 @@
                     </p>
                 </div>
                 <div class="border-t border-outline-variant pt-md space-y-xs text-xs">
-                    <p class="text-xs font-bold text-brand-forest uppercase mb-xs">Suivi Sanitaire</p>
+                    <p class="text-xs font-bold text-brand-forest uppercase mb-xs">{{ __('elevage.section_suivi_sanitaire') }}</p>
                     @if($sanitaire['remanence'] ?? null)
                         <div class="bg-error-bg border border-error-deep/30 rounded-lg p-sm text-error-deep" role="alert">
-                            <p class="font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">block</span>Délai d'attente en cours</p>
+                            <p class="font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">block</span>{{ __('elevage.msg_delai_attente_cours') }}</p>
                             <p>{{ $sanitaire['remanence']->product_used }} — vente interdite jusqu'au {{ $sanitaire['remanence']->end_date->format('d/m/Y') }}.</p>
                         </div>
                     @else
-                        <p class="text-brand-emerald font-semibold">Aucun délai d'attente en cours : vente autorisée.</p>
+                        <p class="text-brand-emerald font-semibold">{{ __('elevage.msg_vente_autorisee') }}</p>
                     @endif
                     <div class="grid grid-cols-2 gap-sm">
-                        <div><span class="text-outline block">En infirmerie</span><span class="font-bold">{{ $sanitaire['infirmerie'] ?? 0 }} sujet(s)</span></div>
-                        <div><span class="text-outline block">Mortalité 7 jours</span><span class="font-bold">{{ $sanitaire['morts_7j'] ?? 0 }} mort(s){{ ($sanitaire['mortalite_7j'] ?? null) === null ? '' : ' — '.number_format($sanitaire['mortalite_7j'], 1, ',', ' ').' %' }}</span></div>
+                        <div><span class="text-outline block">{{ __('elevage.drawer_en_infirmerie') }}</span><span class="font-bold">{{ $sanitaire['infirmerie'] ?? 0 }} sujet(s)</span></div>
+                        <div><span class="text-outline block">{{ __('elevage.drawer_mortalite_7j') }}</span><span class="font-bold">{{ $sanitaire['morts_7j'] ?? 0 }} mort(s){{ ($sanitaire['mortalite_7j'] ?? null) === null ? '' : ' — '.number_format($sanitaire['mortalite_7j'], 1, ',', ' ').' %' }}</span></div>
                     </div>
                     <div>
-                        <span class="text-outline block mb-xs">Derniers soins</span>
+                        <span class="text-outline block mb-xs">{{ __('elevage.drawer_derniers_soins') }}</span>
                         @forelse($sanitaire['derniers_soins'] ?? [] as $soin)
                             <p>{{ $soin->record_date->format('d/m/Y') }} — {{ $soin->action_type }}{{ $soin->product_used ? ' ('.$soin->product_used.')' : '' }}</p>
                         @empty

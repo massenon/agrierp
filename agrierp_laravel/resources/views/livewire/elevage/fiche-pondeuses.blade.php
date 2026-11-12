@@ -7,7 +7,7 @@
             <p class="text-xs text-outline mt-xs">Suivi quotidien de la ponte et récolte d'œufs — transcription fidèle du registre de la ferme.</p>
         </div>
         <button type="button" wire:click="exportFichePdf" wire:loading.attr="disabled" wire:target="exportFichePdf" class="flex items-center gap-xs bg-white border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">
-            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('elevage.bouton_exporter_pdf') }}
         </button>
     </div>
 
