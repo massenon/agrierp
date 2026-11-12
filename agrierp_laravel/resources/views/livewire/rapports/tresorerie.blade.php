@@ -4,11 +4,11 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Date</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Solde Caisse</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Solde Banque</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Solde Total</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.tresorerie_col_date') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.tresorerie_col_caisse') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.tresorerie_col_banque') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.tresorerie_col_total') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('rapports.tresorerie_col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -19,11 +19,11 @@
                             <td data-label="Solde Banque" class="px-md py-sm text-xs">{{ number_format($row['banque'], 0, ',', ' ') }}</td>
                             <td data-label="Solde Total" class="px-md py-sm text-xs font-bold">{{ number_format($row['total'], 0, ',', ' ') }}</td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
-                                <span class="text-outline text-[10px] italic" title="Ce rapport est généré à partir des écritures comptables réelles ; il ne peut pas être modifié ici.">Lecture seule</span>
+                                <span class="text-outline text-[10px] italic" title="{{ __('rapports.tresorerie_lecture_seule_title') }}">{{ __('rapports.tresorerie_lecture_seule') }}</span>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">Aucun mouvement de trésorerie sur la période.</td></tr>
+                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">{{ __('rapports.tresorerie_vide') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

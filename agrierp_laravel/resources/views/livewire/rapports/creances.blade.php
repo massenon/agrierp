@@ -4,10 +4,10 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Client</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Montant Dû</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Échéance</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.creances_col_client') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.creances_col_montant_du') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('rapports.creances_col_echeance') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('rapports.creances_col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -17,11 +17,11 @@
                             <td data-label="Montant Dû" class="px-md py-sm text-xs font-bold">{{ number_format($r->balance, 0, ',', ' ') }}</td>
                             <td data-label="Échéance" class="px-md py-sm text-xs">{{ $r->due_date->format('d/m/Y') }}</td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
-                                <span class="text-outline text-[10px] italic" title="Ce rapport est généré à partir des données réelles ; il ne peut pas être modifié ici.">Lecture seule</span>
+                                <span class="text-outline text-[10px] italic" title="{{ __('rapports.creances_lecture_seule_title') }}">{{ __('rapports.creances_lecture_seule') }}</span>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="px-md py-lg text-center text-outline">Aucune créance sur la période.</td></tr>
+                        <tr><td colspan="4" class="px-md py-lg text-center text-outline">{{ __('rapports.creances_vide') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
