@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -1384,6 +1385,149 @@ void main() {
       );
     },
   );
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Élevage) ──────────────
+  //
+  // Depuis F1, les vues Blade utilisent `__('elevage.xxx')` ; depuis F2,
+  // `lib/l10n/app_fr.arb` contient les traductions Flutter correspondantes.
+  // Ce groupe vérifie que chaque clé PHP du module Élevage :
+  //   1. a un équivalent en camelCase dans app_fr.arb
+  //   2. dont la valeur est identique à la valeur PHP
+  //
+  // Règle de conversion : `titre_gestion_elevage` → `titreGestionElevage`
+  // (camelCase simple, sans préfixe de module).
+  group('F3 — Parité clés ARB ↔ lang/fr (module Élevage)', () {
+    /// Chemin vers `lib/l10n/app_fr.arb` depuis la racine du dépôt Flutter.
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+
+    /// Chemin vers `lang/fr/elevage.php` dans le dépôt Laravel.
+    final phpFichier = File('$dossierLaravel/lang/fr/elevage.php');
+
+    /// Convertit `titre_gestion_bandes` en `titreGestionBandes`.
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    /// Extrait les paires `'cle' => 'valeur'` d'un fichier PHP de traductions.
+    /// Les apostrophes échappées (`\'`) sont dé-échappées dans la valeur.
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      // Chaque paire tient sur une ligne : 'cle' => 'valeur avec \' possible',
+      final motif = RegExp(
+        r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""",
+      );
+      for (final m in motif.allMatches(contenu)) {
+        final cle = m.group(1)!;
+        final valeur = m.group(2)!.replaceAll(r"\'", "'");
+        resultat.add(MapEntry(cle, valeur));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/elevage.php existent',
+      () {
+        expect(
+          arbFichier.existsSync(),
+          isTrue,
+          reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?',
+        );
+        expect(
+          phpFichier.existsSync(),
+          isTrue,
+          reason:
+              '${phpFichier.path} absent — dossier Laravel introuvable '
+              '(AGRIERP_LARAVEL non défini ou monorepo incomplet)',
+        );
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP elevage.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        // Sauts explicites si l'un des fichiers est absent.
+        if (!arbFichier.existsSync()) {
+          markTestSkipped(
+            'SAUT : lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé',
+          );
+        }
+        if (!phpFichier.existsSync()) {
+          markTestSkipped(
+            'SAUT : ${phpFichier.path} absent',
+          );
+        }
+
+        // Lecture du fichier ARB (JSON).
+        final arbJson =
+            jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+
+        // Lecture et analyse du fichier PHP.
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+
+        expect(
+          pairesPhp,
+          isNotEmpty,
+          reason:
+              'Aucune paire clé/valeur trouvée dans ${phpFichier.path} — '
+              'le regex de parsing est peut-être cassé.',
+        );
+
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+
+        for (final paire in pairesPhp) {
+          final clePhp = paire.key;
+          final valeurPhp = paire.value;
+          final cleArb = enCamelCase(clePhp);
+
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add(
+              '  elevage.$clePhp → $cleArb  (valeur PHP : « $valeurPhp »)',
+            );
+          } else if (arbJson[cleArb] != valeurPhp) {
+            valeurDivergente.add(
+              '  $cleArb :\n'
+              '    PHP  : « $valeurPhp »\n'
+              '    ARB  : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+
+        expect(
+          cleManquante,
+          isEmpty,
+          reason:
+              '${cleManquante.length} clé(s) PHP sans équivalent ARB :\n'
+              '${cleManquante.join('\n')}',
+        );
+        expect(
+          valeurDivergente,
+          isEmpty,
+          reason:
+              '${valeurDivergente.length} valeur(s) divergente(s) entre '
+              'lang/fr/elevage.php et app_fr.arb :\n'
+              '${valeurDivergente.join('\n')}',
+        );
+
+        // Compteur informatif (affiché dans la console en mode verbose).
+        // ignore: avoid_print
+        print(
+          'F3 — ${pairesPhp.length} paires clé/valeur vérifiées '
+          '(lang/fr/elevage.php ↔ app_fr.arb).',
+        );
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
 
   // ── Ticket E4 — Libellés des CarteKpi concordants web ↔ poste ───────────
   //
