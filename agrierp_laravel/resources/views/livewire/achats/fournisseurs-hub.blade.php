@@ -1,9 +1,9 @@
 <div>
     <x-tab-page
         :tabs="[
-            ['key' => 'ajouter', 'label' => 'Ajouter Fournisseur', 'icon' => 'person_add'],
-            ['key' => 'fiches', 'label' => 'Fiches Fournisseurs', 'icon' => 'contact_page'],
-            ['key' => 'dettes', 'label' => 'Dettes Fournisseurs', 'icon' => 'request_quote'],
+            ['key' => 'ajouter', 'label' => __('achats.fourn_hub_onglet_ajouter'), 'icon' => 'person_add'],
+            ['key' => 'fiches', 'label' => __('achats.fourn_hub_onglet_fiches'), 'icon' => 'contact_page'],
+            ['key' => 'dettes', 'label' => __('achats.fourn_hub_onglet_dettes'), 'icon' => 'request_quote'],
         ]"
         :active="$tab">
 

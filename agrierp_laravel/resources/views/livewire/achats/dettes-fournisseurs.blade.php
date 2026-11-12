@@ -2,48 +2,48 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">account_balance_wallet</span>Dettes Fournisseurs
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">account_balance_wallet</span>{{ __('achats.dettes_titre') }}
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Suivi des sommes dues aux fournisseurs et de leurs échéances.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">{{ __('achats.dettes_sous_titre') }}</p>
         </div>
         <div class="flex items-center gap-xs">
             <button type="button" wire:click="exportDettesFournisseursPdf" wire:loading.attr="disabled" wire:target="exportDettesFournisseursPdf" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all disabled:opacity-50">
-                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('achats.dettes_btn_exporter') }}
             </button>
             <button type="button" wire:click="openPaymentModal" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>Enregistrer un Règlement
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('achats.dettes_btn_reglement') }}
             </button>
         </div>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md">
-        <x-kpi-card label="Dettes totales" icon="payments" color="emerald" :value="number_format($this->kpis['dettes_totales'], 0, ',', ' ').' FCFA'" />
-        <x-kpi-card label="En retard" icon="warning" color="red" :value="number_format($this->kpis['en_retard'], 0, ',', ' ').' FCFA'" />
-        <x-kpi-card label="Fournisseurs concernés" icon="local_shipping" color="blue" :value="$this->kpis['fournisseurs_concernes']" />
+        <x-kpi-card :label="__('achats.dettes_kpi_dettes_totales')" icon="payments" color="emerald" :value="number_format($this->kpis['dettes_totales'], 0, ',', ' ').' FCFA'" />
+        <x-kpi-card :label="__('achats.dettes_kpi_en_retard')" icon="warning" color="red" :value="number_format($this->kpis['en_retard'], 0, ',', ' ').' FCFA'" />
+        <x-kpi-card :label="__('achats.dettes_kpi_fournisseurs')" icon="local_shipping" color="blue" :value="$this->kpis['fournisseurs_concernes']" />
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
         <div class="p-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-sm border-b border-outline-variant">
             <div class="relative flex-1 md:max-w-xs">
                 <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
+                <input wire:model.live.debounce.300ms="search" type="text" placeholder="{{ __('achats.dettes_placeholder_recherche') }}" class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
             </div>
             <select wire:model.live="statusFilter" class="border border-outline-variant rounded-lg text-xs px-sm py-2 bg-white w-full md:w-auto">
-                <option value="">Tous les statuts</option>
-                <option value="A echoir">À échoir</option>
-                <option value="En retard">En retard</option>
-                <option value="Regle">Réglé</option>
+                <option value="">{{ __('achats.dettes_filtre_tous') }}</option>
+                <option value="A echoir">{{ __('achats.dettes_filtre_a_echoir') }}</option>
+                <option value="En retard">{{ __('achats.dettes_filtre_en_retard') }}</option>
+                <option value="Regle">{{ __('achats.dettes_filtre_regle') }}</option>
             </select>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Fournisseur</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Montant Dû</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Échéance</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dettes_col_fournisseur') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dettes_col_montant_du') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dettes_col_echeance') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dettes_col_statut') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('achats.dettes_col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,21 +54,21 @@
                             <td data-label="Échéance" class="px-md py-sm text-xs">{{ $debt->due_date?->format('d/m/Y') ?? '—' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($debt->display_status === 'soldee')
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Réglé</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ __('achats.dettes_statut_regle') }}</span>
                                 @elseif($debt->display_status === 'en_retard')
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">En retard</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">{{ __('achats.dettes_statut_en_retard') }}</span>
                                 @else
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-blue-100 text-info-blue border-blue-300">À échoir</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-blue-100 text-info-blue border-blue-300">{{ __('achats.dettes_statut_a_echoir') }}</span>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 @if($debt->display_status !== 'soldee')
-                                    <button type="button" wire:click="openPaymentModal('{{ $debt->supplier_id }}')" class="text-brand-emerald text-[11px] font-bold hover:underline">Régler</button>
+                                    <button type="button" wire:click="openPaymentModal('{{ $debt->supplier_id }}')" class="text-brand-emerald text-[11px] font-bold hover:underline">{{ __('achats.dettes_btn_regler') }}</button>
                                 @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">Aucune dette fournisseur pour le moment.</td></tr>
+                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">{{ __('achats.dettes_aucune') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -77,14 +77,14 @@
 
     <x-modal name="modal-create-dettes-fournisseurs" max-width="md">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">Enregistrer un Règlement</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ __('achats.dettes_modal_titre') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-dettes-fournisseurs' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="submitPaiementFournisseur" class="space-y-md">
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Fournisseur *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dettes_modal_fournisseur') }}</label>
                 <select wire:model="paymentSupplierId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('paymentSupplierId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('achats.placeholder_selectionner') }}</option>
                     @foreach($this->suppliers as $supplier)
                         <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
                     @endforeach
@@ -92,29 +92,29 @@
                 @error('paymentSupplierId') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Montant réglé (FCFA) *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dettes_modal_montant') }}</label>
                 <input wire:model="paymentAmount" type="number" placeholder="ex : 185000" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('paymentAmount') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('paymentAmount') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de règlement *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dettes_modal_date') }}</label>
                 <input wire:model="paymentDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('paymentDate') ? 'is-invalid' : 'border-outline-variant' }}">
                 {{-- Ticket EX6 — exercice clos ou absent : le motif R4 sous « Date » (EF6), comme la dépense. --}}
                 @error('paymentDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Compte de Trésorerie *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dettes_modal_compte') }}</label>
                 <select wire:model="paymentTreasuryAccountId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('paymentTreasuryAccountId') ? 'is-invalid' : 'border-outline-variant' }}">
                     @foreach($this->treasuryAccounts as $account)
                         <option value="{{ $account->id }}">{{ $account->label }} ({{ number_format($account->balance, 0, ',', ' ') }} FCFA)</option>
                     @endforeach
                 </select>
                 @error('paymentTreasuryAccountId') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                <p class="text-[10px] text-outline mt-xs">Le règlement est appliqué en priorité aux dettes les plus anciennes de ce fournisseur.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('achats.dettes_modal_aide_fifo') }}</p>
             </div>
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-dettes-fournisseurs' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-dettes-fournisseurs' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('achats.btn_annuler') }}</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ __('achats.btn_enregistrer') }}</button>
             </div>
         </form>
     </x-modal>

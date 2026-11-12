@@ -1,29 +1,29 @@
 <div>
     <div class="border-b border-outline-variant pb-md mb-lg">
         <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-            <span class="material-symbols-outlined text-brand-emerald text-[26px]">request_page</span>Saisie des Dépenses
+            <span class="material-symbols-outlined text-brand-emerald text-[26px]">request_page</span>{{ __('achats.dep_titre') }}
         </h2>
-        <p class="text-xs text-outline mt-xs">Enregistrement des charges d'exploitation courantes de la ferme (SYSCOHADA Classe 6).</p>
+        <p class="text-xs text-outline mt-xs">{{ __('achats.dep_sous_titre') }}</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-md mb-lg">
-        <x-kpi-card label="Dépenses du mois" icon="payments" color="emerald" :value="number_format($this->kpis['depenses_mois'], 0, ',', ' ').' FCFA'" />
-        <x-kpi-card label="Charges Fixes" icon="event_repeat" color="maize" :pending="true" pending-since="Aucun champ Fixe/Variable dans le formulaire source" />
-        <x-kpi-card label="Charges Variables" icon="trending_down" color="blue" :pending="true" pending-since="Aucun champ Fixe/Variable dans le formulaire source" />
+        <x-kpi-card :label="__('achats.dep_kpi_mois')" icon="payments" color="emerald" :value="number_format($this->kpis['depenses_mois'], 0, ',', ' ').' FCFA'" />
+        <x-kpi-card :label="__('achats.dep_kpi_fixes')" icon="event_repeat" color="maize" :pending="true" pending-since="Aucun champ Fixe/Variable dans le formulaire source" />
+        <x-kpi-card :label="__('achats.dep_kpi_variables')" icon="trending_down" color="blue" :pending="true" pending-since="Aucun champ Fixe/Variable dans le formulaire source" />
     </div>
 
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-md flex flex-wrap items-center gap-sm">
         <div class="relative flex-1 min-w-[180px]">
             <span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-            <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
+            <input wire:model.live.debounce.300ms="search" type="text" placeholder="{{ __('achats.dep_placeholder_recherche') }}" class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
         </div>
         <select wire:model.live="pieceFilter" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Toutes les pièces</option>
-            <option>Comptabilisée</option>
-            <option>Sans pièce</option>
+            <option value="">{{ __('achats.dep_filtre_toutes') }}</option>
+            <option>{{ __('achats.dep_filtre_comptabilisee') }}</option>
+            <option>{{ __('achats.dep_filtre_sans_piece') }}</option>
         </select>
         <button @lectureSeule type="button" wire:click="nouvelleDepense" class="py-sm px-lg rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm flex items-center justify-center gap-xs">
-            <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Dépense
+            <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('achats.dep_btn_nouvelle') }}
         </button>
     </div>
 
@@ -32,12 +32,12 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Date</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Libellé</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Total</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Mode</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Pièce</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_col_date') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_col_libelle') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_col_total') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_col_mode') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_col_piece') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_col_actions') }}</th>
                     </tr>
                 </thead>
                 @forelse($this->expenses as $i => $expense)
@@ -54,9 +54,9 @@
                             <td data-label="Mode" class="px-md py-sm text-xs">{{ $expense->on_credit ? 'À crédit' : (\App\Models\Expense::MODES_DE_PAIEMENT[$expense->payment_mode] ?? '—') }}</td>
                             <td data-label="Pièce" class="px-md py-sm">
                                 @if($comptabilisee)
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ $expense->accountingEntry?->numero ?: 'Comptabilisée' }}</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ $expense->accountingEntry?->numero ?: __('achats.dep_statut_comptabilisee') }}</span>
                                 @else
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">Sans pièce</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">{{ __('achats.dep_statut_sans_piece') }}</span>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
@@ -75,9 +75,9 @@
                                 <table class="w-full">
                                     <thead>
                                         <tr>
-                                            <th class="py-xs text-left text-[10px] text-outline font-bold uppercase">Libellé</th>
-                                            <th class="py-xs text-left text-[10px] text-outline font-bold uppercase">Compte de Charge</th>
-                                            <th class="py-xs text-right text-[10px] text-outline font-bold uppercase">Montant</th>
+                                            <th class="py-xs text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_ligne_col_libelle') }}</th>
+                                            <th class="py-xs text-left text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_ligne_col_compte') }}</th>
+                                            <th class="py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_ligne_col_montant') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -88,7 +88,7 @@
                                                 <td class="py-xs text-xs text-right font-semibold">{{ number_format($ligne->amount, 0, ',', ' ') }} FCFA</td>
                                             </tr>
                                         @empty
-                                            <tr class="border-t border-outline-variant"><td colspan="3" class="py-xs text-xs text-outline">Aucune ligne.</td></tr>
+                                            <tr class="border-t border-outline-variant"><td colspan="3" class="py-xs text-xs text-outline">{{ __('achats.dep_ligne_aucune') }}</td></tr>
                                         @endforelse
                                     </tbody>
                                 </table>
@@ -105,7 +105,7 @@
                     </tbody>
                     <x-modal-confirm-delete :name="'archive-expense-'.$expense->id" :item-label="$expense->label" :action="'archiveExpense(\''.$expense->id.'\')'" />
                 @empty
-                    <tbody><tr><td colspan="6" class="px-md py-lg text-center text-outline">Aucune dépense pour le moment.</td></tr></tbody>
+                    <tbody><tr><td colspan="6" class="px-md py-lg text-center text-outline">{{ __('achats.dep_aucune') }}</td></tr></tbody>
                 @endforelse
             </table>
         </div>
@@ -114,23 +114,23 @@
     <x-modal name="modal-depense" max-width="xl">
         <div class="flex items-center justify-between mb-md">
             <h3 class="font-bold text-lg text-brand-forest flex items-center gap-xs">
-                <span class="material-symbols-outlined text-[20px]">add_circle</span>{{ $editingExpenseId ? 'Modifier la Dépense' : 'Nouvelle Dépense' }}
+                <span class="material-symbols-outlined text-[20px]">add_circle</span>{{ $editingExpenseId ? __('achats.dep_modal_titre_modifier') : __('achats.dep_modal_titre_nouveau') }}
             </h3>
             <button type="button" x-on:click="show = false" class="text-outline hover:text-on-surface" title="Fermer"><span class="material-symbols-outlined text-[20px]">close</span></button>
         </div>
-        <p class="text-xs text-outline mb-md">Enregistrez une charge d'exploitation de trésorerie directe : une dépense, plusieurs lignes.</p>
+        <p class="text-xs text-outline mb-md">{{ __('achats.dep_modal_sous_titre') }}</p>
         @error('formulaire') <p class="invalid-feedback mb-sm">{{ $message }}</p> @enderror
         <form wire:submit="submitExpense" class="grid grid-cols-1 md:grid-cols-2 gap-md">
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de la Transaction *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_date') }}</label>
                 <input wire:model="expenseDate" type="date" @if($this->dateMinSaisie) min="{{ $this->dateMinSaisie }}" @endif class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('expenseDate') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('expenseDate') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             @unless($this->aCredit)
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mode de Paiement *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_mode_paiement') }}</label>
                 <select wire:model.live="paymentMode" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('paymentMode') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('achats.placeholder_selectionner') }}</option>
                     @foreach(\App\Models\Expense::MODES_DE_PAIEMENT as $cle => $libelle)
                         <option value="{{ $cle }}">{{ $libelle }}</option>
                     @endforeach
@@ -138,9 +138,9 @@
                 @error('paymentMode') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Compte de Trésorerie Débité *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_compte_debite') }}</label>
                 <select wire:model.live="treasuryAccountId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('treasuryAccountId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('achats.placeholder_selectionner') }}</option>
                     @foreach($this->treasuryAccounts as $account)
                         <option value="{{ $account->id }}">{{ $account->label }} ({{ number_format($account->balance, 0, ',', ' ') }} FCFA)</option>
                     @endforeach
@@ -149,9 +149,9 @@
             </div>
             @endunless
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Centre de Coût *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_centre_cout') }}</label>
                 <select wire:model="costCenterId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('costCenterId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('achats.placeholder_selectionner') }}</option>
                     @foreach($this->costCenters as $centre)
                         <option value="{{ $centre->id }}">{{ $centre->label }}</option>
                     @endforeach
@@ -159,9 +159,9 @@
                 @error('costCenterId') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Fournisseur</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_fournisseur') }}</label>
                 <select wire:model.live="supplierId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('supplierId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Aucun --</option>
+                    <option value="">{{ __('achats.placeholder_aucun') }}</option>
                     @foreach($this->suppliers as $fournisseur)
                         <option value="{{ $fournisseur->id }}">{{ $fournisseur->name }}</option>
                     @endforeach
@@ -170,7 +170,7 @@
             </div>
             @if($supplierId !== '')
                 <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Règlement *</label>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_reglement') }}</label>
                     <select wire:model.live="reglement" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('reglement') ? 'is-invalid' : 'border-outline-variant' }}">
                         @foreach(\App\Models\Expense::REGLEMENTS as $cle => $libelle)
                             <option value="{{ $cle }}">{{ $libelle }}</option>
@@ -178,48 +178,48 @@
                     </select>
                     @error('reglement') <p class="invalid-feedback">{{ $message }}</p> @enderror
                     @if($this->aCredit)
-                        <p class="text-[10px] text-outline mt-xs" data-aide-credit>Aucune trésorerie n'est touchée : la dette est créée au nom du fournisseur et se règle dans « Dettes Fournisseurs ».</p>
+                        <p class="text-[10px] text-outline mt-xs" data-aide-credit>{{ __('achats.dep_modal_aide_credit') }}</p>
                     @endif
                 </div>
             @endif
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Bénéficiaire</label>
-                <input wire:model="beneficiary" type="text" placeholder="ex : M. Dossou (si ce n'est pas un fournisseur)" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('beneficiary') ? 'is-invalid' : 'border-outline-variant' }}">
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_beneficiaire') }}</label>
+                <input wire:model="beneficiary" type="text" placeholder="{{ __('achats.dep_modal_placeholder_beneficiaire') }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('beneficiary') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('beneficiary') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="md:col-span-2">
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Reçu / Facture (Photo)</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('achats.dep_modal_piece') }}</label>
                 <label class="border-2 border-dashed border-outline-variant rounded-lg p-md text-center h-11 flex items-center justify-center gap-xs cursor-pointer hover:border-brand-emerald">
                     <input wire:model="receiptFile" type="file" accept="image/*,application/pdf" class="hidden">
                     <span class="material-symbols-outlined text-outline-variant text-[18px]">add_a_photo</span>
-                    <p class="text-[10px] text-outline">{{ $receiptFile ? $receiptFile->getClientOriginalName() : 'Associer le justificatif (JPG/PNG, max 5Mo)' }}</p>
+                    <p class="text-[10px] text-outline">{{ $receiptFile ? $receiptFile->getClientOriginalName() : __('achats.dep_modal_placeholder_piece') }}</p>
                 </label>
                 @error('receiptFile') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
 
             <div class="md:col-span-2">
                 <div class="flex items-center justify-between mb-xs">
-                    <h4 class="text-[10px] text-brand-forest font-bold uppercase">Lignes de la Dépense *</h4>
+                    <h4 class="text-[10px] text-brand-forest font-bold uppercase">{{ __('achats.dep_modal_lignes_titre') }}</h4>
                     <button type="button" wire:click="addLine" class="text-xs font-bold text-brand-emerald hover:text-brand-forest flex items-center gap-xs">
-                        <span class="material-symbols-outlined text-[18px]">add</span>Ajouter une ligne
+                        <span class="material-symbols-outlined text-[18px]">add</span>{{ __('achats.dep_modal_btn_ajouter_ligne') }}
                     </button>
                 </div>
                 @error('lines') <p class="invalid-feedback mb-xs">{{ $message }}</p> @enderror
                 <div class="grid grid-cols-12 gap-sm mb-xs">
-                    <span class="col-span-5 text-[10px] text-outline font-bold uppercase">Libellé *</span>
-                    <span class="col-span-4 text-[10px] text-outline font-bold uppercase">Compte de Charge *</span>
-                    <span class="col-span-2 text-[10px] text-outline font-bold uppercase">Montant (FCFA) *</span>
+                    <span class="col-span-5 text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_modal_col_libelle') }}</span>
+                    <span class="col-span-4 text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_modal_col_compte') }}</span>
+                    <span class="col-span-2 text-[10px] text-outline font-bold uppercase">{{ __('achats.dep_modal_col_montant') }}</span>
                     <span class="col-span-1"></span>
                 </div>
                 @foreach($lines as $i => $ligne)
                     <div class="grid grid-cols-12 gap-sm mb-sm items-start" wire:key="ligne-depense-{{ $i }}">
                         <div class="col-span-5">
-                            <input wire:model="lines.{{ $i }}.label" type="text" placeholder="ex : Carburant livraison ou Achat provende Lot 3" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('lines.'.$i.'.label') ? 'is-invalid' : 'border-outline-variant' }}">
+                            <input wire:model="lines.{{ $i }}.label" type="text" placeholder="{{ __('achats.dep_modal_placeholder_libelle') }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('lines.'.$i.'.label') ? 'is-invalid' : 'border-outline-variant' }}">
                             @error('lines.'.$i.'.label') <p class="invalid-feedback">{{ $message }}</p> @enderror
                         </div>
                         <div class="col-span-4">
                             <select wire:model="lines.{{ $i }}.chargeAccountId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('lines.'.$i.'.chargeAccountId') ? 'is-invalid' : 'border-outline-variant' }}">
-                                <option value="">-- Sélectionner --</option>
+                                <option value="">{{ __('achats.placeholder_selectionner') }}</option>
                                 @foreach($this->chargeAccounts as $compte)
                                     <option value="{{ $compte->id }}">{{ $compte->code }} - {{ $compte->label }}</option>
                                 @endforeach
@@ -227,7 +227,7 @@
                             @error('lines.'.$i.'.chargeAccountId') <p class="invalid-feedback">{{ $message }}</p> @enderror
                         </div>
                         <div class="col-span-2">
-                            <input wire:model.live.debounce.300ms="lines.{{ $i }}.amount" type="number" min="1" step="1" placeholder="ex : 25000" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('lines.'.$i.'.amount') ? 'is-invalid' : 'border-outline-variant' }}">
+                            <input wire:model.live.debounce.300ms="lines.{{ $i }}.amount" type="number" min="1" step="1" placeholder="{{ __('achats.dep_modal_placeholder_montant') }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('lines.'.$i.'.amount') ? 'is-invalid' : 'border-outline-variant' }}">
                             @error('lines.'.$i.'.amount') <p class="invalid-feedback">{{ $message }}</p> @enderror
                         </div>
                         <div class="col-span-1 flex justify-end">
@@ -237,13 +237,13 @@
                 @endforeach
                 @error('total') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 <div class="flex justify-end border-t border-outline-variant pt-sm">
-                    <p class="text-sm font-bold text-brand-forest">Total : <span data-total-depense>{{ number_format($this->total, 0, ',', ' ') }}</span> FCFA</p>
+                    <p class="text-sm font-bold text-brand-forest">{{ __('achats.dep_modal_total') }} <span data-total-depense>{{ number_format($this->total, 0, ',', ' ') }}</span> FCFA</p>
                 </div>
             </div>
 
             <div class="md:col-span-2 flex justify-end">
                 <button @lectureSeule type="submit" wire:loading.attr="disabled" wire:target="submitExpense" class="py-sm px-lg rounded-lg bg-brand-emerald hover:bg-brand-forest text-white font-bold text-sm flex items-center justify-center gap-xs disabled:opacity-50">
-                    <span class="material-symbols-outlined text-[18px]">save</span>Enregistrer la Dépense
+                    <span class="material-symbols-outlined text-[18px]">save</span>{{ __('achats.dep_modal_btn_enregistrer') }}
                 </button>
             </div>
         </form>

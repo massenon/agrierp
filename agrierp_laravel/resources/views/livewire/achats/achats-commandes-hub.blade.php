@@ -1,9 +1,9 @@
 <div>
     <x-tab-page
         :tabs="[
-            ['key' => 'enregistrer', 'label' => 'Enregistrer un Achat', 'icon' => 'add_shopping_cart'],
-            ['key' => 'liste', 'label' => 'Liste d\'Achats', 'icon' => 'list_alt'],
-            ['key' => 'bons', 'label' => 'Bons de Commande', 'icon' => 'description'],
+            ['key' => 'enregistrer', 'label' => __('achats.hub_onglet_enregistrer'), 'icon' => 'add_shopping_cart'],
+            ['key' => 'liste', 'label' => __('achats.hub_onglet_liste'), 'icon' => 'list_alt'],
+            ['key' => 'bons', 'label' => __('achats.hub_onglet_bons'), 'icon' => 'description'],
         ]"
         :active="$tab">
 
