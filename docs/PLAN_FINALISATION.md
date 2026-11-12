@@ -231,7 +231,7 @@ Prérequis : Flutter stable, Visual Studio 2022 (charge « Développement Deskto
 
 | # | Ticket |
 |---|---|
-| F1 | Web : créer `lang/fr/*.php` et migrer les libellés Blade **module par module**, en commençant par Élevage. | ✅ 12/11/2026 — `lang/fr/elevage.php` créé (370+ clés) ; toutes les vues `livewire/elevage/` migrent vers `__('elevage.xxx')` ; 86 tests Élevage ✓ |
+| F1 | Web : créer `lang/fr/*.php` et migrer les libellés Blade **module par module**, en commençant par Élevage. | ✅ 12/11/2026 — `lang/fr/elevage.php` créé (370+ clés) ; toutes les vues `livewire/elevage/` migrent vers `__('elevage.xxx')` ; 86 tests Élevage ✓ — **Module RH ✅ 12/11/2026** : `lang/fr/rh.php` créé (181 clés) ; 6 vues `livewire/rh/` migrées ; 181 clés ARB intégrées dans `app_fr.arb` via `generer_arb.py`. |
 | F2 | Poste : fichiers ARB (`lib/l10n/app_fr.arb`) générés depuis `lang/fr` par un script, pour garantir la parité des clés. | ✅ 12/11/2026 — `agrierp_flutter/lib/l10n/app_fr.arb` créé (388 clés ARB) ; `l10n.yaml` créé ; `pubspec.yaml` complété (`generate: true`) ; script `agrierp_flutter/outils/generer_arb.py` créé pour les migrations futures. |
 | F3 | Adapter `fidelite_libelles_test.dart` pour comparer les **clés** et non plus les littéraux. | ✅ 12/11/2026 — groupe `'F3 — Parité clés ARB ↔ lang/fr (module Élevage)'` ajouté dans `fidelite_libelles_test.dart` ; vérifie que chaque clé PHP de `lang/fr/elevage.php` a son équivalent camelCase dans `app_fr.arb` et que les valeurs concordent — 375 paires vérifiées, 0 manquante, 0 divergente. |
 

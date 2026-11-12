@@ -1,11 +1,11 @@
 <div>
     <x-tab-page
         :tabs="[
-            ['key' => 'employes', 'label' => 'Registre Employés', 'icon' => 'badge'],
-            ['key' => 'stagiaires', 'label' => 'Registre Stagiaires', 'icon' => 'school'],
-            ['key' => 'pointage', 'label' => 'Feuille de Pointage', 'icon' => 'schedule'],
-            ['key' => 'paie', 'label' => 'Gestion de la Paie', 'icon' => 'payments'],
-            ['key' => 'attestations', 'label' => 'Attestations', 'icon' => 'description'],
+            ['key' => 'employes', 'label' => __('rh.tab_registre_employes'), 'icon' => 'badge'],
+            ['key' => 'stagiaires', 'label' => __('rh.tab_registre_stagiaires'), 'icon' => 'school'],
+            ['key' => 'pointage', 'label' => __('rh.tab_feuille_pointage'), 'icon' => 'schedule'],
+            ['key' => 'paie', 'label' => __('rh.tab_gestion_paie'), 'icon' => 'payments'],
+            ['key' => 'attestations', 'label' => __('rh.tab_attestations'), 'icon' => 'description'],
         ]"
         :active="$tab">
 
