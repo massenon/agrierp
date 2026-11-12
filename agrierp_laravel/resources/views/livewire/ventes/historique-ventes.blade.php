@@ -3,12 +3,12 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
             <div>
                 <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                    <span class="material-symbols-outlined text-brand-emerald text-[26px]">receipt_long</span>Historique des Ventes
+                    <span class="material-symbols-outlined text-brand-emerald text-[26px]">receipt_long</span>{{ __('ventes.titre_historique_ventes') }}
                 </h2>
-                <p class="text-xs text-outline mt-xs">Toutes les ventes enregistrées de l'entreprise.</p>
+                <p class="text-xs text-outline mt-xs">{{ __('ventes.desc_historique_ventes') }}</p>
             </div>
             <a wire:navigate href="{{ route('ventes.devis-hub') }}" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvelle Vente
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('ventes.btn_nouvelle_vente') }}
             </a>
         </div>
         <div class="flex items-center gap-xs bg-white border border-outline-variant rounded-lg p-sm w-fit">
@@ -21,19 +21,19 @@
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Chiffre d'Affaires</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">payments</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_ca') }}</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">payments</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['ca'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Transactions</span><span class="material-symbols-outlined text-[18px] text-info-blue">receipt</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_transactions') }}</span><span class="material-symbols-outlined text-[18px] text-info-blue">receipt</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['transactions'] }}</span>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-accent-yellow shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Panier Moyen</span><span class="material-symbols-outlined text-[18px] text-brand-forest">shopping_cart</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_panier_moyen') }}</span><span class="material-symbols-outlined text-[18px] text-brand-forest">shopping_cart</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['panier_moyen'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Encours Créances</span><span class="material-symbols-outlined text-[18px] text-error-red">request_quote</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_encours_creances') }}</span><span class="material-symbols-outlined text-[18px] text-error-red">request_quote</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['encours_creances'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
     </div>
@@ -44,26 +44,26 @@
             <input wire:model.live.debounce.300ms="search" type="text" placeholder="Facture, client..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
         </div>
         <select wire:model.live="statusFilter" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Statut : Toutes</option>
-            <option value="payee">Payée</option>
-            <option value="attente">En attente</option>
-            <option value="annulee">Annulée</option>
+            <option value="">{{ __('ventes.filtre_statut_toutes') }}</option>
+            <option value="payee">{{ __('ventes.statut_payee') }}</option>
+            <option value="attente">{{ __('ventes.statut_en_attente') }}</option>
+            <option value="annulee">{{ __('ventes.statut_annulee') }}</option>
         </select>
         <select wire:model.live="modeFilter" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Mode : Tous</option>
-            <option value="especes">Espèces</option>
-            <option value="mobile_money">Mobile Money</option>
-            <option value="virement">Virement bancaire</option>
-            <option value="credit">Crédit client</option>
-            <option value="avance">Avance</option>
+            <option value="">{{ __('ventes.filtre_mode_tous') }}</option>
+            <option value="especes">{{ __('ventes.mode_especes') }}</option>
+            <option value="mobile_money">{{ __('ventes.mode_mobile_money') }}</option>
+            <option value="virement">{{ __('ventes.mode_virement') }}</option>
+            <option value="credit">{{ __('ventes.mode_credit_client') }}</option>
+            <option value="avance">{{ __('ventes.mode_avance') }}</option>
         </select>
         <select wire:model.live="customerFilter" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Client : Tous</option>
+            <option value="">{{ __('ventes.filtre_client_tous') }}</option>
             @foreach($this->customers as $customer)
                 <option value="{{ $customer->id }}">{{ $customer->name }}</option>
             @endforeach
         </select>
-        <button type="button" wire:click="resetFilters" class="flex items-center gap-xs text-xs font-bold text-outline hover:text-brand-forest px-sm py-2"><span class="material-symbols-outlined text-[16px]">restart_alt</span>Réinitialiser</button>
+        <button type="button" wire:click="resetFilters" class="flex items-center gap-xs text-xs font-bold text-outline hover:text-brand-forest px-sm py-2"><span class="material-symbols-outlined text-[16px]">restart_alt</span>{{ __('ventes.btn_reinitialiser') }}</button>
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -71,16 +71,16 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Facture</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Client</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Date</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Articles</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Remise</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Total TTC</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Payé</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Reste</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Mode</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_facture') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_client') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_date') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_articles') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_remise') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_total_ttc') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_paye') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_reste') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_mode') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_statut') }}</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
                     </tr>
                 </thead>
@@ -91,22 +91,22 @@
                             $paye = $sale->status === 'annulee' ? 0 : $sale->total - $reste;
                         @endphp
                         <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }} {{ $sale->status === 'annulee' ? 'opacity-50' : '' }}">
-                            <td data-label="Facture" class="px-md py-sm text-xs"><button type="button" wire:click="view('{{ $sale->id }}')" class="text-brand-emerald hover:underline font-bold font-mono">{{ strtoupper(substr($sale->id, 0, 8)) }}</button></td>
-                            <td data-label="Client" class="px-md py-sm text-xs font-bold text-brand-forest">{{ $sale->customer?->name ?? 'Client Anonyme' }}</td>
-                            <td data-label="Date" class="px-md py-sm text-xs">{{ $sale->date_effective->format('d/m/Y H:i') }}</td>
-                            <td data-label="Articles" class="px-md py-sm text-xs text-right">{{ $sale->lines->count() }}</td>
-                            <td data-label="Remise" class="px-md py-sm text-xs text-right">{{ number_format($sale->discount, 0, ',', ' ') }}</td>
-                            <td data-label="Total TTC" class="px-md py-sm text-xs text-right font-bold">{{ number_format($sale->total, 0, ',', ' ') }} FCFA</td>
-                            <td data-label="Payé" class="px-md py-sm text-xs text-right text-brand-emerald">{{ number_format($paye, 0, ',', ' ') }}</td>
-                            <td data-label="Reste" class="px-md py-sm text-xs text-right {{ $reste > 0 ? 'text-error-deep font-bold' : '' }}">{{ number_format($reste, 0, ',', ' ') }}</td>
-                            <td data-label="Mode" class="px-md py-sm text-xs">{{ \App\Support\ModePaiement::libelle($sale->payment_mode) }}</td>
-                            <td data-label="Statut" class="px-md py-sm">
+                            <td data-label="{{ __('ventes.col_facture') }}" class="px-md py-sm text-xs"><button type="button" wire:click="view('{{ $sale->id }}')" class="text-brand-emerald hover:underline font-bold font-mono">{{ strtoupper(substr($sale->id, 0, 8)) }}</button></td>
+                            <td data-label="{{ __('ventes.col_client') }}" class="px-md py-sm text-xs font-bold text-brand-forest">{{ $sale->customer?->name ?? __('ventes.client_anonyme') }}</td>
+                            <td data-label="{{ __('ventes.col_date') }}" class="px-md py-sm text-xs">{{ $sale->date_effective->format('d/m/Y H:i') }}</td>
+                            <td data-label="{{ __('ventes.col_articles') }}" class="px-md py-sm text-xs text-right">{{ $sale->lines->count() }}</td>
+                            <td data-label="{{ __('ventes.col_remise') }}" class="px-md py-sm text-xs text-right">{{ number_format($sale->discount, 0, ',', ' ') }}</td>
+                            <td data-label="{{ __('ventes.col_total_ttc') }}" class="px-md py-sm text-xs text-right font-bold">{{ number_format($sale->total, 0, ',', ' ') }} FCFA</td>
+                            <td data-label="{{ __('ventes.col_paye') }}" class="px-md py-sm text-xs text-right text-brand-emerald">{{ number_format($paye, 0, ',', ' ') }}</td>
+                            <td data-label="{{ __('ventes.col_reste') }}" class="px-md py-sm text-xs text-right {{ $reste > 0 ? 'text-error-deep font-bold' : '' }}">{{ number_format($reste, 0, ',', ' ') }}</td>
+                            <td data-label="{{ __('ventes.col_mode') }}" class="px-md py-sm text-xs">{{ \App\Support\ModePaiement::libelle($sale->payment_mode) }}</td>
+                            <td data-label="{{ __('ventes.col_statut') }}" class="px-md py-sm">
                                 @if($sale->status === 'annulee')
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">Annulée</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-error-bg text-error-deep border-error-deep/30">{{ __('ventes.statut_annulee') }}</span>
                                 @elseif($reste > 0)
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">En attente</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-accent-yellow/20 text-brand-forest border-accent-yellow">{{ __('ventes.statut_en_attente') }}</span>
                                 @else
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Payée</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ __('ventes.statut_payee') }}</span>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
@@ -118,14 +118,14 @@
                                     @else
                                         {{-- CONF-4 : l'annulation d'une vente reste à `manage-ventes` (le comptable corrige par l'avoir). --}}
                                         @can('manage-ventes')
-                                        <button @lectureSeule type="button" wire:click="confirmCancel('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Annuler"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                        <button @lectureSeule type="button" wire:click="confirmCancel('{{ $sale->id }}')" class="text-error-deep hover:text-red-800 p-1" title="{{ __('ventes.statut_annulee') }}"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                                         @endcan
                                     @endif
                                 @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="11" class="px-md py-lg text-center text-outline">Aucune vente pour le moment.</td></tr>
+                        <tr><td colspan="11" class="px-md py-lg text-center text-outline">{{ __('ventes.msg_aucune_vente') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -138,11 +138,11 @@
             <div class="w-12 h-12 bg-error-bg rounded-full flex items-center justify-center mx-auto mb-md">
                 <span class="material-symbols-outlined text-error-deep text-[28px]">warning</span>
             </div>
-            <h3 class="font-bold text-lg text-brand-forest mb-xs">Annuler cette vente ?</h3>
+            <h3 class="font-bold text-lg text-brand-forest mb-xs">{{ __('ventes.titre_annuler_vente') }}</h3>
             <p class="text-xs text-outline mb-lg">Le stock des produits vendus sera automatiquement réintégré. Cette action est réversible uniquement en recréant une nouvelle vente.</p>
             <div class="flex justify-center gap-sm">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-cancel-sale' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button @lectureSeule type="button" wire:click="cancelSale" class="px-md py-sm rounded-lg bg-error-deep text-white text-sm font-bold hover:bg-red-800">Oui, Annuler la Vente</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-cancel-sale' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('ventes.btn_annuler') }}</button>
+                <button @lectureSeule type="button" wire:click="cancelSale" class="px-md py-sm rounded-lg bg-error-deep text-white text-sm font-bold hover:bg-red-800">{{ __('ventes.btn_confirmer_annulation') }}</button>
             </div>
         </div>
     </x-modal>
@@ -156,11 +156,11 @@
             </div>
             <div class="p-lg space-y-md">
                 <div class="grid grid-cols-2 gap-sm text-xs">
-                    <div><span class="text-outline block">Client</span><span class="font-bold">{{ $this->viewingSale->customer?->name ?? 'Client Anonyme' }}</span></div>
-                    <div><span class="text-outline block">Date</span><span class="font-bold">{{ $this->viewingSale->date_effective->format('d/m/Y H:i') }}</span></div>
+                    <div><span class="text-outline block">{{ __('ventes.col_client') }}</span><span class="font-bold">{{ $this->viewingSale->customer?->name ?? __('ventes.client_anonyme') }}</span></div>
+                    <div><span class="text-outline block">{{ __('ventes.col_date') }}</span><span class="font-bold">{{ $this->viewingSale->date_effective->format('d/m/Y H:i') }}</span></div>
                 </div>
                 <div class="border-t border-outline-variant pt-md">
-                    <p class="text-xs font-bold text-brand-forest uppercase mb-sm">Articles</p>
+                    <p class="text-xs font-bold text-brand-forest uppercase mb-sm">{{ __('ventes.col_articles') }}</p>
                     <div class="space-y-xs">
                         @foreach($this->viewingSale->lines as $line)
                             <div class="flex justify-between text-xs border-b border-outline-variant/50 pb-1">
@@ -171,14 +171,14 @@
                     </div>
                 </div>
                 <div class="border-t border-outline-variant pt-md space-y-1 text-xs">
-                    <div class="flex justify-between"><span class="text-outline">Sous-total</span><span>{{ number_format($this->viewingSale->subtotal, 0, ',', ' ') }} FCFA</span></div>
-                    <div class="flex justify-between"><span class="text-outline">Remise</span><span>{{ number_format($this->viewingSale->discount, 0, ',', ' ') }} FCFA</span></div>
+                    <div class="flex justify-between"><span class="text-outline">{{ __('ventes.label_sous_total') }}</span><span>{{ number_format($this->viewingSale->subtotal, 0, ',', ' ') }} FCFA</span></div>
+                    <div class="flex justify-between"><span class="text-outline">{{ __('ventes.col_remise') }}</span><span>{{ number_format($this->viewingSale->discount, 0, ',', ' ') }} FCFA</span></div>
                     <div class="flex justify-between font-bold text-brand-emerald text-sm"><span>Total</span><span>{{ number_format($this->viewingSale->total, 0, ',', ' ') }} FCFA</span></div>
                 </div>
             </div>
             <div class="p-lg border-t border-outline-variant flex justify-center gap-sm">
-                <button type="button" wire:click="exportSaleTicketPdf('{{ $this->viewingSale->id }}')" wire:loading.attr="disabled" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest flex items-center gap-xs disabled:opacity-50"><span class="material-symbols-outlined text-[16px]">download</span>Télécharger PDF</button>
-                <button type="button" wire:click="closeDrawer" class="px-md py-sm rounded-lg border border-outline-variant text-outline text-sm font-bold hover:bg-surface-zebra">Fermer</button>
+                <button type="button" wire:click="exportSaleTicketPdf('{{ $this->viewingSale->id }}')" wire:loading.attr="disabled" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest flex items-center gap-xs disabled:opacity-50"><span class="material-symbols-outlined text-[16px]">download</span>{{ __('ventes.btn_telecharger_pdf') }}</button>
+                <button type="button" wire:click="closeDrawer" class="px-md py-sm rounded-lg border border-outline-variant text-outline text-sm font-bold hover:bg-surface-zebra">{{ __('ventes.btn_fermer') }}</button>
             </div>
         </div>
     @endif

@@ -1,10 +1,10 @@
 <div>
     <x-tab-page
         :tabs="[
-            ['key' => 'liste', 'label' => 'Liste des Clients', 'icon' => 'groups'],
-            ['key' => 'dettes', 'label' => 'Suivi des Dettes', 'icon' => 'request_quote'],
-            ['key' => 'relances', 'label' => 'Relances Clients', 'icon' => 'notifications_active'],
-            ['key' => 'avances', 'label' => 'Historique Avances', 'icon' => 'savings'],
+            ['key' => 'liste', 'label' => __('ventes.tab_liste_clients'), 'icon' => 'groups'],
+            ['key' => 'dettes', 'label' => __('ventes.tab_suivi_dettes'), 'icon' => 'request_quote'],
+            ['key' => 'relances', 'label' => __('ventes.tab_relances_clients'), 'icon' => 'notifications_active'],
+            ['key' => 'avances', 'label' => __('ventes.tab_historique_avances_court'), 'icon' => 'savings'],
         ]"
         :active="$tab">
 

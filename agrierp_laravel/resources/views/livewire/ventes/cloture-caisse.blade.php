@@ -3,9 +3,9 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-sm">
             <div>
                 <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                    <span class="material-symbols-outlined text-brand-emerald text-[26px]">point_of_sale</span>Clôture de Caisse
+                    <span class="material-symbols-outlined text-brand-emerald text-[26px]">point_of_sale</span>{{ __('ventes.titre_cloture_caisse') }}
                 </h2>
-                <p class="text-xs text-outline mt-xs">Rapprochement quotidien entre la caisse physique et les ventes enregistrées.</p>
+                <p class="text-xs text-outline mt-xs">{{ __('ventes.desc_cloture_caisse') }}</p>
             </div>
         </div>
     </div>
@@ -13,11 +13,11 @@
     {{-- Sélecteur de date --}}
     <div class="bg-white border border-outline-variant rounded-lg p-md flex flex-wrap items-center gap-sm">
         <span class="material-symbols-outlined text-outline text-[18px]">calendar_month</span>
-        <label class="text-xs text-on-surface font-medium">Date de clôture :</label>
+        <label class="text-xs text-on-surface font-medium">{{ __('ventes.label_date_cloture') }}</label>
         <input wire:model.live="closureDate" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-1.5">
         @if($dejaValidee)
             <span class="inline-flex items-center gap-xs bg-success-green/10 text-success-green border border-success-green/30 text-[10px] font-bold px-sm py-1 rounded-full">
-                <span class="material-symbols-outlined text-[14px]">check_circle</span>Clôture déjà validée
+                <span class="material-symbols-outlined text-[14px]">check_circle</span>{{ __('ventes.msg_cloture_deja_validee') }}
             </span>
         @endif
     </div>
@@ -25,15 +25,15 @@
     {{-- Résumé des ventes du jour --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Ventes Espèces</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">payments</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_ventes_especes') }}</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">payments</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($ventesEspeces, 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Ventes Mobile Money</span><span class="material-symbols-outlined text-[18px] text-info-blue">smartphone</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_ventes_mobile_money') }}</span><span class="material-symbols-outlined text-[18px] text-info-blue">smartphone</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($ventesMobileMoney, 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-accent-yellow shadow-sm">
-            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">Ventes Virement</span><span class="material-symbols-outlined text-[18px] text-brand-forest">account_balance</span></div>
+            <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_ventes_virement') }}</span><span class="material-symbols-outlined text-[18px] text-brand-forest">account_balance</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($ventesVirement, 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
         </div>
     </div>
@@ -41,12 +41,12 @@
     {{-- Formulaire de saisie --}}
     <div class="bg-white border border-outline-variant rounded-lg p-md">
         <h3 class="text-sm font-bold text-on-surface mb-md flex items-center gap-xs">
-            <span class="material-symbols-outlined text-[18px] text-brand-emerald">calculate</span>Saisie de la caisse physique
+            <span class="material-symbols-outlined text-[18px] text-brand-emerald">calculate</span>{{ __('ventes.titre_saisie_caisse') }}
         </h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
             <div>
-                <label class="block text-xs text-on-surface font-medium mb-xs">Fond de caisse (début de journée) <span class="text-error-red">*</span></label>
+                <label class="block text-xs text-on-surface font-medium mb-xs">{{ __('ventes.label_fond_caisse') }} <span class="text-error-red">*</span></label>
                 <div class="relative">
                     <input wire:model.live="fondDeCaisse" type="number" min="0" step="1" placeholder="0"
                         class="w-full border border-outline-variant rounded-lg px-sm py-2 text-sm pr-16 @if($dejaValidee) bg-gray-50 opacity-60 @endif"
@@ -55,7 +55,7 @@
                 </div>
             </div>
             <div>
-                <label class="block text-xs text-on-surface font-medium mb-xs">Montant compté (fin de journée) <span class="text-error-red">*</span></label>
+                <label class="block text-xs text-on-surface font-medium mb-xs">{{ __('ventes.label_montant_compte') }} <span class="text-error-red">*</span></label>
                 <div class="relative">
                     <input wire:model.live="montantCompte" type="number" min="0" step="1" placeholder="0"
                         class="w-full border border-outline-variant rounded-lg px-sm py-2 text-sm pr-16 @if($dejaValidee) bg-gray-50 opacity-60 @endif"
@@ -70,7 +70,7 @@
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-on-surface flex items-center gap-xs">
                     <span class="material-symbols-outlined text-[16px]">{{ $this->ecart > 0 ? 'trending_up' : ($this->ecart < 0 ? 'trending_down' : 'remove') }}</span>
-                    Écart de caisse
+                    {{ __('ventes.label_ecart_caisse') }}
                 </span>
                 <span class="text-lg font-extrabold {{ $this->ecart > 0 ? 'text-success-green' : ($this->ecart < 0 ? 'text-error-red' : 'text-outline') }}">
                     {{ $this->ecart > 0 ? '+' : '' }}{{ number_format($this->ecart, 0, ',', ' ') }} FCFA
@@ -79,9 +79,9 @@
             @if($this->ecart !== 0.0)
                 <p class="text-[10px] text-outline mt-xs">
                     @if($this->ecart > 0)
-                        Excédent : écriture D 571 / C 718 (compte SYSCOHADA 718 — Autres subventions).
+                        {{ __('ventes.info_ecart_excedent') }}
                     @else
-                        Déficit : écriture D 658 / C 571 (compte SYSCOHADA 658 — Charges diverses).
+                        {{ __('ventes.info_ecart_deficit') }}
                     @endif
                 </p>
             @endif
@@ -105,8 +105,8 @@
                 <button wire:click="valider" wire:loading.attr="disabled"
                     class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full shadow-sm disabled:opacity-60">
                     <span class="material-symbols-outlined text-[18px]" wire:loading.class="hidden">check</span>
-                    <span wire:loading.remove>Valider la clôture</span>
-                    <span wire:loading>Validation…</span>
+                    <span wire:loading.remove>{{ __('ventes.btn_valider_cloture') }}</span>
+                    <span wire:loading>{{ __('ventes.msg_validation') }}</span>
                 </button>
             </div>
         @endunless
@@ -116,20 +116,20 @@
     @if($historique->isNotEmpty())
         <div class="bg-white border border-outline-variant rounded-lg p-md">
             <h3 class="text-sm font-bold text-on-surface mb-md flex items-center gap-xs">
-                <span class="material-symbols-outlined text-[18px] text-outline">history</span>Dernières clôtures (web)
+                <span class="material-symbols-outlined text-[18px] text-outline">history</span>{{ __('ventes.titre_dernieres_clotures') }}
             </h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-xs">
                     <thead>
                         <tr class="text-[10px] text-outline uppercase border-b border-outline-variant">
-                            <th class="text-left py-xs pr-sm">Date</th>
-                            <th class="text-right py-xs pr-sm">Espèces</th>
-                            <th class="text-right py-xs pr-sm">Mobile</th>
-                            <th class="text-right py-xs pr-sm">Virement</th>
-                            <th class="text-right py-xs pr-sm">Fond</th>
-                            <th class="text-right py-xs pr-sm">Compté</th>
-                            <th class="text-right py-xs pr-sm">Écart</th>
-                            <th class="text-left py-xs">Statut</th>
+                            <th class="text-left py-xs pr-sm">{{ __('ventes.col_date') }}</th>
+                            <th class="text-right py-xs pr-sm">{{ __('ventes.col_especes_court') }}</th>
+                            <th class="text-right py-xs pr-sm">{{ __('ventes.col_mobile_court') }}</th>
+                            <th class="text-right py-xs pr-sm">{{ __('ventes.col_virement_court') }}</th>
+                            <th class="text-right py-xs pr-sm">{{ __('ventes.col_fond_court') }}</th>
+                            <th class="text-right py-xs pr-sm">{{ __('ventes.col_compte_court') }}</th>
+                            <th class="text-right py-xs pr-sm">{{ __('ventes.col_ecart') }}</th>
+                            <th class="text-left py-xs">{{ __('ventes.col_statut') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/50">

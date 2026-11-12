@@ -2,11 +2,11 @@
     {{-- CONF-4 : sans `manage-ventes` (comptable : lecture), l'onglet de la caisse n'existe pas. --}}
     <x-tab-page
         :tabs="collect([
-            ['key' => 'vente', 'label' => 'Enregistrer Vente', 'icon' => 'point_of_sale'],
-            ['key' => 'devis', 'label' => 'Devis Prestations', 'icon' => 'description'],
-            ['key' => 'historique', 'label' => 'Historique des Ventes', 'icon' => 'history'],
-            ['key' => 'retours', 'label' => 'Retours et Avoirs', 'icon' => 'assignment_return'],
-            ['key' => 'cloture', 'label' => 'Clôture Caisse', 'icon' => 'point_of_sale'],
+            ['key' => 'vente', 'label' => __('ventes.tab_enregistrer_vente'), 'icon' => 'point_of_sale'],
+            ['key' => 'devis', 'label' => __('ventes.tab_devis_prestations'), 'icon' => 'description'],
+            ['key' => 'historique', 'label' => __('ventes.tab_historique_ventes'), 'icon' => 'history'],
+            ['key' => 'retours', 'label' => __('ventes.tab_retours_avoirs'), 'icon' => 'assignment_return'],
+            ['key' => 'cloture', 'label' => __('ventes.tab_cloture_caisse'), 'icon' => 'point_of_sale'],
         ])->reject(fn ($t) => in_array($t['key'], ['vente', 'cloture']) && ! $peutEncaisser)->values()->all()"
         :active="$tab">
 
