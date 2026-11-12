@@ -81,6 +81,7 @@ dev_dependencies:
   build_runner: ^2.4.14
 
 flutter:
+  generate: true
   uses-material-design: true
 
   # ⚠️ LE LOGO EST EMBARQUÉ, PAS CHARGÉ. `pdf-export.js` le tire de
