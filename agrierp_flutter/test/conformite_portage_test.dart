@@ -444,4 +444,70 @@ void main() {
           'déclarer l\'exemption avec sa raison.',
     );
   });
+
+  /// ⚠️⚠️ TICKET E1 — `BoutonAction` : DIMENSIONS MESURÉES SUR LE BLADE (12/11/2026).
+  ///
+  /// Les valeurs de padding, rayon et taille de police sont lues sur les vues
+  /// Blade (`agrierp_laravel/resources/views/livewire/`) et sur la config
+  /// Tailwind (`tailwind.config.js`) :
+  ///   - `px-md`     → 16 px (`AgriSpacing.md`)
+  ///   - `py-sm`     →  8 px (`AgriSpacing.sm`)
+  ///   - `rounded-lg`→  8 px (`AgriRadius.lg`, `borderRadius.lg = 0.5rem = 8px`)
+  ///   - `text-sm`   → 14 px
+  ///
+  /// Ce test lit le SOURCE de `bouton_action.dart` : un déplacement des
+  /// constantes ou un changement de valeur le fait rougir immédiatement,
+  /// avant tout rendu.
+  test('⚠️⚠️ BoutonAction : dimensions conformes au Blade (E1)', () {
+    final source = File('lib/core/widgets/bouton_action.dart').readAsStringSync();
+
+    // Le fichier existe.
+    expect(
+      source,
+      isNotEmpty,
+      reason: 'lib/core/widgets/bouton_action.dart est absent ou vide.',
+    );
+
+    // Le widget porte bien le nom attendu.
+    expect(
+      source,
+      contains('class BoutonAction'),
+      reason: 'Le widget BoutonAction est introuvable dans bouton_action.dart.',
+    );
+
+    // L'enum de variante est déclaré.
+    expect(
+      source,
+      contains('enum VarianteBouton'),
+      reason: 'L\'enum VarianteBouton est absent de bouton_action.dart.',
+    );
+
+    // Padding horizontal : px-md = AgriSpacing.md = 16 px.
+    expect(
+      source,
+      contains('_paddingH = AgriSpacing.md'),
+      reason: 'Padding horizontal attendu : AgriSpacing.md (px-md = 16 px, mesuré sur le Blade).',
+    );
+
+    // Padding vertical : py-sm = AgriSpacing.sm = 8 px.
+    expect(
+      source,
+      contains('_paddingV = AgriSpacing.sm'),
+      reason: 'Padding vertical attendu : AgriSpacing.sm (py-sm = 8 px, mesuré sur le Blade).',
+    );
+
+    // Rayon de bordure : rounded-lg = AgriRadius.lg = 8 px.
+    expect(
+      source,
+      contains('_rayon = AgriRadius.lg'),
+      reason: 'Rayon attendu : AgriRadius.lg (rounded-lg = 8 px, mesuré sur le Blade).',
+    );
+
+    // Taille de police : text-sm = 14 px.
+    expect(
+      source,
+      contains('_taillePolicePx = 14'),
+      reason: 'Taille de police attendue : 14 px (text-sm, mesurée sur le Blade).',
+    );
+  });
 }

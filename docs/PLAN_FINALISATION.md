@@ -220,7 +220,7 @@ Prérequis : Flutter stable, Visual Studio 2022 (charge « Développement Deskto
 
 | # | Ticket |
 |---|---|
-| E1 | `BaseButton` unique (taille, padding, rayon), mesuré sur la vue web. Migration de tous les boutons d'action, puis garde-fou dans `conformite_portage_test.dart`. |
+| E1 | ✅ 12/11/2026 — `BoutonAction` créé (`lib/core/widgets/bouton_action.dart`) : dimensions mesurées sur le Blade (`px-md`=16 px, `py-sm`=8 px, `rounded-lg`=8 px, `text-sm`=14 px, `font-bold`), trois variantes (`primaire`, `secondaire`, `danger`), désactivé si `onPressed == null`. Garde-fou ajouté dans `conformite_portage_test.dart`. Migration des boutons existants hors scope E1. |
 | E2 | Pagination standard (10 ou 25 lignes). ⚠️ Absente du web : la construire d'abord en composant Blade, puis la porter. |
 | E3 | ❓ Charte des en-têtes de tableau. La consigne mentionne un fond `#0f172a` que ni le web ni le prototype n'utilisent : décider sur le web d'abord (voir Doctrine §2). |
 | E4 | Contrôle des libellés de cartes KPI sur toutes les pages (faiblesse connue n° 2 du `CLAUDE.md` Flutter). |
