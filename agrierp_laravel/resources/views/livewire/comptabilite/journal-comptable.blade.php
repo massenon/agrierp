@@ -2,26 +2,26 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md mb-lg">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">account_balance</span>Journal Comptable
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">account_balance</span>{{ __('comptabilite.journal_titre') }}
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Écritures comptables, double entrée SYSCOHADA.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">{{ __('comptabilite.journal_sous_titre') }}</p>
         </div>
         <div class="flex items-center gap-xs">
             <button type="button" wire:click="exportJournalPdf" wire:loading.attr="disabled" wire:target="exportJournalPdf" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all disabled:opacity-50">
-                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('comptabilite.journal_exporter_pdf') }}
             </button>
             @can('manage-comptabilite')
             <button @lectureSeule type="button" wire:click="newEntry" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>Saisie d'Écriture
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('comptabilite.journal_saisie_ecriture') }}
             </button>
             @endcan
         </div>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
-        <x-kpi-card label="Écritures (mois)" icon="receipt_long" color="emerald" :value="$this->kpis['ecritures_mois']" />
-        <x-kpi-card label="Total Débit" icon="arrow_downward" color="blue" :value="number_format($this->kpis['total_debit'], 0, ',', ' ').' F'" />
-        <x-kpi-card label="Total Crédit" icon="arrow_upward" color="maize" :value="number_format($this->kpis['total_credit'], 0, ',', ' ').' F'" />
+        <x-kpi-card :label="__('comptabilite.journal_kpi_ecritures_mois')" icon="receipt_long" color="emerald" :value="$this->kpis['ecritures_mois']" />
+        <x-kpi-card :label="__('comptabilite.journal_kpi_total_debit')" icon="arrow_downward" color="blue" :value="number_format($this->kpis['total_debit'], 0, ',', ' ').' F'" />
+        <x-kpi-card :label="__('comptabilite.journal_kpi_total_credit')" icon="arrow_upward" color="maize" :value="number_format($this->kpis['total_credit'], 0, ',', ' ').' F'" />
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -35,13 +35,13 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">N° Pièce</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Date</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Libellé</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Débit</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Crédit</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Montant</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_piece') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_date') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_libelle') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_debit') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_credit') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_montant') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.journal_col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -62,17 +62,17 @@
                             <td data-label="Montant" class="px-md py-sm text-xs text-right font-bold">{{ number_format($entry->total_debit, 0, ',', ' ') }}</td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 @if($entry->is_locked)
-                                    <span class="material-symbols-outlined text-[16px] text-outline align-middle" title="Écriture verrouillée (exercice clôturé)">lock</span>
+                                    <span class="material-symbols-outlined text-[16px] text-outline align-middle" title="{{ __('comptabilite.journal_ecriture_verrouillee') }}">lock</span>
                                 @elseif(auth()->user()->can('manage-comptabilite'))
                                     <button @lectureSeule type="button" wire:click="editEntry('{{ $entry->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                     <button @lectureSeule type="button" wire:click="archiveEntry('{{ $entry->id }}')" class="text-error-deep hover:text-red-800 p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">archive</span></button>
                                 @else
-                                    <span class="text-outline text-[10px] italic">Lecture seule</span>
+                                    <span class="text-outline text-[10px] italic">{{ __('comptabilite.lecture_seule') }}</span>
                                 @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-md py-lg text-center text-outline">Aucune écriture pour le moment.</td></tr>
+                        <tr><td colspan="7" class="px-md py-lg text-center text-outline">{{ __('comptabilite.journal_vide') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -82,23 +82,23 @@
 
     <x-modal name="modal-create-journal-comptable" max-width="md">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">{{ $editingId ? "Modifier l'Écriture" : "Saisie d'Écriture" }}</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ $editingId ? __('comptabilite.journal_modal_modifier') : __('comptabilite.journal_saisie_ecriture') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-journal-comptable' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="saveEntry" class="space-y-md">
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Date de l'écriture *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('comptabilite.journal_form_date') }}</label>
                 <input wire:model="entryDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Libellé *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('comptabilite.journal_form_libelle') }}</label>
                 <input wire:model="label" type="text" placeholder="ex : Achat aliment ponte" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('label') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('label') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Compte à débiter *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('comptabilite.journal_form_compte_debit') }}</label>
                 <select wire:model="debitAccountId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('debitAccountId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('comptabilite.selectionner') }}</option>
                     @foreach($this->accounts as $account)
                         <option value="{{ $account->id }}">{{ $account->code }} - {{ $account->label }}</option>
                     @endforeach
@@ -106,9 +106,9 @@
                 @error('debitAccountId') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Compte à créditer *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('comptabilite.journal_form_compte_credit') }}</label>
                 <select wire:model="creditAccountId" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('creditAccountId') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('comptabilite.selectionner') }}</option>
                     @foreach($this->accounts as $account)
                         <option value="{{ $account->id }}">{{ $account->code }} - {{ $account->label }}</option>
                     @endforeach
@@ -116,13 +116,13 @@
                 @error('creditAccountId') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Montant (FCFA) *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('comptabilite.journal_form_montant') }}</label>
                 <input wire:model="amount" type="number" min="1" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('amount') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('amount') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-journal-comptable' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-journal-comptable' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('comptabilite.annuler') }}</button>
+                <button @lectureSeule type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ __('comptabilite.enregistrer') }}</button>
             </div>
         </form>
     </x-modal>

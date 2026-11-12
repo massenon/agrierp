@@ -2,21 +2,21 @@
     <div class="border-b border-outline-variant pb-md mb-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-sm">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">insights</span>Comptabilité Analytique
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">insights</span>{{ __('comptabilite.analytique_titre') }}
             </h2>
-            <p class="text-xs text-outline mt-xs">Marges réelles par espèce/filière — croisement des charges (Classe 6) et produits (Classe 7).</p>
+            <p class="text-xs text-outline mt-xs">{{ __('comptabilite.analytique_sous_titre') }}</p>
         </div>
         <button type="button" wire:click="exportComptaAnalytiquePdf" wire:loading.attr="disabled" wire:target="exportComptaAnalytiquePdf" class="flex items-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full disabled:opacity-50">
-            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('comptabilite.analytique_exporter_pdf') }}
         </button>
     </div>
 
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
         <input wire:model.live="startDate" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-        <span class="text-xs text-outline">au</span>
+        <span class="text-xs text-outline">{{ __('comptabilite.analytique_au') }}</span>
         <input wire:model.live="endDate" type="date" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
         <select wire:model.live="filiereFilter" class="text-xs border border-outline-variant rounded-lg px-sm py-2 bg-white">
-            <option value="">Filière : Toutes</option>
+            <option value="">{{ __('comptabilite.analytique_filiere_toutes') }}</option>
             @foreach($this->filieres as $f)
                 <option value="{{ $f->label }}">{{ $f->label }}</option>
             @endforeach
@@ -24,15 +24,15 @@
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
-        <x-kpi-card label="Chiffre d'Affaires Analytique" icon="payments" color="emerald" :value="number_format($this->kpis['ca'], 0, ',', ' ').' F'" />
-        <x-kpi-card label="Charges Directes" icon="trending_down" color="red" :value="number_format($this->kpis['charges'], 0, ',', ' ').' F'" />
-        <x-kpi-card label="Marge Brute Opérationnelle" icon="trending_up" color="emerald" :value="number_format($this->kpis['marge'], 0, ',', ' ').' F'" />
-        <x-kpi-card label="Taux de Rentabilité" icon="percent" color="maize" :value="$this->kpis['taux'] !== null ? $this->kpis['taux'].' %' : '—'" />
+        <x-kpi-card :label="__('comptabilite.analytique_kpi_ca')" icon="payments" color="emerald" :value="number_format($this->kpis['ca'], 0, ',', ' ').' F'" />
+        <x-kpi-card :label="__('comptabilite.analytique_kpi_charges')" icon="trending_down" color="red" :value="number_format($this->kpis['charges'], 0, ',', ' ').' F'" />
+        <x-kpi-card :label="__('comptabilite.analytique_kpi_marge')" icon="trending_up" color="emerald" :value="number_format($this->kpis['marge'], 0, ',', ' ').' F'" />
+        <x-kpi-card :label="__('comptabilite.analytique_kpi_taux')" icon="percent" color="maize" :value="$this->kpis['taux'] !== null ? $this->kpis['taux'].' %' : '—'" />
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-md">
         <div class="bg-white rounded-lg border border-outline-variant shadow-sm p-md">
-            <h3 class="text-sm font-bold text-brand-forest mb-md">Chiffre d'Affaires vs Coûts Directs par Filière</h3>
+            <h3 class="text-sm font-bold text-brand-forest mb-md">{{ __('comptabilite.analytique_graphe_titre') }}</h3>
             @php
                 $rows = $this->rows;
                 $maxVal = max(1, $rows->max(fn($r) => max($r['ca'], $r['charges'])));
@@ -51,16 +51,16 @@
                 @endforeach
             </svg>
             <div class="flex items-center gap-lg mt-sm text-xs">
-                <span class="flex items-center gap-xs text-outline"><span class="w-3 h-3 rounded-full bg-brand-emerald inline-block"></span>Chiffre d'affaires</span>
-                <span class="flex items-center gap-xs text-outline"><span class="w-3 h-3 rounded-full bg-accent-yellow inline-block"></span>Coûts directs</span>
+                <span class="flex items-center gap-xs text-outline"><span class="w-3 h-3 rounded-full bg-brand-emerald inline-block"></span>{{ __('comptabilite.analytique_legende_ca') }}</span>
+                <span class="flex items-center gap-xs text-outline"><span class="w-3 h-3 rounded-full bg-accent-yellow inline-block"></span>{{ __('comptabilite.analytique_legende_couts') }}</span>
             </div>
         </div>
         <div class="bg-white rounded-lg border border-outline-variant shadow-sm p-md">
-            <h3 class="text-sm font-bold text-brand-forest mb-md">Top 3 Charges (Filière Sélectionnée)</h3>
+            <h3 class="text-sm font-bold text-brand-forest mb-md">{{ __('comptabilite.analytique_top3_titre') }}</h3>
             @if($this->selectedTopCharges === null)
-                <p class="text-xs text-outline">Sélectionnez une filière pour voir le détail des charges principales.</p>
+                <p class="text-xs text-outline">{{ __('comptabilite.analytique_top3_selectionner') }}</p>
             @elseif($this->selectedTopCharges->isEmpty())
-                <p class="text-xs text-outline">Aucune charge directe sur cette filière pour la période sélectionnée.</p>
+                <p class="text-xs text-outline">{{ __('comptabilite.analytique_top3_vide') }}</p>
             @else
                 <div class="space-y-sm">
                     @foreach($this->selectedTopCharges as $charge)
@@ -79,11 +79,11 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Filière</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">CA (FCFA)</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Charges (FCFA)</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Marge (FCFA)</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Taux</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.analytique_col_filiere') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.analytique_col_ca') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.analytique_col_charges') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.analytique_col_marge') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.analytique_col_taux') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -96,7 +96,7 @@
                             <td class="px-md py-sm text-xs text-right">{{ $row['taux'] !== null ? $row['taux'].' %' : '—' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">Aucune filière active.</td></tr>
+                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">{{ __('comptabilite.analytique_vide') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -2,19 +2,19 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md mb-lg">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">balance</span>Balance Générale
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">balance</span>{{ __('comptabilite.balance_titre') }}
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Synthèse des soldes de tous les comptes utilisés — vérification de l'équilibre avant clôture.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">{{ __('comptabilite.balance_sous_titre') }}</p>
         </div>
         <button type="button" wire:click="exportBalancePdf" wire:loading.attr="disabled" wire:target="exportBalancePdf" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all disabled:opacity-50">
-            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('comptabilite.balance_exporter_pdf') }}
         </button>
     </div>
 
     <x-anouveaux-provisoires :ouverture="$this->balance['ouverture']" />
 
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-lg flex flex-wrap items-center gap-sm">
-        <label for="bal-periode-select" class="text-[10px] text-brand-forest font-bold uppercase">Période :</label>
+        <label for="bal-periode-select" class="text-[10px] text-brand-forest font-bold uppercase">{{ __('comptabilite.balance_periode_label') }}</label>
         <select id="bal-periode-select" wire:model.live="periode" class="text-sm font-bold border border-outline-variant rounded-lg px-md py-2 bg-white focus:ring-2 focus:ring-brand-emerald outline-none">
             <option value="mois">{{ $this->libellesPeriode['mois'] }}</option>
             <option value="exercice">{{ $this->libellesPeriode['exercice'] }}</option>
@@ -23,15 +23,15 @@
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-md mb-lg">
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
-            <span class="text-[10px] text-outline font-bold uppercase block">Total Débits (Soldes Finaux)</span>
+            <span class="text-[10px] text-outline font-bold uppercase block">{{ __('comptabilite.balance_total_debits_finals') }}</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->balance['total_final_debit'], 0, ',', ' ') }} F</span>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
-            <span class="text-[10px] text-outline font-bold uppercase block">Total Crédits (Soldes Finaux)</span>
+            <span class="text-[10px] text-outline font-bold uppercase block">{{ __('comptabilite.balance_total_credits_finals') }}</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs">{{ number_format($this->balance['total_final_credit'], 0, ',', ' ') }} F</span>
         </div>
         <div class="p-md rounded-lg border shadow-sm {{ $this->balance['is_balanced'] ? 'border-brand-emerald/30 bg-brand-emerald/5' : 'border-error-red/30 bg-error-red/10' }}">
-            <span class="text-[10px] text-outline font-bold uppercase block">Écart (doit être 0)</span>
+            <span class="text-[10px] text-outline font-bold uppercase block">{{ __('comptabilite.balance_ecart') }}</span>
             <span class="text-lg md:text-2xl font-extrabold block mt-xs {{ $this->balance['is_balanced'] ? 'text-brand-emerald' : 'text-error-deep' }}">
                 {{ number_format($this->balance['ecart'], 0, ',', ' ') }} F
             </span>
@@ -42,8 +42,8 @@
         <div class="bg-error-red/10 border border-error-red/30 rounded-lg p-md mb-lg flex items-start gap-sm">
             <span class="material-symbols-outlined text-error-deep text-[20px]">warning</span>
             <div>
-                <p class="text-xs font-bold text-error-deep">Balance Déséquilibrée</p>
-                <p class="text-[11px] text-error-deep mt-xs">Une anomalie de saisie doit être corrigée avant toute clôture (périodique ou annuelle) de l'exercice.</p>
+                <p class="text-xs font-bold text-error-deep">{{ __('comptabilite.balance_desequilibree_titre') }}</p>
+                <p class="text-[11px] text-error-deep mt-xs">{{ __('comptabilite.balance_desequilibree_msg') }}</p>
             </div>
         </div>
     @endunless
@@ -53,19 +53,19 @@
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase" rowspan="2">N° Compte</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase" rowspan="2">Libellé</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase" colspan="2">Solde Ouverture</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase" colspan="2">Mouvements Période</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase" colspan="2">Solde Final</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase" rowspan="2">{{ __('comptabilite.balance_col_numero') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase" rowspan="2">{{ __('comptabilite.balance_col_libelle') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase" colspan="2">{{ __('comptabilite.balance_en_tete_ouverture') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase" colspan="2">{{ __('comptabilite.balance_en_tete_mouvements') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase" colspan="2">{{ __('comptabilite.balance_en_tete_final') }}</th>
                     </tr>
                     <tr class="bg-surface-zebra border-b border-outline-variant">
-                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">Débit</th>
-                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">Crédit</th>
-                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">Débit</th>
-                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">Crédit</th>
-                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">Débit</th>
-                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">Crédit</th>
+                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_col_ouv_debit') }}</th>
+                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_col_ouv_credit') }}</th>
+                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_col_mvt_debit') }}</th>
+                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_col_mvt_credit') }}</th>
+                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_col_fin_debit') }}</th>
+                        <th class="px-md py-xs text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_col_fin_credit') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,13 +81,13 @@
                             <td data-label="Solde Final Crédit" class="px-md py-sm text-xs text-right font-bold text-error-deep">{{ $row['final_credit'] > 0 ? number_format($row['final_credit'], 0, ',', ' ') : '—' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="px-md py-lg text-center text-outline">Aucun compte mouvementé sur cette période.</td></tr>
+                        <tr><td colspan="8" class="px-md py-lg text-center text-outline">{{ __('comptabilite.balance_vide') }}</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($this->balance['rows']) > 0)
                     <tfoot>
                         <tr class="bg-brand-forest text-white font-bold">
-                            <td class="px-md py-sm text-xs" colspan="2">TOTAUX</td>
+                            <td class="px-md py-sm text-xs" colspan="2">{{ __('comptabilite.balance_totaux') }}</td>
                             <td class="px-md py-sm text-xs text-right">{{ number_format($this->balance['total_opening_debit'], 0, ',', ' ') }}</td>
                             <td class="px-md py-sm text-xs text-right">{{ number_format($this->balance['total_opening_credit'], 0, ',', ' ') }}</td>
                             <td class="px-md py-sm text-xs text-right">{{ number_format($this->balance['total_period_debit'], 0, ',', ' ') }}</td>

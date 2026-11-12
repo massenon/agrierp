@@ -2,10 +2,10 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md mb-lg">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">schedule</span>Balance Âgée
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">schedule</span>{{ __('comptabilite.balance_agee_titre') }}
             </h2>
             <p class="text-xs lg:text-sm text-outline mt-xs">
-                Encours par ancienneté de retard — qui relancer, et dans quel ordre.
+                {{ __('comptabilite.balance_agee_sous_titre') }}
             </p>
         </div>
     </div>
@@ -19,15 +19,15 @@
 
     <div class="bg-white border border-outline-variant rounded-lg p-md mb-lg flex flex-wrap items-center gap-md">
         <div class="flex items-center gap-sm">
-            <label for="ba-volet" class="text-[10px] text-brand-forest font-bold uppercase">Volet :</label>
+            <label for="ba-volet" class="text-[10px] text-brand-forest font-bold uppercase">{{ __('comptabilite.balance_agee_volet_label') }}</label>
             <select id="ba-volet" wire:model.live="volet"
                 class="text-sm font-bold border border-outline-variant rounded-lg px-md py-2 bg-white focus:ring-2 focus:ring-brand-emerald outline-none">
-                <option value="creances">Créances clients</option>
-                <option value="dettes">Dettes fournisseurs</option>
+                <option value="creances">{{ __('comptabilite.balance_agee_creances') }}</option>
+                <option value="dettes">{{ __('comptabilite.balance_agee_dettes') }}</option>
             </select>
         </div>
         <div class="flex items-center gap-sm">
-            <label for="ba-arrete" class="text-[10px] text-brand-forest font-bold uppercase">Arrêté au :</label>
+            <label for="ba-arrete" class="text-[10px] text-brand-forest font-bold uppercase">{{ __('comptabilite.balance_agee_arrete_label') }}</label>
             <input id="ba-arrete" type="date" wire:model.live="arrete"
                 class="text-sm font-bold border border-outline-variant rounded-lg px-md py-2 bg-white focus:ring-2 focus:ring-brand-emerald outline-none">
         </div>
@@ -50,32 +50,32 @@
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">
-                            {{ $volet === 'dettes' ? 'Fournisseur' : 'Client' }}
+                            {{ $volet === 'dettes' ? __('comptabilite.balance_agee_col_fournisseur') : __('comptabilite.balance_agee_col_client') }}
                         </th>
                         @foreach($this->tranches as $tranche)
                             <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ $tranche }}</th>
                         @endforeach
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Total</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('comptabilite.balance_agee_col_total') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($this->donnees['tiers'] as $i => $tiers)
                         <tr class="rrow border-b border-outline-variant {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
-                            <td data-label="{{ $volet === 'dettes' ? 'Fournisseur' : 'Client' }}"
+                            <td data-label="{{ $volet === 'dettes' ? __('comptabilite.balance_agee_col_fournisseur') : __('comptabilite.balance_agee_col_client') }}"
                                 class="px-md py-sm text-xs font-bold text-brand-forest">{{ $tiers['nom'] }}</td>
                             @foreach($this->tranches as $tranche)
                                 <td data-label="{{ $tranche }}" class="px-md py-sm text-xs text-right">
                                     {{ $tiers['tranches'][$tranche] > 0 ? number_format($tiers['tranches'][$tranche], 0, ',', ' ') : '—' }}
                                 </td>
                             @endforeach
-                            <td data-label="Total" class="px-md py-sm text-xs text-right font-bold text-brand-forest">
+                            <td data-label="{{ __('comptabilite.balance_agee_col_total') }}" class="px-md py-sm text-xs text-right font-bold text-brand-forest">
                                 {{ number_format($tiers['total'], 0, ',', ' ') }}
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="{{ count($this->tranches) + 2 }}" class="px-md py-lg text-center text-outline text-xs">
-                                Aucun encours à cette date — tout est soldé.
+                                {{ __('comptabilite.balance_agee_vide') }}
                             </td>
                         </tr>
                     @endforelse
@@ -83,7 +83,7 @@
                 @if(count($this->donnees['tiers']) > 0)
                     <tfoot class="bg-brand-emerald/10 border-t-2 border-brand-emerald">
                         <tr>
-                            <td class="px-md py-sm text-xs font-black text-brand-forest uppercase">Total général</td>
+                            <td class="px-md py-sm text-xs font-black text-brand-forest uppercase">{{ __('comptabilite.balance_agee_total_general') }}</td>
                             @foreach($this->tranches as $tranche)
                                 <td class="px-md py-sm text-xs text-right font-bold">
                                     {{ number_format($this->donnees['totaux'][$tranche], 0, ',', ' ') }}
