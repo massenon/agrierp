@@ -73,7 +73,7 @@
                     <input id="date-vente" dusk="date-vente" type="date" wire:model.live="dateVente" max="{{ $this->dateMax }}" @if($this->dateMin) min="{{ $this->dateMin }}" @endif class="w-full h-10 px-md border rounded-lg text-xs bg-white {{ $errors->has('dateVente') ? 'is-invalid' : 'border-outline-variant' }}">
                     @error('dateVente') <p class="invalid-feedback" dusk="date-vente-erreur">{{ $message }}</p> @enderror
                     @if(! $errors->has('dateVente') && $dateVente !== '' && $dateVente < now()->format('Y-m-d'))
-                        <p class="text-[10px] text-outline mt-xs">Vente antérieure : écriture, stock, créance et fiche seront datés du {{ \Carbon\Carbon::parse($dateVente)->format('d/m/Y') }}.</p>
+                        <p class="text-[10px] text-outline mt-xs">{{ __('ventes.info_vente_anterieure_prefixe') }} {{ \Carbon\Carbon::parse($dateVente)->format('d/m/Y') }}.</p>
                     @endif
                 </div>
             </div>
@@ -177,7 +177,7 @@
                             <option value="{{ $lot->id }}">{{ $lot->code }} ({{ $lot->current_quantity }} têtes)</option>
                         @endforeach
                     </select>
-                    <p class="text-[10px] text-outline mt-xs">Nécessaire pour vérifier qu'aucun délai de rémanence vétérinaire n'est actif sur cette bande.</p>
+                    <p class="text-[10px] text-outline mt-xs">{{ __('ventes.aide_bande_remanence') }}</p>
                     @error('weightLotId') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
             @endif
@@ -189,7 +189,7 @@
             <div>
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('ventes.label_montant_global_vente') }}</label>
                 <input wire:model="weightPrice" dusk="weight-price" type="number" placeholder="ex : 8000" class="w-full h-11 px-md border rounded-lg text-sm focus:ring-2 focus:ring-brand-emerald outline-none {{ $errors->has('weightPrice') ? 'is-invalid' : 'border-outline-variant' }}">
-                <p class="text-[10px] text-outline mt-xs">Vente à la pièce : saisir directement le montant total convenu pour l'ensemble de la quantité — jamais un prix unitaire multiplié automatiquement.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('ventes.aide_vente_piece_montant') }}</p>
                 @error('weightPrice') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
         </div>

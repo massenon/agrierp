@@ -81,7 +81,7 @@
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_reste') }}</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_mode') }}</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_statut') }}</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -139,7 +139,7 @@
                 <span class="material-symbols-outlined text-error-deep text-[28px]">warning</span>
             </div>
             <h3 class="font-bold text-lg text-brand-forest mb-xs">{{ __('ventes.titre_annuler_vente') }}</h3>
-            <p class="text-xs text-outline mb-lg">Le stock des produits vendus sera automatiquement réintégré. Cette action est réversible uniquement en recréant une nouvelle vente.</p>
+            <p class="text-xs text-outline mb-lg">{{ __('ventes.aide_annulation_reinsertion') }}</p>
             <div class="flex justify-center gap-sm">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-cancel-sale' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('ventes.btn_annuler') }}</button>
                 <button @lectureSeule type="button" wire:click="cancelSale" class="px-md py-sm rounded-lg bg-error-deep text-white text-sm font-bold hover:bg-red-800">{{ __('ventes.btn_confirmer_annulation') }}</button>
@@ -173,7 +173,7 @@
                 <div class="border-t border-outline-variant pt-md space-y-1 text-xs">
                     <div class="flex justify-between"><span class="text-outline">{{ __('ventes.label_sous_total') }}</span><span>{{ number_format($this->viewingSale->subtotal, 0, ',', ' ') }} FCFA</span></div>
                     <div class="flex justify-between"><span class="text-outline">{{ __('ventes.col_remise') }}</span><span>{{ number_format($this->viewingSale->discount, 0, ',', ' ') }} FCFA</span></div>
-                    <div class="flex justify-between font-bold text-brand-emerald text-sm"><span>Total</span><span>{{ number_format($this->viewingSale->total, 0, ',', ' ') }} FCFA</span></div>
+                    <div class="flex justify-between font-bold text-brand-emerald text-sm"><span>{{ __('ventes.label_total') }}</span><span>{{ number_format($this->viewingSale->total, 0, ',', ' ') }} FCFA</span></div>
                 </div>
             </div>
             <div class="p-lg border-t border-outline-variant flex justify-center gap-sm">

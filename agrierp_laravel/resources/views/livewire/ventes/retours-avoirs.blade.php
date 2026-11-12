@@ -43,7 +43,7 @@
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_decision') }}</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_montant') }}</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_statut') }}</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -72,7 +72,7 @@
                                 @endif
                                 {{-- MECEF-1 — facture d'avoir (FA) : seulement quand la facture d'origine est normalisée. --}}
                                 @if($note->mecef_status)
-                                    <p class="text-[10px] text-outline mt-xs">Avoir MeCeF : {{ \App\Support\MecefEtat::libelle($note->mecef_status) }}@if($note->mecef_status !== 'transmise' && $note->mecef_message) — {{ $note->mecef_message }}@endif</p>
+                                    <p class="text-[10px] text-outline mt-xs">{{ __('ventes.info_mecef_avoir_prefixe') }} {{ \App\Support\MecefEtat::libelle($note->mecef_status) }}@if($note->mecef_status !== 'transmise' && $note->mecef_message) — {{ $note->mecef_message }}@endif</p>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">

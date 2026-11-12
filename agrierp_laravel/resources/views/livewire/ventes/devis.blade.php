@@ -53,7 +53,7 @@
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_validite') }}</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_montant') }}</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_statut') }}</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

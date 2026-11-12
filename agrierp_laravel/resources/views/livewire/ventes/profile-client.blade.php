@@ -73,7 +73,7 @@
 
             @if($tab === 'creances')
                 <table class="w-full text-xs">
-                    <thead><tr class="text-outline border-b border-outline-variant"><th class="text-left py-xs">{{ __('ventes.col_facture') }}</th><th class="text-left py-xs">{{ __('ventes.col_echeance') }}</th><th class="text-left py-xs">{{ __('ventes.col_anciennete') }}</th><th class="text-right py-xs">{{ __('ventes.col_solde_du') }}</th><th class="text-right py-xs">Actions</th></tr></thead>
+                    <thead><tr class="text-outline border-b border-outline-variant"><th class="text-left py-xs">{{ __('ventes.col_facture') }}</th><th class="text-left py-xs">{{ __('ventes.col_echeance') }}</th><th class="text-left py-xs">{{ __('ventes.col_anciennete') }}</th><th class="text-right py-xs">{{ __('ventes.col_solde_du') }}</th><th class="text-right py-xs">{{ __('ventes.col_actions') }}</th></tr></thead>
                     <tbody>
                         @forelse($this->receivables as $i => $r)
                             <tr class="border-b border-outline-variant {{ $i % 2 === 1 ? 'bg-surface-zebra' : '' }}">
@@ -111,13 +111,13 @@
                             <tr class="border-b border-outline-variant">
                                 <td class="py-xs">
                                     @if($reminder->channel === 'whatsapp')
-                                        <span class="inline-flex items-center gap-1 text-brand-emerald font-bold"><span class="material-symbols-outlined text-[14px]">chat</span>WhatsApp</span>
+                                        <span class="inline-flex items-center gap-1 text-brand-emerald font-bold"><span class="material-symbols-outlined text-[14px]">chat</span>{{ __('ventes.canal_whatsapp') }}</span>
                                     @elseif($reminder->channel === 'email')
-                                        <span class="inline-flex items-center gap-1 text-info-blue font-bold"><span class="material-symbols-outlined text-[14px]">mail</span>Email</span>
+                                        <span class="inline-flex items-center gap-1 text-info-blue font-bold"><span class="material-symbols-outlined text-[14px]">mail</span>{{ __('ventes.canal_email') }}</span>
                                     @elseif($reminder->channel === 'appel')
-                                        <span class="inline-flex items-center gap-1 text-brand-forest font-bold"><span class="material-symbols-outlined text-[14px]">call</span>Appel</span>
+                                        <span class="inline-flex items-center gap-1 text-brand-forest font-bold"><span class="material-symbols-outlined text-[14px]">call</span>{{ __('ventes.canal_appel') }}</span>
                                     @else
-                                        <span class="inline-flex items-center gap-1 text-outline font-bold"><span class="material-symbols-outlined text-[14px]">sms</span>SMS</span>
+                                        <span class="inline-flex items-center gap-1 text-outline font-bold"><span class="material-symbols-outlined text-[14px]">sms</span>{{ __('ventes.canal_sms') }}</span>
                                     @endif
                                 </td>
                                 <td class="py-xs">{{ $reminder->reminder_date->format('d/m/Y') }}</td>

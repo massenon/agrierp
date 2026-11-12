@@ -74,7 +74,7 @@
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_total_achats') }}</th>
                         <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_solde_du') }}</th>
                         <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_statut') }}</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('ventes.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -144,7 +144,7 @@
                 <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('ventes.label_ifu') }}</label>
                 <input wire:model="ifu" type="text" inputmode="numeric" maxlength="13" placeholder="13 chiffres (facultatif)" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('ifu') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('ifu') <p class="invalid-feedback">{{ $message }}</p> @enderror
-                <p class="text-[10px] text-outline mt-xs">Préremplit la facture normalisée de ce client. Laissez vide pour un client particulier.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('ventes.aide_ifu_facturation') }}</p>
             </div>
             <div class="flex justify-end gap-sm pt-sm border-t border-outline-variant">
                 <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-client' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('ventes.btn_annuler') }}</button>

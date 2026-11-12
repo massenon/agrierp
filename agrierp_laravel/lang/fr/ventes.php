@@ -322,4 +322,38 @@ return [
     'col_virement_court'             => 'Virement',
     'col_fond_court'                 => 'Fond',
     'col_compte_court'               => 'Compté',
+
+    // ── Colonne Actions (commune à tous les tableaux) ─────────────────────────
+    'col_actions'                    => 'Actions',
+
+    // ── Libellé Total (pied de tableau détail) ───────────────────────────────
+    'label_total'                    => 'Total',
+
+    // ── Textes d'aide contextuels ─────────────────────────────────────────────
+    'aide_annulation_reinsertion'    => 'Le stock des produits vendus sera automatiquement réintégré. Cette action est réversible uniquement en recréant une nouvelle vente.',
+    'aide_ifu_facturation'           => 'Préremplit la facture normalisée de ce client. Laissez vide pour un client particulier.',
+    'aide_bande_remanence'           => 'Nécessaire pour vérifier qu\'aucun délai de rémanence vétérinaire n\'est actif sur cette bande.',
+    'aide_vente_piece_montant'       => 'Vente à la pièce : saisir directement le montant total convenu pour l\'ensemble de la quantité — jamais un prix unitaire multiplié automatiquement.',
+    'aide_modele_relance_temporaire' => 'Ce modèle s\'applique à l\'envoi en cours — la sauvegarde durable des modèles arrive avec Paramètres (aucune table dédiée pour l\'instant).',
+    'info_vente_anterieure_prefixe'  => 'Vente antérieure : écriture, stock, créance et fiche seront datés du',
+
+    // ── Canaux de relance (badge profil client) ───────────────────────────────
+    'canal_whatsapp'                 => 'WhatsApp',
+    'canal_email'                    => 'Email',
+    'canal_appel'                    => 'Appel',
+    'canal_sms'                      => 'SMS',
+
+    // ── Sous-libellés KPI (textes secondaires) ───────────────────────────────
+    'kpi_sous_relances_mois'         => 'Ce mois-ci, par email',
+    'kpi_sous_recouvre_relancees'    => 'Sur créances relancées',
+    'kpi_sous_total_du_clients'      => 'Total dû par les clients',
+    'kpi_sous_a_recouvrer_urgence'   => 'À recouvrer d\'urgence',
+    'kpi_sous_factures_mois'         => 'Factures créées ce mois-ci',
+    'kpi_sous_avances_mois'          => 'Avances sur commandes (mois)',
+
+    // ── Préfixe MeCeF avoir ───────────────────────────────────────────────────
+    'info_mecef_avoir_prefixe'       => 'Avoir MeCeF :',
+
+    // ── Sous-libellé KPI créances échues ─────────────────────────────────────
+    'kpi_sous_echeance_depassee'     => 'Échéance dépassée',
 ];

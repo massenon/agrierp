@@ -15,12 +15,12 @@
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-error-red shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_creances_echues') }}</span><span class="material-symbols-outlined text-[18px] text-error-red">event_busy</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['creances_echues'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
-            <p class="text-[10px] text-outline mt-xs">Échéance dépassée</p>
+            <p class="text-[10px] text-outline mt-xs">{{ __('ventes.kpi_sous_echeance_depassee') }}</p>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-info-blue shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_relances_effectuees') }}</span><span class="material-symbols-outlined text-[18px] text-info-blue">campaign</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ $this->kpis['relances_effectuees'] }} <small class="text-xs font-normal">env.</small></span>
-            <p class="text-[10px] text-outline mt-xs">Ce mois-ci, par email</p>
+            <p class="text-[10px] text-outline mt-xs">{{ __('ventes.kpi_sous_relances_mois') }}</p>
         </div>
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-emerald shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_taux_reponse') }}</span><span class="material-symbols-outlined text-[18px] text-brand-emerald">check_circle</span></div>
@@ -35,7 +35,7 @@
         <div class="kpi-card bg-white rounded-lg border border-outline-variant border-l-brand-forest shadow-sm">
             <div class="flex justify-between items-start"><span class="text-[10px] text-outline font-bold uppercase">{{ __('ventes.kpi_montant_recouvre') }}</span><span class="material-symbols-outlined text-[18px] text-brand-forest">trending_up</span></div>
             <span class="text-lg md:text-2xl font-extrabold text-on-surface block mt-xs">{{ number_format($this->kpis['montant_recouvre'], 0, ',', ' ') }} <small class="text-xs font-normal">FCFA</small></span>
-            <p class="text-[10px] text-outline mt-xs">Sur créances relancées</p>
+            <p class="text-[10px] text-outline mt-xs">{{ __('ventes.kpi_sous_recouvre_relancees') }}</p>
         </div>
     </div>
 
@@ -91,7 +91,7 @@
                     <button type="button" wire:click="insertTag('[MONTANT_DU]')" class="text-[10px] font-bold px-sm py-1 rounded-full border border-outline-variant text-outline hover:bg-surface-zebra">[MONTANT_DU]</button>
                     <button type="button" wire:click="insertTag('[DATE_ECHEANCE]')" class="text-[10px] font-bold px-sm py-1 rounded-full border border-outline-variant text-outline hover:bg-surface-zebra">[DATE_ECHEANCE]</button>
                 </div>
-                <p class="text-[10px] text-outline mt-xs">Ce modèle s'applique à l'envoi en cours — la sauvegarde durable des modèles arrive avec Paramètres (aucune table dédiée pour l'instant).</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('ventes.aide_modele_relance_temporaire') }}</p>
             </div>
         </div>
     </div>
