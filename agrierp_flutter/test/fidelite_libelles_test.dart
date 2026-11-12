@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'chemins_depot.dart';
 import 'inventaire_maquette.g.dart';
 
 /// ⚠️ INSTANTANÉ FIGÉ, NON RÉGÉNÉRABLE : la maquette HTML est retirée du projet (décision du client, 09/11/2026).
@@ -1383,4 +1384,71 @@ void main() {
       );
     },
   );
+
+  // ── Ticket E4 — Libellés des CarteKpi concordants web ↔ poste ───────────
+  //
+  // Les libellés ci-dessous sont lus dans le Blade (le maître, doctrine art. 5)
+  // et vérifiés présents dans les littéraux de chaîne de l'écran Flutter.
+  // Si un Blade est absent (dépôt partiel), le test se saute avec sa raison.
+  group('E4 — libellés CarteKpi concordants avec le Blade', () {
+    String? _saut(String chemin) {
+      final f = File('$dossierLaravel/$chemin');
+      return f.existsSync() ? null : 'SAUT : ${f.path} absent — rien à comparer';
+    }
+
+    String _codesFlutter(String relatif) {
+      final racine = Directory('$dossierLaravel/../agrierp_flutter').path;
+      return chainesDe(File('$racine/$relatif').readAsStringSync());
+    }
+
+    // ── Facturation & MeCeF ──────────────────────────────────────────────────
+    test(
+      'facturation : les libellés CarteKpi concordent avec le Blade',
+      () {
+        final chaines = _codesFlutter('lib/features/ventes/facturation_screen.dart');
+        // Onglet MeCeF — Blade `facturation.blade.php`
+        for (final libelle in [
+          'Transmises MeCeF',
+          'En attente',
+          'Erreurs MeCeF',
+          // Onglet principal
+          'Factures (mois)',
+          'Montant facturé (mois)',
+          'Clients facturés (mois)',
+        ]) {
+          expect(chaines, contains(libelle), reason: 'CarteKpi absent : $libelle');
+        }
+        // Anciens libellés incorrects ne doivent plus figurer dans les littéraux
+        expect(chaines, isNot(contains('Statut "Transmise"')),
+            reason: 'Libellé corrigé (E4) : remplacé par "Transmises MeCeF"');
+        expect(
+          chaines.contains('Erreur MeCeF') &&
+              !chaines.contains('Erreurs MeCeF'),
+          isFalse,
+          reason: 'Libellé corrigé (E4) : doit être "Erreurs MeCeF" (pluriel)',
+        );
+      },
+      skip: _saut('resources/views/livewire/facturation/facturation.blade.php'),
+    );
+
+    // ── RH — Registre Stagiaires ─────────────────────────────────────────────
+    test(
+      'registre stagiaires : les libellés CarteKpi concordent avec le Blade',
+      () {
+        final chaines = _codesFlutter('lib/features/rh/personnel_stages_screen.dart');
+        for (final libelle in [
+          'Stagiaires Actifs',
+          'Frais Collectés',
+          'Frais en Attente',
+          'Attestations Émises',
+        ]) {
+          expect(chaines, contains(libelle), reason: 'CarteKpi absent : $libelle');
+        }
+        // Ancien libellé incorrect ne doit plus figurer dans les littéraux
+        expect(chaines, isNot(contains('Attestations émises')),
+            reason: 'Libellé corrigé (E4) : remplacé par "Attestations Émises"');
+      },
+      skip: _saut('resources/views/livewire/rh/registre-stagiaires.blade.php'),
+    );
+  });
 }

@@ -580,7 +580,7 @@ class _PersonnelStagesScreenState extends State<PersonnelStagesScreen> {
         CarteKpi(
           key: const Key('kpi-stagiaires-attestations'),
           // ⚠️⚠️ UN TIRET, JAMAIS UN ZÉRO. « 0 » affirmerait qu'aucune n'a été délivrée : c'est le décompte du serveur.
-          libelle: 'Attestations émises',
+          libelle: 'Attestations Émises',
           valeur: d.attestationsEmises == null
               ? '—'
               : '${d.attestationsEmises}',

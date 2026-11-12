@@ -265,7 +265,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
               icone: SymbolesAgri.receipt_long,
             ),
             CarteKpi(
-              libelle: 'Statut "Transmise"',
+              libelle: 'Transmises MeCeF',
               valeur: '${d.compte(StatutMecef.transmise)}',
               legende: 'Reçues par le dispositif',
               couleurLisere: AgriColors.infoBlue,
@@ -285,7 +285,7 @@ class _FacturationScreenState extends State<FacturationScreen> {
             // vente n'a pas encore quitté ce poste. Les additionner masquerait
             // lequel des deux problèmes se pose.
             CarteKpi(
-              libelle: 'Erreur MeCeF',
+              libelle: 'Erreurs MeCeF',
               valeur: '${d.compte(StatutMecef.erreur) + d.compte(StatutMecef.expiree)}',
               legende: d.enAttenteDEnvoi > 0
                   ? '${d.enAttenteDEnvoi} facture(s) pas encore envoyée(s)'
