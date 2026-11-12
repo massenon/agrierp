@@ -11,6 +11,7 @@ use App\Models\PurchaseLine;
 use App\Models\StockMovement;
 use App\Services\StockRotationService;
 use App\Support\ExerciceChoisi;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -137,6 +138,16 @@ class GestionStocks extends Component
 
     public string $adjReason = '';
 
+    /** Ticket E2 — nombre de lignes par page du tableau de stock (10 ou 25). */
+    public int $perPage = 10;
+
+    /** Ticket E2 — change le nombre de lignes par page et revient en page 1. */
+    public function changerParPage(int $n): void
+    {
+        $this->perPage = in_array($n, [10, 25]) ? $n : 10;
+        $this->resetPage('pageStockRows');
+    }
+
     public function mount(): void
     {
         $this->addDate = now()->format('Y-m-d');
@@ -172,11 +183,20 @@ class GestionStocks extends Component
         });
     }
 
-    public function getStockRowsProperty()
+    /**
+     * Ticket E2 — retourne un `LengthAwarePaginator` de `$perPage` lignes (10 ou 25).
+     * Les vues réutilisent `$this->stockRows->items()` pour les lignes courantes ;
+     * `<x-pagination :paginator="$this->stockRows" :per-page="$perPage" />` gère le pied.
+     */
+    public function getStockRowsProperty(): LengthAwarePaginator
     {
-        return $this->stockRowsRaw()
+        $tous = $this->stockRowsRaw()
             ->when($this->search, fn ($rows) => $rows->filter(fn ($r) => str_contains(mb_strtolower($r['product']->name), mb_strtolower($this->search)) || str_contains(mb_strtolower($r['product']->sku ?? ''), mb_strtolower($this->search))))
-            ->when($this->categoryFilter, fn ($rows) => $rows->filter(fn ($r) => $r['product']->category_id === $this->categoryFilter));
+            ->when($this->categoryFilter, fn ($rows) => $rows->filter(fn ($r) => $r['product']->category_id === $this->categoryFilter))
+            ->values();
+        $page = max(1, min((int) $this->getPage('pageStockRows'), (int) ceil(max(1, $tous->count()) / $this->perPage)));
+
+        return new LengthAwarePaginator($tous->forPage($page, $this->perPage)->values(), $tous->count(), $this->perPage, $page, ['pageName' => 'pageStockRows']);
     }
 
     /**
@@ -198,7 +218,11 @@ class GestionStocks extends Component
     {
         $this->authorize('view-stocks');
 
-        $rows = $this->stockRows;
+        // Ticket E2 : `stockRows` est désormais un paginateur ; l'export porte TOUTES les lignes filtrées.
+        $rows = $this->stockRowsRaw()
+            ->when($this->search, fn ($r) => $r->filter(fn ($x) => str_contains(mb_strtolower($x['product']->name), mb_strtolower($this->search)) || str_contains(mb_strtolower($x['product']->sku ?? ''), mb_strtolower($this->search))))
+            ->when($this->categoryFilter, fn ($r) => $r->filter(fn ($x) => $x['product']->category_id === $this->categoryFilter))
+            ->values();
 
         $pdf = app(\App\Services\PdfExportService::class)->render(
             'exports.gestion-stocks',

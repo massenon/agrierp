@@ -71,7 +71,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($this->stockRows as $i => $row)
+                            @forelse($this->stockRows->items() as $i => $row)
                                 <tr class="rrow border-b border-outline-variant hover:bg-brand-emerald/5 {{ $i % 2 === 1 ? 'bg-surface-zebra' : 'bg-white' }}">
                                     <td data-label="Code" class="px-md py-sm text-xs font-mono">{{ $row['product']->sku }}</td>
                                     <td data-label="Désignation" class="px-md py-sm text-xs font-bold text-brand-forest">{{ $row['product']->name }}</td>
@@ -105,6 +105,8 @@
                         </tbody>
                     </table>
                 </div>
+                {{-- Ticket E2 — pied de pagination standard (10 ou 25 lignes, sélecteur « Par page »). --}}
+                <x-pagination :paginator="$this->stockRows" :per-page="$perPage" />
             </div>
         </div>
 

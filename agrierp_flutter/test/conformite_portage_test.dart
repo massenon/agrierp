@@ -510,4 +510,44 @@ void main() {
       reason: 'Taille de police attendue : 14 px (text-sm, mesurée sur le Blade).',
     );
   });
+
+  /// ⚠️⚠️ TICKET E2 — `PaginationAgri` : concordance avec `x-pagination` Blade (12/11/2026).
+  ///
+  /// Le composant Blade `components/pagination.blade.php` a été étendu (prop `perPage`, sélecteur 10/25,
+  /// format « X–Y sur Z résultats »). Le poste DOIT porter les mêmes paramètres dans `pagination_agri.dart`
+  /// pour que la parité web ↔ poste reste garantie. Ce test vérifie la présence des paramètres E2 dans le
+  /// source Flutter ; la valeur et le rendu sont vérifiés par `test/selecteur_exercice_test.dart`.
+  test('PaginationAgri : concordance avec x-pagination Blade (E2)', () {
+    final source = File('lib/core/widgets/pagination_agri.dart').readAsStringSync();
+
+    expect(
+      source,
+      isNotEmpty,
+      reason: 'lib/core/widgets/pagination_agri.dart est absent ou vide.',
+    );
+
+    expect(
+      source,
+      contains('class PaginationAgri'),
+      reason: 'Le widget PaginationAgri est introuvable dans pagination_agri.dart.',
+    );
+
+    expect(
+      source,
+      contains('perPage'),
+      reason: 'Le paramètre perPage est absent de PaginationAgri (ticket E2).',
+    );
+
+    expect(
+      source,
+      contains('total'),
+      reason: 'Le paramètre total est absent de PaginationAgri.',
+    );
+
+    expect(
+      source,
+      contains('onPageChanged'),
+      reason: 'Le paramètre onPageChanged est absent de PaginationAgri (ticket E2).',
+    );
+  });
 }
