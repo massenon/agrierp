@@ -2,13 +2,13 @@
     <div class="border-b border-outline-variant pb-md mb-lg flex flex-col sm:flex-row sm:items-end sm:justify-between gap-sm">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">lan</span>Postes &amp; Appairage
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">lan</span>{{ __('parametres.titre_postes_appairage') }}
             </h2>
-            <p class="text-xs text-outline mt-xs">Postes Windows appairés au serveur : un poste est appairé dès qu'un compte s'y connecte, et le reste jusqu'à l'expiration de son jeton ou sa révocation.</p>
+            <p class="text-xs text-outline mt-xs">{{ __('parametres.desc_postes_appairage') }}</p>
         </div>
         <div class="flex flex-wrap gap-sm">
-            <button type="button" wire:click="demander" class="px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">sync</span>Demander la synchronisation des postes</button>
-            <button type="button" wire:click="actualiser" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">refresh</span>Actualiser</button>
+            <button type="button" wire:click="demander" class="px-md py-sm rounded-lg border border-brand-emerald text-brand-emerald text-sm font-semibold flex items-center gap-xs hover:bg-surface-zebra"><span class="material-symbols-outlined text-[18px]">sync</span>{{ __('parametres.btn_demander_synchro') }}</button>
+            <button type="button" wire:click="actualiser" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]">refresh</span>{{ __('parametres.btn_actualiser') }}</button>
         </div>
     </div>
 
@@ -16,15 +16,15 @@
         <table class="rtable w-full text-xs">
             <thead>
                 <tr class="text-left text-outline border-b border-outline-variant">
-                    <th class="py-sm px-md font-semibold">Poste</th>
-                    <th class="py-sm px-md font-semibold">Utilisateur</th>
-                    <th class="py-sm px-md font-semibold">Appairé le</th>
-                    <th class="py-sm px-md font-semibold">Dernier contact</th>
-                    <th class="py-sm px-md font-semibold">Expiration</th>
-                    <th class="py-sm px-md font-semibold">Dernier envoi</th>
-                    <th class="py-sm px-md font-semibold">Dernier contrôle</th>
-                    <th class="py-sm px-md font-semibold">État</th>
-                    <th class="py-sm px-md font-semibold text-right">Actions</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_poste') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_utilisateur') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_appaire_le') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_dernier_contact') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_expiration') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_dernier_envoi') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_dernier_controle') }}</th>
+                    <th class="py-sm px-md font-semibold">{{ __('parametres.col_etat') }}</th>
+                    <th class="py-sm px-md font-semibold text-right">{{ __('parametres.col_actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -41,7 +41,7 @@
                         <td data-label="Utilisateur" class="py-sm px-md">{{ $poste['utilisateur'] }}</td>
                         <td data-label="Appairé le" class="py-sm px-md">{{ $poste['cree_le']?->format('d/m/Y H:i') ?? '—' }}</td>
                         <td data-label="Dernier contact" class="py-sm px-md">{{ $poste['dernier_contact']?->format('d/m/Y H:i') ?? '—' }}</td>
-                        <td data-label="Expiration" class="py-sm px-md">{{ $poste['expire_le']?->format('d/m/Y') ?? 'Sans expiration' }}</td>
+                        <td data-label="Expiration" class="py-sm px-md">{{ $poste['expire_le']?->format('d/m/Y') ?? __('parametres.sans_expiration') }}</td>
                         <td data-label="Dernier envoi" class="py-sm px-md">{{ $poste['dernier_envoi']?->format('d/m/Y H:i') ?? '—' }}</td>
                         <td data-label="Dernier contrôle" class="py-sm px-md">{{ $poste['dernier_controle']?->format('d/m/Y H:i') ?? '—' }}</td>
                         <td data-label="État" class="py-sm px-md"><span class="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] {{ $pastilles[$poste['etat']] }}">{{ $poste['libelle_etat'] }}</span></td>
@@ -58,13 +58,13 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="py-md text-center text-outline">Aucun poste n'est appairé au serveur pour le moment.</td></tr>
+                    <tr><td colspan="9" class="py-md text-center text-outline">{{ __('parametres.msg_aucun_poste') }}</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
     <div class="bg-surface-zebra rounded-lg p-sm text-[11px] text-outline mt-md">
-        « Révoquer l'appairage » supprime les jetons de ce poste, pour tous les comptes qui s'y sont connectés : utile pour un poste perdu, volé ou remplacé. « Demander la synchronisation » dépose une demande que chaque poste connecté lit dans les 30 secondes ; c'est lui qui envoie et reçoit. L'adresse du serveur et l'identifiant de chaque poste se consultent sur le poste lui-même (Paramètres &gt; Appairage).
+        {{ __('parametres.info_appairage') }}
     </div>
 </div>

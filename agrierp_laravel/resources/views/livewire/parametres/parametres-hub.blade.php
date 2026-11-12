@@ -1,18 +1,18 @@
 <div>
     <x-tab-page
         :tabs="[
-            ['key' => 'roles', 'label' => 'Rôles & Permissions', 'icon' => 'admin_panel_settings'],
-            ['key' => 'entreprise', 'label' => 'Données de l\'Entreprise', 'icon' => 'business'],
-            ['key' => 'facturation', 'label' => 'Facturation normalisée (e-MECeF)', 'icon' => 'receipt_long'],
-            ['key' => 'email', 'label' => 'Email (SMTP)', 'icon' => 'mail'],
-            ['key' => 'modules', 'label' => 'Modules Actifs', 'icon' => 'apps'],
-            ['key' => 'utilisateurs', 'label' => 'Gestion Utilisateurs', 'icon' => 'group'],
-            ['key' => 'postes', 'label' => 'Postes & Appairage', 'icon' => 'lan'],
-            ['key' => 'paiement', 'label' => 'Modes de Paiement', 'icon' => 'payments'],
-            ['key' => 'audit', 'label' => 'Audit Logs', 'icon' => 'history'],
-            ['key' => 'corbeille', 'label' => 'Corbeille', 'icon' => 'restore_from_trash'],
-            ['key' => 'reinitialisation', 'label' => 'Réinitialisation', 'icon' => 'restart_alt'],
-            ['key' => 'sauvegardes', 'label' => 'Sauvegardes', 'icon' => 'database'],
+            ['key' => 'roles', 'label' => __('parametres.onglet_roles'), 'icon' => 'admin_panel_settings'],
+            ['key' => 'entreprise', 'label' => __('parametres.onglet_entreprise'), 'icon' => 'business'],
+            ['key' => 'facturation', 'label' => __('parametres.onglet_facturation'), 'icon' => 'receipt_long'],
+            ['key' => 'email', 'label' => __('parametres.onglet_email'), 'icon' => 'mail'],
+            ['key' => 'modules', 'label' => __('parametres.onglet_modules'), 'icon' => 'apps'],
+            ['key' => 'utilisateurs', 'label' => __('parametres.onglet_utilisateurs'), 'icon' => 'group'],
+            ['key' => 'postes', 'label' => __('parametres.onglet_postes'), 'icon' => 'lan'],
+            ['key' => 'paiement', 'label' => __('parametres.onglet_paiement'), 'icon' => 'payments'],
+            ['key' => 'audit', 'label' => __('parametres.onglet_audit'), 'icon' => 'history'],
+            ['key' => 'corbeille', 'label' => __('parametres.onglet_corbeille'), 'icon' => 'restore_from_trash'],
+            ['key' => 'reinitialisation', 'label' => __('parametres.onglet_reinitialisation'), 'icon' => 'restart_alt'],
+            ['key' => 'sauvegardes', 'label' => __('parametres.onglet_sauvegardes'), 'icon' => 'database'],
         ]"
         :active="$tab">
 

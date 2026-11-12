@@ -2,29 +2,29 @@
     <div class="flex flex-col gap-sm lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant pb-md">
         <div>
             <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
-                <span class="material-symbols-outlined text-brand-emerald text-[26px]">manage_accounts</span>Gestion des Utilisateurs
+                <span class="material-symbols-outlined text-brand-emerald text-[26px]">manage_accounts</span>{{ __('parametres.titre_gestion_utilisateurs') }}
             </h2>
-            <p class="text-xs lg:text-sm text-outline mt-xs">Administration des comptes d'accès à LogiAgriERP.</p>
+            <p class="text-xs lg:text-sm text-outline mt-xs">{{ __('parametres.desc_gestion_utilisateurs') }}</p>
         </div>
         <div class="flex items-center gap-xs">
             <button type="button" wire:click="exportUtilisateursPdf" wire:loading.attr="disabled" wire:target="exportUtilisateursPdf" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-brand-forest font-bold text-xs px-md py-sm rounded-full transition-all disabled:opacity-50">
-                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>Exporter PDF
+                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>{{ __('parametres.btn_exporter_pdf') }}
             </button>
             @can('manage-users')
             {{-- Ticket 15.54 — vider les sessions (web et postes), session en cours conservée. --}}
             <button type="button" x-on:click="$dispatch('open-modal', { name: 'modal-vider-sessions' })" class="flex items-center justify-center gap-xs border border-outline-variant hover:bg-surface-zebra text-error-deep font-bold text-xs px-md py-sm rounded-full transition-all">
-                <span class="material-symbols-outlined text-[18px]">logout</span>Déconnecter Toutes les Sessions
+                <span class="material-symbols-outlined text-[18px]">logout</span>{{ __('parametres.btn_deconnecter_sessions') }}
             </button>
             <button type="button" wire:click="newUser" class="flex items-center justify-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full transition-all shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>Nouvel Utilisateur
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>{{ __('parametres.btn_nouvel_utilisateur') }}
             </button>
             @endcan
         </div>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md">
-        <x-kpi-card label="Utilisateurs actifs" icon="group" color="emerald" :value="$this->kpis['utilisateurs_actifs']" />
-        <x-kpi-card label="Rôles définis" icon="badge" color="blue" :value="$this->kpis['roles_definis']" />
+        <x-kpi-card :label="__('parametres.kpi_utilisateurs_actifs')" icon="group" color="emerald" :value="$this->kpis['utilisateurs_actifs']" />
+        <x-kpi-card :label="__('parametres.kpi_roles_definis')" icon="badge" color="blue" :value="$this->kpis['roles_definis']" />
     </div>
 
     <div class="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden">
@@ -34,20 +34,20 @@
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Rechercher..." class="w-full pl-9 pr-md py-2 border border-outline-variant rounded-lg text-xs bg-white outline-none">
             </div>
             <select wire:model.live="statusFilter" class="border border-outline-variant rounded-lg text-xs px-sm py-2 bg-white w-full md:w-auto">
-                <option value="">Tous les statuts</option>
-                <option value="Actif">Actif</option>
-                <option value="Désactivé">Désactivé</option>
+                <option value="">{{ __('parametres.filtre_tous_statuts') }}</option>
+                <option value="Actif">{{ __('parametres.statut_actif') }}</option>
+                <option value="Désactivé">{{ __('parametres.statut_desactive') }}</option>
             </select>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full rtable">
                 <thead class="bg-surface-zebra border-b border-outline-variant">
                     <tr>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Nom</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Email</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Rôle</th>
-                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">Statut</th>
-                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">Actions</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('parametres.col_nom') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('parametres.col_email') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('parametres.col_role') }}</th>
+                        <th class="px-md py-sm text-left text-[10px] text-outline font-bold uppercase">{{ __('parametres.col_statut') }}</th>
+                        <th class="px-md py-sm text-right text-[10px] text-outline font-bold uppercase">{{ __('parametres.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -63,31 +63,31 @@
                             <td data-label="Rôle" class="px-md py-sm text-xs">{{ $user->role_label ?? '—' }}</td>
                             <td data-label="Statut" class="px-md py-sm">
                                 @if($user->is_active)
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">Actif</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-brand-emerald/10 text-brand-emerald border-brand-emerald/30">{{ __('parametres.statut_actif') }}</span>
                                     @if($user->must_change_password)
-                                        <span class="block text-[10px] text-outline mt-xs">Mot de passe à changer</span>
+                                        <span class="block text-[10px] text-outline mt-xs">{{ __('parametres.statut_mdp_changer') }}</span>
                                     @endif
                                 @else
-                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">Désactivé</span>
+                                    <span class="inline-flex items-center px-sm py-[2px] rounded-full text-[11px] font-bold border bg-surface-zebra text-outline border-outline-variant">{{ __('parametres.statut_desactive') }}</span>
                                 @endif
                             </td>
                             <td data-label="Actions" class="px-md py-sm text-right whitespace-nowrap">
                                 @can('manage-users')
-                                <button type="button" wire:click="editUser('{{ $user->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="Modifier"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+                                <button type="button" wire:click="editUser('{{ $user->id }}')" class="text-info-blue hover:text-blue-800 p-1" title="{{ __('parametres.title_modifier') }}"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                 @if($user->is_active)
-                                    <button type="button" wire:click="resetPasswordUser('{{ $user->id }}')" class="text-brand-forest hover:text-brand-emerald p-1" title="Réinitialiser le mot de passe"><span class="material-symbols-outlined text-[18px]">lock_reset</span></button>
-                                    <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-user-{{ $user->id }}' })" class="text-error-deep hover:text-red-800 p-1" title="Archiver"><span class="material-symbols-outlined text-[18px]">archive</span></button>
+                                    <button type="button" wire:click="resetPasswordUser('{{ $user->id }}')" class="text-brand-forest hover:text-brand-emerald p-1" title="{{ __('parametres.title_reinit_mdp') }}"><span class="material-symbols-outlined text-[18px]">lock_reset</span></button>
+                                    <button type="button" x-on:click="$dispatch('open-modal', { name: 'archive-user-{{ $user->id }}' })" class="text-error-deep hover:text-red-800 p-1" title="{{ __('parametres.title_archiver') }}"><span class="material-symbols-outlined text-[18px]">archive</span></button>
                                 @else
-                                    <button type="button" wire:click="reactivateUser('{{ $user->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="Réactiver"><span class="material-symbols-outlined text-[18px]">restart_alt</span></button>
+                                    <button type="button" wire:click="reactivateUser('{{ $user->id }}')" class="text-brand-emerald hover:text-brand-forest p-1" title="{{ __('parametres.title_reactiver') }}"><span class="material-symbols-outlined text-[18px]">restart_alt</span></button>
                                 @endif
                                 @else
-                                <span class="text-outline text-[10px] italic">Lecture seule</span>
+                                <span class="text-outline text-[10px] italic">{{ __('parametres.label_lecture_seule') }}</span>
                                 @endcan
                             </td>
                         </tr>
                         <x-modal-confirm-delete :name="'archive-user-'.$user->id" :item-label="$user->name" :action="'archiveUser(\''.$user->id.'\')'" />
                     @empty
-                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">Aucun utilisateur pour le moment.</td></tr>
+                        <tr><td colspan="5" class="px-md py-lg text-center text-outline">{{ __('parametres.msg_aucun_utilisateur') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -97,60 +97,60 @@
     <x-modal name="modal-vider-sessions" max-width="sm">
         <div class="text-center">
             <span class="material-symbols-outlined text-error-deep" style="font-size:48px;">logout</span>
-            <h3 class="font-bold text-lg text-brand-forest mt-sm">Déconnecter toutes les sessions ?</h3>
-            <p class="text-xs text-outline mt-xs">Tous les utilisateurs du site sont déconnectés et chaque poste Windows devra se reconnecter. Les saisies en attente sur les postes sont conservées et partiront après la reconnexion. Votre propre session reste ouverte. L'action est journalisée.</p>
+            <h3 class="font-bold text-lg text-brand-forest mt-sm">{{ __('parametres.titre_vider_sessions') }}</h3>
+            <p class="text-xs text-outline mt-xs">{{ __('parametres.desc_vider_sessions') }}</p>
             <div class="flex justify-center gap-sm mt-lg">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-vider-sessions' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="button" wire:click="viderSessions" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold">Déconnecter</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-vider-sessions' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('parametres.btn_annuler') }}</button>
+                <button type="button" wire:click="viderSessions" class="px-md py-sm rounded-lg bg-error-red text-white text-sm font-bold">{{ __('parametres.btn_deconnecter') }}</button>
             </div>
         </div>
     </x-modal>
 
     <x-modal name="modal-reinitialiser-mot-de-passe" max-width="sm">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">Réinitialiser le mot de passe</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ __('parametres.titre_reinit_mdp') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-reinitialiser-mot-de-passe' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="reinitialiserMotDePasse" class="space-y-md">
-            <p class="text-xs text-outline">Choisissez un mot de passe temporaire et communiquez-le à la personne. Elle devra le changer à sa première connexion ; ses sessions et ses postes seront déconnectés. L'action est journalisée (jamais le mot de passe).</p>
+            <p class="text-xs text-outline">{{ __('parametres.desc_reinit_mdp') }}</p>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Mot de passe temporaire *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_mdp_temp') }}</label>
                 <input wire:model="motDePasseTemporaire" type="password" autocomplete="new-password" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('motDePasseTemporaire') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('motDePasseTemporaire') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-reinitialiser-mot-de-passe' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Réinitialiser</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-reinitialiser-mot-de-passe' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('parametres.btn_annuler') }}</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ __('parametres.btn_reinitialiser') }}</button>
             </div>
         </form>
     </x-modal>
 
     <x-modal name="modal-create-gestion-utilisateurs" max-width="lg">
         <div class="flex items-center justify-between mb-md">
-            <h3 class="font-bold text-lg text-brand-forest">{{ $editingUserId ? "Modifier l'Utilisateur" : 'Nouvel Utilisateur' }}</h3>
+            <h3 class="font-bold text-lg text-brand-forest">{{ $editingUserId ? __('parametres.titre_modifier_utilisateur') : __('parametres.titre_creer_utilisateur') }}</h3>
             <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-gestion-utilisateurs' })" class="text-outline hover:text-error-deep"><span class="material-symbols-outlined">close</span></button>
         </div>
         <form wire:submit="saveUser" class="space-y-md">
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Nom complet *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_nom_complet') }}</label>
                 <input wire:model="name" type="text" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('name') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('name') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Nom d'utilisateur *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_nom_utilisateur') }}</label>
                 <input wire:model="username" type="text" placeholder="ex : compta" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('username') ? 'is-invalid' : 'border-outline-variant' }}">
-                <p class="text-[10px] text-outline mt-xs">Lettres, chiffres, point, tiret et souligne. Sans arobase.</p>
+                <p class="text-[10px] text-outline mt-xs">{{ __('parametres.aide_nom_utilisateur') }}</p>
                 @error('username') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Email *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_email_utilisateur') }}</label>
                 <input wire:model="email" type="email" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('email') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('email') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">Rôle *</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_role_utilisateur') }}</label>
                 <select wire:model="role" class="w-full h-11 px-md border rounded-lg text-sm bg-white {{ $errors->has('role') ? 'is-invalid' : 'border-outline-variant' }}">
-                    <option value="">-- Sélectionner --</option>
+                    <option value="">{{ __('parametres.placeholder_selectionner') }}</option>
                     @foreach($this->rolesList as $r)
                         <option value="{{ $r->name }}">{{ ucfirst($r->name) }}</option>
                     @endforeach
@@ -158,13 +158,13 @@
                 @error('role') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ $editingUserId ? 'Nouveau mot de passe' : 'Mot de passe *' }}</label>
-                <input wire:model="password" type="password" placeholder="{{ $editingUserId ? 'Laisser vide pour conserver le mot de passe actuel' : 'Minimum 8 caractères' }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('password') ? 'is-invalid' : 'border-outline-variant' }}">
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ $editingUserId ? __('parametres.label_mdp_utilisateur_modif') : __('parametres.label_mdp_utilisateur') }}</label>
+                <input wire:model="password" type="password" placeholder="{{ $editingUserId ? __('parametres.placeholder_mdp_conserver') : __('parametres.placeholder_mdp_min8') }}" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('password') ? 'is-invalid' : 'border-outline-variant' }}">
                 @error('password') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div class="flex justify-end gap-sm pt-md border-t border-outline-variant">
-                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-gestion-utilisateurs' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">Annuler</button>
-                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">Enregistrer</button>
+                <button type="button" x-on:click="$dispatch('close-modal', { name: 'modal-create-gestion-utilisateurs' })" class="px-md py-sm rounded-lg border border-outline-variant text-sm font-semibold text-outline hover:bg-surface-zebra">{{ __('parametres.btn_annuler') }}</button>
+                <button type="submit" class="px-md py-sm rounded-lg bg-brand-emerald text-white text-sm font-bold hover:bg-brand-forest">{{ __('parametres.btn_enregistrer_utilisateur') }}</button>
             </div>
         </form>
     </x-modal>

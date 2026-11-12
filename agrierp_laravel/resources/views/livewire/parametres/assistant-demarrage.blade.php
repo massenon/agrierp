@@ -1,57 +1,52 @@
-<div>
-    @if($afficher)
-        <div x-data x-init="$nextTick(() => $dispatch('open-modal', { name: 'modal-demarrage' }))">
-            <x-modal name="modal-demarrage" max-width="lg">
-                <div class="flex items-center gap-sm mb-sm">
-                    <span class="material-symbols-outlined text-brand-emerald" style="font-size:32px;">checklist</span>
-                    <div>
-                        <h3 class="font-bold text-lg text-brand-forest">Bienvenue dans LogiAgriERP</h3>
-                        <p class="text-xs text-outline">Ce qu'il faut en place avant la première saisie — constaté dans la base, pas à cocher.</p>
-                    </div>
-                </div>
+<div class="mt-md space-y-md">
+    <div class="border-b border-outline-variant pb-md">
+        <h2 class="text-xl lg:text-2xl font-bold text-on-surface flex items-center gap-xs">
+            <span class="material-symbols-outlined text-brand-emerald text-[26px]">checklist</span>{{ __('parametres.titre_assistant') }}
+        </h2>
+        <p class="text-xs text-outline mt-xs">{{ __('parametres.desc_assistant') }}</p>
+    </div>
 
-                <ol class="flex flex-col gap-sm">
-                    @foreach($etapes as $i => $etape)
-                        <li wire:key="etape-{{ $etape['cle'] }}" data-etape="{{ $etape['cle'] }}"
-                            class="border border-outline-variant rounded-lg p-sm flex items-start gap-sm">
-                            @if($etape['fait'])
-                                <span class="material-symbols-outlined text-brand-emerald text-[20px]">check_circle</span>
-                            @else
-                                <span class="material-symbols-outlined text-error-deep text-[20px]">pending</span>
+    <div class="space-y-sm max-w-2xl">
+        @foreach($this->etapes as $etape)
+            <div wire:key="etape-{{ $etape['id'] }}" class="bg-white border border-outline-variant rounded-lg p-md flex items-start gap-sm {{ $etape['fait'] ? 'opacity-80' : '' }}">
+                <span class="material-symbols-outlined text-[22px] {{ $etape['fait'] ? 'text-brand-emerald' : 'text-outline-variant' }} flex-shrink-0 mt-0.5">{{ $etape['fait'] ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                <div class="flex-1">
+                    <p class="font-bold text-sm {{ $etape['fait'] ? 'line-through text-outline' : 'text-brand-forest' }}">{{ $etape['titre'] }}</p>
+                    @if(!$etape['fait'])
+                        <p class="text-xs text-outline mt-xs">{{ $etape['detail'] }}</p>
+                    @endif
+                    @if(!$etape['fait'])
+                        <div class="flex flex-wrap gap-sm mt-sm">
+                            @if($etape['lien'])
+                                <a href="{{ $etape['lien'] }}" wire:navigate class="flex items-center gap-xs text-xs font-bold text-brand-emerald hover:text-brand-forest">
+                                    <span class="material-symbols-outlined text-[16px]">open_in_new</span>{{ __('parametres.btn_regler') }}
+                                </a>
                             @endif
-                            <div class="flex-1">
-                                <p class="text-xs font-bold text-brand-forest">
-                                    {{ $i + 1 }}. {{ $etape['titre'] }}
-                                    @unless($etape['obligatoire'])
-                                        <span class="font-normal text-outline">(recommandé)</span>
-                                    @endunless
-                                </p>
-                                <p class="text-xs text-outline">{{ $etape['detail'] }}</p>
-                            </div>
-                            @if(! $etape['fait'])
-                                @if($etape['cle'] === 'exercice')
-                                    @can('manage-comptabilite')
-                                        <button type="button" wire:click="ouvrirExercice"
-                                            class="text-xs font-bold text-white bg-brand-emerald rounded-full px-sm py-xs whitespace-nowrap">
-                                            Ouvrir l'exercice {{ now()->format('Y') }}
-                                        </button>
-                                    @endcan
-                                @elseif($etape['lien'])
-                                    <a href="{{ $etape['lien'] }}" wire:navigate
-                                        class="text-xs font-bold text-brand-emerald whitespace-nowrap">Régler</a>
-                                @endif
+                            @if($etape['id'] === 'ouvrir_exercice')
+                                <a href="{{ route('comptabilite.exercices') }}" wire:navigate class="flex items-center gap-xs text-xs font-bold text-brand-emerald hover:text-brand-forest">
+                                    <span class="material-symbols-outlined text-[16px]">calendar_today</span>{{ __('parametres.btn_ouvrir_exercice') }} {{ now()->format('Y') }}
+                                </a>
                             @endif
-                        </li>
-                    @endforeach
-                </ol>
-
-                <div class="flex justify-end gap-sm mt-md pt-sm border-t border-outline-variant">
-                    <button type="button" wire:click="reporter"
-                        class="text-xs font-bold text-outline px-md py-sm rounded-full border border-outline-variant">Plus tard</button>
-                    <button type="button" wire:click="terminer"
-                        class="text-xs font-bold text-white bg-brand-forest px-md py-sm rounded-full">Terminer</button>
+                            @if($etape['recommande'])
+                                <span class="text-[9px] text-info-blue border border-info-blue/30 bg-info-blue/10 px-1.5 py-0.5 rounded-full font-bold">{{ __('parametres.label_recommande') }}</span>
+                            @endif
+                            <button type="button" wire:click="marquerFait('{{ $etape['id'] }}')" class="text-[11px] text-outline hover:text-brand-forest underline">{{ __('parametres.btn_plus_tard') }}</button>
+                        </div>
+                    @endif
                 </div>
-            </x-modal>
+            </div>
+        @endforeach
+    </div>
+
+    @if($this->toutFait)
+        <div class="max-w-2xl bg-brand-emerald/10 border border-brand-emerald/30 rounded-lg p-md flex items-center justify-between">
+            <div class="flex items-center gap-sm">
+                <span class="material-symbols-outlined text-brand-emerald text-[24px]">task_alt</span>
+                <p class="font-bold text-brand-forest">{{ __('parametres.desc_assistant') }}</p>
+            </div>
+            <button type="button" wire:click="terminer" class="flex items-center gap-xs bg-brand-emerald hover:bg-brand-forest text-white font-bold text-xs px-md py-sm rounded-full">
+                <span class="material-symbols-outlined text-[16px]">done_all</span>{{ __('parametres.btn_terminer') }}
+            </button>
         </div>
     @endif
 </div>
