@@ -335,7 +335,7 @@
                         <input wire:model="infSujetRef" type="text" placeholder="ex : #A-204" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                     </div>
                     <div>
-                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_motif') }}</label>
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_motif_requis') }}</label>
                         <input wire:model="infMotif" type="text" placeholder="ex : Suspicion Newcastle" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('infMotif') ? 'is-invalid' : 'border-outline-variant' }}">
                         @error('infMotif') <p class="invalid-feedback">{{ $message }}</p> @enderror
                     </div>

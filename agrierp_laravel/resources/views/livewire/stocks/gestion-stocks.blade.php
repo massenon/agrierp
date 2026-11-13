@@ -100,7 +100,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="8" class="px-md py-lg text-center text-outline">{{ __('stocks.msg_aucun_produit') }}</td></tr>
+                                <tr><td colspan="8" class="px-md py-lg text-center text-outline">{{ __('stocks.msg_aucun_produit_catalogue') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>

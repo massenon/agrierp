@@ -1529,6 +1529,490 @@ void main() {
     );
   });
 
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module RH) ───────────────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module RH)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/rh.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/rh.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason:
+                '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP rh.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  rh.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/rh.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Stocks) ────────────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module Stocks)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/stocks.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/stocks.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason: '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP stocks.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  stocks.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/stocks.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Ventes) ────────────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module Ventes)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/ventes.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/ventes.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason: '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP ventes.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  ventes.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/ventes.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Comptabilité) ──────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module Comptabilité)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/comptabilite.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/comptabilite.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason: '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP comptabilite.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  comptabilite.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/comptabilite.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Achats) ────────────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module Achats)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/achats.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/achats.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason: '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP achats.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  achats.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/achats.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Paramètres) ────────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module Paramètres)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/parametres.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/parametres.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason: '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP parametres.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  parametres.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/parametres.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
+  // ── Ticket F3 — Parité clés ARB ↔ lang/fr (module Rapports) ─────────────
+  group('F3 — Parité clés ARB ↔ lang/fr (module Rapports)', () {
+    final arbFichier = File(
+      '${Directory.current.path}/lib/l10n/app_fr.arb',
+    );
+    final phpFichier = File('$dossierLaravel/lang/fr/rapports.php');
+
+    String enCamelCase(String clePhp) {
+      final parties = clePhp.split('_');
+      return parties.first +
+          parties.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+    }
+
+    List<MapEntry<String, String>> _parsePairesPhp(String contenu) {
+      final resultat = <MapEntry<String, String>>[];
+      final motif = RegExp(r"""'([a-z_]+)'\s*=>\s*'((?:[^'\\]|\\.)*)'\s*,""");
+      for (final m in motif.allMatches(contenu)) {
+        resultat.add(MapEntry(m.group(1)!, m.group(2)!.replaceAll(r"\'", "'")));
+      }
+      return resultat;
+    }
+
+    test(
+      '⚠️ app_fr.arb et lang/fr/rapports.php existent',
+      () {
+        expect(arbFichier.existsSync(), isTrue,
+            reason: 'lib/l10n/app_fr.arb absent — F2 n\'a pas encore poussé ?');
+        expect(phpFichier.existsSync(), isTrue,
+            reason: '${phpFichier.path} absent — dossier Laravel introuvable');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque (voir test ci-dessus)'
+          : null,
+    );
+
+    test(
+      '⚠️ chaque clé PHP rapports.xxx a sa clé ARB et sa valeur concorde',
+      () {
+        if (!arbFichier.existsSync()) markTestSkipped('SAUT : app_fr.arb absent');
+        if (!phpFichier.existsSync()) markTestSkipped('SAUT : ${phpFichier.path} absent');
+        final arbJson = jsonDecode(arbFichier.readAsStringSync()) as Map<String, dynamic>;
+        final pairesPhp = _parsePairesPhp(phpFichier.readAsStringSync());
+        expect(pairesPhp, isNotEmpty,
+            reason: 'Aucune paire dans ${phpFichier.path} — regex cassé ?');
+        final cleManquante = <String>[];
+        final valeurDivergente = <String>[];
+        for (final paire in pairesPhp) {
+          final cleArb = enCamelCase(paire.key);
+          if (!arbJson.containsKey(cleArb)) {
+            cleManquante.add('  rapports.${paire.key} → $cleArb  (« ${paire.value} »)');
+          } else if (arbJson[cleArb] != paire.value) {
+            valeurDivergente.add(
+              '  $cleArb :\n    PHP : « ${paire.value} »\n    ARB : « ${arbJson[cleArb]} »',
+            );
+          }
+        }
+        expect(cleManquante, isEmpty,
+            reason: '${cleManquante.length} clé(s) manquante(s) :\n${cleManquante.join('\n')}');
+        expect(valeurDivergente, isEmpty,
+            reason: '${valeurDivergente.length} valeur(s) divergente(s) :\n${valeurDivergente.join('\n')}');
+        // ignore: avoid_print
+        print('F3 — ${pairesPhp.length} paires vérifiées (lang/fr/rapports.php ↔ app_fr.arb).');
+      },
+      skip: (!arbFichier.existsSync() || !phpFichier.existsSync())
+          ? 'SAUT : un fichier source manque'
+          : null,
+    );
+  });
+
   // ── Ticket E4 — Libellés des CarteKpi concordants web ↔ poste ───────────
   //
   // Les libellés ci-dessous sont lus dans le Blade (le maître, doctrine art. 5)

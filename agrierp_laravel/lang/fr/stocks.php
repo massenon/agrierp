@@ -42,7 +42,7 @@ return [
     'badge_critique'                  => 'Critique',
     'badge_normal'                    => 'Normal',
 
-    'msg_aucun_produit'               => 'Aucun produit pour le moment.',
+    'msg_aucun_produit_catalogue'     => 'Aucun produit pour le moment.',
 
     'modal_titre_ajouter_stock'       => 'Ajouter Stock',
     'label_date_nouveau_stock'        => 'Date du Nouveau Stock *',

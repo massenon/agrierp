@@ -229,7 +229,7 @@
                 @error('quantity') <p class="invalid-feedback">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_statut') }}</label>
+                <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_statut_bande') }}</label>
                 <select wire:model="status" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-white">
                     <option value="actif">Actif</option>
                     <option value="cloture">Clôturé</option>

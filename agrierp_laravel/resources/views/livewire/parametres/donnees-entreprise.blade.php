@@ -39,7 +39,7 @@
             <div class="bg-white border border-outline-variant rounded-lg p-md space-y-md">
                 <p class="text-xs font-bold text-brand-forest uppercase">{{ __('parametres.section_infos_legales') }}</p>
                 <div>
-                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_ifu') }}</label>
+                    <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('parametres.label_ifu_entreprise') }}</label>
                     <input wire:model="ifu" type="text" inputmode="numeric" placeholder="ex : 3202601234567" class="w-full h-11 px-md border rounded-lg text-sm {{ $errors->has('ifu') ? 'is-invalid' : 'border-outline-variant' }}">
                     @error('ifu') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>

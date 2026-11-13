@@ -33,7 +33,7 @@ return [
     'label_adresse_siege'               => 'Adresse du Siège d\'Exploitation',
     'label_telephone_principal'         => 'Téléphone Principal',
     'label_email_contact'               => 'Email de Contact',
-    'label_ifu'                         => 'Identifiant Fiscal Unique (IFU) *',
+    'label_ifu_entreprise'              => 'Identifiant Fiscal Unique (IFU) *',
     'label_rccm'                        => 'Registre du Commerce (RCCM)',
     'label_cnss_salariale'              => 'CNSS salariale (%)',
     'label_vps'                         => 'VPS — Versement Patronal sur Salaires (%)',

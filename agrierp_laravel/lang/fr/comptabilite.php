@@ -7,7 +7,7 @@ return [
     'sous_titre_page'               => 'Pilotage financier SYSCOHADA — plan comptable, journal, bilan, clôture et analytique.',
     'kpi_total_actif'               => 'Total Actif (Bilan)',
     'kpi_recettes_mois'             => 'Recettes du Mois',
-    'kpi_marge_nette'               => 'Marge Nette (Analytique)',
+    'kpi_marge_nette_analytique'    => 'Marge Nette (Analytique)',
     'kpi_tresorerie'                => 'Trésorerie Disponible',
 
     // Cartes de navigation hub

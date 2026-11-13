@@ -9,7 +9,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-md mb-lg">
         <x-kpi-card :label="__('comptabilite.kpi_total_actif')" icon="account_balance_wallet" color="emerald" :value="number_format($this->kpis['total_actif'], 0, ',', ' ').' FCFA'" />
         <x-kpi-card :label="__('comptabilite.kpi_recettes_mois')" icon="payments" color="blue" :value="number_format($this->kpis['recettes_mois'], 0, ',', ' ').' FCFA'" />
-        <x-kpi-card :label="__('comptabilite.kpi_marge_nette')" icon="percent" color="maize" :value="$this->kpis['marge_nette'] !== null ? $this->kpis['marge_nette'].' %' : '—'" />
+        <x-kpi-card :label="__('comptabilite.kpi_marge_nette_analytique')" icon="percent" color="maize" :value="$this->kpis['marge_nette'] !== null ? $this->kpis['marge_nette'].' %' : '—'" />
         <x-kpi-card :label="__('comptabilite.kpi_tresorerie')" icon="account_balance" color="red" :value="number_format($this->kpis['tresorerie'], 0, ',', ' ').' FCFA'" />
     </div>
 

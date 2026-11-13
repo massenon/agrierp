@@ -64,7 +64,7 @@
                         <input wire:model="transformationDate" type="date" class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm">
                     </div>
                     <div>
-                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_operateur') }}</label>
+                        <label class="block text-[10px] text-brand-forest font-bold uppercase mb-xs">{{ __('elevage.label_operateur_saisie') }}</label>
                         <div class="w-full h-11 px-md border border-outline-variant rounded-lg text-sm bg-surface-zebra flex items-center text-outline">{{ auth()->user()->name }}</div>
                     </div>
                 </div>

@@ -22522,3 +22522,16 @@ Décision client du 21/10/2026 : construire la conversion. Une facture EST une v
 **Contrat modifié.** `livestock_daily_entries` : trois colonnes nullables `vente_repro` / `vente_sevre` / `vente_jeune` (migration `2026_11_05_000001`) ; `products.categorie_effectif` (`reproducteur` | `jeune` | `poussin`, nullable, migration `2026_11_05_000002` qui pose la valeur par défaut d'après le nom) ; trois lignes « Reproducteur » (130), « Jeune » (80), « Poussin » (30 g/j, ❓ PROVISOIRES) au barème de l'aviculture (migration `2026_11_05_000003`, `FeedRationStandardsSeeder`). `POST /api/sync/push` : une fiche d'une bande de volailles reproductrices (aviculture hors `ponte`) SANS départ est refusée, un jour antérieur au départ aussi, les ventes se ventilent comme les morts et les dons ; une vente d'un produit sans catégorie, ou sur une bande sans départ, est refusée (`rejected[].reason` en français, `MotifsRefusPush`).
 **Web.** `EffectifParCategorieService::VOLAILLES`, `CategorieVolaille`, `FicheReproducteurs` (départ obligatoire, passage Poussin → Jeune, ventes par catégorie, rationnement par catégorie, autonomie alimentaire), `RecordSaleOnFicheElevageAction::refusDesLignes`, formulaire produit. **Poste.** Drift v82, `categorie_volaille.dart`, `FicheReproducteursScreen`, caisse, formulaire produit.
 **Tests.** `VolaillesEffectifParCategorieTest` (32), `VolaillesSynchronisationTest` (18) ; poste : `volailles_effectif_test` (parité PHP exécutée). Fixtures génériques adaptées (bandes « ponte »).
+
+### Ticket F3 étendu — Garde-fou ARB ↔ lang/fr sur tous les modules Sprint F (13/11/2026)
+
+**Périmètre.** F3 couvrait uniquement `lang/fr/elevage.php` (375 paires, groupe depuis 12/11/2026). Ce ticket étend le garde-fou aux 7 modules ajoutés en F1 : RH, Stocks, Ventes, Comptabilité, Achats, Paramètres, Rapports.
+
+**Livré.**
+- `agrierp_flutter/test/fidelite_libelles_test.dart` : 7 nouveaux groupes `'F3 — Parité clés ARB ↔ lang/fr (module X)'`, un par module, même mécanisme que le groupe Élevage (lecture JSON de l'ARB, lecture + parsing regex des paires PHP, comparaison camelCase).
+- **2 109 paires** vérifiées au total sur 8 modules (Élevage 375 + RH 173 + Stocks 174 + Ventes 299 + Comptabilité 409 + Achats 275 + Paramètres 333 + Rapports 71), 0 manquante, 0 divergente.
+- **7 conflits de clés inter-modules résolus** : clés PHP dupliquées avec des valeurs différentes renommées dans les fichiers `lang/fr/` et les Blades correspondants, ARB régénéré à **2 563 clés** via `generer_arb.py` : `elevage.bouton_enregistrer_modif` → casse corrigée (`Enregistrer les modifications`) ; `elevage.label_statut` → `label_statut_bande` ; `elevage.label_operateur` → `label_operateur_saisie` ; `elevage.label_motif` → `label_motif_requis` ; `comptabilite.kpi_marge_nette` → `kpi_marge_nette_analytique` ; `parametres.label_ifu` → `label_ifu_entreprise` ; `stocks.msg_aucun_produit` → `msg_aucun_produit_catalogue`.
+
+**Tests.** 16 tests F3 verts (`flutter test --plain-name "F3"`). Aucune erreur nouvelle dans `flutter analyze`.
+
+**NON vérifié.** Compilation Windows réelle ; les écrans du poste qui affichaient les libellés renommés (n'utilisent l'ARB que via la génération de code — impact à confirmer au prochain `flutter pub get` + `dart run build_runner build` sur la machine cible).
